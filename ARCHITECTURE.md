@@ -20,3 +20,8 @@ Monolithe modulaire : FastAPI/Pydantic/SQLAlchemy 2/Alembic, SQLite (WAL, foreig
 ## Déploiement
 
 Deux conteneurs, bind-mount `data`, écoute loopback par défaut. Une instance = une activité et sa base ; aucune authentification n'est fournie, donc l'exposition Internet directe est interdite. Un reverse proxy privé avec TLS/authentification externe est requis si accès distant.
+
+
+## Phase 2
+
+Le module app.services.ledger orchestre la transaction de validation et les projections. app.api.ledger expose les opérations locales ; app.models.ledger porte la persistance. Le frontend features/LedgerPage.tsx fournit saisie et consultation. Les calculs monétaires du navigateur utilisent BigInt, les montants API sont des chaînes. Les migrations restent autonomes et figées.

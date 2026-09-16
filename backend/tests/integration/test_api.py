@@ -58,7 +58,8 @@ def test_host_and_cors_boundaries(settings: Settings) -> None:
         allowed = client.get("/api/health", headers={"Origin": "http://localhost:5173"})
         assert allowed.headers["access-control-allow-origin"] == "http://localhost:5173"
         assert "access-control-allow-credentials" not in allowed.headers
-        assert client.post("/api/status").status_code == 405
+        assert client.post("/api/status").status_code == 403
+        assert client.post("/api/status", headers={"X-SoloLMNP-Request": "1"}).status_code == 405
 
 
 def test_production_disables_interactive_api_docs(settings: Settings) -> None:

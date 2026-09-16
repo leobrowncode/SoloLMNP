@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { fetchStatus, type ApplicationStatus } from "./api/status";
+import LedgerPage from "./features/LedgerPage";
 
 type LoadState = { kind: "loading" } | { kind: "error" } | { kind: "loaded"; data: ApplicationStatus };
 
 const stages = [
-  ["01", "Fondations", "Configuration, stockage exact, migrations et contrôles techniques.", "En cours de validation"],
-  ["02", "Comptabilité", "Écritures en partie double, journal, grand livre et balance.", "Prochaine étape"],
+  ["01", "Fondations", "Configuration, stockage exact, migrations et contrôles techniques.", "Disponible"],
+  ["02", "Comptabilité", "Écritures en partie double, journal, grand livre et balance.", "Disponible"],
   ["03–05", "Gestion & états", "Opérations, immobilisations, amortissements et états comptables.", "À développer"],
   ["06–10", "Fiscalité & déclaration", "Règles sourcées, reports, clôture, FEC et préparation de la saisie EFI.", "À développer"],
   ["11–12", "Conservation & fiabilité", "Justificatifs, sauvegarde, restauration et parcours complets.", "À développer"],
@@ -41,6 +42,7 @@ export default function App() {
         <p className="sidebar-label">VOTRE ESPACE LOCAL</p>
         <nav aria-label="Navigation principale">
           <a href="#main" className="nav-active"><span aria-hidden="true">◫</span> Vue d’ensemble</a>
+          <a href="#comptabilite">Comptabilité</a>
           <a href="#installation"><span aria-hidden="true">◎</span> État de l’installation</a>
           <a href="#roadmap"><span aria-hidden="true">↗</span> Étapes du projet</a>
         </nav>
@@ -55,15 +57,16 @@ export default function App() {
       <main id="main" tabIndex={-1}>
         <header className="topbar">
           <span>ESPACE DE GESTION</span>
-          <span className="phase-badge">Phase 1 · Fondations</span>
+          <span className="phase-badge">Phase 2 · Comptabilité</span>
         </header>
         <div className="content">
           <section className="intro" aria-labelledby="welcome-title">
             <p className="eyebrow">UNE COMPTABILITÉ QUE VOUS POURREZ EXPLIQUER</p>
-            <h1 id="welcome-title">Les bonnes bases,<br /><span>avant les premiers chiffres.</span></h1>
-            <p className="intro-description">Votre espace LMNP se construit autour d’une comptabilité traçable. Cette première étape vérifie que l’application et son stockage sont prêts pour la suite.</p>
+            <h1 id="welcome-title">Des écritures traçables,<br /><span>des comptes vérifiables.</span></h1>
+            <p className="intro-description">Enregistrez vos écritures, contrôlez leur équilibre et consultez votre comptabilité. Les calculs fiscaux seront ajoutés dans les prochaines phases.</p>
           </section>
 
+          {ready && status?.phase === "ledger" && <LedgerPage />}
           <section id="installation" className="installation" aria-labelledby="installation-title">
             <div className="section-heading">
               <div><p className="eyebrow">DIAGNOSTIC EN DIRECT</p><h2 id="installation-title">État de l’installation</h2></div>
@@ -113,7 +116,7 @@ export default function App() {
           <section className="scope-note" aria-label="Périmètre disponible">
             <span className="scope-icon" aria-hidden="true">i</span>
             <div><h2>Ce que permet cette version</h2>
-            <p>Vérifier les fondations techniques. La saisie des opérations, les calculs comptables, le FEC et la liasse fiscale seront ajoutés dans les prochaines phases. Aucun montant déclarable n’est produit aujourd’hui.</p></div>
+            <p>Saisir des écritures comptables et consulter le journal, le grand livre et la balance. Les opérations métier, le bilan, le FEC et la liasse fiscale seront ajoutés dans les prochaines phases. Aucun montant déclarable n’est produit aujourd’hui.</p></div>
           </section>
 
           <section id="roadmap" className="roadmap" aria-labelledby="roadmap-title">
