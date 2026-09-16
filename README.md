@@ -2,7 +2,7 @@
 
 Application libre, mono-utilisateur et auto-hébergeable pour une activité LMNP au réel simplifié BIC.
 
-**Version 0.3.0 — ledger persistant.** Saisie de brouillons, validation définitive, extourne, journal, grand livre, balance et historique sont disponibles. Les recettes/dépenses métier, les calculs fiscaux, le FEC et les déclarations restent à développer. Cette version ne produit aucun montant déclarable.
+**Version 0.4.0 — opérations et banque.** Le ledger, les recettes, dépenses, règlements, imports CSV, rapprochements et emprunts ventilés sont disponibles. Les immobilisations, états annuels, calculs fiscaux, FEC et déclarations restent à développer. Cette version ne produit aucun montant déclarable.
 
 ## Démarrer
 
@@ -14,13 +14,13 @@ cd SoloLMNP
 docker compose up --build --wait
 ```
 
-Pendant la revue, le ledger est sur la branche `feat/accounting-ledger`, qui dépend de la PR de fondations #14. Faire `git switch feat/accounting-ledger` avant de construire cette version.
+Pendant la revue, les opérations sont sur la branche `feat/transactions`, qui dépend de la branche du ledger. Faire `git switch feat/transactions` avant de construire cette version.
 
 Ouvrir [l'application locale](http://127.0.0.1:5173). La base et les futurs documents restent dans `data/`. Le fichier `.env` est facultatif ; l'exemple permet de régler port et emplacement des données. Sur Linux, faire correspondre les UID/GID du backend au propriétaire de `data/` (voir le guide).
 
 Le backend applique les migrations avant de démarrer. L'interface affiche l'état réel du service et du schéma SQLite. Une base absente, illisible ou non migrée ne sera pas déclarée prête.
 
-**Vérification P2 :** 120 tests backend, 10 tests frontend, Ruff, mypy, ESLint, TypeScript et build réussis sous Windows. Voir [le rapport de phase 2](docs/PHASE2_REPORT.md).
+**Vérification P3 :** 146 tests backend, 14 tests frontend, Ruff, mypy, ESLint, TypeScript et build réussis sous Windows. Voir [le rapport de phase 3](docs/PHASE3_REPORT.md).
 
 **Historique P1 :** tests natifs sous Windows et [CI complète réussie](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132) : backend Linux/Windows, frontend et test Docker de construction, démarrage et persistance.
 

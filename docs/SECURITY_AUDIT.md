@@ -32,3 +32,7 @@
 ## Contrôles P2
 
 Les mutations exigent X-SoloLMNP-Request: 1 ; Origin doit correspondre à l’hôte demandé ou à une origine explicitement autorisée et Sec-Fetch-Site ne doit pas être cross-site. Les modèles refusent les champs inconnus et les montants JSON numériques. Les requêtes SQL sont paramétrées. BEGIN IMMEDIATE sérialise les écritures et les triggers interdisent les mutations des écritures validées. Ces contrôles ne remplacent pas la protection réseau et du fichier SQLite.
+
+## Contrôles P3
+
+Le CSV bancaire est limité à 1 Mo et 5 000 lignes, parsé sans exécution et sans utiliser de chemin fourni par l'utilisateur. L'en-tête, les dates, montants et références sont strictement contrôlés. Les empreintes détectent les réimports et conflits. Les identifiants idempotents empêchent la double comptabilisation après un retry. Les rapprochements et opérations sont aussi validés par des triggers SQLite. Les libellés importés restent des données non fiables rendues comme texte par React.

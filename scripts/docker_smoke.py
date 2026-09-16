@@ -75,23 +75,64 @@ def main() -> None:
             http_check()
             # Exercise a browser-like write through nginx on disposable data.
             base = f"http://127.0.0.1:{port}"
-            request = urllib.request.Request(
-                base + "/api/ledger/activity",
-                data=json.dumps({
-                    "activity_name": "Docker fictitious",
-                    "activity_start_date": "2025-01-01",
-                }).encode(),
-                headers={
+            headers = {
                     "Content-Type": "application/json",
                     "X-SoloLMNP-Request": "1",
                     "Origin": base,
                     "Sec-Fetch-Site": "same-origin",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(request, timeout=10) as response:
-                assert response.status == 201
-                assert json.load(response)["activity"]["activity_name"] == "Docker fictitious"
+            }
+
+            def post(path: str, body: dict[str, object]) -> dict[str, object]:
+                request = urllib.request.Request(
+                    base + path,
+                    data=json.dumps(body).encode(),
+                    headers=headers,
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    assert response.status in {200, 201}
+                    return json.load(response)
+
+            activity = post("/api/ledger/activity", {
+                "activity_name": "Docker fictitious",
+                "activity_start_date": "2025-01-01",
+            })
+            assert activity["activity"]["activity_name"] == "Docker fictitious"
+            post("/api/ledger/years", {
+                "year": 2025,
+                "start_date": "2025-01-01",
+                "end_date": "2025-12-31",
+                "fiscal_vintage": "2025",
+            })
+            post("/api/operations/properties", {
+                "name": "Docker fictitious property",
+                "address": "Fictitious address",
+                "acquisition_date": "2025-01-01",
+                "acquisition_price": "100000.00",
+                "land_value": "20000.00",
+                "building_value": "80000.00",
+            })
+            post("/api/operations/banks", {
+                "name": "Docker fictitious bank",
+                "account_number": "512000",
+            })
+            operation = post("/api/operations", {
+                "request_id": "docker-operation-001",
+                "kind": "EXPENSE",
+                "property_id": 1,
+                "fiscal_year_id": 1,
+                "date": "2025-02-01",
+                "piece_date": "2025-02-01",
+                "piece_reference": "DOCKER-001",
+                "amount": "100.00",
+                "description": "Fictitious insurance",
+                "counterparty": "Fictitious supplier",
+                "accounting_account": "616000",
+                "bank_account_id": 1,
+                "deductible_percentage": "80.00",
+                "fiscal_treatment": "PARTIAL",
+            })
+            assert operation["accounting_entry_id"] == 1
             for service in ("backend", "frontend"):
                 assert (
                     run("exec", "-T", service, "id", "-u", capture=True).stdout.strip()
@@ -125,11 +166,14 @@ def main() -> None:
                 "import sqlite3; from pathlib import Path; "
                 "db=sqlite3.connect('/app/data/sololmnp.sqlite3'); "
                 "assert db.execute('select value from ci_persistence_probe').fetchone()[0] "
-                "== 'fictitious'; db.close(); "
+                "== 'fictitious'; "
+                "assert db.execute('select count(*) from business_operation').fetchone()[0] == 1; "
+                "assert db.execute('select count(*) from accounting_entry').fetchone()[0] == 1; "
+                "db.close(); "
                 "assert Path('/app/data/ci-document.txt').read_text(encoding='utf-8') == 'fictitious'",
             )
             print(
-                "Docker smoke passed: HTTP, readiness, non-root, migrations and persisted data."
+                "Docker smoke passed: HTTP, accounting operation, non-root, migrations and persisted data."
             )
         except BaseException:
             run("logs", "--no-color", check=False)

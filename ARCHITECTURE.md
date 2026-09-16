@@ -25,3 +25,7 @@ Deux conteneurs, bind-mount `data`, écoute loopback par défaut. Une instance =
 ## Phase 2
 
 Le module app.services.ledger orchestre la transaction de validation et les projections. app.api.ledger expose les opérations locales ; app.models.ledger porte la persistance. Le frontend features/LedgerPage.tsx fournit saisie et consultation. Les calculs monétaires du navigateur utilisent BigInt, les montants API sont des chaînes. Les migrations restent autonomes et figées.
+
+## Phase 3
+
+`app.services.operations` construit les écritures de recettes, dépenses, règlements et emprunts en réutilisant le service du ledger. Les modèles métier conservent le lien vers l'écriture validée, l'identité de retry et les métadonnées fiscales sans recalculer la comptabilité. L'import bancaire alimente un sous-ledger non comptable ; `bank_match` relie ensuite un mouvement à une ligne 512 unique. L'interface de `OperationsPage` impose une revue avant chaque mutation comptable. Voir [PHASE3_REPORT.md](docs/PHASE3_REPORT.md).
