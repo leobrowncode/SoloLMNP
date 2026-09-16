@@ -1,12 +1,10 @@
 """Local single-user ledger API; every write is a serialized transaction."""
 
-from collections.abc import Iterator
 from datetime import date
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.api.ledger_schemas import (
@@ -20,6 +18,7 @@ from app.api.ledger_schemas import (
     VersionInput,
     YearInput,
 )
+from app.api.sessions import dependencies
 from app.core.database import Database
 from app.domain.accounting.chart import INITIAL_ACCOUNTS, INITIAL_JOURNALS
 from app.models import (
@@ -49,31 +48,7 @@ from app.services.ledger import (
 def build_ledger_router(database: Database) -> APIRouter:
     router = APIRouter(prefix="/api/ledger", tags=["ledger"])
 
-    def read_session() -> Iterator[Session]:
-        try:
-            with database.sessions() as session:
-                yield session
-        except OperationalError:
-            fail("DATABASE_UNAVAILABLE", "Base indisponible : vérifier les migrations.", 503)
-
-    def write_session() -> Iterator[Session]:
-        try:
-            # Acquire the writer lock BEFORE reads, including sequence/version checks.
-            with database.engine.connect().execution_options(sqlite_write=True) as connection:
-                with (
-                    connection.begin(),
-                    Session(bind=connection, expire_on_commit=False) as session,
-                ):
-                    yield session
-                    session.flush()
-        except IntegrityError:
-            fail("INTEGRITY_CONFLICT", "Opération refusée par les contraintes d’intégrité.", 409)
-        except OperationalError:
-            fail(
-                "DATABASE_BUSY",
-                "Base occupée ou indisponible. Réessayez sans recréer l’opération.",
-                503,
-            )
+    read_session, write_session = dependencies(database)
 
     Read = Annotated[Session, Depends(read_session)]
     Write = Annotated[Session, Depends(write_session, scope="function")]
@@ -223,7 +198,10 @@ def build_ledger_router(database: Database) -> APIRouter:
         date_from: date | None = None,
         date_to: date | None = None,
         piece: str | None = None,
-        source: Literal["MANUAL", "REVERSAL"] | None = None,
+        source: Literal[
+            "MANUAL", "REVERSAL", "REVENUE", "EXPENSE", "SETTLEMENT", "LOAN_PAYMENT", "LOAN_FUNDING"
+        ]
+        | None = None,
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> dict[str, Any]:

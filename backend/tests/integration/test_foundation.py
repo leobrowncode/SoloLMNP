@@ -57,6 +57,11 @@ def test_migration_idempotent_and_metadata_matches(database: Database, settings:
             "accounting_entry",
             "accounting_entry_line",
             "ledger_event",
+            "business_operation",
+            "bank_account",
+            "bank_transaction",
+            "bank_match",
+            "loan",
         }
         for pragma, expected in (("foreign_keys", 1), ("journal_mode", "wal"), ("synchronous", 2)):
             assert connection.exec_driver_sql(f"PRAGMA {pragma}").scalar() == expected
@@ -164,3 +169,31 @@ def test_migration_downgrade_and_reupgrade(settings: Settings) -> None:
         database.engine.dispose()
     command.upgrade(config, "head")
     command.check(config)
+
+
+def test_operations_migration_preserves_existing_foundation_data(settings: Settings) -> None:
+    config = migration_config(settings)
+    command.upgrade(config, "0002_ledger")
+    database = Database(settings)
+    try:
+        with database.sessions.begin() as session:
+            session.add(activity())
+            session.flush()
+            session.add_all([property_record(), fiscal_year()])
+    finally:
+        database.engine.dispose()
+
+    command.upgrade(config, "head")
+    database = Database(settings)
+    try:
+        with database.engine.connect() as connection:
+            assert connection.scalar(text("SELECT activity_name FROM rental_activity")) == (
+                "Activité fictive"
+            )
+            assert connection.scalar(text("SELECT COUNT(*) FROM property")) == 1
+            assert connection.scalar(text("SELECT COUNT(*) FROM fiscal_year")) == 1
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
+                SCHEMA_REVISION
+            )
+    finally:
+        database.engine.dispose()

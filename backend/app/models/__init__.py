@@ -7,8 +7,14 @@ from app.models.ledger import (
     AccountingJournal,
     LedgerEvent,
 )
+from app.models.operations import BankAccount, BankMatch, BankTransaction, BusinessOperation, Loan
 
 __all__ = [
+    "BankAccount",
+    "BankMatch",
+    "BankTransaction",
+    "BusinessOperation",
+    "Loan",
     "Base",
     "FiscalYear",
     "Property",

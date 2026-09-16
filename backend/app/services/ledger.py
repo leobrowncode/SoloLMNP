@@ -215,8 +215,18 @@ def post_entry(session: Session, entry: AccountingEntry, version: int) -> Accoun
 
 
 def reverse_entry(
-    session: Session, original: AccountingEntry, data: ReversalInput
+    session: Session, original: AccountingEntry, data: ReversalInput, *, business: bool = False
 ) -> AccountingEntry:
+    from app.models.operations import BankMatch
+
+    if original.source_type not in {"MANUAL", "REVERSAL"} and not business:
+        fail("BUSINESS_REVERSAL_REQUIRED", "Extournez cette écriture depuis son opération métier.")
+    if session.scalar(
+        select(BankMatch)
+        .join(AccountingEntryLine)
+        .where(AccountingEntryLine.accounting_entry_id == original.id)
+    ):
+        fail("BANK_MATCH_EXISTS", "Annulez d’abord le rapprochement bancaire avec un motif.")
     if original.status != "VALIDATED":
         fail("NOT_VALIDATED", "Seule une écriture validée peut être extournée.")
     if original.reversal_of_id is not None:
