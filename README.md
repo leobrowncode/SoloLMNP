@@ -2,7 +2,7 @@
 
 Application libre, mono-utilisateur et auto-hébergeable pour une activité LMNP au réel simplifié BIC.
 
-**Version 0.3.0 — ledger persistant.** Saisie de brouillons, validation définitive, extourne, journal, grand livre, balance et historique sont disponibles. Les recettes/dépenses métier, les calculs fiscaux, le FEC et les déclarations restent à développer. Cette version ne produit aucun montant déclarable.
+**Version 0.5.0 — immobilisations et amortissements comptables.** Le ledger, les opérations, la banque, les emprunts, le registre des actifs, les composants et les dotations comptables sont disponibles. Les états annuels, calculs fiscaux, FEC et déclarations restent à développer. Cette version ne produit aucun montant déclarable.
 
 ## Démarrer
 
@@ -14,13 +14,15 @@ cd SoloLMNP
 docker compose up --build --wait
 ```
 
-Pendant la revue, le ledger est sur la branche `feat/accounting-ledger`, qui dépend de la PR de fondations #14. Faire `git switch feat/accounting-ledger` avant de construire cette version.
+Pendant la revue, les immobilisations sont sur la branche `feat/assets-depreciation`, empilée sur les phases précédentes. Faire `git switch feat/assets-depreciation` avant de construire cette version.
 
 Ouvrir [l'application locale](http://127.0.0.1:5173). La base et les futurs documents restent dans `data/`. Le fichier `.env` est facultatif ; l'exemple permet de régler port et emplacement des données. Sur Linux, faire correspondre les UID/GID du backend au propriétaire de `data/` (voir le guide).
 
 Le backend applique les migrations avant de démarrer. L'interface affiche l'état réel du service et du schéma SQLite. Une base absente, illisible ou non migrée ne sera pas déclarée prête.
 
-**Vérification P2 :** 120 tests backend, 10 tests frontend, Ruff, mypy, ESLint, TypeScript et build réussis sous Windows. Voir [le rapport de phase 2](docs/PHASE2_REPORT.md).
+**Vérification P4 :** 156 tests backend, 15 tests frontend, couverture backend 93 %,
+Ruff, mypy, ESLint, TypeScript, build et migration contrôlés. Voir
+[le rapport de phase 4](docs/PHASE4_REPORT.md).
 
 **Historique P1 :** tests natifs sous Windows et [CI complète réussie](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132) : backend Linux/Windows, frontend et test Docker de construction, démarrage et persistance.
 
@@ -60,7 +62,8 @@ Les montants Python utilisent `Decimal`, avec stockage en centimes entiers SQLit
 - Disponible : migration `0001_foundation`, activité unique, plusieurs biens, exercices, contraintes et tests d'intégrité.
 - Disponible : contrats d'écritures immuables avec validation d'équilibre ; aucun enregistrement comptable persistant.
 - Disponible : API de santé/disponibilité, interface responsive, restrictions réseau et configuration.
-- À venir : onboarding et API de saisie, ledger, opérations, actifs, états, fiscalité, clôture, FEC, liasse, documents et sauvegarde.
+- Disponible : ledger, opérations, banque CSV, emprunts, immobilisations, composants, plans et dotations comptables.
+- À venir : états, fiscalité, clôture, FEC, liasse, documents et sauvegarde.
 - Recherche : les scénarios A–J restent un catalogue ; les deux tests dits golden ne valident aucun résultat fiscal chiffré.
 
 Voir [le rapport de phase 1](docs/PHASE1_REPORT.md), [l'architecture](ARCHITECTURE.md), [la roadmap](ROADMAP.md), [le modèle de données](docs/DATA_MODEL.md), [la sécurité](SECURITY.md) et [le workflow EFI](docs/FILING.md).

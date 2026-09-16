@@ -9,7 +9,7 @@ from sqlalchemy.pool import ConnectionPoolEntry
 
 from app.core.config import Settings
 
-SCHEMA_REVISION = "0002_ledger"
+SCHEMA_REVISION = "0004_assets"
 
 
 def create_database_engine(settings: Settings) -> Engine:

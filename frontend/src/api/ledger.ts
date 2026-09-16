@@ -3,19 +3,21 @@ export interface Setup { activity: { activity_name: string } | null; years: Year
 export interface Account { number: string; label: string; account_type: string; active: boolean }
 export interface Journal { code: string; label: string; active: boolean }
 export interface Line { account_number: string; label: string; debit: string; credit: string }
+export interface EntryLine extends Line { id: number; position: number; account_label: string | null }
 export interface EntryInput {
   fiscal_year_id: number; journal_code: string; accounting_date: string;
   piece_reference: string; piece_date: string; label: string; lines: Line[];
 }
-export interface Entry extends EntryInput {
+export interface Entry extends Omit<EntryInput, "lines"> {
+  lines: EntryLine[];
   id: number; version: number; status: string; entry_number: string | null;
   total_debit: string; total_credit: string; balanced: boolean; reversal_of_id: number | null;
 }
 export interface BalanceRow { account_number: string; label: string; total_debit: string; total_credit: string; debit_balance: string; credit_balance: string }
 export interface Balance { balance: BalanceRow[]; total_debit: string; total_credit: string; balanced: boolean }
 export interface LedgerLine { entry_id: number; entry_number: string; date: string; label: string; debit: string; credit: string; balance: string }
-export async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
-  const response = await fetch("/api/ledger" + path, {
+export async function request<T>(path: string, method = "GET", body?: unknown, prefix = "/api/ledger"): Promise<T> {
+  const response = await fetch(prefix + path, {
     method, cache: "no-store",
     headers: { "Content-Type": "application/json", "X-SoloLMNP-Request": "1" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

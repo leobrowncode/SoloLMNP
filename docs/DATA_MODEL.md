@@ -37,7 +37,10 @@ Toutes les tables ont clés entières/UUID, dates ISO, timestamps UTC, contraint
 - `account`, `accounting_journal`, `accounting_entry`, `accounting_entry_line`; unicité `(fiscal_year_id,journal_code,entry_number)`.
 - `revenue`, `expense` référencent bien, exercice et écriture ; montant comptable brut distinct de pourcentage/traitement fiscal.
 - `bank_account`, `bank_import`, `bank_transaction` (empreinte de dédoublonnage), `reconciliation`.
-- `loan`, `loan_payment` sépare principal, intérêts, assurance, frais et référence l'écriture.
+- `loan` conserve les termes contractuels (capital, taux, durée, mensualité et assurance
+  mensuelles). Les échéances dans `business_operation` séparent principal, intérêts,
+  assurance et frais et référencent chacune une écriture. Le capital restant est dérivé
+  du compte 164, il n'est pas un second total modifiable.
 - `asset`, `asset_component`, `depreciation_schedule`, `depreciation_period`; contraintes base, cumul et terrain.
 - `tax_computation`, `fiscal_adjustment`, `depreciation_carry_forward`, `tax_loss_carry_forward` : lots et usages séparés, immuables après clôture.
 - `tax_form`, `tax_form_field`, `tax_mapping`, `tax_form_field_result`, `tax_return_package`, `tax_return_snapshot`.
@@ -64,3 +67,16 @@ Chaque résultat de case stocke valeur, expression évaluée, comptes, écriture
 ## Schéma P2
 
 La migration 0002_ledger ajoute account, accounting_journal, accounting_entry, accounting_entry_line et ledger_event. AccountingEntry porte DRAFT/VALIDATED, une version optimiste, sequence, entry_number et reversal_of_id. Les libellés sont figés lors de la validation. Les lignes contiennent des centimes INTEGER. LedgerEvent est append-only et survit à la suppression d’un brouillon. Voir [le rapport](PHASE2_REPORT.md).
+
+## Schéma P3
+
+La migration `0003_operations` ajoute comptes bancaires, mouvements importés, rapprochements, emprunts et opérations métier. `BusinessOperation.accounting_entry_id` est unique ; `request_id` rend les créations idempotentes. `BankMatch` est une relation un-à-un entre mouvement et ligne comptable. Les tables métier sont immuables et les suppressions de migration sont refusées dès qu'elles contiennent des données. Voir [PHASE3_REPORT.md](PHASE3_REPORT.md).
+
+## Schéma P4
+
+La migration `0004_assets` persiste `asset`, `asset_component`,
+`depreciation_schedule` et `depreciation_period`. Les deux premières tables conservent
+les hypothèses documentées, le plan les fige et la période porte le résultat exact par
+exercice ainsi que le lien unique vers l'écriture. Une construction décomposée ne reçoit
+pas elle-même de plan : seuls ses composants sont amortis. Voir
+[PHASE4_REPORT.md](PHASE4_REPORT.md).
