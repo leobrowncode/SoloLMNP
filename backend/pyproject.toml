@@ -1,17 +1,25 @@
+[build-system]
+requires = ["setuptools==84.0.0", "wheel==0.48.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "sololmnp-backend"
-version = "0.1.0"
+version = "0.2.0"
 description = "Backend foundation for a self-hosted LMNP accounting application"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1",
   "pydantic-settings>=2.6,<3",
-  "sqlalchemy>=2.0,<3",
+  "sqlalchemy>=2.0,<2.1",
   "alembic>=1.14,<2",
-  "uvicorn[standard]>=0.32,<1",
+  "uvicorn>=0.32,<1",
 ]
 [project.optional-dependencies]
-dev = ["httpx>=0.28,<1", "mypy>=1.13,<2", "pytest>=8.3,<9", "pytest-cov>=6,<7", "ruff>=0.8,<1", "types-PyYAML>=6.0,<7", "PyYAML>=6.0,<7"]
+dev = ["httpx>=0.28,<1", "mypy>=1.13,<2", "pytest>=8.3,<9", "pytest-cov>=6,<7", "ruff>=0.8,<1", "pip-tools>=7,<8", "pip-audit>=2,<3"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
@@ -20,6 +28,9 @@ target-version = "py312"
 line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"alembic/versions/**" = ["E501"]
 [tool.mypy]
 python_version = "3.12"
 strict = true

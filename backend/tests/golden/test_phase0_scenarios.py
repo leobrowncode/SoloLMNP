@@ -3,11 +3,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[3]
 
+
 def test_reference_scenarios_are_complete_and_fictional() -> None:
     data = json.loads((ROOT / "backend/tests/fixtures/scenarios.json").read_text())
     assert data["fictional_only"] is True
     assert [scenario["id"] for scenario in data["scenarios"]] == list("ABCDEFGHIJ")
     assert all(scenario["assertions"] for scenario in data["scenarios"])
+
 
 def test_vintages_are_separate_and_research_only() -> None:
     rules_2025 = json.loads((ROOT / "fiscal/2025/rules.yaml").read_text())
