@@ -1,0 +1,2 @@
+Alembic migration environment will be activated with the persistent SQLAlchemy model in Phase 1.
+No empty migration is emitted in Phase 0.

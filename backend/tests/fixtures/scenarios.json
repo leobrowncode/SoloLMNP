@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "fictional_only": true,
+  "scenarios": [
+    {"id":"A","title":"Première année","assertions":["opening_balances_explicit","balanced_ledger"]},
+    {"id":"B","title":"Deuxième année","assertions":["prior_closing_equals_opening","vintage_isolated"]},
+    {"id":"C","title":"Amortissement plafonné","assertions":["accounting_depreciation_unchanged","unused_depreciation_separate"]},
+    {"id":"D","title":"Déficit fiscal","assertions":["tax_loss_separate_from_depreciation"]},
+    {"id":"E","title":"Mobilier en cours d'année","assertions":["prorata_applied","cumulative_not_above_base"]},
+    {"id":"F","title":"Emprunt ventilé","assertions":["principal_not_expense","interest_insurance_separate"]},
+    {"id":"G","title":"Charge partiellement déductible","assertions":["full_amount_in_ledger","fiscal_addition_visible"]},
+    {"id":"H","title":"Clôture et réouverture","assertions":["closed_locked","reason_required","snapshot_superseded"]},
+    {"id":"I","title":"FEC complet","assertions":["ledger_only","deterministic","validator_no_error"]},
+    {"id":"J","title":"Liasse fictive","assertions":["field_traceability","interform_checks","efi_not_transmission"]}
+  ]
+}
