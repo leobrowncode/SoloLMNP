@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from alembic import command
+from app.core.database import SCHEMA_REVISION
 from app.main import create_app
 from tests.conftest import migration_config
 
@@ -368,7 +369,5 @@ def test_migration_refuses_to_discard_business_records(client, settings, databas
     with pytest.raises(RuntimeError, match="Cannot discard business records"):
         command.downgrade(migration_config(settings), "0002_ledger")
     with database.engine.connect() as connection:
-        assert (
-            connection.scalar(text("SELECT version_num FROM alembic_version")) == "0003_operations"
-        )
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == SCHEMA_REVISION
         assert connection.scalar(text("SELECT COUNT(*) FROM business_operation")) == 1

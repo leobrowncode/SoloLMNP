@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchStatus, type ApplicationStatus } from "./api/status";
 import LedgerPage from "./features/LedgerPage";
 import OperationsPage from "./features/OperationsPage";
+import AssetsPage from "./features/AssetsPage";
 
 type LoadState = { kind: "loading" } | { kind: "error" } | { kind: "loaded"; data: ApplicationStatus };
 
@@ -9,7 +10,8 @@ const stages = [
   ["01", "Fondations", "Configuration, stockage exact, migrations et contrôles techniques.", "Disponible"],
   ["02", "Comptabilité", "Écritures en partie double, journal, grand livre et balance.", "Disponible"],
   ["03", "Opérations", "Recettes, dépenses, banque CSV, rapprochement et emprunts.", "Disponible"],
-  ["04–05", "Immobilisations & états", "Immobilisations, amortissements et états comptables.", "À développer"],
+  ["04", "Immobilisations", "Registre, composants, prorata et dotations comptables.", "Disponible"],
+  ["05", "États comptables", "Inventaire, bilan et compte de résultat.", "À développer"],
   ["06–10", "Fiscalité & déclaration", "Règles sourcées, reports, clôture, FEC et préparation de la saisie EFI.", "À développer"],
   ["11–12", "Conservation & fiabilité", "Justificatifs, sauvegarde, restauration et parcours complets.", "À développer"],
 ];
@@ -17,7 +19,7 @@ const stages = [
 export default function App() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
-  const [page, setPage] = useState<"ledger" | "operations">("ledger");
+  const [page, setPage] = useState<"ledger" | "operations" | "assets">("ledger");
   useEffect(() => {
     const controller = new AbortController();
     void fetchStatus(controller.signal).then(
@@ -47,6 +49,7 @@ export default function App() {
           <a href="#main" className="nav-active"><span aria-hidden="true">◫</span> Vue d’ensemble</a>
           <a href="#main" onClick={() => setPage("ledger")}>Comptabilité</a>
           <a href="#main" onClick={() => setPage("operations")}>Opérations & banque</a>
+          <a href="#main" onClick={() => setPage("assets")}>Immobilisations</a>
           <a href="#installation"><span aria-hidden="true">◎</span> État de l’installation</a>
           <a href="#roadmap"><span aria-hidden="true">↗</span> Étapes du projet</a>
         </nav>
@@ -61,16 +64,16 @@ export default function App() {
       <main id="main" tabIndex={-1}>
         <header className="topbar">
           <span>ESPACE DE GESTION</span>
-          <span className="phase-badge">Phase 3 · Opérations</span>
+          <span className="phase-badge">Phase 4 · Immobilisations</span>
         </header>
         <div className="content">
           <section className="intro" aria-labelledby="welcome-title">
             <p className="eyebrow">UNE COMPTABILITÉ QUE VOUS POURREZ EXPLIQUER</p>
-            <h1 id="welcome-title">Des opérations concrètes,<br /><span>une comptabilité explicable.</span></h1>
-            <p className="intro-description">Saisissez recettes, dépenses, règlements et emprunts. Chaque validation produit une écriture équilibrée que vous pouvez retrouver dans le ledger.</p>
+            <h1 id="welcome-title">Des actifs documentés,<br /><span>des dotations traçables.</span></h1>
+            <p className="intro-description">Tenez le registre des immobilisations, séparez le terrain, documentez les composants et comptabilisez chaque dotation dans le ledger.</p>
           </section>
 
-          {ready && (status?.phase === "ledger" || status?.phase === "operations") && (page === "ledger" ? <LedgerPage /> : <OperationsPage />)}
+          {ready && ["ledger", "operations", "assets"].includes(status?.phase ?? "") && (page === "ledger" ? <LedgerPage /> : page === "operations" ? <OperationsPage /> : <AssetsPage />)}
           <section id="installation" className="installation" aria-labelledby="installation-title">
             <div className="section-heading">
               <div><p className="eyebrow">DIAGNOSTIC EN DIRECT</p><h2 id="installation-title">État de l’installation</h2></div>
@@ -120,7 +123,7 @@ export default function App() {
           <section className="scope-note" aria-label="Périmètre disponible">
             <span className="scope-icon" aria-hidden="true">i</span>
             <div><h2>Ce que permet cette version</h2>
-            <p>Gérer les opérations courantes, importer un relevé CSV, rapprocher la banque et ventiler les échéances d’emprunt. Les immobilisations, le bilan, le FEC et la liasse fiscale seront ajoutés dans les prochaines phases. Aucun montant déclarable n’est produit aujourd’hui.</p></div>
+            <p>Gérer les opérations courantes, la banque, les emprunts, les immobilisations, leurs composants et les dotations comptables. Le bilan, le moteur fiscal, le FEC et la liasse seront ajoutés dans les prochaines phases. Aucun montant déclarable n’est produit aujourd’hui.</p></div>
           </section>
 
           <section id="roadmap" className="roadmap" aria-labelledby="roadmap-title">

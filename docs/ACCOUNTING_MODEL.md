@@ -38,3 +38,16 @@ Le ledger persistant est opérationnel. Les règles de validation, la numérotat
 ## Implémentation P3
 
 Les opérations suivent une comptabilité d'engagement : 411/401 lors de la constatation, puis apurement par 512 lors du règlement. Les dépenses restent comptabilisées pour leur montant intégral ; leur pourcentage fiscal ne modifie jamais l'écriture. Le capital d'emprunt, les intérêts, l'assurance et les frais sont ventilés. Détails et références ANC : [PHASE3_REPORT.md](PHASE3_REPORT.md).
+
+## Implémentation P4
+
+La base amortissable correspond à la valeur brute diminuée de la valeur résiduelle
+significative et mesurable renseignée. La mise en service démarre le plan comptable.
+Le terrain utilise 211 et ne possède ni durée, ni plan, ni compte 28. Les constructions,
+installations, équipements et meubles utilisent leurs comptes 21/218 et 281 associés.
+Chaque période confirmée débite 681100 et crédite le compte 28 du plan.
+
+La durée est une estimation documentée de l'utilisation par l'activité. Le logiciel ne
+fournit pas de barème automatique. Si une construction est décomposée, les composants
+doivent couvrir exactement sa base afin d'éviter un double amortissement ou une omission.
+Détails et sources : [PHASE4_REPORT.md](PHASE4_REPORT.md).
