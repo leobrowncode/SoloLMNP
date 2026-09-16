@@ -3,7 +3,7 @@
 ## État au 16 septembre 2026
 
 - P0 : architecture et catalogue de scénarios livrés dans la PR #1. La recherche fiscale reste à compléter avant toute règle exécutable.
-- P1 : implémentation et contrôles natifs réalisés ; validation Docker/CI à obtenir avant clôture de l'issue.
+- P1 : implémentation, contrôles natifs et [CI Linux/Windows/frontend/Docker réussis](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132). Revue et intégration de la [PR #14](https://github.com/leobrowncode/SoloLMNP/pull/14) en attente.
 - P2 : prochaine phase métier. Le ledger persistant précède tous les calculs comptables et fiscaux.
 
 | Phase | Périmètre | Issue |

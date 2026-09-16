@@ -15,4 +15,4 @@ Issues créées le 16 septembre 2026 dans le dépôt SoloLMNP :
 - [[P11] Justificatifs durcis, backup et restauration](https://github.com/leobrowncode/SoloLMNP/issues/12)
 - [[P12] E2E, sécurité, accessibilité et performance](https://github.com/leobrowncode/SoloLMNP/issues/13)
 
-Chaque issue contient les critères d'acceptation et les exigences communes. La P1 reste ouverte jusqu'à validation de la CI/Docker et revue. La P2 constitue la prochaine phase d'implémentation métier. Ne pas recréer ce backlog.
+Chaque issue contient les critères d'acceptation et les exigences communes. La CI P1, dont Docker, a réussi ; l'issue reste ouverte jusqu'à revue et intégration de la PR #14. La P2 constitue la prochaine phase d'implémentation métier. Ne pas recréer ce backlog.

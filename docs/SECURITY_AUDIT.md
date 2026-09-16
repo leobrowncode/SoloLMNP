@@ -4,11 +4,11 @@
 
 | Risque | Mesure actuelle | Vérification / limite |
 |---|---|---|
-| Exposition réseau sans authentification | Interface Compose liée à 127.0.0.1 ; API non publiée ; Vite loopback | Configuration relue ; Docker à exécuter en CI |
+| Exposition réseau sans authentification | Interface Compose liée à 127.0.0.1 ; API non publiée ; Vite loopback | Configuration relue ; smoke Docker CI réussi |
 | Host/CORS | Hôtes explicites, aucun joker, CORS vide par défaut, proxy même origine | Tests Host malveillant et origines acceptées/refusées |
 | Injection SQL | ORM/paramètres ; aucune entrée SQL fournie par l'utilisateur | Tests de persistance ; aucune API métier modifiable à cette phase |
 | XSS | Échappement React, aucune insertion HTML brute ; CSP Nginx | Tests et revue ; headers Docker vérifiés par le smoke prévu |
-| Privilèges conteneurs | Utilisateurs non root, racine readonly, cap_drop ALL, no-new-privileges | Smoke vérifie l'UID ; exécution Docker distante requise |
+| Privilèges conteneurs | Utilisateurs non root, racine readonly, cap_drop ALL, no-new-privileges | Smoke Docker distant réussi, UID contrôlés |
 | Intégrité SQLite | FK, WAL, synchronous FULL, BEGIN explicite, migrations Alembic | Tests d'annulation de DML et DDL, FK, contraintes, downgrade/upgrade |
 | Précision monétaire | Decimal fini au centime ; INTEGER avec contraintes de type et signe | Tests float/int/bool/NaN/infinis/sous-centimes et grande précision |
 | Mutation d'écriture | Contrats frozen et lignes copiées en tuple ; validation retourne une valeur | Tests ; persistance et verrouillage métier réservés P2/P7 |
@@ -25,5 +25,5 @@
 - Les statuts d'exercice sont définis mais leur workflow, les verrouillages d'exercice et l'audit append-only ne sont pas encore implémentés.
 - Uploads, import bancaire, désérialisation, restauration et moteur de formules ne sont pas exposés. Leurs protections restent à implémenter avec les fonctionnalités.
 - Les versions de paquets sont figées, mais les lockfiles Python ne contiennent pas encore les hashes de distributions. Les tags Docker restent mutables ; geler les digests lors d'une publication et organiser les mises à jour.
-- Les contrôles Linux/Docker et leurs résultats distants doivent être vérifiés avant de considérer l'installation Docker validée.
+- Les contrôles backend Linux/Windows, frontend et Docker ont réussi dans la [CI #4](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132). Cela ne remplace pas les futurs audits des fonctions métier.
 - Deux avertissements de dépréciation upstream apparaissent dans les tests Starlette/httpx ; ils ne sont pas masqués.

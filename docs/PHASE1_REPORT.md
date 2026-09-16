@@ -57,12 +57,20 @@ Les images Docker sont versionnées par tags maintenus, pas encore par digest.
   actualisation et affichage mobile à 390 px contrôlés, sans débordement horizontal.
 - `git diff --check` et inspection des fichiers suivis avant commit.
 
-## Limites et validation restante
+## Validation distante
+
+La [CI #4](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132)
+est intégralement réussie sur le commit `b565296` :
+backend Ubuntu, backend Windows, frontend et Docker. Le job Docker a construit
+les images et vérifié démarrage, migrations, disponibilité HTTP, utilisateurs
+non root et persistance après recréation. Cette vérification complète les tests
+locaux. La PR #14 reste en brouillon pour revue, dépendante de la PR #1.
+
+## Limites
 
 Docker n'est pas installé sur le poste de développement. Le smoke CI construit
 les deux images, vérifie HTTP, migrations, utilisateurs non root et persistance
-après recréation des conteneurs. Sa présence dans le dépôt ne prouve pas son
-exécution : le résultat distant doit être contrôlé avant de clôturer P1.
+après recréation des conteneurs ; cette exécution distante a maintenant réussi.
 
 Les tables administratives n'ont pas encore d'API de saisie. Le workflow de
 clôture, le verrouillage des exercices, l'audit et les validations métier

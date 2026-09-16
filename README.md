@@ -20,7 +20,7 @@ Ouvrir [l'application locale](http://127.0.0.1:5173). La base et les futurs docu
 
 Le backend applique les migrations avant de démarrer. L'interface affiche l'état réel du service et du schéma SQLite. Une base absente, illisible ou non migrée ne sera pas déclarée prête.
 
-**Vérification actuelle :** tests et exécution native réalisés sous Windows. Docker n'est pas installé sur le poste de développement ; son test de construction, démarrage et persistance est fourni dans la CI et doit réussir avant validation du déploiement.
+**Vérification actuelle :** tests natifs sous Windows et [CI complète réussie](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132) : backend Linux/Windows, frontend et test Docker de construction, démarrage et persistance.
 
 ## Développement et contrôles
 

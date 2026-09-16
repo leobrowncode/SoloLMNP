@@ -170,9 +170,10 @@ Ces tags restent mutables : une reconstruction future peut recevoir des correcti
 La reproductibilité octet pour octet des images nécessitera le gel de leurs digests lors
 d'une publication, avec une procédure régulière de mise à jour de sécurité.
 
-**Limite de vérification de cette phase :** Docker n'est pas installé dans le poste de travail
-ayant produit cette modification. Les vérifications Docker sont codées dans la CI ; leur
-présence ne constitue pas la preuve qu'une exécution distante a réussi.
+**Vérification de cette phase :** Docker n'est pas installé dans le poste de travail
+ayant produit cette modification. Son exécution distante a été confirmée avec succès dans
+la [CI #4](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132) :
+construction, migrations, HTTP, utilisateurs non root et persistance.
 
 ## Sources techniques consultées le 15 septembre 2026
 
