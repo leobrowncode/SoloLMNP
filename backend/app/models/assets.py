@@ -84,7 +84,6 @@ class AssetComponent(Base):
 class DepreciationSchedule(Base):
     __tablename__ = "depreciation_schedule"
     __table_args__ = (
-        UniqueConstraint("asset_id", "component_id"),
         CheckConstraint(
             "(asset_id IS NOT NULL AND component_id IS NULL) OR "
             "(asset_id IS NULL AND component_id IS NOT NULL)",

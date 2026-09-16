@@ -167,9 +167,6 @@ def upgrade() -> None:
             ["account.number"],
             name=op.f("fk_depreciation_schedule_depreciation_account_account"),
         ),
-        sa.UniqueConstraint(
-            "asset_id", "component_id", name=op.f("uq_depreciation_schedule_asset_id")
-        ),
     )
     op.create_table(
         "depreciation_period",
