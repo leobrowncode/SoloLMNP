@@ -1,1 +1,13 @@
-{"compilerOptions":{"target":"ES2022","useDefineForClassFields":true,"lib":["ES2022","DOM","DOM.Iterable"],"allowJs":false,"skipLibCheck":true,"esModuleInterop":true,"allowSyntheticDefaultImports":true,"strict":true,"forceConsistentCasingInFileNames":true,"module":"ESNext","moduleResolution":"Bundler","resolveJsonModule":true,"isolatedModules":true,"noEmit":true,"jsx":"react-jsx","noUncheckedIndexedAccess":true},"include":["src"]}
+{
+  "compilerOptions": {
+    "target": "ES2022", "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext", "moduleResolution": "Bundler", "skipLibCheck": true,
+    "esModuleInterop": true, "allowSyntheticDefaultImports": true,
+    "strict": true, "noUnusedLocals": true, "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true, "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true, "isolatedModules": true,
+    "noEmit": true, "jsx": "react-jsx",
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.app.tsbuildinfo"
+  },
+  "include": ["src"]
+}

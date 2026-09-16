@@ -16,5 +16,9 @@ for title in \
   '[P11] Justificatifs durcis, backup et restauration' \
   '[P12] E2E, sécurité, accessibilité et performance'
 do
+  if gh issue list --state all --limit 1000 --json title --jq '.[].title' | grep -Fxq -- "$title"; then
+    printf 'Issue existante : %s\n' "$title"
+    continue
+  fi
   gh issue create --title "$title" --body "Voir ROADMAP.md. Critères obligatoires : tests, documentation, traçabilité et sources officielles pour toute règle fiscale/comptable."
 done
