@@ -36,3 +36,10 @@ Les mutations exigent X-SoloLMNP-Request: 1 ; Origin doit correspondre à l’h�
 ## Contrôles P3
 
 Le CSV bancaire est limité à 1 Mo et 5 000 lignes, parsé sans exécution et sans utiliser de chemin fourni par l'utilisateur. L'en-tête, les dates, montants et références sont strictement contrôlés. Les empreintes détectent les réimports et conflits. Les identifiants idempotents empêchent la double comptabilisation après un retry. Les rapprochements et opérations sont aussi validés par des triggers SQLite. Les libellés importés restent des données non fiables rendues comme texte par React.
+
+## Contrôles P4
+
+Les actifs, composants et plans d'amortissement sont immuables. Des contraintes SQL
+indépendantes de l'API interdisent une base terrain, le dépassement de base par les
+composants et une période comptabilisée sans écriture OD conforme. La durée maximale de
+200 ans borne les entrées pathologiques ; tous les montants restent des centimes entiers.

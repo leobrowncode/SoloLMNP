@@ -133,6 +133,30 @@ def main() -> None:
                 "fiscal_treatment": "PARTIAL",
             })
             assert operation["accounting_entry_id"] == 1
+            post("/api/assets", {
+                "property_id": 1,
+                "category": "FURNITURE",
+                "label": "Docker fictitious furniture",
+                "acquisition_date": "2025-07-01",
+                "service_start_date": "2025-07-01",
+                "acquisition_value": "1200.00",
+                "depreciable_value": "1200.00",
+                "non_depreciable_value": "0.00",
+                "residual_value": "0.00",
+                "method": "LINEAR",
+                "useful_life_months": 60,
+                "asset_account": "218400",
+                "depreciation_account": "281840",
+                "basis_reason": "Docker fictitious invoice",
+                "duration_reason": "Docker five-year useful life",
+            })
+            periods = post("/api/assets/years/1/calculate", {})
+            assert isinstance(periods, list) and len(periods) == 1
+            depreciation = post(f"/api/assets/periods/{periods[0]['id']}/post", {
+                "request_id": "docker-depreciation-001",
+                "piece_reference": "DOCKER-DOT-001",
+            })
+            assert depreciation["source_type"] == "DEPRECIATION"
             for service in ("backend", "frontend"):
                 assert (
                     run("exec", "-T", service, "id", "-u", capture=True).stdout.strip()
@@ -168,12 +192,14 @@ def main() -> None:
                 "assert db.execute('select value from ci_persistence_probe').fetchone()[0] "
                 "== 'fictitious'; "
                 "assert db.execute('select count(*) from business_operation').fetchone()[0] == 1; "
-                "assert db.execute('select count(*) from accounting_entry').fetchone()[0] == 1; "
+                "assert db.execute('select count(*) from accounting_entry').fetchone()[0] == 2; "
+                "assert db.execute('select count(*) from asset').fetchone()[0] == 1; "
+                "assert db.execute(\"select count(*) from depreciation_period where status='POSTED'\").fetchone()[0] == 1; "
                 "db.close(); "
                 "assert Path('/app/data/ci-document.txt').read_text(encoding='utf-8') == 'fictitious'",
             )
             print(
-                "Docker smoke passed: HTTP, accounting operation, non-root, migrations and persisted data."
+                "Docker smoke passed: HTTP, operations, depreciation, non-root, migrations and persistence."
             )
         except BaseException:
             run("logs", "--no-color", check=False)

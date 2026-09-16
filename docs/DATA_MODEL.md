@@ -71,3 +71,12 @@ La migration 0002_ledger ajoute account, accounting_journal, accounting_entry, a
 ## Schéma P3
 
 La migration `0003_operations` ajoute comptes bancaires, mouvements importés, rapprochements, emprunts et opérations métier. `BusinessOperation.accounting_entry_id` est unique ; `request_id` rend les créations idempotentes. `BankMatch` est une relation un-à-un entre mouvement et ligne comptable. Les tables métier sont immuables et les suppressions de migration sont refusées dès qu'elles contiennent des données. Voir [PHASE3_REPORT.md](PHASE3_REPORT.md).
+
+## Schéma P4
+
+La migration `0004_assets` persiste `asset`, `asset_component`,
+`depreciation_schedule` et `depreciation_period`. Les deux premières tables conservent
+les hypothèses documentées, le plan les fige et la période porte le résultat exact par
+exercice ainsi que le lien unique vers l'écriture. Une construction décomposée ne reçoit
+pas elle-même de plan : seuls ses composants sont amortis. Voir
+[PHASE4_REPORT.md](PHASE4_REPORT.md).
