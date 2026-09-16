@@ -1,19 +1,41 @@
 # Roadmap
 
-- **P0 Recherche/architecture (présent)** : squelettes, invariants, menaces, modèles, registre de sources, fixtures et contrats.
-- **P1 Fondations** : modèles SQLAlchemy/migration initiale, configuration SQLite, API, UI shell, dépendances verrouillées, CI durcie.
-- **P2 Ledger** : plan configurable, journaux, écritures/lignes, validation atomique, journal/grand livre/balance et property tests.
-- **P3 Opérations** : recettes/dépenses, CSV bancaire idempotent, rapprochement, emprunts ventilés.
-- **P4 Immobilisations** : registre/composants, terrain, plans et écritures d'amortissement comptable.
-- **P5 États** : inventaire, bilan/résultat issus du ledger, à-nouveaux et continuité.
-- **P6 Fiscal** : règles sourcées par millésime, retraitements, deux registres de reports, golden tests.
-- **P7 Clôture/audit** : validations, audit append-only, verrouillage/réouverture/invalidation.
-- **P8 FEC** : recherche actualisée, exporter/validator et fixtures officielles.
-- **P9 Liasse** : définitions officielles 2031/2033, DSL/mappings, contrôles, package/snapshot.
-- **P10 EFI** : déclaration, mode double-écran, rapport PDF, feuille, données 2042-C-PRO.
-- **P11 Documents/backup** : uploads durcis, associations, sauvegarde/restauration/exports.
-- **P12 Hardening** : E2E, sécurité, accessibilité, performance, migration et documentation opérateur.
+## État au 16 septembre 2026
 
-## Backlog GitHub
+- P0 : architecture et catalogue de scénarios livrés dans la PR #1. La recherche fiscale reste à compléter avant toute règle exécutable.
+- P1 : implémentation et contrôles natifs réalisés ; validation Docker/CI à obtenir avant clôture de l'issue.
+- P2 : prochaine phase métier. Le ledger persistant précède tous les calculs comptables et fiscaux.
 
-Les fichiers de corps reproductibles sont dans `.github/ISSUES.md`. La création distante nécessite un remote et une authentification GitHub ; elle doit être exécutée avec `gh issue create` dès qu'ils existent.
+| Phase | Périmètre | Issue |
+|---|---|---|
+| P1 | Fondations persistantes et migration initiale | [#2](https://github.com/leobrowncode/SoloLMNP/issues/2) |
+| P2 | Ledger en partie double et projections comptables | [#3](https://github.com/leobrowncode/SoloLMNP/issues/3) |
+| P3 | Recettes, dépenses, banque CSV et emprunts | [#4](https://github.com/leobrowncode/SoloLMNP/issues/4) |
+| P4 | Registre des immobilisations et amortissements comptables | [#5](https://github.com/leobrowncode/SoloLMNP/issues/5) |
+| P5 | Inventaire, bilan, résultat et continuité | [#6](https://github.com/leobrowncode/SoloLMNP/issues/6) |
+| P6 | Moteur fiscal versionné et reports séparés | [#7](https://github.com/leobrowncode/SoloLMNP/issues/7) |
+| P7 | Contrôles, audit, clôture et réouverture | [#8](https://github.com/leobrowncode/SoloLMNP/issues/8) |
+| P8 | Export et validation FEC sourcés | [#9](https://github.com/leobrowncode/SoloLMNP/issues/9) |
+| P9 | Mappings 2031/2033, package et snapshot | [#10](https://github.com/leobrowncode/SoloLMNP/issues/10) |
+| P10 | Feuille de saisie EFI et 2042-C-PRO | [#11](https://github.com/leobrowncode/SoloLMNP/issues/11) |
+| P11 | Justificatifs durcis, backup et restauration | [#12](https://github.com/leobrowncode/SoloLMNP/issues/12) |
+| P12 | E2E, sécurité, accessibilité et performance | [#13](https://github.com/leobrowncode/SoloLMNP/issues/13) |
+
+## Ordre et critères de passage
+
+1. **Fondations** : installation reproductible, migrations, configuration et CI.
+2. **Ledger** : comptes/journaux/écritures/lignes, validation atomique, chronologie et numérotation, journal/grand livre/balance, contrôles de concurrence.
+3. **Opérations** : recettes, dépenses, imports CSV idempotents, rapprochement, capital/intérêts/assurance séparés.
+4. **Immobilisations** : bases et composants documentés, terrain non amortissable, prorata et écritures de dotation.
+5. **États** : inventaire, bilan équilibré, résultat dérivé des comptes, continuité et à-nouveaux.
+6. **Fiscalité** : sources par période d'effet, retraitements, registres de reports distincts et golden tests chiffrés.
+7. **Clôture** : validations, journal d'audit, verrouillage, réouverture motivée et invalidation des dépendances.
+8. **FEC** : format sourcé, export exclusivement depuis le ledger, validations et reproductibilité.
+9. **Liasse** : formulaires officiels, mapping complet, traçabilité, package et snapshot.
+10. **EFI** : feuille de recopie et rapport ; déclaration personnelle séparée.
+11. **Conservation** : justificatifs, sauvegarde SQLite cohérente, restauration contrôlée et portabilité.
+12. **Durcissement** : parcours A–J bout en bout, sécurité, accessibilité et performances.
+
+Chaque phase exige périmètre, prérequis, modèle/migration, implémentation, tests exécutés, corrections, documentation et commit. Une issue reste ouverte si une validation bloquante manque. Aucun état READY fiscal avant contrôle complet des règles et formulaires du millésime.
+
+Les issues ont été effectivement créées le 16 septembre 2026. Leur état GitHub fait foi ; voir également [.github/ISSUES.md](.github/ISSUES.md).

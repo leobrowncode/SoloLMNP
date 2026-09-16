@@ -1,16 +1,29 @@
-# Audit de sécurité initial — 2026-09-15
+# Audit de sécurité — fondations, 16 septembre 2026
 
-| Risque | Mesure d'architecture | Résiduel/action |
+## Protections implémentées
+
+| Risque | Mesure actuelle | Vérification / limite |
 |---|---|---|
-| Exposition sans authentification | ports Docker sur loopback | documenter proxy privé ; jamais Internet direct |
-| Injection SQL | ORM et paramètres | interdire SQL concaténé, tests |
-| XSS | React échappé/CSP future | interdire `dangerouslySetInnerHTML` |
-| Traversée/upload | UUID, signature MIME, taille, hors webroot | scanner et tests Phase 11 |
-| Désérialisation | YAML sûr, aucun pickle, DSL sans eval | revue des loaders |
-| SSRF/command/XXE | aucune récupération URL utilisateur, aucun shell/XML | règles statiques |
-| Corruption SQLite | transactions, FK, WAL, backup API | tests crash/restauration |
-| Fuite Git | gitignore strict et fixtures fictives | secret scan CI à ajouter |
-| Supply chain | versions bornées backend, audit npm | verrouiller hashes/lockfiles |
-| Intégrité fiscale | sources/version/empreintes/golden tests | revue humaine obligatoire |
+| Exposition réseau sans authentification | Interface Compose liée à 127.0.0.1 ; API non publiée ; Vite loopback | Configuration relue ; Docker à exécuter en CI |
+| Host/CORS | Hôtes explicites, aucun joker, CORS vide par défaut, proxy même origine | Tests Host malveillant et origines acceptées/refusées |
+| Injection SQL | ORM/paramètres ; aucune entrée SQL fournie par l'utilisateur | Tests de persistance ; aucune API métier modifiable à cette phase |
+| XSS | Échappement React, aucune insertion HTML brute ; CSP Nginx | Tests et revue ; headers Docker vérifiés par le smoke prévu |
+| Privilèges conteneurs | Utilisateurs non root, racine readonly, cap_drop ALL, no-new-privileges | Smoke vérifie l'UID ; exécution Docker distante requise |
+| Intégrité SQLite | FK, WAL, synchronous FULL, BEGIN explicite, migrations Alembic | Tests d'annulation de DML et DDL, FK, contraintes, downgrade/upgrade |
+| Précision monétaire | Decimal fini au centime ; INTEGER avec contraintes de type et signe | Tests float/int/bool/NaN/infinis/sous-centimes et grande précision |
+| Mutation d'écriture | Contrats frozen et lignes copiées en tuple ; validation retourne une valeur | Tests ; persistance et verrouillage métier réservés P2/P7 |
+| Informations techniques | Disponibilité 503 sans SQL/chemin exposé ; docs API désactivées en production | Tests sur base corrompue et schéma incorrect |
+| Fuite Git/image | Exclusion env, bases, pièces, exports, backups, dépendances et caches | Contrôle des fichiers suivis avant commit |
+| Dépendances | Lockfiles, actions CI référencées par SHA, audits npm/pip-audit | Audits locaux : aucune vulnérabilité connue signalée |
+| Fiabilité fiscale | Statut research_only, aucun moteur ni montant déclarable | Catalogue de scénarios uniquement ; règles à valider avant P6 |
 
-Les images conteneur ne sont pas encore durcies en utilisateur non-root et les dépendances `latest` du squelette frontend doivent être verrouillées par `package-lock.json` avant production. Aucun mécanisme applicatif d'authentification n'est prévu conformément au modèle mono-utilisateur.
+## Risques résiduels et périmètre
+
+- Une installation sans authentification doit rester privée. Le filtrage Host/CORS n'est pas une authentification ; l'écoute réseau constitue la barrière principale.
+- L'application n'offre encore aucune API de mutation métier. Les contrôles d'origine des futures écritures, CSRF, limites de requêtes et audit seront ajoutés avec ces endpoints.
+- Le propriétaire de la machine peut modifier directement SQLite. Les contraintes ne constituent ni chiffrement ni journal inviolable.
+- Les statuts d'exercice sont définis mais leur workflow, les verrouillages d'exercice et l'audit append-only ne sont pas encore implémentés.
+- Uploads, import bancaire, désérialisation, restauration et moteur de formules ne sont pas exposés. Leurs protections restent à implémenter avec les fonctionnalités.
+- Les versions de paquets sont figées, mais les lockfiles Python ne contiennent pas encore les hashes de distributions. Les tags Docker restent mutables ; geler les digests lors d'une publication et organiser les mises à jour.
+- Les contrôles Linux/Docker et leurs résultats distants doivent être vérifiés avant de considérer l'installation Docker validée.
+- Deux avertissements de dépréciation upstream apparaissent dans les tests Starlette/httpx ; ils ne sont pas masqués.
