@@ -1,6 +1,6 @@
 export interface ApplicationStatus {
   application_version: string;
-  phase: "foundation";
+  phase: "foundation" | "ledger";
   database: {
     status: "ready" | "not_ready";
     schema_revision: string | null;
@@ -16,7 +16,7 @@ function record(value: unknown): value is Record<string, unknown> {
 export function isApplicationStatus(value: unknown): value is ApplicationStatus {
   if (!record(value) || !record(value.database) || !record(value.fiscal)) return false;
   return typeof value.application_version === "string"
-    && value.phase === "foundation"
+    && (value.phase === "foundation" || value.phase === "ledger")
     && ["ready", "not_ready"].includes(String(value.database.status))
     && (typeof value.database.schema_revision === "string" || value.database.schema_revision === null)
     && typeof value.database.expected_revision === "string"
