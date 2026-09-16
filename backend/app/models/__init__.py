@@ -1,3 +1,4 @@
+from app.models.assets import Asset, AssetComponent, DepreciationPeriod, DepreciationSchedule
 from app.models.base import Base
 from app.models.foundation import FiscalYear, Property, RentalActivity
 from app.models.ledger import (
@@ -16,6 +17,10 @@ __all__ = [
     "BusinessOperation",
     "Loan",
     "Base",
+    "Asset",
+    "AssetComponent",
+    "DepreciationSchedule",
+    "DepreciationPeriod",
     "FiscalYear",
     "Property",
     "RentalActivity",

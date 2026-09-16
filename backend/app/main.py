@@ -12,12 +12,13 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from app.api.assets import build_assets_router
 from app.api.ledger import build_ledger_router
 from app.api.operations import build_operations_router
 from app.core.config import Settings, get_settings
 from app.core.database import SCHEMA_REVISION, Database
 
-APPLICATION_VERSION = "0.4.0"
+APPLICATION_VERSION = "0.5.0"
 
 
 class DatabaseStatus(BaseModel):
@@ -33,7 +34,7 @@ class FiscalStatus(BaseModel):
 
 class ApplicationStatus(BaseModel):
     application_version: str = APPLICATION_VERSION
-    phase: Literal["operations"] = "operations"
+    phase: Literal["assets"] = "assets"
     database: DatabaseStatus
     fiscal: FiscalStatus = Field(default_factory=FiscalStatus)
 
@@ -97,6 +98,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     application.include_router(build_ledger_router(database))
     application.include_router(build_operations_router(database))
+    application.include_router(build_assets_router(database))
 
     @application.get("/api/health", tags=["system"])
     def health() -> dict[str, str]:
@@ -127,6 +129,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "bank_transaction",
                     "bank_match",
                     "loan",
+                    "asset",
+                    "asset_component",
+                    "depreciation_schedule",
+                    "depreciation_period",
                 }.issubset(tables)
         except SQLAlchemyError:
             # Never expose a local path, SQL statement or exception to the client.
