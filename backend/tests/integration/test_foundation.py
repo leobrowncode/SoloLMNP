@@ -52,6 +52,11 @@ def test_migration_idempotent_and_metadata_matches(database: Database, settings:
             "rental_activity",
             "property",
             "fiscal_year",
+            "account",
+            "accounting_journal",
+            "accounting_entry",
+            "accounting_entry_line",
+            "ledger_event",
         }
         for pragma, expected in (("foreign_keys", 1), ("journal_mode", "wal"), ("synchronous", 2)):
             assert connection.exec_driver_sql(f"PRAGMA {pragma}").scalar() == expected

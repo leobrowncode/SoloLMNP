@@ -1,20 +1,22 @@
-"""Read-only foundation API; schema changes are owned exclusively by Alembic."""
+"""Single-user accounting API; schema changes are owned exclusively by Alembic."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Literal
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from app.api.ledger import build_ledger_router
 from app.core.config import Settings, get_settings
 from app.core.database import SCHEMA_REVISION, Database
 
-APPLICATION_VERSION = "0.2.0"
+APPLICATION_VERSION = "0.3.0"
 
 
 class DatabaseStatus(BaseModel):
@@ -30,7 +32,7 @@ class FiscalStatus(BaseModel):
 
 class ApplicationStatus(BaseModel):
     application_version: str = APPLICATION_VERSION
-    phase: Literal["foundation"] = "foundation"
+    phase: Literal["ledger"] = "ledger"
     database: DatabaseStatus
     fiscal: FiscalStatus = Field(default_factory=FiscalStatus)
 
@@ -60,12 +62,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=list(configuration.cors_origins),
         allow_credentials=False,
-        allow_methods=["GET"],
-        allow_headers=["Content-Type"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Content-Type", "X-SoloLMNP-Request"],
     )
     application.add_middleware(
         TrustedHostMiddleware, allowed_hosts=list(configuration.allowed_hosts)
     )
+
+    @application.middleware("http")
+    async def protect_writes(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            origin = request.headers.get("origin")
+            same_origin = str(request.base_url).rstrip("/")
+            if (
+                request.headers.get("x-sololmnp-request") != "1"
+                or (origin is not None and origin not in {same_origin, *configuration.cors_origins})
+                or request.headers.get("sec-fetch-site") == "cross-site"
+            ):
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "detail": {
+                            "code": "ORIGIN_REJECTED",
+                            "message": "Requête d’écriture non autorisée depuis cette origine.",
+                        }
+                    },
+                )
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    application.include_router(build_ledger_router(database))
 
     @application.get("/api/health", tags=["system"])
     def health() -> dict[str, str]:
@@ -86,6 +115,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "rental_activity",
                     "property",
                     "fiscal_year",
+                    "account",
+                    "accounting_journal",
+                    "accounting_entry",
+                    "accounting_entry_line",
+                    "ledger_event",
                 }.issubset(tables)
         except SQLAlchemyError:
             # Never expose a local path, SQL statement or exception to the client.

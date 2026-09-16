@@ -9,7 +9,7 @@ from sqlalchemy.pool import ConnectionPoolEntry
 
 from app.core.config import Settings
 
-SCHEMA_REVISION = "0001_foundation"
+SCHEMA_REVISION = "0002_ledger"
 
 
 def create_database_engine(settings: Settings) -> Engine:
@@ -33,7 +33,9 @@ def create_database_engine(settings: Settings) -> Engine:
 
     @event.listens_for(engine, "begin")
     def explicit_begin(connection: Connection) -> None:
-        connection.exec_driver_sql("BEGIN")
+        connection.exec_driver_sql(
+            "BEGIN IMMEDIATE" if connection.get_execution_options().get("sqlite_write") else "BEGIN"
+        )
 
     return engine
 
