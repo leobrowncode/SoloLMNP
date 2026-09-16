@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { assetsRequest as api, type Asset, type DepreciationPeriod } from "../api/assets";
 import { request, type Account, type Setup } from "../api/ledger";
 import { operationsRequest, type Property } from "../api/operations";
@@ -22,6 +22,7 @@ export default function AssetsPage() {
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const periodRequest = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -38,8 +39,9 @@ export default function AssetsPage() {
   useEffect(() => {
     if (!yearId) return;
     let active = true;
+    const requestId = ++periodRequest.current;
     void api<DepreciationPeriod[]>(`/years/${yearId}/periods`).then((rows) => {
-      if (active) setPeriods(rows);
+      if (active && requestId === periodRequest.current) setPeriods(rows);
     }).catch((reason: Error) => { if (active) setError(reason.message); });
     return () => { active = false; };
   }, [yearId, revision]);
@@ -86,9 +88,12 @@ export default function AssetsPage() {
   }
   async function calculate() {
     setError(""); setMessage("");
+    const requestId = ++periodRequest.current;
     try {
       const rows = await api<DepreciationPeriod[]>(`/years/${yearId}/calculate`, "POST");
-      setPeriods(rows); setMessage(`${rows.length} période(s) calculée(s). Vérifiez-les avant comptabilisation.`);
+      if (requestId === periodRequest.current) {
+        setPeriods(rows); setMessage(`${rows.length} période(s) calculée(s). Vérifiez-les avant comptabilisation.`);
+      }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Calcul impossible."); }
   }
 
