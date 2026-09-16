@@ -27,3 +27,8 @@
 - Les versions de paquets sont figées, mais les lockfiles Python ne contiennent pas encore les hashes de distributions. Les tags Docker restent mutables ; geler les digests lors d'une publication et organiser les mises à jour.
 - Les contrôles backend Linux/Windows, frontend et Docker ont réussi dans la [CI #4](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132). Cela ne remplace pas les futurs audits des fonctions métier.
 - Deux avertissements de dépréciation upstream apparaissent dans les tests Starlette/httpx ; ils ne sont pas masqués.
+
+
+## Contrôles P2
+
+Les mutations exigent X-SoloLMNP-Request: 1 ; Origin doit correspondre à l’hôte demandé ou à une origine explicitement autorisée et Sec-Fetch-Site ne doit pas être cross-site. Les modèles refusent les champs inconnus et les montants JSON numériques. Les requêtes SQL sont paramétrées. BEGIN IMMEDIATE sérialise les écritures et les triggers interdisent les mutations des écritures validées. Ces contrôles ne remplacent pas la protection réseau et du fichier SQLite.

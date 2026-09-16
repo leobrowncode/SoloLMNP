@@ -73,6 +73,25 @@ def main() -> None:
         try:
             run("up", "--build", "--detach", "--wait", "--wait-timeout", "180")
             http_check()
+            # Exercise a browser-like write through nginx on disposable data.
+            base = f"http://127.0.0.1:{port}"
+            request = urllib.request.Request(
+                base + "/api/ledger/activity",
+                data=json.dumps({
+                    "activity_name": "Docker fictitious",
+                    "activity_start_date": "2025-01-01",
+                }).encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "X-SoloLMNP-Request": "1",
+                    "Origin": base,
+                    "Sec-Fetch-Site": "same-origin",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(request, timeout=10) as response:
+                assert response.status == 201
+                assert json.load(response)["activity"]["activity_name"] == "Docker fictitious"
             for service in ("backend", "frontend"):
                 assert (
                     run("exec", "-T", service, "id", "-u", capture=True).stdout.strip()

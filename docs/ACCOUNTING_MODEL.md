@@ -29,3 +29,8 @@ Cette liste est une proposition à valider lors de la phase Ledger selon le PCG 
 ## Projections
 
 Journal : lignes ordonnées par date/journal/numéro. Grand livre : lignes groupées par compte avec solde courant. Balance : sommes débit/crédit par compte. Bilan et résultat reposent sur mappings de comptes versionnés, jamais sur les opérations ou formulaires fiscaux.
+
+
+## Implémentation P2
+
+Le ledger persistant est opérationnel. Les règles de validation, la numérotation, les protections SQLite, les projections et leurs références ANC sont détaillées dans [PHASE2_REPORT.md](PHASE2_REPORT.md). Le journal, le grand livre et la balance utilisent exclusivement les écritures VALIDATED.

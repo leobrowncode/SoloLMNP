@@ -59,3 +59,8 @@ Chaque résultat de case stocke valeur, expression évaluée, comptes, écriture
 `TaxReturnSnapshot` est l'enveloppe persistée immuable : identifiant de package, versions, JSON canonique, empreintes d'exports, statut `CURRENT|SUPERSEDED`. Une nouvelle clôture crée un nouvel objet.
 
 `AuditEvent` est append-only : timestamp UTC, entité/id, action, champ, anciennes/nouvelles valeurs JSON, motif et métadonnées. Les valeurs sensibles sont minimisées ; les événements de clôture, réouverture et snapshot ne peuvent être purgés par l'UI.
+
+
+## Schéma P2
+
+La migration 0002_ledger ajoute account, accounting_journal, accounting_entry, accounting_entry_line et ledger_event. AccountingEntry porte DRAFT/VALIDATED, une version optimiste, sequence, entry_number et reversal_of_id. Les libellés sont figés lors de la validation. Les lignes contiennent des centimes INTEGER. LedgerEvent est append-only et survit à la suppression d’un brouillon. Voir [le rapport](PHASE2_REPORT.md).
