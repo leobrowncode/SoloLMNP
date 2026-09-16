@@ -1,12 +1,56 @@
 services:
   backend:
-    build: {context: ., dockerfile: Dockerfile.backend}
-    env_file: [.env]
-    volumes: ["./data:/data"]
-    ports: ["127.0.0.1:8000:8000"]
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        APP_UID: ${SOLOLMNP_UID:-1000}
+        APP_GID: ${SOLOLMNP_GID:-1000}
+    environment:
+      APP_ENV: production
+      DATABASE_URL: sqlite:////app/data/sololmnp.sqlite3
+      DOCUMENTS_DIR: /app/data/documents
+      CORS_ORIGINS: "[]"
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,[::1]}
+    volumes:
+      - type: bind
+        source: ${SOLOLMNP_DATA_DIR:-./data}
+        target: /app/data
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/status', timeout=3)"
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 15s
     restart: unless-stopped
   frontend:
-    build: {context: ., dockerfile: Dockerfile.frontend}
-    ports: ["127.0.0.1:5173:80"]
-    depends_on: [backend]
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "127.0.0.1:${SOLOLMNP_PORT:-5173}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, wget, --quiet, --spider, http://127.0.0.1:8080/healthz]
+      interval: 5s
+      timeout: 4s
+      retries: 12
     restart: unless-stopped
