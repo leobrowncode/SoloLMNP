@@ -20,12 +20,18 @@ def statements(session: Session, year_id: int) -> dict[str, Any]:
         .order_by(Account.number, AccountingEntry.sequence, AccountingEntryLine.position)
     )
     balances: dict[str, int] = {}
+    entry_balances: dict[int, int] = {}
     accounts: dict[str, Account] = {}
     for line, account in rows:
-        balances[account.number] = balances.get(account.number, 0) + (
-            to_cents(line.debit) - to_cents(line.credit)
-        )
+        net = to_cents(line.debit) - to_cents(line.credit)
+        balances[account.number] = balances.get(account.number, 0) + net
+        entry_id = line.accounting_entry_id
+        entry_balances[entry_id] = entry_balances.get(entry_id, 0) + net
         accounts[account.number] = account
+    # Opposite errors in separate entries must never cancel in annual totals.
+    # Opening previews and posting share this same defensive source validation.
+    if any(entry_balances.values()):
+        fail("UNBALANCED_STATEMENTS", "Une écriture validée est déséquilibrée : états bloqués.")
     if sum(balances.values()) != 0:
         fail("UNBALANCED_STATEMENTS", "Le ledger validé est déséquilibré : états bloqués.")
 

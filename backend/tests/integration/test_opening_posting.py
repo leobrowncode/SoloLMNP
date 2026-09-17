@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
@@ -52,6 +53,53 @@ def continuity(client):
     response = client.get("/api/ledger/years/2/opening-continuity")
     assert response.status_code == 200, response.text
     return response.json()
+
+
+@pytest.mark.parametrize(
+    "operation", ["statements", "opening-preview", "opening-continuity", "opening"]
+)
+def test_offsetting_corrupt_entries_block_statements_and_openings(client, database, operation):
+    from sqlalchemy import event
+    from sqlalchemy.orm.attributes import set_committed_value
+
+    from app.models import AccountingEntryLine
+
+    first = book(client, "512000", "706000", "10.00")
+    second = book(client, "512000", "108000", "20.00")
+    next_year(client)
+    close(database)
+    data = request(client)
+    before = report(client)
+
+    def corrupt(line, context):
+        # Opposite one-cent errors leave every account's aggregate unchanged.
+        # Simulate damaged historical reads without disabling SQLite protections
+        # or marking the loaded rows dirty in the posting transaction.
+        if line.account_number == "512000":
+            if line.accounting_entry_id == first["id"]:
+                set_committed_value(line, "debit", Decimal("10.01"))
+            elif line.accounting_entry_id == second["id"]:
+                set_committed_value(line, "debit", Decimal("19.99"))
+
+    event.listen(AccountingEntryLine, "load", corrupt)
+    try:
+        if operation == "opening":
+            response = generate(client, data)
+        else:
+            year_id = 1 if operation == "statements" else 2
+            response = client.get(f"/api/ledger/years/{year_id}/{operation}")
+        assert response.status_code == 409, response.text
+        assert response.json()["detail"]["code"] == "UNBALANCED_STATEMENTS"
+    finally:
+        event.remove(AccountingEntryLine, "load", corrupt)
+
+    assert report(client) == before
+    assert client.get("/api/ledger/entries?fiscal_year_id=2").json()["count"] == 0
+    with database.sessions() as session:
+        assert (
+            session.scalar(select(LedgerEvent).where(LedgerEvent.action == "OPENING_GENERATED"))
+            is None
+        )
 
 
 @pytest.mark.parametrize("loss", [False, True])

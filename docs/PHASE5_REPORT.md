@@ -255,3 +255,34 @@ Validation locale : 198 tests backend réussis, couverture 94 %, puis les quatre
 tests ciblés réussis après nettoyage des imports. Les 38 tests frontend, Ruff
 lint/format, mypy, ESLint, TypeScript et build Vite passent. La CI du nouveau
 commit sera contrôlée après publication.
+
+## Refus des déséquilibres compensés (17 septembre 2026)
+
+La CI du commit de synchronisation `2bd2c08` a réussi sur Linux, Windows,
+frontend et Docker : [exécution 35244771362](https://github.com/leobrowncode/SoloLMNP/actions/runs/35244771362).
+
+La revue du contrôle défensif des états a révélé que deux écritures corrompues
+avec des écarts opposés pouvaient conserver exactement les mêmes soldes par
+compte. Le contrôle global déclarait alors le bilan équilibré et autorisait
+même la génération des à-nouveaux depuis cette source incohérente.
+
+Les états vérifient désormais aussi le solde de chaque écriture validée dans
+leur lecture existante, en centimes entiers, avant de produire les totaux.
+Un écart bloque les états et, par réutilisation du même service, la préparation,
+la génération et le contrôle de continuité des à-nouveaux. La réponse conserve
+le code HTTP 409 et `UNBALANCED_STATEMENTS`. Cette protection renforce l'invariant
+de partie double déjà documenté en P2 ; aucune nouvelle règle fiscale, migration
+ou modification des données utilisateur.
+
+Quatre régressions injectent à la lecture des écarts de +0,01 € et −0,01 € dans
+deux écritures distinctes. Les quatre échouent avant correction, y compris une
+génération acceptée à tort. Après correction, elles passent et vérifient
+l'absence d'à-nouveaux et d'événement de génération, ainsi que la conservation
+des états source. Les protections SQLite restent actives pendant les tests.
+
+Ce lot de fiabilisation ne réalise pas l'inventaire et ne termine pas P5 ;
+l'issue #6 reste ouverte avec les limites décrites ci-dessus.
+
+Validation locale : 202 tests backend réussis (couverture 94 %), 38 tests
+frontend réussis, Ruff lint/format, mypy, pip check, ESLint, TypeScript et build
+Vite réussis. La CI du nouveau commit reste à vérifier après publication.
