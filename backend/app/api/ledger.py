@@ -14,6 +14,7 @@ from app.api.ledger_schemas import (
     EditInput,
     EntryInput,
     JournalInput,
+    OpeningInput,
     ReversalInput,
     VersionInput,
     YearInput,
@@ -44,6 +45,7 @@ from app.services.ledger import (
     reverse_entry,
 )
 from app.services.opening import opening_preview
+from app.services.opening_posting import generate_opening, opening_continuity
 from app.services.statements import statements
 
 
@@ -281,6 +283,14 @@ def build_ledger_router(database: Database) -> APIRouter:
     @router.get("/years/{year_id}/opening-preview")
     def preview_opening(year_id: int, session: Read) -> dict[str, Any]:
         return opening_preview(session, year_id)
+
+    @router.post("/years/{year_id}/opening")
+    def post_opening(year_id: int, data: OpeningInput, session: Write) -> dict[str, Any]:
+        return generate_opening(session, year_id, data)
+
+    @router.get("/years/{year_id}/opening-continuity")
+    def check_opening(year_id: int, session: Read) -> dict[str, Any]:
+        return opening_continuity(session, year_id)
 
     @router.get("/years/{year_id}/balance")
     def balance(year_id: int, session: Read) -> dict[str, Any]:

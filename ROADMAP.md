@@ -7,7 +7,7 @@
 - P2 : ledger, API et interface implémentés ; 120 tests backend et 10 frontend passent en local. Voir [le rapport](docs/PHASE2_REPORT.md).
 - P3 : recettes/dépenses à l'engagement, règlements, banque CSV, rapprochement et emprunts implémentés. Voir [le rapport](docs/PHASE3_REPORT.md).
 - P4 : registre immuable, composants, prorata en jours et dotations ledger implémentés. Voir [le rapport](docs/PHASE4_REPORT.md).
-- P5 : en cours. API et écran de bilan/résultat provisoires, puis prévisualisation des soldes à reprendre à l’ouverture depuis le ledger validé. Inventaire, génération idempotente des à-nouveaux et validation de continuité restent à implémenter ; l’issue #6 reste ouverte. Voir [le rapport](docs/PHASE5_REPORT.md).
+- P5 : en cours. Bilan/résultat provisoires, prévisualisation et génération idempotente des à-nouveaux, contrôle par compte et scénario de règlement en deuxième année livrés. La génération exige une source clôturée (parcours de clôture prévu en P7). Inventaire, présentation réglementaire et validation complète de continuité restent à terminer ; l’issue #6 reste ouverte. Voir [le rapport](docs/PHASE5_REPORT.md).
 
 | Phase | Périmètre | Issue |
 |---|---|---|

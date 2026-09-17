@@ -1,5 +1,7 @@
 """Read-only preparation of opening balances, before result allocation."""
 
+import hashlib
+import json
 from datetime import timedelta
 from typing import Any
 
@@ -120,7 +122,7 @@ def opening_preview(session: Session, year_id: int) -> dict[str, Any]:
                 "avant comptabilisation.",
             }
         )
-    return {
+    value = {
         "status": "PROVISIONAL",
         "read_only": True,
         "source_fiscal_year_id": previous.id,
@@ -137,3 +139,20 @@ def opening_preview(session: Session, year_id: int) -> dict[str, Any]:
         "balanced": True,
         "warnings": warnings,
     }
+    # Target activity and dates bind a preview to a single transition. Warnings
+    # are rechecked on posting and do not change the source balance identity.
+    identity = {
+        key: value[key]
+        for key in (
+            "source_fiscal_year_id",
+            "source_end_date",
+            "target_fiscal_year_id",
+            "opening_date",
+            "lines",
+            "previous_result",
+        )
+    }
+    value["preview_token"] = hashlib.sha256(
+        json.dumps(identity, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    return value

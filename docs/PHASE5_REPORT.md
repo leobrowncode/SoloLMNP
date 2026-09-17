@@ -1,5 +1,9 @@
 # Phase 5 — états provisoires et préparation des à-nouveaux
 
+État courant : la génération et le contrôle technique des à-nouveaux décrits dans
+la dernière section sont livrés. Les sections précédentes documentent les lots
+successifs et leurs limites à leur date de livraison.
+
 ## Périmètre
 
 `GET /api/ledger/years/{year_id}/statements` et l’écran « États comptables »
@@ -124,3 +128,73 @@ Validation de ce lot : suite initiale de 173 tests backend réussie, puis 11 tes
 limite de stockage d’une ligne. Les cumuls restent des entiers sans limite SQLite.
 Les 27 tests frontend, Ruff (lint/format), mypy, pip check, ESLint, TypeScript
 et le build Vite passent. La CI distante de ce nouveau commit reste à vérifier.
+
+## Génération idempotente et contrôle de reprise (17 septembre 2026)
+
+La CI du commit de prévisualisation `78280f9` est réussie sur Linux, Windows,
+frontend et Docker : [exécution 35224917266](https://github.com/leobrowncode/SoloLMNP/actions/runs/35224917266).
+
+`POST /api/ledger/years/{year_id}/opening` accepte `preview_token` (empreinte
+renvoyée par la prévisualisation), `journal_code`, `piece_reference` et
+`result_account` (null si résultat nul). Le service vérifie à nouveau les soldes
+dans une transaction SQLite `BEGIN IMMEDIATE`, exige une source contiguë de la
+même activité, CLOSED et sans brouillon, ainsi qu’une destination OPEN et vide.
+Le journal doit être actif et de type OPENING, les comptes repris actifs.
+La référence de pièce est obligatoire. Une prévisualisation périmée est refusée.
+
+La reprise avant affectation utilise un compte de capitaux propres choisi
+explicitement : subdivision 120 pour un bénéfice (hors 1209, acomptes sur
+dividendes), 129 pour une perte. Aucun compte n’est créé automatiquement.
+Source vérifiée le 17 septembre 2026 : PCG ANC 2026, article 112-2 page 9,
+plan des comptes page 133 et article 1211-12 page 154 (lien ci-dessus).
+Cette implémentation prépare le bilan d’ouverture avant affectation ; elle ne
+réalise ni la centralisation des classes 6/7 dans l’exercice source, ni
+l’affectation du résultat à l’exploitant. Ces opérations et leur articulation
+avec la clôture devront être validées dans les lots suivants.
+
+L’écriture est immédiatement validée à la date d’ouverture avec provenance
+OPENING, identifiant de l’exercice source et événement OPENING_GENERATED qui
+conserve les paramètres. Les comptes 6/7 ne sont pas repris. Une même demande
+renvoie l’écriture existante, sans autre écriture ni événement, y compris après
+des opérations courantes ou le verrouillage de la destination. Des paramètres
+différents sont refusés. Une erreur annule toute la transaction. L’extourne
+générique est interdite ; un futur parcours métier devra gérer les corrections.
+
+Migration **0005_opening** : index unique partiel sur l’exercice destinataire
+pour les écritures OPENING ; pas de nouvelle table. Appliquer `alembic upgrade
+head` avant le démarrage. La rétrogradation conserve les données et refuse de
+retirer cette protection si une reprise générée existe. Les bases de test
+vérifient la migration, le retour 0004 → 0005 et la cohérence des métadonnées.
+La limite actuelle est une seule écriture, au plus 100 comptes et un total
+compatible avec le stockage entier SQLite ; un dépassement est refusé sans
+troncature ni écriture partielle. Un solde entièrement nul ne génère rien.
+
+`GET /api/ledger/years/{year_id}/opening-continuity` compare par compte la seule
+écriture générée aux soldes source actuels, avec écarts signés, état de clôture
+et empreinte de la source. Les opérations courantes de la destination n’entrent
+pas dans cette comparaison. Ce diagnostic reste PROVISIONAL ; il ne certifie
+pas les comptes et ne rapproche pas les reprises manuelles. Une source rouverte
+ou modifiée est signalée et ne peut pas être régénérée silencieusement.
+
+L’écran expose le formulaire de génération après prévisualisation et le contrôle
+de continuité à la demande. Les blocages connus désactivent le formulaire ;
+le serveur répète tous les contrôles. Les demandes simultanées sont protégées,
+les réponses tardives d’un écran quitté ignorées, les anciens écarts effacés
+avant chaque contrôle. Après comptabilisation, le reçu invite à actualiser les
+états. Un échec réseau permet de réessayer la même demande sans double reprise.
+
+Validation : 192 tests backend passent (couverture 94 %), puis les 19 tests
+ciblés passent après ajout de deux tests de migration, soit 194 cas au total.
+Les 37 tests frontend, Ruff lint/format, mypy, pip check, ESLint, TypeScript et
+build Vite passent. Les tests de génération couvrent bénéfice/perte, amortissements,
+centimes, concurrence, idempotence, blocages, rollback, source rouverte, unicité
+SQL et migrations. Le règlement d’une créance reprise en deuxième année solde
+le compte client sans nouveau produit, tout en préservant le diagnostic initial.
+
+**Limite opérationnelle :** le parcours de clôture P7 n’existe pas encore ; le
+formulaire reste donc bloqué pour les exercices OPEN actuels. Les tests utilisent
+des sources clôturées fictives, sans ajouter de contournement dans l’API publique.
+Ne pas modifier directement les données réelles pour simuler une clôture.
+Inventaire justifié, présentation réglementaire, correction des reprises après
+réouverture et parcours complet sur deux exercices restent à terminer.
+L’issue #6 reste ouverte et aucun montant déclarable n’est produit.

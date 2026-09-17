@@ -17,12 +17,12 @@ test("loads on demand, shows loss and warnings, clears totals on failure", async
   const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(response(preview));
   render(<OpeningPreview year={2} />);
   expect(fetch).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button"));
+  fireEvent.click(screen.getByRole("button", { name: "Prévisualiser les à-nouveaux" }));
   expect(await screen.findByRole("table")).toHaveTextContent("À déterminer");
   expect(screen.getByText("L’exercice précédent n’est pas clôturé.")).toBeInTheDocument();
   expect(fetch.mock.calls[0]?.[0]).toBe("/api/ledger/years/2/opening-preview");
   fetch.mockResolvedValue(response({ detail: { message: "Exercice précédent absent" } }, 409));
-  fireEvent.click(screen.getByRole("button"));
+  fireEvent.click(screen.getByRole("button", { name: "Prévisualiser les à-nouveaux" }));
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
   expect(await screen.findByRole("alert")).toHaveTextContent("Exercice précédent absent");
 });

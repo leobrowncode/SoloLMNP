@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
+import OpeningPosting from "./OpeningPosting";
 
 interface OpeningLine { account_number: string | null; label: string; debit: string; credit: string }
 export interface Opening {
+  preview_token?: string;
   source_end_date: string; opening_date: string; excluded_draft_count: number;
   lines: OpeningLine[]; result_line: OpeningLine | null;
   total_debit: string; total_credit: string;
@@ -30,7 +32,7 @@ export default function OpeningPreview({ year }: { year: number }) {
   }
   return <section aria-labelledby="opening-title">
     <h3 id="opening-title">Préparer les à-nouveaux de cet exercice</h3>
-    <p>Prévisualisation depuis l’exercice précédent. Aucune écriture n’est créée. Le compte de reprise du résultat reste à déterminer avant comptabilisation.</p>
+    <p>La prévisualisation depuis l’exercice précédent ne crée aucune écriture. Vérifiez les soldes avant de demander leur comptabilisation.</p>
     <button type="button" onClick={() => { void load(); }} disabled={loading}>Prévisualiser les à-nouveaux</button>
     {loading && <p role="status">Chargement des soldes à reprendre…</p>}
     {error && <p role="alert">{error}</p>}
@@ -45,5 +47,6 @@ export default function OpeningPreview({ year }: { year: number }) {
         <tfoot><tr><th colSpan={2}>Totaux incluant le résultat précédent</th><td>{data.total_debit}</td><td>{data.total_credit}</td></tr></tfoot>
       </table>
     </div>}
+    <OpeningPosting key={data ? "loaded" : "empty"} year={year} preview={data} />
   </section>;
 }
