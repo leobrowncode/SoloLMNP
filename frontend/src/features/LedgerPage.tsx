@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { request, cents, amount, type Setup, type Account, type Journal, type Entry, type EntryInput, type Balance, type LedgerLine } from "../api/ledger";
 import "./ledger.css";
+import InventoryForm from "./InventoryForm";
 
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
 export default function LedgerPage() {
@@ -129,9 +130,10 @@ export default function LedgerPage() {
       <label>Exercice<select value={year} onChange={(e) => { setYear(Number(e.target.value)); setDraft(null); setConfirmation(null); setOffset(0); setBalance(null); setLedger([]); setEntries([]); }}>
         {setup.years.map((y) => <option key={y.id} value={y.id}>{y.year} · {y.status}</option>)}
       </select></label>
-      <nav aria-label="Vues comptables" className="ledger-tabs">{["Brouillons", "Journal", "Grand livre", "Balance", "Plan comptable"].map((name) =>
-        <button key={name} aria-pressed={tab === name} onClick={() => { setTab(name); setOffset(0); setEntries([]); }}>{name}</button>)}</nav>
+      <nav aria-label="Vues comptables" className="ledger-tabs">{["Brouillons", "Journal", "Grand livre", "Balance", "Plan comptable", "Inventaire"].map((name) =>
+        <button key={name} aria-pressed={tab === name} onClick={() => { setTab(name); setOffset(0); setEntries([]); if (name === "Inventaire") setDraft(null); }}>{name}</button>)}</nav>
       {tab === "Brouillons" && <button disabled={!writable || busy} onClick={() => startDraft()}>Nouvelle écriture</button>}
+      {tab === "Inventaire" && selectedYear && <InventoryForm key={year} year={selectedYear} accounts={accounts} journals={journals} onPosted={() => setRevision((v) => v + 1)} />}
       {draft && <form className="entry-editor" onSubmit={(e) => {
         e.preventDefault();
         void mutate(async () => {

@@ -1,7 +1,7 @@
 export interface Year { id: number; year: number; start_date: string; end_date: string; status: string }
 export interface Setup { activity: { activity_name: string } | null; years: Year[] }
 export interface Account { number: string; label: string; account_type: string; active: boolean }
-export interface Journal { code: string; label: string; active: boolean }
+export interface Journal { code: string; label: string; active: boolean; journal_type?: string }
 export interface Line { account_number: string; label: string; debit: string; credit: string }
 export interface EntryLine extends Line { id: number; position: number; account_label: string | null }
 export interface EntryInput {

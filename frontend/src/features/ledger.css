@@ -1,6 +1,6 @@
 .ledger-page { margin: 2rem 0; padding: 2rem; background: #fff; border: 1px solid #d8e0d8; border-radius: 16px; }
 .ledger-page label { display: inline-flex; flex-direction: column; gap: .4rem; margin: .6rem 1rem .6rem 0; font-size: .9rem; }
-.ledger-page input, .ledger-page select { padding: .65rem; border: 1px solid #819588; border-radius: 6px; max-width: 100%; background: white; color: #173c2e; }
+.ledger-page input, .ledger-page select, .ledger-page textarea { padding: .65rem; border: 1px solid #819588; border-radius: 6px; max-width: 100%; background: white; color: #173c2e; }
 .ledger-page button { margin: .4rem; padding: .65rem 1rem; border: 1px solid #456a54; background: #f2f7f2; color: #173c2e; border-radius: 6px; cursor: pointer; }
 .ledger-page button:disabled { opacity: .5; cursor: default; }
 .ledger-page button[aria-pressed="true"] { background: #173c2e; color: white; }
@@ -15,4 +15,3 @@
 .ledger-page pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 25rem; overflow: auto; }
 .ledger-page summary { cursor: pointer; padding: .8rem 0; }
 @media(max-width: 700px) { .ledger-page { padding: 1rem; } .ledger-page label { display: flex; margin-right: 0; } }
-
