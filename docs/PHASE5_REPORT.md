@@ -286,3 +286,59 @@ l'issue #6 reste ouverte avec les limites décrites ci-dessus.
 Validation locale : 202 tests backend réussis (couverture 94 %), 38 tests
 frontend réussis, Ruff lint/format, mypy, pip check, ESLint, TypeScript et build
 Vite réussis. La CI du nouveau commit reste à vérifier après publication.
+
+
+## API d’inventaire manuel justifié (17 septembre 2026)
+
+La CI de `b98fd85` est réussie sur Linux, Windows, frontend et Docker :
+[exécution 35246276637](https://github.com/leobrowncode/SoloLMNP/actions/runs/35246276637).
+
+`POST /api/ledger/inventory` comptabilise atomiquement une écriture explicitement
+saisie avec tous les champs de `EntryInput`, un `request_id` UUID et une
+`justification` de 10 à 3000 caractères après suppression des espaces externes.
+La pièce datée et sa référence restent obligatoires. Les comptes, montants et dates
+sont choisis par l’appelant ; aucun schéma comptable ou calcul fiscal n’est déduit.
+Le journal actif GENERAL est une restriction de ce parcours applicatif.
+
+L’écriture est immédiatement VALIDATED avec provenance INVENTORY. La transaction
+réutilise les contrôles du ledger (équilibre au centime, stockage, comptes actifs,
+exercice OPEN, date dans l’exercice et non future). Un échec annule écriture,
+lignes et événements, même après la validation si l’audit échoue. L’événement
+append-only INVENTORY_POSTED conserve la justification et les paramètres ; il est
+consultable via `/api/ledger/entries/{id}/events` et le bouton Historique existant.
+Le filtre de source « Inventaire manuel » du journal expose ces écritures.
+
+La même clé et les mêmes paramètres renvoient la même écriture sans nouvel audit,
+même après verrouillage, désactivation ou extourne. Les chaînes monétaires sont
+normalisées au centime pour comparer les réessais. Une clé réutilisée avec un autre
+contenu reçoit 409 INVENTORY_REQUEST_CONFLICT. Le verrou SQLite BEGIN IMMEDIATE
+sérialise la recherche de clé et la création : cette garantie concerne l’API,
+pas des insertions SQL externes. Une nouvelle intention exige une nouvelle clé ;
+une nouvelle clé avec le même contenu n’est pas une détection de doublon métier.
+
+L’extourne générique avec motif est autorisée dans le même exercice OPEN et conserve
+le lien à l’original. Aucune correction silencieuse ou contre-passation automatique
+en année suivante n’est ajoutée. Les états restent exclusivement dérivés du ledger.
+
+Source officielle consultée le 17 septembre 2026 : PCG ANC 2026 (lien dans la section
+Source comptable), art. 1021-3 et 1031-1/1031-3, page 129 ; art. 1032-1/1032-2,
+page 130. Ces articles fondent la justification de l’inventaire, la partie double,
+la validation définitive et les références des pièces datées. Les longueurs du
+texte, la clé UUID et le choix de journal sont des contraintes techniques.
+
+**Limites :** premier lot API uniquement, sans formulaire de saisie dédié. Un texte
+et une référence ne vérifient ni l’existence ni le contenu du document justificatif ;
+l’archivage et les liens aux fichiers restent à livrer. L’utilisateur doit vérifier
+le traitement, son calcul et éviter les doubles saisies avec opérations/registre.
+Ce lot ne fournit pas de traitements automatiques CCA/PCA/FNP/PAR, provisions,
+inventaire exhaustif, centralisation/affectation du résultat ou clôture publique.
+Il ne certifie pas la conformité des comptes et ne clôture pas l’issue #6.
+Aucun modèle persistant ni migration supplémentaire ; aucune base réelle modifiée.
+La nouvelle provenance INVENTORY est ajoutée au filtre existant sans changer les
+champs des réponses ledger.
+
+Tests ajoutés : 20 cas pour comptabilisation/audit/projections/extourne, réessais
+concurrents, normalisation des montants, paramètres incompatibles, justification,
+pièce datée, rollback sur déséquilibre et panne d’audit, verrouillage et désactivation.
+
+Validation locale : 222 tests backend réussis (couverture 94 %), 38 tests frontend réussis ; Ruff lint/format, mypy, pip check, ESLint, TypeScript et build Vite réussis. La CI du nouveau commit reste à vérifier après publication.

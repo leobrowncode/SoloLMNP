@@ -13,6 +13,7 @@ from app.api.ledger_schemas import (
     ActivityInput,
     EditInput,
     EntryInput,
+    InventoryInput,
     JournalInput,
     OpeningInput,
     ReversalInput,
@@ -31,6 +32,7 @@ from app.models import (
     LedgerEvent,
     RentalActivity,
 )
+from app.services.inventory import post_inventory
 from app.services.ledger import (
     check_draft,
     create_draft,
@@ -212,6 +214,7 @@ def build_ledger_router(database: Database) -> APIRouter:
             "LOAN_FUNDING",
             "DEPRECIATION",
             "OPENING",
+            "INVENTORY",
         ]
         | None = None,
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
@@ -259,6 +262,10 @@ def build_ledger_router(database: Database) -> APIRouter:
     @router.post("/entries", status_code=201)
     def create(data: EntryInput, session: Write) -> dict[str, Any]:
         return entry_json(create_draft(session, data))
+
+    @router.post("/inventory")
+    def inventory(data: InventoryInput, session: Write) -> dict[str, Any]:
+        return entry_json(post_inventory(session, data))
 
     @router.put("/entries/{entry_id}")
     def edit(entry_id: int, data: EditInput, session: Write) -> dict[str, Any]:

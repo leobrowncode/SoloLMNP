@@ -60,7 +60,7 @@ describe("ledger", () => {
     const fetcher = mockApi(); render(<LedgerPage />);
     await userEvent.click(await screen.findByRole("button", { name: "Journal" }));
     const source = screen.getByRole("combobox", { name: "Source" });
-    for (const value of ["DEPRECIATION", "OPENING", "SETTLEMENT", ""]) {
+    for (const value of ["DEPRECIATION", "OPENING", "INVENTORY", "SETTLEMENT", ""]) {
       await userEvent.selectOptions(source, value);
       await waitFor(() => {
         const calls = fetcher.mock.calls.filter(([url]) => url.includes("/entries?"));

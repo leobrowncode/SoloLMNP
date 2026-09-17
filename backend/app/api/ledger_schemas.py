@@ -3,6 +3,7 @@
 from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
@@ -92,6 +93,11 @@ class EntryInput(Input):
 
 class EditInput(EntryInput):
     expected_version: int = Field(ge=1)
+
+
+class InventoryInput(EntryInput):
+    request_id: UUID
+    justification: Annotated[str, Field(min_length=10, max_length=3000)]
 
 
 class VersionInput(Input):
