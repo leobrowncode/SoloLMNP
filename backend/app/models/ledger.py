@@ -10,9 +10,11 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -58,6 +60,12 @@ class AccountingJournal(Base):
 class AccountingEntry(Base):
     __tablename__ = "accounting_entry"
     __table_args__ = (
+        Index(
+            "uq_opening_entry_year",
+            "fiscal_year_id",
+            unique=True,
+            sqlite_where=text("source_type = 'OPENING'"),
+        ),
         UniqueConstraint("fiscal_year_id", "sequence", name="uq_entry_year_sequence"),
         UniqueConstraint("fiscal_year_id", "entry_number", name="uq_entry_year_number"),
         CheckConstraint("status IN ('DRAFT','VALIDATED')", name="status"),

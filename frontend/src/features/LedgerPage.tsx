@@ -162,7 +162,11 @@ export default function LedgerPage() {
       </form>}
       {(tab === "Journal" || tab === "Brouillons") && <>
         <details><summary>Filtres</summary><div className="ledger-filters">
-          {Object.entries(filter).map(([key, value]) => <label key={key}>{{ journal_code: "Code journal", account_number: "Numéro de compte", date_from: "Du", date_to: "Au", piece: "Pièce", source: "Source (MANUAL ou REVERSAL)" }[key]}<input type={key.startsWith("date") ? "date" : "text"} value={value} onChange={(e) => { setFilter({ ...filter, [key]: e.target.value }); setOffset(0); }} /></label>)}
+          {Object.entries(filter).filter(([key]) => key !== "source").map(([key, value]) => <label key={key}>{{ journal_code: "Code journal", account_number: "Numéro de compte", date_from: "Du", date_to: "Au", piece: "Pièce" }[key]}<input type={key.startsWith("date") ? "date" : "text"} value={value} onChange={(e) => { setFilter({ ...filter, [key]: e.target.value }); setOffset(0); }} /></label>)}
+          <label>Source<select value={filter.source} onChange={(e) => { setFilter({ ...filter, source: e.target.value }); setOffset(0); }}>
+            <option value="">Toutes les sources</option>
+            {Object.entries({ MANUAL: "Saisie manuelle", REVERSAL: "Extournes", REVENUE: "Recettes", EXPENSE: "Dépenses", SETTLEMENT: "Règlements", LOAN_PAYMENT: "Échéances d’emprunt", LOAN_FUNDING: "Déblocages d’emprunt", DEPRECIATION: "Dotations aux amortissements", OPENING: "À-nouveaux", INVENTORY: "Inventaire manuel" }).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select></label>
         </div></details>
         <p>{viewReady ? count + " écriture(s)" : "Chargement…"} · {tab === "Journal" ? "validées uniquement" : "hors états comptables"}</p>
         {viewReady && entries.map((entry) => <article className="entry-card" key={entry.id}>
@@ -219,4 +223,3 @@ export default function LedgerPage() {
     </>}
   </section>;
 }
-

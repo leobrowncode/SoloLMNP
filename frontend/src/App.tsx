@@ -3,6 +3,7 @@ import { fetchStatus, type ApplicationStatus } from "./api/status";
 import LedgerPage from "./features/LedgerPage";
 import OperationsPage from "./features/OperationsPage";
 import AssetsPage from "./features/AssetsPage";
+import StatementsPage from "./features/StatementsPage";
 
 type LoadState = { kind: "loading" } | { kind: "error" } | { kind: "loaded"; data: ApplicationStatus };
 
@@ -11,7 +12,7 @@ const stages = [
   ["02", "Comptabilité", "Écritures en partie double, journal, grand livre et balance.", "Disponible"],
   ["03", "Opérations", "Recettes, dépenses, banque CSV, rapprochement et emprunts.", "Disponible"],
   ["04", "Immobilisations", "Registre, composants, prorata et dotations comptables.", "Disponible"],
-  ["05", "États comptables", "Inventaire, bilan et compte de résultat.", "À développer"],
+  ["05", "États comptables", "Bilan et résultat provisoires ; inventaire et continuité à suivre.", "En cours"],
   ["06–10", "Fiscalité & déclaration", "Règles sourcées, reports, clôture, FEC et préparation de la saisie EFI.", "À développer"],
   ["11–12", "Conservation & fiabilité", "Justificatifs, sauvegarde, restauration et parcours complets.", "À développer"],
 ];
@@ -19,7 +20,7 @@ const stages = [
 export default function App() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
-  const [page, setPage] = useState<"ledger" | "operations" | "assets">("ledger");
+  const [page, setPage] = useState<"ledger" | "operations" | "assets" | "statements">("ledger");
   useEffect(() => {
     const controller = new AbortController();
     void fetchStatus(controller.signal).then(
@@ -50,6 +51,7 @@ export default function App() {
           <a href="#main" onClick={() => setPage("ledger")}>Comptabilité</a>
           <a href="#main" onClick={() => setPage("operations")}>Opérations & banque</a>
           <a href="#main" onClick={() => setPage("assets")}>Immobilisations</a>
+          <a href="#main" onClick={() => setPage("statements")}>États comptables</a>
           <a href="#installation"><span aria-hidden="true">◎</span> État de l’installation</a>
           <a href="#roadmap"><span aria-hidden="true">↗</span> Étapes du projet</a>
         </nav>
@@ -73,7 +75,7 @@ export default function App() {
             <p className="intro-description">Tenez le registre des immobilisations, séparez le terrain, documentez les composants et comptabilisez chaque dotation dans le ledger.</p>
           </section>
 
-          {ready && ["ledger", "operations", "assets"].includes(status?.phase ?? "") && (page === "ledger" ? <LedgerPage /> : page === "operations" ? <OperationsPage /> : <AssetsPage />)}
+          {ready && ["ledger", "operations", "assets"].includes(status?.phase ?? "") && (page === "ledger" ? <LedgerPage /> : page === "operations" ? <OperationsPage /> : page === "assets" ? <AssetsPage /> : <StatementsPage />)}
           <section id="installation" className="installation" aria-labelledby="installation-title">
             <div className="section-heading">
               <div><p className="eyebrow">DIAGNOSTIC EN DIRECT</p><h2 id="installation-title">État de l’installation</h2></div>
@@ -123,7 +125,7 @@ export default function App() {
           <section className="scope-note" aria-label="Périmètre disponible">
             <span className="scope-icon" aria-hidden="true">i</span>
             <div><h2>Ce que permet cette version</h2>
-            <p>Gérer les opérations courantes, la banque, les emprunts, les immobilisations, leurs composants et les dotations comptables. Le bilan, le moteur fiscal, le FEC et la liasse seront ajoutés dans les prochaines phases. Aucun montant déclarable n’est produit aujourd’hui.</p></div>
+            <p>Gérer les opérations courantes, la banque, les emprunts, les immobilisations et consulter le bilan et le résultat provisoires issus des écritures validées. L’inventaire, la continuité, le moteur fiscal, le FEC et la liasse restent à développer. Aucun montant déclarable n’est produit aujourd’hui.</p></div>
           </section>
 
           <section id="roadmap" className="roadmap" aria-labelledby="roadmap-title">

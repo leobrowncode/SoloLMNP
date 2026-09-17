@@ -56,6 +56,23 @@ describe("ledger", () => {
     expect(await screen.findByText("Balance équilibrée")).toBeInTheDocument();
     expect(screen.getByRole("table")).toHaveTextContent("123.45");
   });
+  it("filters generated and business entries with readable source choices", async () => {
+    const fetcher = mockApi(); render(<LedgerPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Journal" }));
+    const source = screen.getByRole("combobox", { name: "Source" });
+    for (const value of ["DEPRECIATION", "OPENING", "INVENTORY", "SETTLEMENT", ""]) {
+      await userEvent.selectOptions(source, value);
+      await waitFor(() => {
+        const calls = fetcher.mock.calls.filter(([url]) => url.includes("/entries?"));
+        const params = new URLSearchParams(calls.at(-1)![0].split("?")[1]);
+        expect(params.get("source")).toBe(value || null);
+        expect(params.get("status")).toBe("VALIDATED");
+        expect(params.get("offset")).toBe("0");
+      });
+    }
+    expect(screen.getByRole("option", { name: "À-nouveaux" })).toHaveValue("OPENING");
+    expect(screen.getByRole("option", { name: "Dotations aux amortissements" })).toHaveValue("DEPRECIATION");
+  });
   it("shows network errors without claiming readiness", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Hors ligne")));
     render(<LedgerPage />);
@@ -63,4 +80,3 @@ describe("ledger", () => {
     expect(screen.queryByText("Balance équilibrée")).not.toBeInTheDocument();
   });
 });
-

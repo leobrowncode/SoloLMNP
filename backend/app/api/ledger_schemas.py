@@ -3,6 +3,7 @@
 from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
@@ -94,6 +95,11 @@ class EditInput(EntryInput):
     expected_version: int = Field(ge=1)
 
 
+class InventoryInput(EntryInput):
+    request_id: UUID
+    justification: Annotated[str, Field(min_length=10, max_length=3000)]
+
+
 class VersionInput(Input):
     expected_version: int = Field(ge=1)
 
@@ -102,3 +108,10 @@ class ReversalInput(Input):
     accounting_date: date
     piece_reference: Label
     reason: Annotated[str, Field(min_length=5, max_length=300)]
+
+
+class OpeningInput(Input):
+    preview_token: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    journal_code: JournalCode
+    piece_reference: Label
+    result_account: AccountNumber | None = None

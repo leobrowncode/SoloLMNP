@@ -13,7 +13,9 @@ from app.api.ledger_schemas import (
     ActivityInput,
     EditInput,
     EntryInput,
+    InventoryInput,
     JournalInput,
+    OpeningInput,
     ReversalInput,
     VersionInput,
     YearInput,
@@ -30,6 +32,7 @@ from app.models import (
     LedgerEvent,
     RentalActivity,
 )
+from app.services.inventory import post_inventory
 from app.services.ledger import (
     check_draft,
     create_draft,
@@ -43,6 +46,9 @@ from app.services.ledger import (
     replace_draft,
     reverse_entry,
 )
+from app.services.opening import opening_preview
+from app.services.opening_posting import generate_opening, opening_continuity
+from app.services.statements import statements
 
 
 def build_ledger_router(database: Database) -> APIRouter:
@@ -199,7 +205,16 @@ def build_ledger_router(database: Database) -> APIRouter:
         date_to: date | None = None,
         piece: str | None = None,
         source: Literal[
-            "MANUAL", "REVERSAL", "REVENUE", "EXPENSE", "SETTLEMENT", "LOAN_PAYMENT", "LOAN_FUNDING"
+            "MANUAL",
+            "REVERSAL",
+            "REVENUE",
+            "EXPENSE",
+            "SETTLEMENT",
+            "LOAN_PAYMENT",
+            "LOAN_FUNDING",
+            "DEPRECIATION",
+            "OPENING",
+            "INVENTORY",
         ]
         | None = None,
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
@@ -248,6 +263,10 @@ def build_ledger_router(database: Database) -> APIRouter:
     def create(data: EntryInput, session: Write) -> dict[str, Any]:
         return entry_json(create_draft(session, data))
 
+    @router.post("/inventory")
+    def inventory(data: InventoryInput, session: Write) -> dict[str, Any]:
+        return entry_json(post_inventory(session, data))
+
     @router.put("/entries/{entry_id}")
     def edit(entry_id: int, data: EditInput, session: Write) -> dict[str, Any]:
         row = get_entry(session, entry_id)
@@ -271,6 +290,22 @@ def build_ledger_router(database: Database) -> APIRouter:
     @router.post("/entries/{entry_id}/reverse", status_code=201)
     def reverse(entry_id: int, data: ReversalInput, session: Write) -> dict[str, Any]:
         return entry_json(reverse_entry(session, get_entry(session, entry_id), data))
+
+    @router.get("/years/{year_id}/statements")
+    def financial_statements(year_id: int, session: Read) -> dict[str, Any]:
+        return statements(session, year_id)
+
+    @router.get("/years/{year_id}/opening-preview")
+    def preview_opening(year_id: int, session: Read) -> dict[str, Any]:
+        return opening_preview(session, year_id)
+
+    @router.post("/years/{year_id}/opening")
+    def post_opening(year_id: int, data: OpeningInput, session: Write) -> dict[str, Any]:
+        return generate_opening(session, year_id, data)
+
+    @router.get("/years/{year_id}/opening-continuity")
+    def check_opening(year_id: int, session: Read) -> dict[str, Any]:
+        return opening_continuity(session, year_id)
 
     @router.get("/years/{year_id}/balance")
     def balance(year_id: int, session: Read) -> dict[str, Any]:

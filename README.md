@@ -2,7 +2,7 @@
 
 Application libre, mono-utilisateur et auto-hébergeable pour une activité LMNP au réel simplifié BIC.
 
-**Version 0.5.0 — immobilisations et amortissements comptables.** Le ledger, les opérations, la banque, les emprunts, le registre des actifs, les composants et les dotations comptables sont disponibles. Les états annuels, calculs fiscaux, FEC et déclarations restent à développer. Cette version ne produit aucun montant déclarable.
+**Version 0.5.0 — immobilisations et premiers états provisoires.** Le ledger, les opérations, la banque, les emprunts, le registre des actifs, les composants et les dotations comptables sont disponibles. L’écran « États comptables » présente un bilan et un résultat provisoires par compte depuis les écritures validées. L’inventaire, la continuité, les états annuels réglementaires, calculs fiscaux, FEC et déclarations restent à développer. Cette version ne produit aucun montant déclarable.
 
 ## Démarrer
 
