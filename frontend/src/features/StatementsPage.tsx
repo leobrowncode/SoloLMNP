@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { request, type Setup } from "../api/ledger";
+import OpeningPreview from "./OpeningPreview";
 import "./ledger.css";
 
 interface Row { account_number: string; label: string; amount: string }
@@ -49,6 +50,7 @@ export default function StatementsPage() {
       <label>Exercice <select value={year} onChange={(event) => refresh(Number(event.target.value))}>{setup.years.map((item) => <option key={item.id} value={item.id}>{item.year}</option>)}</select></label>
       <button type="button" onClick={() => refresh()}>Actualiser les états</button>
     </div>}
+    {year !== 0 && <OpeningPreview key={`${year}-${attempt}`} year={year} />}
     {error && <p role="alert">{error}</p>}
     {!error && (!setup || (year !== 0 && !data)) && <p role="status">Chargement des états…</p>}
     {data && <div aria-live="polite">

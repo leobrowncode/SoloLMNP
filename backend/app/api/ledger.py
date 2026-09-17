@@ -43,6 +43,7 @@ from app.services.ledger import (
     replace_draft,
     reverse_entry,
 )
+from app.services.opening import opening_preview
 from app.services.statements import statements
 
 
@@ -276,6 +277,10 @@ def build_ledger_router(database: Database) -> APIRouter:
     @router.get("/years/{year_id}/statements")
     def financial_statements(year_id: int, session: Read) -> dict[str, Any]:
         return statements(session, year_id)
+
+    @router.get("/years/{year_id}/opening-preview")
+    def preview_opening(year_id: int, session: Read) -> dict[str, Any]:
+        return opening_preview(session, year_id)
 
     @router.get("/years/{year_id}/balance")
     def balance(year_id: int, session: Read) -> dict[str, Any]:

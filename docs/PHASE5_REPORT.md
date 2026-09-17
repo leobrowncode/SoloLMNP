@@ -1,4 +1,4 @@
-# Phase 5 — premier lot : états provisoires par compte
+# Phase 5 — états provisoires et préparation des à-nouveaux
 
 ## Périmètre
 
@@ -74,3 +74,53 @@ l'affichage d'une erreur courante. Quatre échouent sur l'ancien composant et le
 six passent après correction. Suite frontend : 23 tests réussis ; ESLint,
 TypeScript et build Vite réussis. Cette correction ne modifie ni les règles
 comptables ni le schéma et ne termine pas P5.
+
+## Prévisualisation des à-nouveaux (17 septembre 2026)
+
+Depuis « États comptables », sélectionner l’exercice destinataire puis cliquer
+sur « Prévisualiser les à-nouveaux ». La route en lecture seule
+`GET /api/ledger/years/{year_id}/opening-preview` recherche l’exercice de la même
+activité se terminant exactement la veille de son ouverture. Aucun prédécesseur
+contigu : réponse 409 explicite ; exercice destinataire inconnu : 404.
+
+Les soldes non nuls des comptes de bilan validés sont repris en débit/crédit,
+sans compensation entre comptes. Les comptes de charges et produits ne sont
+pas repris. Leur résultat est présenté distinctement, sur une ligne sans numéro
+de compte, et inclus dans les totaux de contrôle. Cette ligne n’est pas une
+écriture comptabilisable : le compte de reprise et l’affectation restent à
+déterminer. Les montants sont calculés en centimes entiers et affichés en chaînes.
+La réponse reste PROVISIONAL même si le prédécesseur est clôturé.
+
+Source : PCG ANC au 1er janvier 2026 (lien ci-dessus), articles 112-2 et 112-3,
+page 9, consultés le 17 septembre 2026. Le diagnostic prépare la comparaison
+avec le bilan précédent avant répartition ; il ne certifie pas la continuité.
+Il n’applique pas encore les opérations de centralisation et d’affectation du
+résultat décrites pour le compte 12 (article 1211-12, page 154).
+
+Les alertes indiquent : exercice précédent non clôturé, brouillons exclus,
+exercice destinataire non ouvert, écritures déjà présentes (brouillons compris),
+comptes inactifs et compte de reprise du résultat à déterminer. Aucune alerte
+ne déclenche de mutation. L’historique et l’exercice destinataire restent intacts.
+Le bilan source utilise les mêmes contrôles bloquants de classement et d’équilibre
+que les états. Aucun modèle persistant ou migration supplémentaire.
+
+Le changement d’exercice et l’actualisation des états effacent la prévisualisation.
+Les réponses tardives, succès comme erreurs, de l’ancien exercice sont ignorées.
+Une nouvelle demande efface les anciens montants avant chargement.
+
+Onze tests backend couvrent les soldes de bilan, amortissements, bénéfice/perte,
+centimes et grands montants, extourne et comptes soldés, exercice absent ou non
+contigu, comptes inactifs, écritures destinataires, états verrouillés et source
+corrompue/mal classée. Quatre tests frontend couvrent le chargement à la demande,
+l’échec sans anciens totaux, les réponses tardives et l’actualisation globale.
+
+Ce lot prépare la génération idempotente des à-nouveaux. Il ne la réalise pas,
+ne valide pas encore un scénario complet de deuxième année et ne termine pas P5.
+L’issue #6 reste ouverte ; inventaire, génération, contrôle de continuité après
+comptabilisation et présentation réglementaire restent nécessaires.
+
+Validation de ce lot : suite initiale de 173 tests backend réussie, puis 11 tests
+à-nouveaux réussis après ajout de deux régressions sur les cumuls dépassant la
+limite de stockage d’une ligne. Les cumuls restent des entiers sans limite SQLite.
+Les 27 tests frontend, Ruff (lint/format), mypy, pip check, ESLint, TypeScript
+et le build Vite passent. La CI distante de ce nouveau commit reste à vérifier.
