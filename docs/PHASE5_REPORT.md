@@ -1,8 +1,9 @@
 # Phase 5 — états provisoires et préparation des à-nouveaux
 
-État courant : la génération et le contrôle technique des à-nouveaux décrits dans
-la dernière section sont livrés. Les sections précédentes documentent les lots
-successifs et leurs limites à leur date de livraison.
+État courant : états provisoires, à-nouveaux et API d’inventaire livrés dans #18,
+fusionnée le 17 septembre 2026. Le lot suivant ajoute le formulaire d’inventaire
+décrit en fin de rapport. Les sections précédentes documentent les lots successifs
+et leurs limites à leur date de livraison.
 
 ## Périmètre
 
@@ -342,3 +343,46 @@ concurrents, normalisation des montants, paramètres incompatibles, justificatio
 pièce datée, rollback sur déséquilibre et panne d’audit, verrouillage et désactivation.
 
 Validation locale : 222 tests backend réussis (couverture 94 %), 38 tests frontend réussis ; Ruff lint/format, mypy, pip check, ESLint, TypeScript et build Vite réussis. La CI du nouveau commit reste à vérifier après publication.
+
+## Formulaire d’inventaire manuel (17 septembre 2026)
+
+La PR #18 est fusionnée dans main (49a2882), après réussite de la
+[CI 35250803096](https://github.com/leobrowncode/SoloLMNP/actions/runs/35250803096).
+Ce lot poursuit l’issue #6 depuis ce main, sans recréer les fonctions déjà livrées.
+
+Dans Comptabilité > Inventaire, sélectionner un exercice ouvert et saisir le
+journal GENERAL actif, la pièce datée, sa référence, les lignes et la justification.
+Le formulaire propose uniquement les comptes actifs et contrôle un seul côté
+positif par ligne, les montants exacts et l’équilibre en BigInt. Une revue distincte
+présente toutes les valeurs avant confirmation de la validation définitive.
+Le serveur reste responsable de tous les contrôles comptables et des dates.
+Le reçu indique le numéro d’écriture ; le journal et son historique existants
+permettent de consulter la justification et d’effectuer une extourne motivée.
+
+Avant tout envoi, les paramètres et leur UUID sont conservés dans sessionStorage,
+par exercice. Une réponse perdue conserve la demande immuable pour un réessai
+identique, y compris après navigation et rechargement du même onglet. Une demande
+récupérée n’est jamais envoyée automatiquement. Le réessai reste accessible pour
+un exercice désormais fermé : l’API peut alors reconnaître une écriture déjà
+validée. Les doubles soumissions simultanées sont bloquées dans le composant.
+Un stockage indisponible bloque l’envoi ; un contenu invalide bloque la nouvelle
+saisie et conserve les données pour diagnostic. L’abandon après tentative exige
+une confirmation explicite de vérification du journal, car une erreur réseau
+ne prouve pas l’absence d’écriture. Un succès retire la demande conservée.
+
+Limites : conservation dans le même onglet uniquement, sans garantie après sa
+fermeture, purge du navigateur ou remplacement de la base de l’instance.
+Après fermeture, consulter le journal avant toute nouvelle saisie. Deux onglets
+ou deux UUID distincts ne sont pas une détection de doublon métier. Les données
+conservées comprennent la justification ; aucun fichier justificatif n’est
+archivé. Aucun schéma automatique, nouveau traitement comptable ou fiscal,
+migration ou modification de base réelle. Présentation réglementaire,
+centralisation/affectation, pièces archivées et parcours de clôture restent à
+livrer. L’issue #6 reste ouverte.
+
+Validation locale : 48 tests frontend réussis (10 nouveaux cas : revue et reçu,
+équilibre, lignes à deux côtés, réponse perdue, remontage/réessai, double soumission,
+stockage indisponible ou corrompu, exercice fermé et isolation des exercices).
+Les 20 tests backend d’inventaire existants passent. ESLint, TypeScript, build Vite,
+Ruff lint/format et mypy passent. Le backend étant inchangé, la suite complète
+backend et Docker sont laissés à la CI de cette PR.
