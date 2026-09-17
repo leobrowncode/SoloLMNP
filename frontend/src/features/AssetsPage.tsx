@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { assetsRequest as api, type Asset, type DepreciationPeriod } from "../api/assets";
 import { request, type Account, type Setup } from "../api/ledger";
 import { operationsRequest, type Property } from "../api/operations";
@@ -36,14 +36,19 @@ export default function AssetsPage() {
     }).catch((reason: Error) => { if (active) setError(reason.message); });
     return () => { active = false; };
   }, [revision]);
-  useEffect(() => {
+  // Register the read before the user can calculate against this rendered year.
+  // A passive effect could otherwise invalidate a calculation started first.
+  useLayoutEffect(() => {
     if (!yearId) return;
     let active = true;
-    const requestId = ++periodRequest.current;
+    const requests = periodRequest;
+    const requestId = ++requests.current;
     void api<DepreciationPeriod[]>(`/years/${yearId}/periods`).then((rows) => {
       if (active && requestId === periodRequest.current) setPeriods(rows);
-    }).catch((reason: Error) => { if (active) setError(reason.message); });
-    return () => { active = false; };
+    }).catch((reason: Error) => {
+      if (active && requestId === periodRequest.current) setError(reason.message);
+    });
+    return () => { active = false; ++requests.current; };
   }, [yearId, revision]);
 
   const account = (name: string, label: string, prefix: string, value?: string): Field => ({
@@ -94,7 +99,9 @@ export default function AssetsPage() {
       if (requestId === periodRequest.current) {
         setPeriods(rows); setMessage(`${rows.length} période(s) calculée(s). Vérifiez-les avant comptabilisation.`);
       }
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Calcul impossible."); }
+    } catch (reason) {
+      if (requestId === periodRequest.current) setError(reason instanceof Error ? reason.message : "Calcul impossible.");
+    }
   }
 
   return <section id="assets" className="ledger-page" aria-labelledby="assets-title">
@@ -112,7 +119,11 @@ export default function AssetsPage() {
         {row.components.map((part) => <p key={part.id}>↳ {part.label} · {part.value} € · {part.useful_life_months} mois</p>)}
       </article>)}
       <div className="section-heading"><div><h3>Dotations comptables</h3><p>Le calcul en jours calendaires ne modifie jamais la couche fiscale.</p></div>
-        <label>Exercice<select value={yearId} onChange={(event) => setYearId(Number(event.target.value))}>{setup.years.filter((year) => year.status === "OPEN").map((year) => <option key={year.id} value={year.id}>{year.year}</option>)}</select></label>
+        <label>Exercice<select value={yearId} onChange={(event) => {
+          ++periodRequest.current;
+          setPeriods([]); setError(""); setMessage(""); setEditor(null);
+          setYearId(Number(event.target.value));
+        }}>{setup.years.filter((year) => year.status === "OPEN").map((year) => <option key={year.id} value={year.id}>{year.year}</option>)}</select></label>
       </div>
       <button disabled={!yearId} onClick={() => { void calculate(); }}>Calculer les périodes</button>
       <div className="ledger-table"><table><thead><tr><th>Actif / composant</th><th>Période</th><th>Jours</th><th>Dotation</th><th>Cumul</th><th>VNC de la base</th><th>État</th></tr></thead><tbody>

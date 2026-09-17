@@ -57,3 +57,20 @@ réussis, couverture backend 93 %. `pip check`, Ruff (lint et format), mypy,
 ESLint, TypeScript et build Vite réussis. `npm ci` indique zéro vulnérabilité.
 Les fixtures backend appliquent toutes les migrations sur des bases temporaires.
 Docker et la CI distante ne sont pas validés par ces contrôles locaux.
+
+## Correction de la CI et des réponses asynchrones (17 septembre 2026)
+
+La CI du premier commit P5 a validé le backend Linux/Windows et Docker, mais
+échoué sur le test de calcul des immobilisations. Le chargement initial des
+périodes pouvait démarrer après un clic sur Calculer et invalider ce calcul.
+L'abonnement aux périodes est désormais établi avant que les contrôles de
+l'exercice rendu soient interactifs. Les lectures et calculs périmés ne peuvent
+plus publier leur erreur ; changer d'exercice efface immédiatement les périodes,
+les messages et le formulaire de comptabilisation de l'ancien exercice.
+
+Six cas de test couvrent les réponses initiales tardives (succès/erreur), les
+calculs de l'ancien exercice (succès/erreur), la fermeture du formulaire et
+l'affichage d'une erreur courante. Quatre échouent sur l'ancien composant et les
+six passent après correction. Suite frontend : 23 tests réussis ; ESLint,
+TypeScript et build Vite réussis. Cette correction ne modifie ni les règles
+comptables ni le schéma et ne termine pas P5.
