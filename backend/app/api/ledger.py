@@ -43,6 +43,7 @@ from app.services.ledger import (
     replace_draft,
     reverse_entry,
 )
+from app.services.statements import statements
 
 
 def build_ledger_router(database: Database) -> APIRouter:
@@ -271,6 +272,10 @@ def build_ledger_router(database: Database) -> APIRouter:
     @router.post("/entries/{entry_id}/reverse", status_code=201)
     def reverse(entry_id: int, data: ReversalInput, session: Write) -> dict[str, Any]:
         return entry_json(reverse_entry(session, get_entry(session, entry_id), data))
+
+    @router.get("/years/{year_id}/statements")
+    def financial_statements(year_id: int, session: Read) -> dict[str, Any]:
+        return statements(session, year_id)
 
     @router.get("/years/{year_id}/balance")
     def balance(year_id: int, session: Read) -> dict[str, Any]:
