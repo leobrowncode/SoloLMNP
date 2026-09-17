@@ -8,6 +8,7 @@
 - P3 : recettes/dépenses à l'engagement, règlements, banque CSV, rapprochement et emprunts implémentés. Voir [le rapport](docs/PHASE3_REPORT.md).
 - P4 : registre immuable, composants, prorata en jours et dotations ledger implémentés. Voir [le rapport](docs/PHASE4_REPORT.md).
 - P5 : en cours. Bilan/résultat provisoires, prévisualisation et génération idempotente des à-nouveaux, contrôle par compte et scénario de règlement en deuxième année livrés. La génération exige une source clôturée (parcours de clôture prévu en P7). Inventaire, présentation réglementaire et validation complète de continuité restent à terminer ; l’issue #6 reste ouverte. Voir [le rapport](docs/PHASE5_REPORT.md).
+  - Intégration P3/P4/P5 : scénario sur deux exercices avec règlements métier, emprunt et dotations ; correction du double comptage du capital après reprise et filtres du journal étendus aux dotations/à-nouveaux. La clôture reste simulée uniquement dans les fixtures de test.
 
 | Phase | Périmètre | Issue |
 |---|---|---|

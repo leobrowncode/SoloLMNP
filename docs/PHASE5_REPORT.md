@@ -198,3 +198,60 @@ Ne pas modifier directement les données réelles pour simuler une clôture.
 Inventaire justifié, présentation réglementaire, correction des reprises après
 réouverture et parcours complet sur deux exercices restent à terminer.
 L’issue #6 reste ouverte et aucun montant déclarable n’est produit.
+
+## Intégration opérations, emprunts et dotations (17 septembre 2026)
+
+La CI du commit `7229cfb` a réussi sur Linux, Windows, frontend et Docker :
+[exécution 35232175984](https://github.com/leobrowncode/SoloLMNP/actions/runs/35232175984).
+
+Un scénario intégré P3/P4/P5 a révélé un défaut : le calcul du capital restant
+dû additionnait les mouvements de tous les exercices, y compris les à-nouveaux
+générés. Un emprunt de 10 000 € apparaissait ainsi à 20 000 € après sa reprise,
+et un remboursement de capital supérieur au montant réel était accepté.
+Trois cas ont échoué sur le code précédent et passent après correction.
+
+Le cumul historique des mouvements du capital exclut désormais uniquement les
+écritures de provenance OPENING générées par l’application. Les soldes initiaux
+manuels et les extournes restent inclus. Les états annuels continuent à inclure
+les à-nouveaux de leur exercice. Cette correction de double comptage n’ajoute
+aucune règle comptable ou fiscale, aucune migration ni modification de données.
+Les reprises manuelles dupliquant un historique déjà importé restent hors de ce
+contrôle : leur rapprochement nécessite un futur parcours d’import dédié.
+
+Le test intégré utilise un exercice 2025 puis un exercice court du 1er au
+31 janvier 2026, afin de vérifier les dotations sans valider une date future.
+La source est clôturée par une fixture sur une base temporaire, car P7 reste à
+livrer. Le scénario passe par les API métier pour le déblocage de l’emprunt,
+les recettes/dépenses non réglées, leurs règlements en deuxième exercice,
+l’échéance et les dotations du registre. Les valeurs attendues sont explicites :
+
+| Contrôle | Valeur attendue |
+|---|---:|
+| Capital après à-nouveaux | 10 000,00 € |
+| Résultat 2025 (900,25 − 100,15 − 120,92) | 679,18 € |
+| Résultat 2026 après règlement des créances/dettes reprises | 0,00 € |
+| Capital après échéance de 125 € dont 100 € de capital | 9 900,00 € |
+| Dotation de janvier 2026 | 20,37 € |
+| Résultat du second exercice (20 € intérêts + 5 € assurance + dotation) | −45,37 € |
+| Total actif / passif du second exercice | 10 533,81 € |
+
+Le test vérifie aussi les réessais idempotents, les opérations soldées, le bilan
+équilibré, les états source inchangés et la continuité des soldes repris.
+Deux régressions refusent des remboursements de capital de 10 000,01 € et
+20 000 € sans écriture partielle. Un quatrième test préserve le capital saisi
+manuellement et restaure son solde après extourne d’une échéance en année 2.
+
+Le filtre `source` du journal accepte maintenant DEPRECIATION et OPENING.
+L’interface remplace la saisie libre des codes par une liste française de toutes
+les provenances disponibles. Un test UI vérifie les requêtes filtrées et le
+retour à toutes les sources ; le scénario backend vérifie leur contenu et
+l’isolement des exercices.
+
+L’inventaire justifié, la présentation réglementaire, la centralisation et
+l’affectation du résultat, la clôture/réouverture et le parcours utilisateur
+complet restent à réaliser. Ce lot ne termine pas P5 et ne clôture pas #6.
+
+Validation locale : 198 tests backend réussis, couverture 94 %, puis les quatre
+tests ciblés réussis après nettoyage des imports. Les 38 tests frontend, Ruff
+lint/format, mypy, ESLint, TypeScript et build Vite passent. La CI du nouveau
+commit sera contrôlée après publication.

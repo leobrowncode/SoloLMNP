@@ -295,11 +295,15 @@ def settle(session: Session, parent_id: int, data: SettlementInput) -> BusinessO
 
 
 def principal_balance(session: Session, loan: Loan) -> int:
+    # This is a lifetime movement sum, not an annual balance. Generated openings
+    # repeat historical liabilities already included below. Keep manual initial
+    # balances and reversals; exclude only the application's generated carryovers.
     rows = session.execute(
         select(AccountingEntryLine.credit, AccountingEntryLine.debit)
         .join(AccountingEntry)
         .where(
             AccountingEntry.status == "VALIDATED",
+            AccountingEntry.source_type != "OPENING",
             AccountingEntryLine.account_number == loan.principal_account,
         )
     )

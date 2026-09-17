@@ -203,7 +203,15 @@ def build_ledger_router(database: Database) -> APIRouter:
         date_to: date | None = None,
         piece: str | None = None,
         source: Literal[
-            "MANUAL", "REVERSAL", "REVENUE", "EXPENSE", "SETTLEMENT", "LOAN_PAYMENT", "LOAN_FUNDING"
+            "MANUAL",
+            "REVERSAL",
+            "REVENUE",
+            "EXPENSE",
+            "SETTLEMENT",
+            "LOAN_PAYMENT",
+            "LOAN_FUNDING",
+            "DEPRECIATION",
+            "OPENING",
         ]
         | None = None,
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
