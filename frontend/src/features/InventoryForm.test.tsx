@@ -44,6 +44,57 @@ describe("manual inventory", () => {
     expect(JSON.parse(init.body)).toMatchObject({ fiscal_year_id: 1, journal_code: "OD", justification: "Calcul justifié dans la pièce INV-1.", lines: [{ debit: "123.45" }, { credit: "123.45" }] });
     expect(sessionStorage.length).toBe(0); expect(props.onPosted).toHaveBeenCalledOnce();
   });
+  it("keeps the confirmed receipt and refreshes the ledger when pending cleanup fails", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response()); vi.stubGlobal("fetch", fetcher);
+    const view = render(<InventoryForm {...props} />); await fill();
+    const storage = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("Stockage indisponible"); });
+    try {
+      await userEvent.click(screen.getByRole("button", { name: "Confirmer la comptabilisation" }));
+      expect(await screen.findByRole("status")).toHaveTextContent("2025-000010");
+      expect(screen.getByRole("alert")).toHaveTextContent("comptabilisée");
+      expect(props.onPosted).toHaveBeenCalledOnce();
+      expect(sessionStorage.getItem("sololmnp.inventory.pending.1")).not.toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "Effacer la demande locale confirmée" }));
+      expect(fetcher).toHaveBeenCalledOnce();
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      storage.mockRestore();
+      await userEvent.click(screen.getByRole("button", { name: "Effacer la demande locale confirmée" }));
+      expect(sessionStorage.getItem("sololmnp.inventory.pending.1")).toBeNull();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(fetcher).toHaveBeenCalledOnce();
+      expect(props.onPosted).toHaveBeenCalledOnce();
+      expect(screen.getByRole("status")).toHaveTextContent("2025-000010");
+      view.unmount(); render(<InventoryForm {...props} />);
+      expect(screen.getByRole("button", { name: "Vérifier l’inventaire" })).toBeEnabled();
+    } finally { storage.mockRestore(); }
+  });
+  it("recovers the identical request after confirmed posting with failed local cleanup", async () => {
+    const fetcher = vi.fn().mockImplementation(async () => response()); vi.stubGlobal("fetch", fetcher);
+    const view = render(<InventoryForm {...props} />); await fill();
+    const storage = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("Stockage indisponible"); });
+    try {
+      await userEvent.click(screen.getByRole("button", { name: "Confirmer la comptabilisation" }));
+      expect(await screen.findByRole("status")).toHaveTextContent("2025-000010");
+      expect(props.onPosted).toHaveBeenCalledOnce();
+    } finally { storage.mockRestore(); }
+    view.unmount(); render(<InventoryForm {...props} year={{ ...year, status: "CLOSED" }} />);
+    expect(fetcher).toHaveBeenCalledOnce();
+    await userEvent.click(screen.getByRole("button", { name: "Réessayer la même demande" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("2025-000010");
+    expect(fetcher.mock.calls[0]![1].body).toBe(fetcher.mock.calls[1]![1].body);
+    expect(sessionStorage.length).toBe(0);
+  });
+  it("shows refresh failure without losing the confirmed receipt or resending", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response()); vi.stubGlobal("fetch", fetcher);
+    const onPosted = vi.fn(() => { throw new Error("Journal indisponible"); });
+    render(<InventoryForm {...props} onPosted={onPosted} />); await fill();
+    await userEvent.click(screen.getByRole("button", { name: "Confirmer la comptabilisation" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("2025-000010");
+    expect(screen.getByRole("alert")).toHaveTextContent("Journal indisponible");
+    expect(screen.queryByRole("button", { name: "Réessayer la même demande" })).not.toBeInTheDocument();
+    expect(sessionStorage.length).toBe(0);
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
   it("refuses imbalance and double-sided lines without sending anything", async () => {
     const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher); render(<InventoryForm {...props} />);
     await fill("123.44"); expect(screen.getByRole("alert")).toHaveTextContent("équilibrés au centime");

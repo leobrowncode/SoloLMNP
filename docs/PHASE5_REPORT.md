@@ -386,3 +386,27 @@ stockage indisponible ou corrompu, exercice fermé et isolation des exercices).
 Les 20 tests backend d’inventaire existants passent. ESLint, TypeScript, build Vite,
 Ruff lint/format et mypy passent. Le backend étant inchangé, la suite complète
 backend et Docker sont laissés à la CI de cette PR.
+
+
+## Reçu confirmé et nettoyage local (29 septembre 2026)
+
+Le formulaire livré par la PR #19 est présent sur main. Un échec de suppression
+sessionStorage après réponse positive masquait l’erreur derrière le reçu et
+empêchait l’actualisation du journal. Le reçu distingue désormais la confirmation
+serveur du nettoyage local : l’actualisation est déclenchée même si le stockage
+refuse la suppression, une alerte explique la situation et un bouton réessaie
+uniquement l’effacement local, sans nouvelle requête comptable. Une erreur
+synchrone du rappel d’actualisation reste également visible avec le reçu.
+
+Si la page est rechargée avant nettoyage, la demande conservée garde son UUID
+et ses paramètres ; le réessai explicite retrouve l’écriture via l’idempotence
+existante, même après clôture de l’exercice. Aucun envoi automatique.
+
+Trois régressions couvrent l’échec et le réessai de nettoyage sans nouvelle
+requête, le remontage après confirmation et l’erreur d’actualisation. Les deux
+premiers cas échouent avant correction. Validation : 51 tests frontend et les
+20 tests backend d’inventaire passent. ESLint, TypeScript, build Vite, Ruff
+lint/format, mypy et git diff --check passent. La suite backend complète et
+Docker restent à vérifier dans la CI distante. Les règles comptables, API et schéma
+restent inchangés ; aucune migration ni modification de base réelle. Les
+limites P5 précédentes restent applicables et l’issue #6 reste ouverte.
