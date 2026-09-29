@@ -37,6 +37,7 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const [error, setError] = useState(recovery.error);
+  const [cleanupError, setCleanupError] = useState("");
   const [receipt, setReceipt] = useState<Entry | null>(null);
   const [checked, setChecked] = useState(false);
   let totals = "Montants au centime requis.";
@@ -64,6 +65,14 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
       setReview({ ...draft, lines, justification: justification.trim(), request_id: crypto.randomUUID() });
     } catch (reason) { setError((reason as Error).message); }
   }
+  function clearConfirmedRequest() {
+    try {
+      sessionStorage.removeItem(storageKey);
+      setCleanupError("");
+    } catch {
+      setCleanupError("L’écriture est comptabilisée, mais la demande locale n’a pas pu être effacée. Réessayez son effacement. Après rechargement, réessayez uniquement la même demande pour retrouver cette écriture.");
+    }
+  }
   async function post() {
     if (!review || pending.current) return;
     pending.current = true; setBusy(true); setError("");
@@ -73,12 +82,15 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
       setAttempted(true);
       const entry = await request<Entry>("/inventory", "POST", review);
       setReceipt(entry);
-      sessionStorage.removeItem(storageKey);
+      clearConfirmedRequest();
       onPosted();
     } catch (reason) { setError((reason as Error).message); }
     finally { pending.current = false; setBusy(false); }
   }
-  if (receipt) return <section><h3>Inventaire comptabilisé</h3><p role="status">Écriture {receipt.entry_number} · {receipt.label}. Consultez le journal et son historique pour retrouver la justification ou effectuer une extourne motivée.</p></section>;
+  if (receipt) return <section><h3>Inventaire comptabilisé</h3><p role="status">Écriture {receipt.entry_number} · {receipt.label}. Consultez le journal et son historique pour retrouver la justification ou effectuer une extourne motivée.</p>
+    {cleanupError && <><p role="alert">{cleanupError}</p><button type="button" onClick={clearConfirmedRequest}>Effacer la demande locale confirmée</button></>}
+    {error && <p role="alert">L’écriture est comptabilisée, mais l’actualisation a échoué : {error}. Actualisez le journal.</p>}
+  </section>;
   return <form className="entry-editor" onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(); }}>
     <h3>Inventaire manuel · exercice {year.year}</h3>
     <p>Choisissez les comptes et montants après vérification du traitement et du calcul. La confirmation valide définitivement l’écriture. La référence et la justification ne constituent pas un archivage de pièce.</p>
