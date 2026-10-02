@@ -1,8 +1,12 @@
 # Fichier des écritures comptables (FEC)
 
-## Références de recherche
+## Références
 
-Base légale : [LPF article L47 A](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000042659296) et format prescrit par [article A47 A-1 du LPF](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000028219503). Doctrine : [BOI-CF-IOR-60-40](https://bofip.impots.gouv.fr/bofip/9028-PGP.html). Ces liens et textes consolidés doivent être revérifiés avant Phase 8.
+Base légale : [LPF article L47 A](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000042659296) et format prescrit par l’article A47 A-1 du LPF. Le texte de l’arrêté du 29 juillet 2013 (JORFTEXT000027788276) a été relu le 2 octobre 2026 : les dix-huit premiers champs d’un fichier à plat sont, dans l’ordre, JournalCode, JournalLib, EcritureNum, EcritureDate, CompteNum, CompteLib, CompAuxNum, CompAuxLib, PieceRef, PieceDate, EcritureLib, Debit, Credit, EcritureLet, DateLet, ValidDate, Montantdevise, Idevise. Le fichier reprend les écritures après inventaire, y compris les à-nouveaux, et exclut les écritures de centralisation et de solde des comptes de charges et de produits. Doctrine : [BOI-CF-IOR-60-40-20](https://bofip.impots.gouv.fr/bofip/9028-PGP.html/identifiant=BOI-CF-IOR-60-40-20-20170607).
+
+## Export livré
+
+`GET /api/filing/years/{id}/fec` n’accepte qu’un exercice `CLOSED`. Le contenu est UTF-8, séparateur tabulation, fin de ligne CRLF, dates `YYYYMMDD`, montants avec virgule. Le nom suit `FEC` plus la date de fin d’exercice. L’empreinte SHA-256 est renvoyée dans `X-Content-SHA256` et reste identique tant que les écritures validées ne changent pas. Les écritures `CENTRALIZATION` sont omises. Un ERROR du validateur interdit l’export. Cet export n’affirme pas que le contribuable est tenu de remettre un FEC.
 
 ## Contrat prévu
 

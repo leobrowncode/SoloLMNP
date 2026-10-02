@@ -1,5 +1,5 @@
 # Sauvegarde et restauration
 
-Phase 11 produira une archive locale contenant une sauvegarde cohérente SQLite, documents, manifeste (schéma/application/millésimes), tailles et SHA-256. Aucun secret d'environnement. Création dans un fichier temporaire à permissions restrictives puis renommage atomique.
+`POST /api/filing/backup` écrit une archive locale : copie SQLite via l’API backup, documents du répertoire configuré, manifeste (version, révision de schéma, tailles, SHA-256). Aucun secret d’environnement. Le zip est composé dans un fichier temporaire puis renommé.
 
-La restauration refuse chemins absolus, `..`, liens, doublons, archives démesurées et empreintes invalides ; elle contrôle versions et base avant remplacement. Toujours tester sur copie, conserver plusieurs générations hors machine et chiffrer les archives contenant des données personnelles.
+`POST /api/filing/backup/restore` refuse un nom contenant `..`, un lien, un doublon, une archive trop grande, une empreinte fausse ou un schéma différent. La base extraite est contrôlée, puis écrite dans `restore-check.sqlite3` à côté de la base ouverte. Le fichier en service n’est pas remplacé tant que l’application tourne. Conserver plusieurs générations hors machine et chiffrer les archives qui contiennent des données personnelles.

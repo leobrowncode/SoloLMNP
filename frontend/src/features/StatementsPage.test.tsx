@@ -21,7 +21,9 @@ test("shows provisional statements and removes stale totals on refresh failure",
   expect(screen.getByText(/Brouillons exclus : 1/)).toBeInTheDocument();
   failed = true;
   fireEvent.click(screen.getByRole("button", { name: "Actualiser les états" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("Ledger déséquilibré");
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("Ledger déséquilibré");
+  expect(alert).toHaveFocus();
   expect(screen.queryByText("Résultat comptable : -10.01 €")).not.toBeInTheDocument();
 });
 
@@ -39,6 +41,21 @@ test("ignores late responses from the previous year", async () => {
   expect(await screen.findByText(/2026-01-01 — 2026-12-31/)).toBeInTheDocument();
   await act(async () => { finish?.(response(report(1))); await pending; });
   await waitFor(() => expect(screen.queryByText(/2025-01-01 — 2025-12-31/)).not.toBeInTheDocument());
+});
+
+test("shows rubric presentation without applying reclassifications", async () => {
+  const body = report(1);
+  body.presentation = {
+    reclassifications_applied: false,
+    warnings: [{ code: "DECOUVERT", message: "Découvert signalé sur 512000." }],
+    income_rubrics: [{ code: "PRODUITS_EXPLOITATION", label: "Produits d’exploitation", accounts: [], total: "0.00" }],
+    balance_rubrics: [{ code: "TRESORERIE", label: "Trésorerie", accounts: [{ account_number: "512000", label: "Banques", amount: "-15.00" }], total: "-15.00" }],
+  };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => String(input).endsWith("/setup") ? response(setup) : response(body));
+  render(<StatementsPage />);
+  expect(await screen.findByText("Découvert signalé sur 512000.")).toBeInTheDocument();
+  expect(screen.getByText("Trésorerie")).toBeInTheDocument();
+  expect(screen.getByText(/Aucun reclassement automatique/)).toBeInTheDocument();
 });
 
 test("explains how to start without an exercise", async () => {

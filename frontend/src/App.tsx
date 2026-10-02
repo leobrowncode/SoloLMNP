@@ -4,6 +4,7 @@ import LedgerPage from "./features/LedgerPage";
 import OperationsPage from "./features/OperationsPage";
 import AssetsPage from "./features/AssetsPage";
 import StatementsPage from "./features/StatementsPage";
+import FiscalPage from "./features/FiscalPage";
 
 type LoadState = { kind: "loading" } | { kind: "error" } | { kind: "loaded"; data: ApplicationStatus };
 
@@ -12,15 +13,15 @@ const stages = [
   ["02", "Comptabilité", "Écritures en partie double, journal, grand livre et balance.", "Disponible"],
   ["03", "Opérations", "Recettes, dépenses, banque CSV, rapprochement et emprunts.", "Disponible"],
   ["04", "Immobilisations", "Registre, composants, prorata et dotations comptables.", "Disponible"],
-  ["05", "États comptables", "Bilan et résultat provisoires ; inventaire et continuité à suivre.", "En cours"],
-  ["06–10", "Fiscalité & déclaration", "Règles sourcées, reports, clôture, FEC et préparation de la saisie EFI.", "À développer"],
-  ["11–12", "Conservation & fiabilité", "Justificatifs, sauvegarde, restauration et parcours complets.", "À développer"],
+  ["05", "États comptables", "Rubriques, centralisation, affectation et continuité.", "Disponible"],
+  ["06–10", "Fiscalité & déclaration", "Retraitements sourcés, clôture, FEC, liasse de travail et feuille EFI.", "Disponible"],
+  ["11–12", "Conservation & fiabilité", "Justificatifs, sauvegarde, restauration et parcours A à J.", "Disponible"],
 ];
 
 export default function App() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
-  const [page, setPage] = useState<"ledger" | "operations" | "assets" | "statements">("ledger");
+  const [page, setPage] = useState<"ledger" | "operations" | "assets" | "statements" | "fiscal">("ledger");
   useEffect(() => {
     const controller = new AbortController();
     void fetchStatus(controller.signal).then(
@@ -52,6 +53,7 @@ export default function App() {
           <a href="#main" onClick={() => setPage("operations")}>Opérations & banque</a>
           <a href="#main" onClick={() => setPage("assets")}>Immobilisations</a>
           <a href="#main" onClick={() => setPage("statements")}>États comptables</a>
+          <a href="#main" onClick={() => setPage("fiscal")}>Aperçu fiscal</a>
           <a href="#installation"><span aria-hidden="true">◎</span> État de l’installation</a>
           <a href="#roadmap"><span aria-hidden="true">↗</span> Étapes du projet</a>
         </nav>
@@ -66,16 +68,16 @@ export default function App() {
       <main id="main" tabIndex={-1}>
         <header className="topbar">
           <span>ESPACE DE GESTION</span>
-          <span className="phase-badge">Phase 4 · Immobilisations</span>
+          <span className="phase-badge">Phase 12 · Conservation</span>
         </header>
         <div className="content">
           <section className="intro" aria-labelledby="welcome-title">
             <p className="eyebrow">UNE COMPTABILITÉ QUE VOUS POURREZ EXPLIQUER</p>
-            <h1 id="welcome-title">Des actifs documentés,<br /><span>des dotations traçables.</span></h1>
-            <p className="intro-description">Tenez le registre des immobilisations, séparez le terrain, documentez les composants et comptabilisez chaque dotation dans le ledger.</p>
+            <h1 id="welcome-title">De l’écriture à la conservation,<br /><span>sans montant déclarable.</span></h1>
+            <p className="intro-description">Centralisez le résultat, clôturez l’exercice, exportez le FEC et conservez une sauvegarde locale. Le moteur fiscal et la feuille EFI restent en recherche.</p>
           </section>
 
-          {ready && ["ledger", "operations", "assets"].includes(status?.phase ?? "") && (page === "ledger" ? <LedgerPage /> : page === "operations" ? <OperationsPage /> : page === "assets" ? <AssetsPage /> : <StatementsPage />)}
+          {ready && ["ledger", "operations", "assets"].includes(status?.phase ?? "") && (page === "ledger" ? <LedgerPage /> : page === "operations" ? <OperationsPage /> : page === "assets" ? <AssetsPage /> : page === "fiscal" ? <FiscalPage /> : <StatementsPage />)}
           <section id="installation" className="installation" aria-labelledby="installation-title">
             <div className="section-heading">
               <div><p className="eyebrow">DIAGNOSTIC EN DIRECT</p><h2 id="installation-title">État de l’installation</h2></div>
@@ -125,7 +127,7 @@ export default function App() {
           <section className="scope-note" aria-label="Périmètre disponible">
             <span className="scope-icon" aria-hidden="true">i</span>
             <div><h2>Ce que permet cette version</h2>
-            <p>Gérer les opérations courantes, la banque, les emprunts, les immobilisations et consulter le bilan et le résultat provisoires issus des écritures validées. L’inventaire, la continuité, le moteur fiscal, le FEC et la liasse restent à développer. Aucun montant déclarable n’est produit aujourd’hui.</p></div>
+            <p>Tenir la comptabilité, clôturer un exercice, exporter un FEC et préparer une feuille de recopie. Le moteur fiscal reste en recherche. Aucun montant déclarable n’est produit.</p></div>
           </section>
 
           <section id="roadmap" className="roadmap" aria-labelledby="roadmap-title">

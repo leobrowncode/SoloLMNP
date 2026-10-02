@@ -1,1 +1,43 @@
-{"vintage":"2025","version":"research-0","status":"research_only","immutable":true,"rules":[{"id":"RULE-LMNP-DEPRECIATION-LIMIT-001","implementation":"blocked_pending_millesime_validation"},{"id":"RULE-LMNP-LOSS-001","implementation":"blocked_pending_millesime_validation"}]}
+{
+  "vintage": "2025",
+  "version": "research-1",
+  "status": "research_only",
+  "immutable": false,
+  "rules": [
+    {
+      "id": "RULE-LMNP-DEPRECIATION-LIMIT-001",
+      "status": "executable",
+      "effect_start": "2015-01-01",
+      "source": "CGI art. 39 C, version en vigueur au 01/01/2015, et BOI-BIC-AMT-20-40-10-20",
+      "interpretation": "La dotation comptable 681 reste au ledger. La part déductible est limitée à la capacité loyers moins autres charges déductibles. L'excédent est inscrit au registre d'amortissements non déduits, sans consommation automatique des reports antérieurs."
+    },
+    {
+      "id": "RULE-LMNP-LOSS-001",
+      "status": "executable",
+      "effect_start": "2024-02-14",
+      "source": "BOI-BIC-CHAMP-40-20, III-A, renvoyant au CGI art. 156 I 1° ter",
+      "interpretation": "Un résultat fiscal négatif est un déficit LMNP reportable, distinct du registre d'amortissements. Il n'est pas imputé sur le revenu global. L'ordre de consommation des reports antérieurs reste désactivé."
+    },
+    {
+      "id": "RULE-LAND-NON-DEPRECIABLE-001",
+      "status": "executable",
+      "effect_start": "2017-03-01",
+      "source": "BOI-BIC-AMT-10-20 et BOI-BIC-CHAMP-40-20",
+      "interpretation": "Un terrain enregistré ne peut pas avoir de base amortissable. Le contrôle relit le registre, sans estimer de ventilation."
+    },
+    {
+      "id": "RULE-PARTIAL-CHARGE-001",
+      "status": "executable",
+      "effect_start": "2025-01-01",
+      "source": "Principe de réintégration : la charge reste entière au ledger, seule la quote-part non déductible déclarée est ajoutée.",
+      "interpretation": "L'utilisateur confirme un montant non déductible, plafonné par le solde de charge du compte, hors comptes 681. Le ledger n'est pas modifié."
+    },
+    {
+      "id": "RULE-LMNP-BIC-001",
+      "status": "blocked",
+      "effect_start": null,
+      "source": "CGI art. 155 IV, applicabilité historique non arrêtée",
+      "interpretation": "La qualification LMNP ou LMP du foyer n'est pas déduite."
+    }
+  ]
+}

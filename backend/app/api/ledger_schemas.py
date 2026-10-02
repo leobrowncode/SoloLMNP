@@ -115,3 +115,46 @@ class OpeningInput(Input):
     journal_code: JournalCode
     piece_reference: Label
     result_account: AccountNumber | None = None
+
+
+def parse_signed_money(value: object) -> Decimal:
+    if not isinstance(value, str):
+        raise ValueError("Les montants JSON doivent être des chaînes décimales.")
+    try:
+        amount = Decimal(value)
+        to_cents(amount)
+    except (ArithmeticError, ValueError) as exc:
+        raise ValueError("Montant fini au centime exact requis.") from exc
+    return amount
+
+
+SignedMoneyInput = Annotated[Decimal, BeforeValidator(parse_signed_money)]
+
+
+class CentralizationInput(Input):
+    request_id: UUID
+    journal_code: JournalCode
+    piece_reference: Label
+    justification: Annotated[str, Field(min_length=10, max_length=3000)]
+    result_account: AccountNumber | None = None
+    expected_result: SignedMoneyInput
+
+
+class FiscalAdjustmentInput(Input):
+    account_number: AccountNumber
+    amount: MoneyInput
+    justification: Annotated[str, Field(min_length=10, max_length=3000)]
+
+
+class FiscalInput(Input):
+    adjustments: list[FiscalAdjustmentInput] = Field(default_factory=list, max_length=20)
+
+
+class AppropriationInput(Input):
+    request_id: UUID
+    journal_code: JournalCode
+    piece_reference: Label
+    justification: Annotated[str, Field(min_length=10, max_length=3000)]
+    source_account: AccountNumber
+    target_account: AccountNumber
+    expected_amount: MoneyInput

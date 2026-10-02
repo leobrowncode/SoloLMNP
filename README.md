@@ -2,7 +2,7 @@
 
 Application libre, mono-utilisateur et auto-hébergeable pour une activité LMNP au réel simplifié BIC.
 
-**Version 0.5.0 — immobilisations et premiers états provisoires.** Le ledger, les opérations, la banque, les emprunts, le registre des actifs, les composants et les dotations comptables sont disponibles. L’écran « États comptables » présente un bilan et un résultat provisoires par compte depuis les écritures validées. L’inventaire, la continuité, les états annuels réglementaires, calculs fiscaux, FEC et déclarations restent à développer. Cette version ne produit aucun montant déclarable.
+**Version 0.5.0 — roadmap P0 à P12 implémentée, fiscalité encore en recherche.** Le ledger, les opérations, la banque, les emprunts, les immobilisations, les états provisoires, la centralisation, la clôture, le FEC, une liasse de travail, la feuille EFI, les justificatifs et la sauvegarde sont disponibles. Cette version ne produit aucun montant déclarable.
 
 ## Démarrer
 
@@ -20,9 +20,7 @@ Ouvrir [l'application locale](http://127.0.0.1:5173). La base et les futurs docu
 
 Le backend applique les migrations avant de démarrer. L'interface affiche l'état réel du service et du schéma SQLite. Une base absente, illisible ou non migrée ne sera pas déclarée prête.
 
-**Vérification P4 :** 156 tests backend, 15 tests frontend, couverture backend 93 %,
-Ruff, mypy, ESLint, TypeScript, build et migration contrôlés. Voir
-[le rapport de phase 4](docs/PHASE4_REPORT.md).
+**Vérification locale :** `python scripts/check.py` (Ruff, mypy, pytest, ESLint, TypeScript, Vitest, build). Les rapports [P5](docs/PHASE5_REPORT.md) à [P12](docs/PHASE12_REPORT.md) décrivent le périmètre et les limites. La CI distante n’a pas été relancée.
 
 **Historique P1 :** tests natifs sous Windows et [CI complète réussie](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132) : backend Linux/Windows, frontend et test Docker de construction, démarrage et persistance.
 
@@ -62,8 +60,7 @@ Les montants Python utilisent `Decimal`, avec stockage en centimes entiers SQLit
 - Disponible : migration `0001_foundation`, activité unique, plusieurs biens, exercices, contraintes et tests d'intégrité.
 - Disponible : contrats d'écritures immuables avec validation d'équilibre ; aucun enregistrement comptable persistant.
 - Disponible : API de santé/disponibilité, interface responsive, restrictions réseau et configuration.
-- Disponible : ledger, opérations, banque CSV, emprunts, immobilisations, composants, plans et dotations comptables.
-- À venir : états, fiscalité, clôture, FEC, liasse, documents et sauvegarde.
-- Recherche : les scénarios A–J restent un catalogue ; les deux tests dits golden ne valident aucun résultat fiscal chiffré.
+- Disponible : ledger, opérations, banque CSV, emprunts, immobilisations, états provisoires, centralisation, clôture, FEC, mappings de travail, feuille EFI, justificatifs et sauvegarde.
+- Recherche : le moteur fiscal reste `research_only`. Les règles bloquantes désactivées et les cases CERFA non certifiées interdisent un statut prêt.
 
 Voir [le rapport de phase 1](docs/PHASE1_REPORT.md), [l'architecture](ARCHITECTURE.md), [la roadmap](ROADMAP.md), [le modèle de données](docs/DATA_MODEL.md), [la sécurité](SECURITY.md) et [le workflow EFI](docs/FILING.md).

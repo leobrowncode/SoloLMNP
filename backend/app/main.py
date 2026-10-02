@@ -13,12 +13,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.assets import build_assets_router
+from app.api.filing import build_filing_router
+from app.api.fiscal import build_fiscal_router
 from app.api.ledger import build_ledger_router
 from app.api.operations import build_operations_router
 from app.core.config import Settings, get_settings
 from app.core.database import SCHEMA_REVISION, Database
-
-APPLICATION_VERSION = "0.5.0"
+from app.core.version import APPLICATION_VERSION
+from app.domain.fiscal.loader import available_vintages
 
 
 class DatabaseStatus(BaseModel):
@@ -99,6 +101,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(build_ledger_router(database))
     application.include_router(build_operations_router(database))
     application.include_router(build_assets_router(database))
+    application.include_router(build_fiscal_router(database))
+    application.include_router(build_filing_router(database, configuration))
 
     @application.get("/api/health", tags=["system"])
     def health() -> dict[str, str]:
@@ -133,6 +137,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "asset_component",
                     "depreciation_schedule",
                     "depreciation_period",
+                    "fiscal_computation",
+                    "depreciation_carry_forward",
+                    "tax_loss_carry_forward",
+                    "audit_event",
+                    "tax_return_snapshot",
+                    "supporting_document",
                 }.issubset(tables)
         except SQLAlchemyError:
             # Never expose a local path, SQL statement or exception to the client.
@@ -143,7 +153,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             database=DatabaseStatus(
                 status="ready" if ready else "not_ready",
                 schema_revision=revision,
-            )
+            ),
+            fiscal=FiscalStatus(available_vintages=available_vintages() if ready else []),
         )
 
     return application

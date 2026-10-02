@@ -1,0 +1,33 @@
+{
+  "form": "2033-B",
+  "vintage": "2026",
+  "version": "research-1",
+  "status": "research_only",
+  "source": "Structure de travail interne. Les cases CERFA ne sont pas certifiées pour ce millésime.",
+  "fields": [
+    {
+      "code": "PRODUITS",
+      "label": "Total des produits",
+      "required": true,
+      "rules": [],
+      "formula": {"op": "sum_accounts", "prefixes": ["7"]}
+    },
+    {
+      "code": "CHARGES",
+      "label": "Total des charges",
+      "required": true,
+      "rules": [],
+      "formula": {"op": "sum_accounts", "prefixes": ["6"]}
+    },
+    {
+      "code": "RESULTAT_FISCAL",
+      "label": "Résultat fiscal de travail",
+      "required": true,
+      "rules": ["RULE-LMNP-DEPRECIATION-LIMIT-001", "RULE-LMNP-LOSS-001"],
+      "formula": {"op": "tax_result"}
+    }
+  ],
+  "checks": [
+    {"id": "RESULT_IS_TAX", "left": "RESULTAT_FISCAL", "right": {"op": "tax_result"}}
+  ]
+}

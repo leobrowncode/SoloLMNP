@@ -410,3 +410,11 @@ lint/format, mypy et git diff --check passent. La suite backend complète et
 Docker restent à vérifier dans la CI distante. Les règles comptables, API et schéma
 restent inchangés ; aucune migration ni modification de base réelle. Les
 limites P5 précédentes restent applicables et l’issue #6 reste ouverte.
+
+## Présentation, centralisation et affectation (2 octobre 2026)
+
+Les états ajoutent une présentation par rubriques PCG (immobilisé, circulant, trésorerie, capitaux, dettes, charges et produits par nature) dérivée des écritures validées. Le détail par compte est conservé. Aucun reclassement n’est appliqué. Un découvert de trésorerie ou un solde inhabituel est signalé. Le statut reste `PROVISIONAL`.
+
+La centralisation des classes 6 et 7, puis l’affectation du 120 (hors 1209) ou du 129 vers un autre compte de capitaux, sont des parcours explicites. L’utilisateur confirme le compte et le montant. Le serveur recalcule et refuse un écart. Les écritures sont idempotentes, justifiées, dans un journal d’opérations diverses, et peuvent être extournées. Aucun compte n’est créé automatiquement. Les CCA, PCA et FNP automatiques restent hors périmètre.
+
+L’issue #6 n’est pas fermée : la clôture publique et le statut fiscal prêt dépendent des contrôles des phases suivantes, et des règles bloquantes restent désactivées.

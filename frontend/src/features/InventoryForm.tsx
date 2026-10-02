@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { amount, cents, request, type Account, type Entry, type EntryInput, type Journal, type Year } from "../api/ledger";
 
 type InventoryInput = EntryInput & { justification: string; request_id: string };
@@ -37,6 +37,8 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const [error, setError] = useState(recovery.error);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   const [cleanupError, setCleanupError] = useState("");
   const [receipt, setReceipt] = useState<Entry | null>(null);
   const [checked, setChecked] = useState(false);
@@ -89,12 +91,12 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
   }
   if (receipt) return <section><h3>Inventaire comptabilisé</h3><p role="status">Écriture {receipt.entry_number} · {receipt.label}. Consultez le journal et son historique pour retrouver la justification ou effectuer une extourne motivée.</p>
     {cleanupError && <><p role="alert">{cleanupError}</p><button type="button" onClick={clearConfirmedRequest}>Effacer la demande locale confirmée</button></>}
-    {error && <p role="alert">L’écriture est comptabilisée, mais l’actualisation a échoué : {error}. Actualisez le journal.</p>}
+    {error && <p role="alert" tabIndex={-1} ref={errorRef}>L’écriture est comptabilisée, mais l’actualisation a échoué : {error}. Actualisez le journal.</p>}
   </section>;
   return <form className="entry-editor" onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(); }}>
     <h3>Inventaire manuel · exercice {year.year}</h3>
     <p>Choisissez les comptes et montants après vérification du traitement et du calcul. La confirmation valide définitivement l’écriture. La référence et la justification ne constituent pas un archivage de pièce.</p>
-    {error && <p role="alert">{error}</p>}
+    {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
     {!review && <fieldset disabled={year.status !== "OPEN" || !!recovery.error}>
       <legend>Saisie justifiée</legend>
       <label>Journal d’inventaire<select required value={draft.journal_code} onChange={(e) => setDraft({ ...draft, journal_code: e.target.value })}><option value="">Choisir un journal</option>{general.map((j) => <option key={j.code} value={j.code}>{j.code} · {j.label}</option>)}</select></label>

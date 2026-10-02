@@ -1,13 +1,27 @@
 # Roadmap
 
-## État au 16 septembre 2026
+## État au 2 octobre 2026
 
-- P0 : architecture et catalogue de scénarios livrés dans la PR #1. La recherche fiscale reste à compléter avant toute règle exécutable.
+- P0 à P4 : livrés. Voir les rapports de phase et l’historique ci-dessous.
+- P5 : présentation par rubriques, centralisation et affectation du résultat livrées. Les états restent provisoires jusqu’à la clôture. Voir [le rapport](docs/PHASE5_REPORT.md).
+- P6 : calcul fiscal versionné et registres de reports séparés. Statut `research_only`. Voir [le rapport](docs/PHASE6_REPORT.md).
+- P7 : pré-contrôle, clôture, réouverture motivée et audit. Voir [le rapport](docs/PHASE7_REPORT.md).
+- P8 : export FEC déterministe des écritures validées d’un exercice clôturé, hors centralisation. Voir [le rapport](docs/PHASE8_REPORT.md).
+- P9 : compilateur de mappings en liste blanche et snapshots immuables. Structure de travail, pas une liasse certifiée. Voir [le rapport](docs/PHASE9_REPORT.md).
+- P10 : feuille de recopie EFI et rappel 2042-C-PRO sans numéro de case officiel ni télétransmission. Voir [le rapport](docs/PHASE10_REPORT.md).
+- P11 : dépôt de justificatifs, sauvegarde cohérente et restauration contrôlée vers une copie de vérification. Voir [le rapport](docs/PHASE11_REPORT.md).
+- P12 : scénarios A–J, accessibilité des formulaires de clôture, d’inventaire et d’états, budgets de requêtes. Voir [le rapport](docs/PHASE12_REPORT.md).
+
+Les issues #6 à #13 restent ouvertes. Aucun statut fiscal `READY` n’est produit : la qualification LMNP/LMP du foyer, la cession, la TVA, les plus-values et la ventilation automatique du terrain sont encore désactivées, et les cases CERFA ne sont pas certifiées.
+
+Historique antérieur au 2 octobre 2026 :
+
+- P0 : architecture et catalogue de scénarios livrés dans la PR #1.
 - P1 : implémentation, contrôles natifs et [CI Linux/Windows/frontend/Docker réussis](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132). Revue et intégration de la [PR #14](https://github.com/leobrowncode/SoloLMNP/pull/14) en attente.
-- P2 : ledger, API et interface implémentés ; 120 tests backend et 10 frontend passent en local. Voir [le rapport](docs/PHASE2_REPORT.md).
+- P2 : ledger, API et interface implémentés. Voir [le rapport](docs/PHASE2_REPORT.md).
 - P3 : recettes/dépenses à l'engagement, règlements, banque CSV, rapprochement et emprunts implémentés. Voir [le rapport](docs/PHASE3_REPORT.md).
 - P4 : registre immuable, composants, prorata en jours et dotations ledger implémentés. Voir [le rapport](docs/PHASE4_REPORT.md).
-- P5 : en cours. Bilan/résultat provisoires, prévisualisation et génération idempotente des à-nouveaux, contrôle par compte et scénario de règlement en deuxième année livrés. La génération exige une source clôturée (parcours de clôture prévu en P7). Inventaire, présentation réglementaire et validation complète de continuité restent à terminer ; l’issue #6 reste ouverte. Voir [le rapport](docs/PHASE5_REPORT.md).
+- P5 initiale : bilan/résultat provisoires, inventaire manuel, prévisualisation et génération des à-nouveaux. Voir [le rapport](docs/PHASE5_REPORT.md).
   - Intégration P3/P4/P5 : scénario sur deux exercices avec règlements métier, emprunt et dotations ; correction du double comptage du capital après reprise et filtres du journal étendus aux dotations/à-nouveaux. La clôture reste simulée uniquement dans les fixtures de test.
   - Inventaire P5 : API de saisie manuelle justifiée, atomique et idempotente, audit et filtre journal livrés dans la PR #18. Formulaire dédié livré dans la PR #19 ; pièces archivées et traitements automatiques restent à développer.
   - Suite de l’issue #6 livrée dans la PR #19 fusionnée : formulaire d’inventaire manuel, revue avant validation, reçu et reprise de la même demande après réponse perdue. Les pièces archivées, traitements automatiques et autres limites P5 restent à livrer.

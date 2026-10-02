@@ -4,7 +4,7 @@
 
 La déclaration de résultat industrielle et commerciale utilise la série 2031 et, sous réel simplifié, la liasse simplifiée 2033 (notamment A bilan, B résultat, C immobilisations/amortissements, D déficits/provisions, E valeur ajoutée, F composition du capital, G filiales/participations), seulement lorsque le formulaire et la situation du millésime les rendent applicables. Sources à récupérer par millésime dans le [moteur de recherche des formulaires DGFiP](https://www.impots.gouv.fr/formulaire) et la [fiche 2031-SD](https://www.impots.gouv.fr/formulaire/2031-sd/impot-sur-le-revenu-benefices-industriels-et-commerciaux).
 
-Aucune case n'est définie en Phase 0 : les CERFA, millésimes, annexes et notices officiels doivent être archivés par URL/empreinte avant mapping. Les données pour la 2042-C-PRO restent un produit séparé de la liasse professionnelle.
+Les fichiers `fiscal/{année}/forms/2033.json` sont une structure de travail `research_only`. Ils ne recopient pas les cases CERFA. Les notices officielles doivent encore être archivées par URL et empreinte avant tout montant déclarable. La 2042-C-PRO reste un produit séparé : `official_case` est nul et le statut est `case_not_verified`.
 
 ## Mapping
 

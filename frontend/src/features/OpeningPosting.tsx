@@ -52,7 +52,7 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
   }
   return <section aria-labelledby="opening-posting-title">
     <h4 id="opening-posting-title">Comptabiliser et contrôler les à-nouveaux</h4>
-    <p>La génération valide une écriture à la date d’ouverture. Elle exige un exercice précédent clôturé sans brouillon et un exercice destinataire ouvert et vide. Le parcours de clôture reste à livrer en P7.</p>
+    <p>La génération valide une écriture à la date d’ouverture. Elle exige un exercice précédent clôturé sans brouillon et un exercice destinataire ouvert et vide.</p>
     {preview && !receipt && <form onSubmit={(event) => { void post(event); }}>
       <fieldset disabled={blocked || busy}>
         <legend>Reprise avant affectation du résultat</legend>
