@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import OperationsPage from "./OperationsPage";
@@ -47,17 +47,54 @@ describe("OperationsPage", () => {
   it("shows the accounting amount and outstanding settlement separately", async () => {
     mockApi();
     render(<OperationsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /Transactions/ }));
     expect(await screen.findByText(/Assurance · 100.00 €/)).toBeInTheDocument();
     expect(screen.getByText(/Reste à régler : 40.00 €/)).toBeInTheDocument();
-    expect(screen.getByText(/Le pourcentage fiscal.+ne réduit jamais le montant/s)).toBeInTheDocument();
+    expect(screen.getByText(/pourcentage fiscal est indicatif/i)).toBeInTheDocument();
+  });
+
+  it("explains that a justificatif CSV posts unpaid operations", async () => {
+    mockApi();
+    render(<OperationsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /Transactions/ }));
+    await userEvent.click(await screen.findByText("Importer des justificatifs (CSV)"));
+    expect(screen.getByText(/Chaque ligne crée une recette ou une dépense non réglée/)).toBeInTheDocument();
+    expect(screen.getByText(/kind;date;piece_date;type;counterparty;amount;description;piece_reference;source_file/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Prévisualiser les justificatifs" })).toBeDisabled();
   });
 
   it("states that importing a bank file does not post accounting entries", async () => {
     mockApi();
     render(<OperationsPage />);
-    await userEvent.click(await screen.findByRole("button", { name: "Banque" }));
+    await userEvent.click(await screen.findByRole("button", { name: /Banque/ }));
     await userEvent.click(screen.getByText("Importer un relevé CSV"));
     expect(screen.getByText(/L’import seul ne comptabilise rien/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Prévisualiser l’import" })).toBeDisabled();
+  });
+
+  it("orders setup tabs like the tutorial", async () => {
+    mockApi();
+    render(<OperationsPage />);
+    const tabs = await screen.findAllByRole("button", { pressed: false });
+    const names = screen.getAllByRole("button").map((node) => node.textContent).filter((text) =>
+      text && /Biens|Banque|Emprunts|Transactions/.test(text),
+    );
+    expect(names.slice(0, 4).map((text) => text?.replace(/^\d+\s*/, "").trim())).toEqual([
+      "Biens", "Banque", "Emprunts", "Transactions",
+    ]);
+    expect(tabs.length).toBeGreaterThan(0);
+  });
+
+  it("prefills loyer type and an automatic piece reference on new revenue", async () => {
+    mockApi();
+    render(<OperationsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /Transactions/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Nouvelle recette" }));
+    expect(screen.getByRole("combobox", { name: /Type d.opération/ })).toHaveValue("LOY");
+    expect(screen.getByRole("textbox", { name: /Référence justificative/ })).toHaveValue("LOY-XXXX-XX-SANSNOM");
+    expect(screen.getByText(/Générée automatiquement/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Date comptable"), { target: { value: "2026-03-15" } });
+    await userEvent.type(screen.getByLabelText("Locataire / client"), "Dupont");
+    expect(screen.getByRole("textbox", { name: /Référence justificative/ })).toHaveValue("LOY-2026-03-Dupont");
   });
 });

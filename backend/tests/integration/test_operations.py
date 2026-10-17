@@ -210,6 +210,43 @@ def test_loan_funding_payment_and_principal_from_ledger(client):
     assert client.get("/api/operations/loans").json()[0]["remaining_principal"] == "10000.00"
 
 
+def test_second_loan_line_gets_its_own_164_account(client):
+    first = loan(client)
+    assert first["principal_account"] == "164000"
+    conflict = client.post(
+        "/api/operations/loans",
+        json={
+            "property_id": 1,
+            "lender": "Deuxième ligne",
+            "start_date": "2025-01-01",
+            "initial_principal": "195000.00",
+            "interest_rate": "3.50",
+            "duration_months": 300,
+            "principal_account": "164000",
+        },
+    )
+    assert conflict.status_code == 422, conflict.text
+    assert "propre compte 164" in conflict.json()["detail"]["message"]
+    second = client.post(
+        "/api/operations/loans",
+        json={
+            "property_id": 1,
+            "lender": "Deuxième ligne",
+            "start_date": "2025-01-01",
+            "initial_principal": "195000.00",
+            "interest_rate": "3.50",
+            "duration_months": 300,
+        },
+    )
+    assert second.status_code == 201, second.text
+    body = second.json()
+    assert body["initial_principal"] == "195000.00"
+    assert body["principal_account"] == "164001"
+    assert body["principal_account"] != first["principal_account"]
+    accounts = {row["number"] for row in client.get("/api/ledger/accounts").json()}
+    assert "164001" in accounts
+
+
 def test_loan_payment_invalid_split_and_principal_overflow(client):
     loan(client)
     payload = settlement(principal="100.00", interest="1.00", insurance="0.00", other_costs="0.00")
@@ -360,6 +397,71 @@ def test_closed_year_blocks_business_posting(client, database):
 )
 def test_invalid_operation_never_posts(client, changes):
     assert client.post("/api/operations", json=operation(**changes)).status_code in {404, 409, 422}
+    assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 0
+
+
+OPS = (
+    "kind;date;piece_date;type;counterparty;amount;description;piece_reference;source_file\n"
+    "REVENUE;2025-03-01;2025-03-01;LOY;Martin;850,00;Loyer mars;LOY-2025-03-Martin;quittance.pdf\n"
+    "EXPENSE;2025-02-12;2025-02-12;ASS;MAIF;186.40;Assurance PNO;ASS-2025-02-MAIF;maif.pdf\n"
+)
+
+
+def test_operations_csv_preview_import_reimport_and_conflict(client):
+    payload = {"property_id": 1, "fiscal_year_id": 1, "content": OPS}
+    preview = client.post("/api/operations/import/preview", json=payload)
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["imported"] == 0
+    assert body["rows"][0]["accounting_account"] == "706000"
+    assert body["rows"][0]["duplicate"] is False
+    assert body["rows"][1]["accounting_account"] == "616000"
+    assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 0
+    imported = client.post("/api/operations/import", json=payload)
+    assert imported.status_code == 200, imported.text
+    assert imported.json()["imported"] == 2
+    assert client.post("/api/operations/import", json=payload).json()["imported"] == 0
+    operations = client.get("/api/operations?fiscal_year_id=1").json()
+    revenue = next(row for row in operations if row["kind"] == "REVENUE")
+    expense = next(row for row in operations if row["kind"] == "EXPENSE")
+    assert revenue["remaining_to_settle"] == "850.00"
+    assert revenue["fiscal_treatment"] == "REQUIRES_REVIEW"
+    assert expense["remaining_to_settle"] == "186.40"
+    rent_entry = client.get("/api/ledger/entries/" + str(revenue["accounting_entry_id"])).json()
+    charge_entry = client.get("/api/ledger/entries/" + str(expense["accounting_entry_id"])).json()
+    assert {line["account_number"] for line in rent_entry["lines"]} == {"411000", "706000"}
+    assert {line["account_number"] for line in charge_entry["lines"]} == {"401000", "616000"}
+    assert rent_entry["journal_code"] == "VE"
+    assert charge_entry["journal_code"] == "AC"
+    conflict = OPS.replace("850,00", "851.00")
+    assert (
+        client.post("/api/operations/import", json={**payload, "content": conflict}).status_code
+        == 409
+    )
+    assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 2
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "kind,date,piece_date,type,counterparty,amount,description,piece_reference,source_file\n",
+        OPS.replace("LOY", "ASS", 1),
+        OPS.replace("850,00", "0"),
+        OPS.replace("850,00", "-10.00"),
+        OPS.replace("2025-03-01", "2025-02-30", 1),
+        OPS.replace("2025-03-01", "2024-03-01", 1),
+        OPS + "REVENUE;2025-04-01;2025-04-01;LOY;Martin;1.00;Loyer;LOY-2025-03-Martin;\n",
+        "kind;date;piece_date;type;counterparty;amount;description;piece_reference;source_file\n",
+    ],
+)
+def test_operations_csv_invalid_input_rejected(client, content):
+    assert (
+        client.post(
+            "/api/operations/import",
+            json={"property_id": 1, "fiscal_year_id": 1, "content": content},
+        ).status_code
+        == 422
+    )
     assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 0
 
 

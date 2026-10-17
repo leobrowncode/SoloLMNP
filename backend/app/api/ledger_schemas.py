@@ -37,6 +37,38 @@ class Input(BaseModel):
 class ActivityInput(Input):
     activity_name: Label
     activity_start_date: date
+    siren: str | None = None
+    siret: str | None = None
+
+    @model_validator(mode="after")
+    def identity(self) -> "ActivityInput":
+        self.siren = _digits(self.siren, 9, "SIREN")
+        self.siret = _digits(self.siret, 14, "SIRET")
+        if self.siret and (self.siren is None or not self.siret.startswith(self.siren)):
+            raise ValueError("Le SIRET doit commencer par le SIREN.")
+        return self
+
+
+class IdentityInput(Input):
+    siren: str | None = None
+    siret: str | None = None
+
+    @model_validator(mode="after")
+    def identity(self) -> "IdentityInput":
+        self.siren = _digits(self.siren, 9, "SIREN")
+        self.siret = _digits(self.siret, 14, "SIRET")
+        if self.siret and (self.siren is None or not self.siret.startswith(self.siren)):
+            raise ValueError("Le SIRET doit commencer par le SIREN.")
+        return self
+
+
+def _digits(value: str | None, length: int, label: str) -> str | None:
+    if value is None or value.strip() == "":
+        return None
+    cleaned = value.strip()
+    if len(cleaned) != length or not cleaned.isdigit():
+        raise ValueError(f"Le {label} doit comporter {length} chiffres.")
+    return cleaned
 
 
 class YearInput(Input):

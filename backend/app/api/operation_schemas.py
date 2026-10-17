@@ -34,6 +34,23 @@ class PropertyInput(Input):
         return self
 
 
+class TenantInput(Input):
+    name: Label
+    monthly_rent: PositiveMoney
+    entry_date: Date
+    exit_date: Date | None = None
+
+    @model_validator(mode="after")
+    def stay(self) -> "TenantInput":
+        if self.exit_date is not None and self.exit_date < self.entry_date:
+            raise ValueError("La date de sortie précède l’entrée dans le logement.")
+        return self
+
+
+class RentScheduleInput(Input):
+    fiscal_year_id: int = Field(gt=0)
+
+
 class BankInput(Input):
     name: Label
     account_number: AccountNumber
@@ -91,7 +108,7 @@ class LoanInput(Input):
     duration_months: int = Field(ge=1, le=1200)
     monthly_payment: MoneyInput = Decimal("0.00")
     monthly_insurance: MoneyInput = Decimal("0.00")
-    principal_account: AccountNumber
+    principal_account: AccountNumber | None = None
     notes: Annotated[str, Field(max_length=2000)] = ""
 
 
@@ -121,6 +138,12 @@ class LoanPaymentInput(SettlementInput):
 
 class CSVInput(Input):
     bank_account_id: int = Field(gt=0)
+    content: Annotated[str, Field(min_length=1, max_length=1_000_000)]
+
+
+class OperationsCSVInput(Input):
+    property_id: int = Field(gt=0)
+    fiscal_year_id: int = Field(gt=0)
     content: Annotated[str, Field(min_length=1, max_length=1_000_000)]
 
 

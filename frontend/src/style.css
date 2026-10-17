@@ -111,6 +111,19 @@ section{
   font-size:20px;
   line-height:1
 }
+.sidebar nav .nav-step{
+  display:inline-grid;
+  place-items:center;
+  min-width:1.5rem;
+  height:1.5rem;
+  padding:0 .2rem;
+  border-radius:999px;
+  background:#dfe8df;
+  color:#274d3d;
+  font-size:.72rem;
+  font-weight:700;
+  line-height:1
+}
 .sidebar-note{
   margin-top:auto;
   border-top:1px solid #e5e9e2;
@@ -150,15 +163,6 @@ main{
   color:#718079;
   font-size:10px;
   letter-spacing:1.5px
-}
-.phase-badge{
-  border:1px solid #d9e3d6;
-  background:#eef3eb;
-  padding:6px 13px;
-  border-radius:30px;
-  color:#52704b;
-  font-size:11px;
-  letter-spacing:0
 }
 .content{
   max-width:1230px;
@@ -482,9 +486,6 @@ footer{
     height:60px;
     padding:0 6%;
     font-size:9px
-  }
-  .phase-badge{
-    font-size:10px
   }
   .content{
     padding:31px 6% 22px

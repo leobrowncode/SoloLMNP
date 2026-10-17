@@ -28,12 +28,18 @@ def load_vintage(vintage: str) -> dict[str, Any]:
         fail("VINTAGE_NOT_USABLE", "Ce millésime n’est pas utilisable en l’état.")
     executable = []
     blocked = []
+    scope = []
     for rule in document.get("rules", []):
-        if rule.get("status") == "executable":
+        status = rule.get("status")
+        if status == "executable":
             missing = [field for field in REQUIRED if not rule.get(field)]
             if missing or rule.get("id", "").startswith("RULE-BLOCKED"):
                 fail("RULE_INCOMPLETE", f"Règle {rule.get('id')} incomplète.")
             executable.append(rule)
+        elif status == "scope":
+            if not rule.get("id") or not rule.get("interpretation"):
+                fail("RULE_INCOMPLETE", f"Règle {rule.get('id')} incomplète.")
+            scope.append(rule.get("id"))
         else:
             blocked.append(rule.get("id"))
     return {
@@ -43,6 +49,7 @@ def load_vintage(vintage: str) -> dict[str, Any]:
         "sha256": hashlib.sha256(raw).hexdigest(),
         "executable": executable,
         "blocked": [item for item in blocked if item],
+        "scope": [item for item in scope if item],
     }
 
 

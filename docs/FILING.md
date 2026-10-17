@@ -34,15 +34,22 @@ calcul. Les exports PDF/JSON/CSV servent à la préparation et à l'archivage.
 Ils ne constituent pas une transmission fiscale officielle. SoloLMNP ne
 télétransmet rien, ne pilote pas le portail et n'effectue aucun scraping.
 
-## À vérifier pour chaque millésime avant P9/P10
+## Millésime 2025 — avancement sources
 
-- Formulaires/notices publiés, annexe 2031-bis, cases exactes, annexes pertinentes,
-  champs obligatoires et contrôles inter-formulaires.
-- Année des revenus, dates de clôture et millésime de campagne déclarative : ces
-  notions doivent être distinguées dans le modèle de versions.
-- Services activés dans l'espace professionnel et parcours de saisie correspondant
-  au profil fiscal ; la configuration privée du contribuable n'a pas été testée.
-- Besoins particuliers qui pourraient sortir du périmètre BIC au réel simplifié.
+Formulaires et notice 2031 / 2033 du millésime 2025 sont archivés avec URL, date de
+consultation et empreinte dans `fiscal/2025/sources/`. Le registre des cases est
+dans `fiscal/2025/forms/cases.yaml`. La liasse BIC 2025 est `ready` lorsque chaque
+case émise est dans ce registre et que le package n’a ni erreur ni écart bloquant
+(immobilisations, classement, effectifs, cession, TVA). Le millésime 2026 et la
+2042-C-PRO restent non déclarables.
 
-Les définitions de règles et mappings restent `research_only`. Confirmer l'accès
-EFI ne valide ni les montants ni la complétude d'une future liasse.
+## Hors de la feuille recopiable
+
+- 2033-F et 2033-G : non applicables aux entreprises individuelles.
+- 2042-C-PRO : produit séparé, case non archivée.
+- Millésime 2026 : formulaires non archivés.
+- Cession, TVA, plus-values : la présence de ces opérations refuse `ready`.
+- La cotisation CVAE n’est pas calculée. La case 117 reste une base, nulle jusqu’à 152 500 € de chiffre d’affaires.
+- L’accès à l’espace professionnel du contribuable n’est pas testé ici.
+
+Confirmer l’accès EFI ne remplace pas le contrôle des montants par l’utilisateur avant validation sur impots.gouv.fr.

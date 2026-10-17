@@ -10,12 +10,13 @@ from sqlalchemy.orm import Session
 
 from app.core.config import PROJECT_ROOT
 from app.core.money import to_cents
+from app.domain.filing.liasse import extend_package
 from app.models import AccountingEntry, AccountingEntryLine
 from app.services.fiscal import _operating, latest_fiscal
 from app.services.ledger import fail, get_year, money
 from app.services.statements import statements
 
-OPS = {"sum_accounts", "balance", "tax_result", "add", "subtract"}
+OPS = {"sum_accounts", "balance", "tax_result", "add", "subtract", "named", "nonneg", "absneg"}
 
 
 def compile_package(session: Session, year_id: int) -> dict[str, Any]:
@@ -36,6 +37,9 @@ def compile_package(session: Session, year_id: int) -> dict[str, Any]:
         fields.append(
             {
                 "code": field["code"],
+                "form_ref": field.get("form_ref", document["form"]),
+                "official_case": field.get("official_case"),
+                "official_case_deficit": field.get("official_case_deficit"),
                 "label": field["label"],
                 "required": field["required"],
                 "expression": json.dumps(field["formula"], sort_keys=True),
@@ -56,7 +60,7 @@ def compile_package(session: Session, year_id: int) -> dict[str, Any]:
             errors.append(
                 {"code": "INTERFORM", "message": f"Contrôle {check['id']} non satisfait."}
             )
-    return {
+    package = {
         "status": "research_only",
         "declarable": False,
         "form": document["form"],
@@ -72,10 +76,77 @@ def compile_package(session: Session, year_id: int) -> dict[str, Any]:
         "warnings": [
             {
                 "code": "RESEARCH_ONLY",
-                "message": "Mapping de travail : aucune case n’est prête à déclarer.",
+                "message": (
+                    "Feuille de recopie pour la déclaration. "
+                    "SoloLMNP n’envoie rien aux impôts."
+                ),
             }
         ],
+        "by_property": [],
+        "copy": {
+            "transmission": False,
+            "portal": "https://www.impots.gouv.fr/professionnel/teleprocedures-efi-ou-edi",
+        },
     }
+    extend_package(session, year, fiscal, package)
+    _mark_copy_ready(year, package)
+    return package
+
+
+def _mark_copy_ready(year: Any, package: dict[str, Any]) -> None:
+    """2025 BIC liasse only. A failing gate leaves the sheet as research_only."""
+    for field in package["fields"]:
+        field["status"] = "research_only"
+    package["status"] = "research_only"
+    package["declarable"] = False
+    if year.fiscal_vintage != "2025" or package["errors"]:
+        return
+    registry = json.loads(
+        (PROJECT_ROOT / "fiscal" / "2025" / "forms" / "cases.yaml").read_text(encoding="utf-8")
+    )
+    known = {
+        case["work_code"]: case
+        for case in registry["cases"]
+        if case.get("work_code") and case["form"] != "2042-C-PRO"
+    }
+    for field in package["fields"]:
+        case = known.get(field["code"])
+        form = field.get("form_ref", "")
+        if (
+            case is None
+            or case["form"] != form
+            or (form.startswith("2033") and case.get("official_case") != field.get("official_case"))
+            or (form.startswith("2033") and case.get("verification") != "verified")
+            or (form == "2031-SD" and case.get("verification") != "verified_by_cross_reference")
+            or form not in {case["form"]}
+        ):
+            package["errors"].append(
+                {
+                    "code": "CASE_NON_VERIFIEE",
+                    "message": f"La case {field['code']} n’est pas au registre vérifié 2025.",
+                }
+            )
+            return
+        if form.startswith("2033") and not field.get("official_case"):
+            package["errors"].append(
+                {
+                    "code": "CASE_NON_VERIFIEE",
+                    "message": f"La case {field['code']} n’a pas de numéro officiel.",
+                }
+            )
+            return
+    blocking = {
+        "IMMOBILISATIONS_ECART",
+        "EFFECTIFS",
+        "RESULTAT_MIXTE",
+        "CLASSEMENT_INCOMPLET",
+    }
+    if any(item["code"] in blocking for item in package["warnings"]):
+        return
+    package["status"] = "ready"
+    package["declarable"] = True
+    for field in package["fields"]:
+        field["status"] = "ready"
 
 
 def _context(
@@ -104,10 +175,73 @@ def _context(
     _income, _expenses, _depreciation, charges, products = _operating(session, year_id)
     balances.update(charges)
     balances.update(products)
+    for number in (*charges, *products):
+        entry_ids.setdefault(number, _entry_ids(session, year_id, number))
+    named = _named(charges, products, entry_ids, fiscal)
     return {
         "balances": balances,
         "entries": entry_ids,
         "tax_result": _cents(fiscal["fiscal_result"]),
+        "named": named,
+    }
+
+
+def _named(
+    charges: dict[str, int],
+    products: dict[str, int],
+    entry_ids: dict[str, list[int]],
+    fiscal: dict[str, Any],
+) -> dict[str, tuple[int, list[str], list[int]]]:
+    def bucket(amounts: dict[str, int]) -> tuple[int, list[str], list[int]]:
+        accounts = sorted(amounts)
+        entries = [entry for number in accounts for entry in entry_ids.get(number, [])]
+        return sum(amounts.values()), accounts, entries
+
+    def pick(source: dict[str, int], prefixes: tuple[str, ...]) -> dict[str, int]:
+        return {
+            number: amount
+            for number, amount in source.items()
+            if number.startswith(prefixes)
+        }
+
+    exploitation_income = {
+        number: amount
+        for number, amount in products.items()
+        if not number.startswith(("76", "77"))
+    }
+    exploitation_charges = {
+        number: amount
+        for number, amount in charges.items()
+        if not number.startswith(("66", "67"))
+    }
+    income_total = sum(exploitation_income.values())
+    charge_total = sum(exploitation_charges.values())
+    income_accounts = sorted(exploitation_income)
+    charge_accounts = sorted(exploitation_charges)
+    details = fiscal.get("details") or {}
+    before = details.get("fiscal_result_before_prior_losses", fiscal["fiscal_result"])
+    return {
+        "services": bucket(pick(products, ("706",))),
+        "exploitation_income": bucket(exploitation_income),
+        "financial_income": bucket(pick(products, ("76",))),
+        "external": bucket(pick(charges, ("60", "61", "62"))),
+        "taxes": bucket(pick(charges, ("63",))),
+        "depreciation": bucket(pick(charges, ("681",))),
+        "financial_expense": bucket(pick(charges, ("66", "67"))),
+        "exploitation_charges": bucket(exploitation_charges),
+        "operating_result": (
+            income_total - charge_total,
+            income_accounts + charge_accounts,
+            [
+                entry
+                for number in income_accounts + charge_accounts
+                for entry in entry_ids.get(number, [])
+            ],
+        ),
+        "accounting": (_cents(fiscal["accounting_result"]), [], []),
+        "unused": (_cents(fiscal["unused_depreciation"]), [], []),
+        "additions": (_cents(fiscal["non_deductible"]), [], []),
+        "fiscal_before": (_cents(str(before)), [], []),
     }
 
 
@@ -120,6 +254,18 @@ def _eval(
         return 0, [], []
     if op == "tax_result":
         return context["tax_result"], [], []
+    if op == "named":
+        bucket = context["named"].get(str(formula.get("key", "")))
+        if bucket is None:
+            errors.append({"code": "DSL", "message": f"Montant inconnu pour {code}."})
+            return 0, [], []
+        return bucket
+    if op == "nonneg":
+        value, accounts, entries = _eval(formula["term"], context, errors, code)
+        return max(0, value), accounts, entries
+    if op == "absneg":
+        value, accounts, entries = _eval(formula["term"], context, errors, code)
+        return max(0, -value), accounts, entries
     if op == "sum_accounts":
         prefixes = tuple(formula.get("prefixes", []))
         accounts = [number for number in context["balances"] if number.startswith(prefixes)]

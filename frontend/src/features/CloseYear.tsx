@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
 
-interface Check { blocking: boolean; errors: { code: string; message: string }[]; warnings: { code: string; message: string }[] }
+interface Check {
+  blocking: boolean;
+  errors: { code: string; message: string }[];
+  warnings: { code: string; message: string }[];
+  infos?: { code: string; message: string }[];
+}
 
 export default function CloseYear({ year }: { year: number }) {
   const [check, setCheck] = useState<Check | null>(null);
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
   const [acks, setAcks] = useState<string[]>([]);
+  const [prepared, setPrepared] = useState(false);
   const errorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   async function load() {
@@ -21,6 +27,7 @@ export default function CloseYear({ year }: { year: number }) {
     try {
       const next = await request<Check>(`/years/${year}/ready`, "POST", { acknowledged: acks }, "/api/filing");
       setCheck(next);
+      setPrepared(true);
       setReceipt("Exercice marqué prêt à clôturer. La confirmation suivante fige les écritures.");
     } catch (reason) { setError((reason as Error).message); }
   }
@@ -38,10 +45,11 @@ export default function CloseYear({ year }: { year: number }) {
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
     {receipt && <p role="status">{receipt}</p>}
     {check && <div>
+      {(check.infos ?? []).map((item) => <p key={item.code}>{item.message}</p>)}
       {check.errors.map((item) => <p key={item.code} role="alert">{item.message}</p>)}
       {check.warnings.map((item) => <label key={item.code}><input type="checkbox" checked={acks.includes(item.code)} onChange={(event) => setAcks((current) => event.target.checked ? [...current, item.code] : current.filter((code) => code !== item.code))} />{item.message}</label>)}
       <button type="button" disabled={check.blocking} onClick={() => { void ready(); }}>Accuser et préparer la clôture</button>
-      <button type="button" onClick={() => { void closeYear(); }}>Confirmer la clôture</button>
+      <button type="button" disabled={!prepared || check.blocking} onClick={() => { void closeYear(); }}>Confirmer la clôture</button>
     </div>}
   </section>;
 }

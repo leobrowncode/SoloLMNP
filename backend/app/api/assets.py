@@ -37,6 +37,10 @@ def build_assets_router(database: Database) -> APIRouter:
             )
         return rows
 
+    @router.post("/properties/{property_id}/plan", status_code=201)
+    def dwelling_plan(property_id: int, session: Write) -> dict[str, Any]:
+        return service.install_dwelling_plan(session, property_id)
+
     @router.post("", status_code=201)
     def create(data: AssetInput, session: Write) -> dict[str, Any]:
         return service.row_json(service.create_asset(session, data))

@@ -46,3 +46,6 @@ playwright-report/
 Thumbs.db
 .idea/
 .vscode/
+# Keep archived DGFiP forms versioned with their fingerprints.
+!fiscal/**/sources/official/
+!fiscal/**/sources/official/*.pdf

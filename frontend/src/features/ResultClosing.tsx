@@ -37,11 +37,21 @@ export default function ResultClosing({ year }: { year: number }) {
   async function load() {
     setError(""); setPreview(null); setAppropriation(null); setReceipt("");
     try {
-      const [central, accountsValue, journalsValue] = await Promise.all([
+      const [central, loadedAccounts, journalsValue] = await Promise.all([
         request<CentralPreview>(`/years/${year}/centralization-preview`),
         request<Account[]>("/accounts"),
         request<Journal[]>("/journals"),
       ]);
+      let accountsValue = loadedAccounts;
+      for (const [number, label] of [
+        ["120000", "Résultat de l’exercice (bénéfice)"],
+        ["129000", "Résultat de l’exercice (déficit)"],
+      ] as const) {
+        if (!accountsValue.some((account) => account.number === number)) {
+          await request("/accounts", "POST", { number, label, account_type: "EQUITY" });
+        }
+      }
+      accountsValue = await request<Account[]>("/accounts");
       setPreview(central); setAccounts(accountsValue); setJournals(journalsValue);
       if (central.already_posted) setAppropriation(await request<ApproPreview>(`/years/${year}/appropriation-preview`));
     } catch (reason) { setError((reason as Error).message); }

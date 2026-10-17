@@ -15,7 +15,7 @@ from app.domain.filing.mappings import compile_package
 from app.services.backup import create_backup, restore_backup
 from app.services.closing import close_year, mark_ready, precheck, reopen_year
 from app.services.documents import store_document
-from app.services.efi import efi_worksheet
+from app.services.efi import efi_worksheet, worksheet_pdf
 
 
 def build_filing_router(database: Database, settings: Settings) -> APIRouter:
@@ -59,6 +59,15 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
     @router.get("/years/{year_id}/efi")
     def efi(year_id: int, session: Read) -> dict[str, Any]:
         return efi_worksheet(session, year_id)
+
+    @router.get("/years/{year_id}/efi.pdf")
+    def efi_pdf(year_id: int, session: Read) -> Response:
+        worksheet = efi_worksheet(session, year_id)
+        return Response(
+            content=worksheet_pdf(worksheet),
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="efi-research.pdf"'},
+        )
 
     @router.post("/documents", status_code=201)
     def documents(data: DocumentInput, session: Write) -> dict[str, Any]:

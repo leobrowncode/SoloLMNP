@@ -15,6 +15,11 @@ from app.models.filing import SupportingDocument
 from app.services.ledger import fail
 
 EXTENSIONS = {"application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png"}
+SIGNATURES = {
+    "application/pdf": (b"%PDF-",),
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+}
 SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -25,6 +30,12 @@ def store_document(session: Session, settings: Settings, data: DocumentInput) ->
         fail("INVALID_DOCUMENT", "Le contenu du justificatif est illisible.", 422)
     if not content or len(content) > settings.max_upload_bytes:
         fail("DOCUMENT_SIZE", "La taille du justificatif est refusée.", 422)
+    if not content.startswith(SIGNATURES[data.media_type]):
+        fail(
+            "DOCUMENT_SIGNATURE",
+            "La signature du fichier ne correspond pas au type annoncé.",
+            422,
+        )
     if data.entry_id is not None and session.get(AccountingEntry, data.entry_id) is None:
         fail("ENTRY_NOT_FOUND", "Écriture introuvable.", 404)
     settings.documents_dir.mkdir(parents=True, exist_ok=True)

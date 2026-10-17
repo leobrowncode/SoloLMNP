@@ -9,14 +9,14 @@
       "status": "executable",
       "effect_start": "2015-01-01",
       "source": "CGI art. 39 C, version en vigueur au 01/01/2015, et BOI-BIC-AMT-20-40-10-20",
-      "interpretation": "La dotation comptable 681 reste au ledger. La part déductible est limitée à la capacité loyers moins autres charges déductibles. L'excédent est inscrit au registre d'amortissements non déduits, sans consommation automatique des reports antérieurs."
+      "interpretation": "La dotation comptable 681 reste au ledger. La part déductible de l'exercice est limitée à la capacité (loyers moins autres charges déductibles, après réintégrations). L'excédent constitue un report d'amortissement non déduit. Les reports antérieurs d'exercices CLOTURÉS sont consommés ensuite en FIFO (plus ancien d'abord) sur la capacité résiduelle. Les registres d'origine ne sont pas mutés : la consommation est tracée dans le calcul courant."
     },
     {
       "id": "RULE-LMNP-LOSS-001",
       "status": "executable",
       "effect_start": "2024-02-14",
       "source": "BOI-BIC-CHAMP-40-20, III-A, renvoyant au CGI art. 156 I 1° ter",
-      "interpretation": "Un résultat fiscal négatif est un déficit LMNP reportable, distinct du registre d'amortissements. Il n'est pas imputé sur le revenu global. L'ordre de consommation des reports antérieurs reste désactivé."
+      "interpretation": "Un résultat fiscal négatif est un déficit LMNP reportable, distinct du registre d'amortissements. Il n'est pas imputé sur le revenu global. Sur un résultat fiscal positif (après plafonnement et consommation des amortissements reportés), les déficits antérieurs d'exercices CLOTURÉS sont imputés en FIFO dans la limite de dix années. Hors MVP : changement de statut LMP/LMNP, report en arrière."
     },
     {
       "id": "RULE-LAND-NON-DEPRECIABLE-001",
@@ -34,10 +34,10 @@
     },
     {
       "id": "RULE-LMNP-BIC-001",
-      "status": "blocked",
+      "status": "scope",
       "effect_start": null,
-      "source": "CGI art. 155 IV, applicabilité historique non arrêtée",
-      "interpretation": "La qualification LMNP ou LMP du foyer n'est pas déduite."
+      "source": "Périmètre produit : activité déclarée LMNP. Le LMP (CGI art. 155 IV) n'est pas traité.",
+      "interpretation": "L'utilisateur déclare une activité LMNP. Aucun seuil de recettes ni comparaison avec les autres revenus du foyer n'est calculé. Les règles LMP ne sont pas appliquées."
     }
   ]
 }

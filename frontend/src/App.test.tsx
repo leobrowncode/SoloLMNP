@@ -26,8 +26,8 @@ describe("Foundation status", () => {
     vi.stubGlobal("fetch", request);
     render(<App />);
     expect(await screen.findByText("Le socle technique répond correctement")).toBeInTheDocument();
-    expect(screen.getByText("En recherche")).toBeInTheDocument();
-    expect(screen.getByText(/Aucun montant déclarable/)).toBeInTheDocument();
+    expect(screen.getByText("Recopie")).toBeInTheDocument();
+    expect(screen.getByText(/Aucun envoi n’est effectué/)).toBeInTheDocument();
     expect(request).toHaveBeenCalledWith("/api/status", expect.objectContaining({ cache: "no-store" }));
   });
 
@@ -47,7 +47,7 @@ describe("Foundation status", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Connexion au service indisponible");
     await userEvent.click(screen.getByRole("button", { name: /Actualiser/ }));
     expect(await screen.findByText("Le socle technique répond correctement")).toBeInTheDocument();
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls.filter(([url]) => url === "/api/status")).toHaveLength(2);
   });
 
   it("rejects malformed API output", async () => {

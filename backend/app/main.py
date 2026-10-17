@@ -39,6 +39,7 @@ class ApplicationStatus(BaseModel):
     phase: Literal["assets"] = "assets"
     database: DatabaseStatus
     fiscal: FiscalStatus = Field(default_factory=FiscalStatus)
+    storage_warning: str | None = None
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -143,18 +144,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "audit_event",
                     "tax_return_snapshot",
                     "supporting_document",
+                    "tenant",
                 }.issubset(tables)
         except SQLAlchemyError:
             # Never expose a local path, SQL statement or exception to the client.
             ready = False
         response.status_code = 200 if ready else 503
         response.headers["Cache-Control"] = "no-store"
+        on_cloud_drive = "onedrive" in str(configuration.database_path).lower()
         return ApplicationStatus(
             database=DatabaseStatus(
                 status="ready" if ready else "not_ready",
                 schema_revision=revision,
             ),
             fiscal=FiscalStatus(available_vintages=available_vintages() if ready else []),
+            storage_warning=(
+                "La base est dans un dossier synchronisé (OneDrive). "
+                "Copiez le projet hors de ce dossier : la synchro peut corrompre SQLite."
+                if on_cloud_drive
+                else None
+            ),
         )
 
     return application

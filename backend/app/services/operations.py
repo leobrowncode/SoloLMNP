@@ -13,10 +13,23 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.ledger_schemas import EntryInput, ReversalInput
-from app.api.operation_schemas import LoanPaymentInput, OperationInput, SettlementInput
+from app.api.operation_schemas import (
+    LoanPaymentInput,
+    OperationInput,
+    RentScheduleInput,
+    SettlementInput,
+    TenantInput,
+)
 from app.core.money import to_cents
 from app.models import Account, AccountingEntry, AccountingEntryLine, Property
-from app.models.operations import BankAccount, BankMatch, BankTransaction, BusinessOperation, Loan
+from app.models.operations import (
+    BankAccount,
+    BankMatch,
+    BankTransaction,
+    BusinessOperation,
+    Loan,
+    Tenant,
+)
 from app.services.ledger import (
     create_draft,
     event,
@@ -40,6 +53,51 @@ def account(session: Session, number: str, prefix: str) -> Account:
     if row is None or not row.active or not number.startswith(prefix):
         fail("ACCOUNT_KIND", f"Compte actif de classe {prefix} requis.", 422)
     return row
+
+
+def allocate_principal_account(session: Session, preferred: str | None = None) -> str:
+    """Each loan needs its own 164 account; create the next free one when needed."""
+    used = set(session.scalars(select(Loan.principal_account)))
+    if preferred is not None:
+        account(session, preferred, "164")
+        if preferred in used:
+            fail(
+                "LOAN_ACCOUNT_IN_USE",
+                f"Le compte {preferred} est déjà lié à un autre emprunt. "
+                "Chaque ligne de crédit doit avoir son propre compte 164 "
+                "(ex. 164001, 164002).",
+                422,
+            )
+        return preferred
+    existing = [
+        number
+        for number in session.scalars(
+            select(Account.number)
+            .where(Account.active.is_(True), Account.number.startswith("164"))
+            .order_by(Account.number)
+        )
+        if number not in used
+    ]
+    if existing:
+        return existing[0]
+    for index in range(1000):
+        candidate = f"164{index:03d}"
+        if candidate in used:
+            continue
+        if session.get(Account, candidate) is None:
+            session.add(
+                Account(
+                    number=candidate,
+                    label=f"Emprunt {candidate}",
+                    account_type="LIABILITY",
+                    active=True,
+                )
+            )
+            session.flush()
+        else:
+            account(session, candidate, "164")
+        return candidate
+    fail("LOAN_ACCOUNT_EXHAUSTED", "Aucun compte 164 libre n’est disponible.", 422)
 
 
 def bank(session: Session, bank_id: int) -> BankAccount:
@@ -561,3 +619,298 @@ def import_csv(session: Session, bank_id: int, content: str, commit: bool) -> di
             },
         )
     return {"rows": result, "imported": imported, "count": len(rows)}
+
+
+OPERATIONS_CSV_HEADER = [
+    "kind",
+    "date",
+    "piece_date",
+    "type",
+    "counterparty",
+    "amount",
+    "description",
+    "piece_reference",
+    "source_file",
+]
+OPERATION_TYPE_ACCOUNTS: dict[str, dict[str, str]] = {
+    "REVENUE": {"LOY": "706000", "TROP": "706000", "CHG": "706000", "AUT": "706000"},
+    "EXPENSE": {
+        "ASS": "616000",
+        "ENT": "615000",
+        "FOU": "606000",
+        "HON": "622000",
+        "BAN": "627000",
+        "TAX": "635000",
+        "FON": "635000",
+        "COP": "614000",
+        "GES": "622000",
+        "INT": "661000",
+        "AUT": "606000",
+    },
+}
+
+
+def add_tenant(session: Session, property_id: int, data: TenantInput) -> Tenant:
+    if session.get(Property, property_id) is None:
+        fail("PROPERTY_NOT_FOUND", "Bien introuvable.", 404)
+    if session.scalar(
+        select(Tenant.id).where(Tenant.property_id == property_id, Tenant.name == data.name)
+    ):
+        fail("TENANT_EXISTS", "Ce colocataire est déjà enregistré sur ce bien.", 422)
+    row = Tenant(property_id=property_id, **data.model_dump())
+    session.add(row)
+    session.flush()
+    return row
+
+
+def schedule_rents(session: Session, property_id: int, data: RentScheduleInput) -> dict[str, int]:
+    if session.get(Property, property_id) is None:
+        fail("PROPERTY_NOT_FOUND", "Bien introuvable.", 404)
+    year = get_year(session, data.fiscal_year_id, writable=True)
+    created = already = 0
+    tenants = session.scalars(
+        select(Tenant).where(Tenant.property_id == property_id).order_by(Tenant.id)
+    )
+    for tenant in tenants:
+        end = year.end_date if tenant.exit_date is None else min(tenant.exit_date, year.end_date)
+        first = max(tenant.entry_date, year.start_date)
+        cursor = date(first.year, first.month, 1)
+        while cursor <= end:
+            if cursor < date(tenant.entry_date.year, tenant.entry_date.month, 1):
+                cursor = _next_month(cursor)
+                continue
+            op_date = cursor if cursor >= year.start_date else year.start_date
+            if op_date < tenant.entry_date:
+                op_date = tenant.entry_date
+            if op_date > end:
+                break
+            request_id = f"rent-p{property_id}-t{tenant.id}-{cursor:%Y%m}"
+            existed = session.scalar(
+                select(BusinessOperation.id).where(BusinessOperation.request_id == request_id)
+            )
+            create_operation(
+                session,
+                OperationInput(
+                    request_id=request_id,
+                    kind="REVENUE",
+                    property_id=property_id,
+                    fiscal_year_id=year.id,
+                    date=op_date,
+                    piece_date=op_date,
+                    piece_reference=f"LOY-{cursor:%Y-%m}-T{tenant.id}",
+                    amount=money(to_cents(tenant.monthly_rent)),
+                    description=f"Loyer {cursor:%Y-%m} — {tenant.name}"[:300],
+                    counterparty=tenant.name,
+                    accounting_account="706000",
+                    deductible_percentage="100.00",
+                    fiscal_treatment="REQUIRES_REVIEW",
+                ),
+            )
+            if existed is None:
+                created += 1
+            else:
+                already += 1
+            cursor = _next_month(cursor)
+    return {"created": created, "already": already}
+
+
+def _next_month(cursor: date) -> date:
+    if cursor.month == 12:
+        return date(cursor.year + 1, 1, 1)
+    return date(cursor.year, cursor.month + 1, 1)
+
+
+def import_request_id(piece: str) -> str:
+    return "doc-" + hashlib.sha256(piece.encode()).hexdigest()[:60]
+
+
+def parse_operations_csv(content: str) -> list[dict[str, str]]:
+    try:
+        reader = csv.DictReader(io.StringIO(content.lstrip("\ufeff")), delimiter=";", strict=True)
+        if reader.fieldnames != OPERATIONS_CSV_HEADER:
+            fail(
+                "CSV_HEADER",
+                "En-tête attendu : " + ";".join(OPERATIONS_CSV_HEADER),
+                422,
+            )
+        rows: list[dict[str, str]] = []
+        references: set[str] = set()
+        for index, raw in enumerate(reader, 2):
+            if index > 5001 or None in raw or any(value is None for value in raw.values()):
+                fail(
+                    "CSV_SHAPE",
+                    f"Ligne {index} invalide ou limite de 5 000 lignes dépassée.",
+                    422,
+                )
+            kind = raw["kind"].strip()
+            type_code = raw["type"].strip()
+            accounts = OPERATION_TYPE_ACCOUNTS.get(kind)
+            if accounts is None or type_code not in accounts:
+                fail(
+                    "CSV_TYPE",
+                    f"Type incompatible avec la nature de l’opération, ligne {index}.",
+                    422,
+                )
+            counterparty, description = raw["counterparty"].strip(), raw["description"].strip()
+            piece, source = raw["piece_reference"].strip(), raw["source_file"].strip()
+            if (
+                not counterparty
+                or len(counterparty) > 200
+                or not description
+                or len(description) > 300
+                or not piece
+                or len(piece) > 200
+                or len(source) > 300
+                or piece in references
+            ):
+                fail(
+                    "CSV_REFERENCE",
+                    f"Tiers, libellé ou référence unique invalide, ligne {index}.",
+                    422,
+                )
+            value = raw["amount"].strip().replace(",", ".")
+            if not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,2})?", value):
+                fail("CSV_AMOUNT", f"Montant positif au centime invalide, ligne {index}.", 422)
+            amount = to_cents(Decimal(value))
+            if not amount:
+                fail("CSV_ZERO", f"Montant nul, ligne {index}.", 422)
+            raw_date, raw_piece = raw["date"].strip(), raw["piece_date"].strip()
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw_date) or not re.fullmatch(
+                r"\d{4}-\d{2}-\d{2}", raw_piece
+            ):
+                fail("CSV_INVALID", f"Dates ISO requises, ligne {index}.", 422)
+            try:
+                day = date.fromisoformat(raw_date)
+                piece_day = date.fromisoformat(raw_piece)
+            except ValueError:
+                fail("CSV_INVALID", f"Dates ISO requises, ligne {index}.", 422)
+            rows.append(
+                {
+                    "kind": kind,
+                    "date": day.isoformat(),
+                    "piece_date": piece_day.isoformat(),
+                    "type": type_code,
+                    "accounting_account": accounts[type_code],
+                    "counterparty": counterparty,
+                    "amount": money(amount),
+                    "description": description,
+                    "piece_reference": piece,
+                    "source_file": source,
+                }
+            )
+            references.add(piece)
+        if not rows:
+            fail("CSV_EMPTY", "Le fichier ne contient aucune opération.", 422)
+        return rows
+    except (csv.Error, ValueError, ArithmeticError):
+        fail("CSV_INVALID", "CSV invalide : dates ISO et montants au centime requis.", 422)
+
+
+def operations_for_piece(session: Session, piece: str) -> list[BusinessOperation]:
+    return list(
+        session.scalars(
+            select(BusinessOperation)
+            .join(AccountingEntry, AccountingEntry.id == BusinessOperation.accounting_entry_id)
+            .where(AccountingEntry.piece_reference == piece)
+        )
+    )
+
+
+def same_imported_operation(
+    session: Session,
+    row: BusinessOperation,
+    data: dict[str, str],
+    property_id: int,
+    year_id: int,
+) -> bool:
+    entry = get_entry(session, row.accounting_entry_id)
+    return (
+        row.kind == data["kind"]
+        and row.property_id == property_id
+        and row.fiscal_year_id == year_id
+        and row.date.isoformat() == data["date"]
+        and entry.piece_date.isoformat() == data["piece_date"]
+        and money(to_cents(row.amount)) == data["amount"]
+        and row.description == data["description"]
+        and row.counterparty == data["counterparty"]
+        and row.accounting_account == data["accounting_account"]
+        and entry.piece_reference == data["piece_reference"]
+    )
+
+
+def import_operations_csv(
+    session: Session, property_id: int, year_id: int, content: str, commit: bool
+) -> dict[str, Any]:
+    property_exists(session, property_id)
+    year = get_year(session, year_id, writable=True)
+    rows = parse_operations_csv(content)
+    prepared: list[dict[str, Any]] = []
+    for index, data in enumerate(rows, 2):
+        day = date.fromisoformat(data["date"])
+        if not year.start_date <= day <= year.end_date:
+            fail("DATE_OUTSIDE_YEAR", f"Date comptable hors exercice, ligne {index}.", 422)
+        request_id = import_request_id(data["piece_reference"])
+        by_request = session.scalar(
+            select(BusinessOperation).where(BusinessOperation.request_id == request_id)
+        )
+        matches = operations_for_piece(session, data["piece_reference"])
+        found = {row.id: row for row in matches}
+        if by_request is not None:
+            found[by_request.id] = by_request
+        if len(found) > 1:
+            fail(
+                "CSV_CONFLICT",
+                f"La référence {data['piece_reference']} correspond à plusieurs opérations.",
+            )
+        duplicate = False
+        if found:
+            existing = next(iter(found.values()))
+            if not same_imported_operation(session, existing, data, property_id, year_id):
+                fail(
+                    "CSV_CONFLICT",
+                    f"La référence {data['piece_reference']} existe avec un contenu différent.",
+                )
+            duplicate = True
+        prepared.append({**data, "duplicate": duplicate, "request_id": request_id})
+    imported = 0
+    if commit:
+        for data in prepared:
+            if data["duplicate"]:
+                continue
+            create_operation(
+                session,
+                OperationInput.model_validate(
+                    {
+                        "request_id": data["request_id"],
+                        "kind": data["kind"],
+                        "property_id": property_id,
+                        "fiscal_year_id": year_id,
+                        "date": data["date"],
+                        "piece_date": data["piece_date"],
+                        "piece_reference": data["piece_reference"],
+                        "amount": data["amount"],
+                        "description": data["description"],
+                        "counterparty": data["counterparty"],
+                        "accounting_account": data["accounting_account"],
+                        "deductible_percentage": "100.00",
+                        "fiscal_treatment": "REQUIRES_REVIEW",
+                    }
+                ),
+            )
+            imported += 1
+        event(
+            session,
+            "OPERATIONS_IMPORTED",
+            None,
+            {
+                "property_id": property_id,
+                "fiscal_year_id": year_id,
+                "imported": imported,
+                "duplicates": len(rows) - imported,
+                "sha256": hashlib.sha256(content.encode()).hexdigest(),
+            },
+        )
+    visible = [
+        {key: value for key, value in row.items() if key != "request_id"} for row in prepared
+    ]
+    return {"rows": visible, "imported": imported, "count": len(rows)}

@@ -79,6 +79,22 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
         "year_status": year.status,
         "errors": errors,
         "warnings": warnings,
+        "infos": [
+            {
+                "code": "FEC_SCOPE",
+                "message": (
+                    "Le FEC exclut les écritures de centralisation "
+                    "et ne lit que les lignes validées."
+                ),
+            },
+            {
+                "code": "FISCAL_SCOPE",
+                "message": (
+                    "Liasse BIC recopiable pour un LMNP au réel simplifié, millésime 2025. "
+                    "LMP, cession, TVA, plus-values et 2042-C-PRO restent hors de cette feuille."
+                ),
+            },
+        ],
         "blocking": bool(errors),
     }
 

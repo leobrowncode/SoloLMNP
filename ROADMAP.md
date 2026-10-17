@@ -12,7 +12,7 @@
 - P11 : dépôt de justificatifs, sauvegarde cohérente et restauration contrôlée vers une copie de vérification. Voir [le rapport](docs/PHASE11_REPORT.md).
 - P12 : scénarios A–J, accessibilité des formulaires de clôture, d’inventaire et d’états, budgets de requêtes. Voir [le rapport](docs/PHASE12_REPORT.md).
 
-Les issues #6 à #13 restent ouvertes. Aucun statut fiscal `READY` n’est produit : la qualification LMNP/LMP du foyer, la cession, la TVA, les plus-values et la ventilation automatique du terrain sont encore désactivées, et les cases CERFA ne sont pas certifiées.
+Les issues #6 à #13 restent ouvertes sur leurs résidus. L’outil vise une activité déclarée LMNP ; le LMP est hors périmètre. Depuis le 17 octobre 2026, la liasse BIC millésime 2025 est `ready` lorsque le registre vérifié est respecté et qu’aucun écart d’immobilisations, de classement, de cession ou de TVA n’est détecté. La cession, la TVA, les plus-values et la ventilation automatique du terrain restent désactivées. Le calcul fiscal stocké et le millésime 2026 restent `research_only`. La 2042-C-PRO n’est pas numérotée.
 
 Historique antérieur au 2 octobre 2026 :
 

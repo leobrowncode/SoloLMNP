@@ -1,0 +1,59 @@
+{
+  "vintage": "2025",
+  "consulted_at": "2026-10-02",
+  "purpose": "Archive officielle des formulaires et notices du millésime avant tout mapping déclarable. SoloLMNP ne télétransmet rien.",
+  "status": "archived",
+  "documents": [
+    {
+      "id": "2031-SD-2025",
+      "form": "2031-SD",
+      "title": "Impôt sur le revenu — Bénéfices industriels et commerciaux",
+      "cerfa": "11085*27",
+      "kind": "form",
+      "page_url": "https://www.impots.gouv.fr/formulaire/2031-sd/impot-sur-le-revenu",
+      "pdf_url": "https://www.impots.gouv.fr/sites/default/files/formulaires/2031-sd/2025/2031-sd_5028.pdf",
+      "local_path": "official/2031-sd_2025.pdf",
+      "sha256": "ac642cc3ea8517b716f3ef68af39eefcfe8beb49bbd9993812c8c95d1986f758",
+      "bytes": 249171,
+      "notes": "Inclut l’annexe 2031 Bis-SD et la notice du formulaire dans le même PDF."
+    },
+    {
+      "id": "2033-SD-LIASSE-2025",
+      "form": "2033-A-SD à 2033-G-SD",
+      "title": "Liasse BIC/IS — Régime RSI (tableaux 2033-A à 2033-G)",
+      "cerfa": "15948*07",
+      "kind": "form",
+      "page_url": "https://www.impots.gouv.fr/formulaire/2033-sd/liasse-bicsi-regime-rsi-tableaux-ndeg-2033-sd-2033-g-sd",
+      "pdf_url": "https://www.impots.gouv.fr/sites/default/files/formulaires/2033-sd/2025/2033-sd_5015.pdf",
+      "local_path": "official/2033-sd_liasse_2025.pdf",
+      "sha256": "264c870d04160d4cebf31e0c67a5795e465b0a1a4785a7e39ef15988cab0758b",
+      "bytes": 215009,
+      "notes": "Formulaire unique regroupant 2033-A (bilan), B (résultat), C (immobilisations), D (provisions/déficits), E (valeur ajoutée), F et G."
+    },
+    {
+      "id": "2033-NOT-SD-2025",
+      "form": "2033-NOT-SD",
+      "title": "Notice pour établir la liasse BIC/IS — Régime RSI",
+      "cerfa": "50448*27",
+      "kind": "notice",
+      "page_url": "https://www.impots.gouv.fr/formulaire/2033-sd/liasse-bicsi-regime-rsi-tableaux-ndeg-2033-sd-2033-g-sd",
+      "pdf_url": "https://www.impots.gouv.fr/sites/default/files/formulaires/2033-sd/2025/2033-sd_5016.pdf",
+      "local_path": "official/2033-not-sd_2025.pdf",
+      "sha256": "6bcda8ac8ea76cb08fb8e9b9863d314e887abea2f4c5ed9b0f9f644a7d6f291b",
+      "bytes": 446663,
+      "notes": "Confirme que les entreprises individuelles n’ont pas à servir 2033-F ni 2033-G. Rappelle le report manuel ou automatique vers 2042-C-PRO."
+    }
+  ],
+  "out_of_scope_documents": [
+    {
+      "form": "2042-C-PRO",
+      "reason": "Déclaration personnelle séparée. Les numéros de cases du millésime ne sont pas archivés ici ; le produit reste case_not_verified sur cette partie uniquement.",
+      "status": "deferred"
+    },
+    {
+      "form": "2050–2059 (réel normal)",
+      "reason": "Hors périmètre MVP : SoloLMNP cible le réel simplifié uniquement.",
+      "status": "out_of_scope"
+    }
+  ]
+}

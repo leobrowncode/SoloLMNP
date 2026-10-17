@@ -11,6 +11,7 @@ from pathlib import Path
 from app.core.config import Settings
 from app.core.database import SCHEMA_REVISION
 from app.core.version import APPLICATION_VERSION
+from app.domain.fiscal.loader import available_vintages, load_vintage
 from app.services.ledger import fail
 
 MAX_ARCHIVE = 200 * 1024 * 1024
@@ -42,6 +43,10 @@ def create_backup(settings: Settings) -> dict[str, str]:
             manifest = {
                 "application_version": APPLICATION_VERSION,
                 "schema_revision": SCHEMA_REVISION,
+                "fiscal_vintages": [
+                    {"vintage": vintage, "rules_sha256": load_vintage(vintage)["sha256"]}
+                    for vintage in available_vintages()
+                ],
                 "files": manifest_files,
             }
             archive.writestr(

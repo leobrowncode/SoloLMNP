@@ -111,6 +111,19 @@ export default function LedgerPage() {
       <label>Date réelle de début<input name="start" type="date" required /></label>
       <button disabled={busy}>Créer l’activité</button>
     </form>}
+    {setup?.activity && <form onSubmit={(e) => {
+      const data = formData(e);
+      void mutate(() => request("/activity/identity", "POST", {
+        siren: String(data.get("siren") ?? ""),
+        siret: String(data.get("siret") ?? ""),
+      }), "Identité enregistrée. Elle apparaîtra en tête de la liasse.");
+    }}>
+      <h3>Identité pour la liasse</h3>
+      <p>Le SIRET figure sur la 2031. Laissez vide si vous ne l’avez pas encore.</p>
+      <label>SIREN<input name="siren" inputMode="numeric" maxLength={9} defaultValue={setup.activity.siren ?? ""} /></label>
+      <label>SIRET<input name="siret" inputMode="numeric" maxLength={14} defaultValue={setup.activity.siret ?? ""} /></label>
+      <button disabled={busy}>Enregistrer l’identité</button>
+    </form>}
     {setup?.activity && <details open={!setup.years.length}>
       <summary>{setup.activity.activity_name} · Ajouter un exercice</summary>
       <form onSubmit={(e) => {

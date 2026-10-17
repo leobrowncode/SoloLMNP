@@ -3,6 +3,21 @@
 Cette phase fournit l'infrastructure de l'application. Elle ne permet pas encore de tenir
 une comptabilité ni de produire une déclaration fiscale.
 
+## Lanceur local (sans Docker)
+
+Prérequis : Python 3.12+ et Node.js 24 avec `npm`.
+
+| Système | Commande |
+| --- | --- |
+| Windows | Double-cliquer sur `SoloLMNP.bat` |
+| Linux / macOS | `./scripts/start_local.sh` |
+| Tous | `python scripts/start_local.py` |
+
+Le script `scripts/start_local.py` crée `.venv`, installe `backend/requirements.lock` et les
+dépendances frontend si besoin, copie `.env.example` vers `.env`, applique les migrations,
+démarre Uvicorn (`127.0.0.1:8000`) et Vite (`127.0.0.1:5173`), puis ouvre le navigateur.
+Arrêt avec Ctrl+C. Guide métier : [TUTORIAL.md](TUTORIAL.md).
+
 ## Docker Compose
 
 Prérequis : Docker Engine ou Docker Desktop avec Compose v2 récent, en mode conteneurs Linux.

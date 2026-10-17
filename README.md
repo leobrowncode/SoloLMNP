@@ -2,23 +2,27 @@
 
 Application libre, mono-utilisateur et auto-hébergeable pour une activité LMNP au réel simplifié BIC.
 
-**Version 0.5.0 — roadmap P0 à P12 implémentée, fiscalité encore en recherche.** Le ledger, les opérations, la banque, les emprunts, les immobilisations, les états provisoires, la centralisation, la clôture, le FEC, une liasse de travail, la feuille EFI, les justificatifs et la sauvegarde sont disponibles. Cette version ne produit aucun montant déclarable.
+**Version 1.0.0 — liasse BIC 2025 recopiable pour un LMNP au réel simplifié.** Le ledger, les opérations, la banque, les emprunts, les immobilisations, les états, la clôture, le FEC, la feuille EFI et la sauvegarde sont disponibles. Pour un exercice 2025 sans écart d’immobilisations ni opération hors périmètre, la liasse est marquée prête à recopier. SoloLMNP n’envoie rien. Le millésime 2026, la 2042-C-PRO, le LMP, la cession, la TVA et les plus-values restent hors de cette feuille.
 
 ## Démarrer
 
-Avec Docker Desktop/Engine et Compose v2, en conteneurs Linux :
+Prérequis locaux : Python 3.12+ et Node.js 24. Puis, depuis la racine du dépôt :
+
+- **Windows :** double-cliquer sur [`SoloLMNP.bat`](SoloLMNP.bat)
+- **Linux / macOS :** `./scripts/start_local.sh`
+- **Tous systèmes :** `python scripts/start_local.py`
+
+Le lanceur crée `.venv` et installe les dépendances au besoin, migre SQLite, démarre API + interface, puis ouvre [http://127.0.0.1:5173](http://127.0.0.1:5173). Les données restent dans `data/`. Tutoriel d’usage : [docs/TUTORIAL.md](docs/TUTORIAL.md).
+
+Alternative Docker (Compose v2, conteneurs Linux) :
 
 ```sh
-git clone https://github.com/leobrowncode/SoloLMNP.git
-cd SoloLMNP
 docker compose up --build --wait
 ```
 
-Pendant la revue, les immobilisations sont sur la branche `feat/assets-depreciation`, empilée sur les phases précédentes. Faire `git switch feat/assets-depreciation` avant de construire cette version.
+Sur Linux avec Docker, faire correspondre les UID/GID du backend au propriétaire de `data/` (voir [DEPLOYMENT.md](docs/DEPLOYMENT.md)). Le fichier `.env` est facultatif.
 
-Ouvrir [l'application locale](http://127.0.0.1:5173). La base et les futurs documents restent dans `data/`. Le fichier `.env` est facultatif ; l'exemple permet de régler port et emplacement des données. Sur Linux, faire correspondre les UID/GID du backend au propriétaire de `data/` (voir le guide).
-
-Le backend applique les migrations avant de démarrer. L'interface affiche l'état réel du service et du schéma SQLite. Une base absente, illisible ou non migrée ne sera pas déclarée prête.
+Le backend applique les migrations avant de démarrer. L’interface affiche l’état réel du service et du schéma SQLite. Une base absente, illisible ou non migrée ne sera pas déclarée prête.
 
 **Vérification locale :** `python scripts/check.py` (Ruff, mypy, pytest, ESLint, TypeScript, Vitest, build). Les rapports [P5](docs/PHASE5_REPORT.md) à [P12](docs/PHASE12_REPORT.md) décrivent le périmètre et les limites. La CI distante n’a pas été relancée.
 
@@ -45,8 +49,9 @@ Les fichiers `backend/requirements*.lock` et `frontend/package-lock.json` figent
 backend/      FastAPI, configuration, SQLAlchemy, Alembic, contrats et tests
 frontend/     React, TypeScript strict, diagnostic réel et tests d'interface
 fiscal/       Recherches 2025/2026, statut research_only
-docs/         Modèles, règles, sécurité, déploiement, déclaration et roadmap
-scripts/      Contrôles locaux, démarrage, Nginx et smoke Docker
+docs/         Modèles, règles, sécurité, déploiement, tutoriel et roadmap
+scripts/      Contrôles locaux, lanceur natif, Nginx et smoke Docker
+SoloLMNP.bat  Lanceur Windows (double-clic)
 data/         Données locales ignorées par Git
 .github/      CI Linux/Windows, builds et suivi des phases
 ```
@@ -60,7 +65,7 @@ Les montants Python utilisent `Decimal`, avec stockage en centimes entiers SQLit
 - Disponible : migration `0001_foundation`, activité unique, plusieurs biens, exercices, contraintes et tests d'intégrité.
 - Disponible : contrats d'écritures immuables avec validation d'équilibre ; aucun enregistrement comptable persistant.
 - Disponible : API de santé/disponibilité, interface responsive, restrictions réseau et configuration.
-- Disponible : ledger, opérations, banque CSV, emprunts, immobilisations, états provisoires, centralisation, clôture, FEC, mappings de travail, feuille EFI, justificatifs et sauvegarde.
-- Recherche : le moteur fiscal reste `research_only`. Les règles bloquantes désactivées et les cases CERFA non certifiées interdisent un statut prêt.
+- Disponible : ledger, opérations, banque CSV, import CSV de justificatifs, emprunts, immobilisations, états provisoires, centralisation, clôture, FEC, mappings de travail, feuille EFI, justificatifs et sauvegarde.
+- Recherche : le calcul fiscal enregistré reste `research_only`, parce que le LMP, la cession, la TVA et les plus-values sont hors périmètre. La liasse BIC 2025 devient `ready` seulement si chaque case utilisée est au registre vérifié et qu’aucun écart ne bloque la recopie.
 
 Voir [le rapport de phase 1](docs/PHASE1_REPORT.md), [l'architecture](ARCHITECTURE.md), [la roadmap](ROADMAP.md), [le modèle de données](docs/DATA_MODEL.md), [la sécurité](SECURITY.md) et [le workflow EFI](docs/FILING.md).

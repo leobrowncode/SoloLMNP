@@ -15,6 +15,7 @@ from app.api.ledger_schemas import (
     CentralizationInput,
     EditInput,
     EntryInput,
+    IdentityInput,
     InventoryInput,
     JournalInput,
     OpeningInput,
@@ -76,6 +77,8 @@ def build_ledger_router(database: Database) -> APIRouter:
                 "id": activity.id,
                 "activity_name": activity.activity_name,
                 "activity_start_date": activity.activity_start_date.isoformat(),
+                "siren": activity.siren,
+                "siret": activity.siret,
             }
             if activity
             else None,
@@ -105,6 +108,16 @@ def build_ledger_router(database: Database) -> APIRouter:
             if not session.get(AccountingJournal, code):
                 session.add(AccountingJournal(code=code, label=label, journal_type=kind))
         event(session, "ACTIVITY_CREATED", None, data.model_dump(mode="json"))
+        return setup(session)
+
+    @router.post("/activity/identity")
+    def update_identity(data: IdentityInput, session: Write) -> dict[str, Any]:
+        activity = session.get(RentalActivity, 1)
+        if activity is None:
+            fail("ACTIVITY_REQUIRED", "Créez l’activité avant d’indiquer le SIRET.", 422)
+        activity.siren = data.siren
+        activity.siret = data.siret
+        event(session, "ACTIVITY_IDENTITY", None, data.model_dump(mode="json"))
         return setup(session)
 
     @router.post("/years", status_code=201)

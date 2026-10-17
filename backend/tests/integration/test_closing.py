@@ -1,4 +1,6 @@
 import base64
+import json
+import zipfile
 from uuid import uuid4
 
 import pytest
@@ -62,8 +64,14 @@ def test_close_reopen_fec_efi_and_documents(client, settings):
     assert efi["transmission"] is False
     assert efi["personal_return"]["official_case"] is None
     assert efi["personal_return"]["separated_from_liasse"] is True
+    assert efi["liasse"]["fields"][0]["expression"]
+    pdf = client.get("/api/filing/years/1/efi.pdf")
+    assert pdf.status_code == 200
+    assert pdf.content.startswith(b"%PDF-")
+    assert b"ready" in pdf.content
     package = client.get("/api/filing/years/1/package").json()
-    assert package["declarable"] is False
+    assert package["declarable"] is True
+    assert package["status"] == "ready"
     assert package["errors"] == []
     assert package["fields"][0]["entries"]
     reopened = client.post(
@@ -87,12 +95,26 @@ def test_close_reopen_fec_efi_and_documents(client, settings):
     assert len(stored) == 1
     assert stored[0].name.endswith(".pdf")
     assert ".." not in stored[0].name
+    rejected = client.post(
+        "/api/filing/documents",
+        json={
+            "filename": "photo.jpg",
+            "media_type": "image/jpeg",
+            "content_base64": base64.b64encode(b"%PDF-1.4 test").decode(),
+        },
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["detail"]["code"] == "DOCUMENT_SIGNATURE"
 
 
 def test_backup_round_trip_rejects_escape(client, settings):
     book(client, "512000", "706000", "10.00")
     created = client.post("/api/filing/backup")
     assert created.status_code == 201, created.text
+    archive = settings.database_path.parent / "backups" / created.json()["filename"]
+    with zipfile.ZipFile(archive) as bundle:
+        manifest = json.loads(bundle.read("manifest.json"))
+    assert {item["vintage"] for item in manifest["fiscal_vintages"]} >= {"2025", "2026"}
     restored = client.post(
         "/api/filing/backup/restore", json={"filename": created.json()["filename"]}
     )

@@ -1,33 +1,194 @@
 {
   "form": "2033-B",
   "vintage": "2025",
-  "version": "research-1",
+  "version": "research-3",
   "status": "research_only",
-  "source": "Structure de travail interne. Les cases CERFA ne sont pas certifiées pour ce millésime.",
+  "source": "Cases officielles lues sur fiscal/2025/sources (liasse 2033-SD 2025). Feuille de recopie : aucun envoi.",
+  "source_manifest": "../sources/manifest.json",
+  "cases_registry": "cases.yaml",
   "fields": [
     {
-      "code": "PRODUITS",
-      "label": "Total des produits",
+      "code": "SERVICES_VENDUS",
+      "official_case": "217",
+      "form_ref": "2033-B-SD",
+      "label": "Production vendue — services (exercice N)",
       "required": true,
+      "verification": "verified",
       "rules": [],
-      "formula": {"op": "sum_accounts", "prefixes": ["7"]}
+      "formula": {"op": "named", "key": "services"}
+    },
+    {
+      "code": "PRODUITS",
+      "official_case": "232",
+      "form_ref": "2033-B-SD",
+      "label": "Total des produits d'exploitation hors TVA (I)",
+      "required": true,
+      "verification": "verified",
+      "rules": [],
+      "formula": {"op": "named", "key": "exploitation_income"}
+    },
+    {
+      "code": "CHARGES_EXTERNES",
+      "official_case": "242",
+      "form_ref": "2033-B-SD",
+      "label": "Autres charges externes",
+      "required": true,
+      "verification": "verified",
+      "rules": [],
+      "formula": {"op": "named", "key": "external"}
+    },
+    {
+      "code": "IMPOTS_TAXES",
+      "official_case": "244",
+      "form_ref": "2033-B-SD",
+      "label": "Impôts, taxes et versements assimilés",
+      "required": true,
+      "verification": "verified",
+      "rules": [],
+      "formula": {"op": "named", "key": "taxes"}
+    },
+    {
+      "code": "DOTATIONS",
+      "official_case": "254",
+      "form_ref": "2033-B-SD",
+      "label": "Dotations aux amortissements",
+      "required": true,
+      "verification": "verified",
+      "rules": [],
+      "formula": {"op": "named", "key": "depreciation"}
     },
     {
       "code": "CHARGES",
-      "label": "Total des charges",
+      "official_case": "264",
+      "form_ref": "2033-B-SD",
+      "label": "Total des charges d'exploitation (II)",
       "required": true,
+      "verification": "verified",
       "rules": [],
-      "formula": {"op": "sum_accounts", "prefixes": ["6"]}
+      "formula": {"op": "named", "key": "exploitation_charges"}
+    },
+    {
+      "code": "RESULTAT_EXPLOITATION",
+      "official_case": "270",
+      "form_ref": "2033-B-SD",
+      "label": "Résultat d'exploitation (I – II)",
+      "required": true,
+      "verification": "verified",
+      "rules": [],
+      "formula": {"op": "named", "key": "operating_result"}
+    },
+    {
+      "code": "PRODUITS_FINANCIERS",
+      "official_case": "280",
+      "form_ref": "2033-B-SD",
+      "label": "Produits financiers (III)",
+      "required": true,
+      "verification": "verified",
+      "rules": [],
+      "formula": {"op": "named", "key": "financial_income"}
+    },
+    {
+      "code": "CHARGES_FINANCIERES",
+      "official_case": "294",
+      "form_ref": "2033-B-SD",
+      "label": "Charges financières (V)",
+      "required": true,
+      "verification": "verified",
+      "rules": [],
+      "formula": {"op": "named", "key": "financial_expense"}
+    },
+    {
+      "code": "BENEFICE_COMPTABLE",
+      "official_case": "312",
+      "form_ref": "2033-B-SD",
+      "label": "Bénéfice comptable (col. 1)",
+      "required": true,
+      "verification": "verified",
+      "rules": [],
+      "formula": {"op": "nonneg", "term": {"op": "named", "key": "accounting"}}
+    },
+    {
+      "code": "DEFICIT_COMPTABLE",
+      "official_case": "314",
+      "form_ref": "2033-B-SD",
+      "label": "Déficit comptable (col. 2)",
+      "required": true,
+      "verification": "verified",
+      "rules": [],
+      "formula": {"op": "absneg", "term": {"op": "named", "key": "accounting"}}
+    },
+    {
+      "code": "AMORT_NON_DEDUCTIBLE",
+      "official_case": "318",
+      "form_ref": "2033-B-SD",
+      "label": "Amortissements excédentaires et autres amortissements non déductibles",
+      "required": true,
+      "verification": "verified",
+      "rules": ["RULE-LMNP-DEPRECIATION-LIMIT-001"],
+      "formula": {"op": "named", "key": "unused"}
+    },
+    {
+      "code": "REINTEGRATIONS_DIVERS",
+      "official_case": "330",
+      "form_ref": "2033-B-SD",
+      "label": "Divers (réintégrations)",
+      "required": true,
+      "verification": "verified",
+      "rules": [],
+      "formula": {"op": "named", "key": "additions"}
+    },
+    {
+      "code": "RESULTAT_FISCAL_AVANT_DEFICITS_BENEFICE",
+      "official_case": "352",
+      "form_ref": "2033-B-SD",
+      "label": "Résultat fiscal avant imputation des déficits antérieurs — bénéfice",
+      "required": true,
+      "verification": "verified",
+      "rules": ["RULE-LMNP-DEPRECIATION-LIMIT-001", "RULE-LMNP-LOSS-001"],
+      "formula": {"op": "nonneg", "term": {"op": "named", "key": "fiscal_before"}}
+    },
+    {
+      "code": "RESULTAT_FISCAL_AVANT_DEFICITS_DEFICIT",
+      "official_case": "354",
+      "form_ref": "2033-B-SD",
+      "label": "Résultat fiscal avant imputation des déficits antérieurs — déficit",
+      "required": true,
+      "verification": "verified",
+      "rules": ["RULE-LMNP-LOSS-001"],
+      "formula": {"op": "absneg", "term": {"op": "named", "key": "fiscal_before"}}
     },
     {
       "code": "RESULTAT_FISCAL",
-      "label": "Résultat fiscal de travail",
+      "official_case": "370",
+      "official_case_deficit": "372",
+      "form_ref": "2033-B-SD",
+      "label": "Résultat fiscal après imputation des déficits — bénéfice (case 370)",
       "required": true,
+      "verification": "verified",
       "rules": ["RULE-LMNP-DEPRECIATION-LIMIT-001", "RULE-LMNP-LOSS-001"],
-      "formula": {"op": "tax_result"}
+      "formula": {"op": "nonneg", "term": {"op": "tax_result"}}
+    },
+    {
+      "code": "RESULTAT_FISCAL_DEFICIT",
+      "official_case": "372",
+      "form_ref": "2033-B-SD",
+      "label": "Résultat fiscal après imputation des déficits — déficit (case 372)",
+      "required": true,
+      "verification": "verified",
+      "rules": ["RULE-LMNP-LOSS-001"],
+      "formula": {"op": "absneg", "term": {"op": "tax_result"}}
     }
   ],
   "checks": [
-    {"id": "RESULT_IS_TAX", "left": "RESULTAT_FISCAL", "right": {"op": "tax_result"}}
+    {
+      "id": "BENEFIT_IS_NONNEG_TAX",
+      "left": "RESULTAT_FISCAL",
+      "right": {"op": "nonneg", "term": {"op": "tax_result"}}
+    },
+    {
+      "id": "DEFICIT_IS_ABSNEG_TAX",
+      "left": "RESULTAT_FISCAL_DEFICIT",
+      "right": {"op": "absneg", "term": {"op": "tax_result"}}
+    }
   ]
 }
