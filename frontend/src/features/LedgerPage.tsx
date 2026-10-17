@@ -95,7 +95,6 @@ export default function LedgerPage() {
   }
 
   return <section id="comptabilite" className="ledger-page" aria-labelledby="ledger-title">
-    <p className="eyebrow">COMPTABILITÉ EN PARTIE DOUBLE</p>
     <h2 id="ledger-title">Votre comptabilité</h2>
     <p>Seules les écritures validées alimentent le journal, le grand livre et la balance. Leur validation est définitive.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}
@@ -135,13 +134,13 @@ export default function LedgerPage() {
       }}>
         <label>Début de l’exercice<input name="start" type="date" required /></label>
         <label>Fin de l’exercice<input name="end" type="date" required /></label>
-        <label>Millésime fiscal<input name="vintage" pattern="[0-9]{4}" required placeholder="2025" /></label>
+        <label>Millésime fiscal<input name="vintage" pattern="[0-9]{4}" required placeholder="2026" /></label>
         <button disabled={busy}>Créer l’exercice</button>
       </form>
     </details>}
     {!!setup?.years.length && <>
       <label>Exercice<select value={year} onChange={(e) => { setYear(Number(e.target.value)); setDraft(null); setConfirmation(null); setOffset(0); setBalance(null); setLedger([]); setEntries([]); }}>
-        {setup.years.map((y) => <option key={y.id} value={y.id}>{y.year} · {y.status}</option>)}
+        {setup.years.map((y) => <option key={y.id} value={y.id}>{y.year} · {y.status === "OPEN" ? "ouvert" : y.status === "CLOSED" ? "clôturé" : "prêt à clôturer"}</option>)}
       </select></label>
       <nav aria-label="Vues comptables" className="ledger-tabs">{["Brouillons", "Journal", "Grand livre", "Balance", "Plan comptable", "Inventaire"].map((name) =>
         <button key={name} aria-pressed={tab === name} onClick={() => { setTab(name); setOffset(0); setEntries([]); if (name === "Inventaire") setDraft(null); }}>{name}</button>)}</nav>

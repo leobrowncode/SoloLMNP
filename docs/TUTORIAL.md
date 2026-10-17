@@ -35,7 +35,7 @@ Vérifier que l’écran « État de l’installation » affiche **Base SQLite :
 Menu **Comptabilité** :
 
 1. **Créer l’activité** (nom + date de début réelle).
-2. **Ajouter un exercice**. Pour des revenus 2025, millésime `2025` (cases archivées). Un millésime 2026 reprend ces numéros tant que les formulaires 2026 ne sont pas archivés : vérifiez-les sur le portail.
+2. **Ajouter un exercice 2026** (achat en 2026 : pas de liasse 2025). Millésime `2026`. Les numéros de cases viennent du dernier formulaire lu : vérifiez-les au moment de la déclaration 2027.
 3. (Optionnel) Onglet **Plan comptable** pour ajouter des comptes.
 
 Pour une activité déjà existante : saisir des **à-nouveaux** justifiés. L’application
@@ -150,6 +150,6 @@ Activité + exercice 2026
 
 - Périmètre LMNP uniquement (pas de LMP).
 - Cession, TVA, plus-values et ventilation automatique du terrain : désactivées. Leur présence bloque la recopie.
-- Millésime 2025 : la liasse est prête à recopier quand l’écran l’indique. Le millésime 2026 reprend des numéros non archivés : vérifiez-les sur le portail.
+- Exercice 2026 seulement. Il n’y a pas de liasse 2025. Vérifiez les numéros de cases sur la déclaration déposée en 2027.
 - 2042-C-PRO : case non archivée, à part de la liasse BIC.
 - Aucune télétransmission.

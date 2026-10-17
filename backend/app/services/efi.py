@@ -43,12 +43,16 @@ def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
         "declarant": copy.get("declarant"),
         "by_property": package.get("by_property", []),
         "disclaimer": (
-            "Liasse BIC 2025 prête à recopier dans le périmètre LMNP. "
-            "La 2042-C-PRO n’a pas de case archivée. Aucun envoi n’est effectué."
+            (
+                "Feuille de l’exercice 2026, à recopier. Pas de déclaration 2025. "
+                "Aucun envoi n’est effectué."
+                if package.get("vintage") == "2026"
+                else "Feuille prête à recopier. Aucun envoi n’est effectué."
+            )
             if package.get("declarable")
             else (
-                "Feuille de recopie non déclarable. Aucune case 2042-C-PRO n’est affirmée "
-                "tant que la notice du millésime n’est pas archivée. Aucun envoi n’est effectué."
+                "Feuille de recopie non déclarable. Aucune case 2042-C-PRO n’est affirmée. "
+                "Aucun envoi n’est effectué."
             )
         ),
         "liasse": {

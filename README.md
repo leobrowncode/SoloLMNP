@@ -2,7 +2,7 @@
 
 Application libre, mono-utilisateur et auto-hébergeable pour une activité LMNP au réel simplifié BIC.
 
-**Version 1.0.0 — liasse BIC 2025 recopiable pour un LMNP au réel simplifié.** Le ledger, les opérations, la banque, les emprunts, les immobilisations, les états, la clôture, le FEC, la feuille EFI et la sauvegarde sont disponibles. Pour un exercice 2025 sans écart d’immobilisations ni opération hors périmètre, la liasse est marquée prête à recopier. SoloLMNP n’envoie rien. Le millésime 2026, la 2042-C-PRO, le LMP, la cession, la TVA et les plus-values restent hors de cette feuille.
+**Version 1.0.0 — comptabilité LMNP de l’exercice 2026.** Le ledger, les opérations, la banque, les emprunts, les immobilisations, les états, la clôture, le FEC et la feuille à recopier sont disponibles. Un achat en 2026 n’a pas de liasse 2025. SoloLMNP n’envoie rien. La 2042-C-PRO, le LMP, la cession, la TVA et les plus-values restent hors de cette feuille.
 
 ## Démarrer
 
@@ -66,6 +66,6 @@ Les montants Python utilisent `Decimal`, avec stockage en centimes entiers SQLit
 - Disponible : contrats d'écritures immuables avec validation d'équilibre ; aucun enregistrement comptable persistant.
 - Disponible : API de santé/disponibilité, interface responsive, restrictions réseau et configuration.
 - Disponible : ledger, opérations, banque CSV, import CSV de justificatifs, emprunts, immobilisations, états provisoires, centralisation, clôture, FEC, mappings de travail, feuille EFI, justificatifs et sauvegarde.
-- Recherche : le calcul fiscal enregistré reste `research_only`, parce que le LMP, la cession, la TVA et les plus-values sont hors périmètre. La liasse BIC 2025 devient `ready` seulement si chaque case utilisée est au registre vérifié et qu’aucun écart ne bloque la recopie.
+- Recherche : le calcul fiscal enregistré reste `research_only`, parce que le LMP, la cession, la TVA et les plus-values sont hors périmètre. La feuille de l’exercice 2026 est recopiable si chaque case est au registre lu et qu’aucun écart ne bloque.
 
 Voir [le rapport de phase 1](docs/PHASE1_REPORT.md), [l'architecture](ARCHITECTURE.md), [la roadmap](ROADMAP.md), [le modèle de données](docs/DATA_MODEL.md), [la sécurité](SECURITY.md) et [le workflow EFI](docs/FILING.md).

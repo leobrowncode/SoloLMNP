@@ -269,9 +269,8 @@ export default function FiscalPage() {
     <section className="ledger-page fiscal-dashboard" aria-labelledby="fiscal-title">
       <h2 id="fiscal-title">Charges & amortissements LMNP</h2>
       <p className="form-help">
-        Tableau de bord pour comprendre le plafond d’amortissement et tendre vers un
-        <strong> résultat fiscal proche de 0 €</strong>. Le ledger n’est jamais modifié.
-        Le LMP, la cession, la TVA et les plus-values restent hors outil.
+        Le plafond d’amortissement vise un résultat fiscal proche de 0 €.
+        La comptabilité ne change pas. Cession, TVA et plus-values restent hors de cet écran.
       </p>
 
       {error && <p className="ledger-error" role="alert">{error}</p>}
@@ -293,7 +292,7 @@ export default function FiscalPage() {
           >
             {years.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.year}{item.status ? ` · ${item.status}` : ""}
+                {item.year}{item.status ? ` · ${item.status === "OPEN" ? "ouvert" : item.status === "CLOSED" ? "clôturé" : "prêt à clôturer"}` : ""}
               </option>
             ))}
           </select>
@@ -595,8 +594,9 @@ export default function FiscalPage() {
           )}
 
           <p className="field-hint">
-            Statut : {result.status} · déclarable : {result.declarable ? "oui" : "non"}.
-            Aucune télétransmission.
+            {result.declarable
+              ? "Ce résultat peut alimenter la liasse. Aucune télétransmission."
+              : "Aperçu fiscal. La liasse indique ensuite si elle est recopiable. Aucune télétransmission."}
           </p>
         </div>
       )}

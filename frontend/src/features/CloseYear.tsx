@@ -34,8 +34,8 @@ export default function CloseYear({ year }: { year: number }) {
   async function closeYear() {
     setError("");
     try {
-      const response = await request<{ generation: number }>(`/years/${year}/close`, "POST", { confirmation: "CLOTURER" }, "/api/filing");
-      setReceipt(`Exercice clôturé, génération ${response.generation}. Les snapshots précédents restent lisibles.`);
+      await request(`/years/${year}/close`, "POST", { confirmation: "CLOTURER" }, "/api/filing");
+      setReceipt("Exercice clôturé. Les exports déjà figés restent consultables.");
     } catch (reason) { setError((reason as Error).message); }
   }
   return <section aria-labelledby="close-title">

@@ -7,9 +7,9 @@
 
 Current roadmap position:
 
-- Completed through: liasse BIC 2025 recopiable, 17 octobre 2026
-- Current phase: V1 livrée pour le LMNP réel simplifié, millésime 2025
-- Current objective: conserver le refus de READY hors de ce périmètre
+- Completed through: feuille de l’exercice 2026, achat 2026, pas de liasse 2025
+- Current phase: exercice 2026
+- Current objective: recopier la feuille 2026 ; revérifier les numéros en 2027
 
 ## Completed
 
@@ -28,7 +28,8 @@ Current roadmap position:
 
 - Montants en centimes entiers. Le ledger est la seule source du journal, du bilan et du FEC.
 - Les couches fiscales ne modifient pas les écritures.
-- Aucun statut `ready` sur une case absente du registre, un millésime autre que 2025, ou un écart d’immobilisations, de classement, d’effectifs, de cession ou de TVA.
+- Aucun statut `ready` sur une case absente du registre, un millésime autre que 2026 ou 2025, ou un écart d’immobilisations, de classement, d’effectifs, de cession ou de TVA.
+- Un achat en 2026 n’a pas de liasse 2025.
 - 2042-C-PRO reste un produit séparé, non numéroté.
 - Les comptes 120 et 129 ne sont pas créés automatiquement.
 - La restauration écrit `restore-check.sqlite3` et ne remplace pas la base ouverte.

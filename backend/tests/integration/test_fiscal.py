@@ -117,3 +117,24 @@ def test_liasse_keeps_interest_out_of_operating_charges(client):
         field for field in sheet["liasse"]["fields"] if field["form_ref"] == "2031-SD"
     ]
     assert any(field["value"] == "920.00" for field in reported)
+
+
+def test_2026_purchase_skips_the_2025_return(client):
+    created = client.post(
+        "/api/ledger/years",
+        json={
+            "year": 2026,
+            "start_date": "2026-01-01",
+            "end_date": "2026-12-31",
+            "fiscal_vintage": "2026",
+        },
+    )
+    assert created.status_code == 201, created.text
+    year_id = next(row["id"] for row in created.json()["years"] if row["year"] == 2026)
+    fiscal = client.post(f"/api/fiscal/years/{year_id}", json={"adjustments": []})
+    assert fiscal.status_code == 200, fiscal.text
+    sheet = client.get(f"/api/filing/years/{year_id}/efi").json()
+    assert sheet["declarable"] is True
+    assert "pas de liasse 2025" in sheet["vintage_note"]
+    assert "2026" in sheet["disclaimer"]
+    assert "Pas de déclaration 2025" in sheet["disclaimer"]

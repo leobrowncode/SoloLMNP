@@ -134,8 +134,8 @@ export default function AssetsPage() {
   }
 
   return <section id="assets" className="ledger-page" aria-labelledby="assets-title">
-    <p className="eyebrow">REGISTRE ET SOUS-LEDGER</p><h2 id="assets-title">Immobilisations & amortissements</h2>
-    <p>La valeur, la durée et la mise en service sont documentées et figées. Le terrain ne peut jamais produire de dotation.</p>
+    <h2 id="assets-title">Immobilisations</h2>
+    <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}{message && <p role="status">{message}</p>}
     {!setup?.activity ? <p>Initialisez d’abord l’activité, l’exercice et le bien.</p> : <>
       <button disabled={!properties.length} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>

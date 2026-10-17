@@ -64,7 +64,10 @@ export default function OperationsPage() {
       const lists = await Promise.all(p.map((item) => api<Tenant[]>("/properties/" + item.id + "/tenants")));
       if (!active) return;
       setSetup(s); setAccounts(a); setProperties(p); setBanks(b); setLoans(l); setOperations(o);
-      setTenants(Object.fromEntries(p.map((item, index) => [item.id, lists[index] ?? []])));
+      setTenants(Object.fromEntries(p.map((item, index) => [
+        item.id,
+        Array.isArray(lists[index]) ? lists[index] : [],
+      ])));
       setBankId((current) => current || b[0]?.id || 0);
       setOpPropertyId((current) => current || p[0]?.id || 0);
       setOpYearId((current) => current || s.years.find((year) => year.status === "OPEN")?.id || 0);
@@ -225,9 +228,12 @@ export default function OperationsPage() {
   }
 
   const openYears = setup?.years.filter((year) => year.status === "OPEN") ?? [];
+  function occupants(id: number) {
+    const rows = tenants[id];
+    return Array.isArray(rows) ? rows : [];
+  }
   return <section id="operations" className="ledger-page" aria-labelledby="operations-title">
-    <p className="eyebrow">ÉTAPE 2 · DU JUSTIFICATIF À L’ÉCRITURE</p>
-    <h2 id="operations-title">Opérations & banque</h2>
+    <h2 id="operations-title">Opérations et banque</h2>
     <p>Suivez l’ordre des onglets : bien, banque, emprunts, puis recettes et dépenses.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}
     {message && <p role="status">{message}</p>}
@@ -262,7 +268,7 @@ export default function OperationsPage() {
       )}
 
       {tab === "Biens" && <>
-        <p className="form-help">Le registre des biens ne génère pas d’écriture d’acquisition. Terrain + bâtiment doivent égaler le prix. Les frais de notaire et d’agence sont en plus : ils seront ajoutés à la base amortissable du bâtiment. Indiquez une surface et un prix au m² que vous avez constatés pour proposer le terrain. Aucun forfait de 15 % n’est appliqué.</p>
+        <p className="form-help">Ajoutez le logement avant les loyers. Terrain et bâtiment doivent égaler le prix. Les frais de notaire viennent en plus.</p>
         <button type="button" onClick={() => setEditor({
           title: "Ajouter un bien", path: "/properties",
           help: "Le terrain et le bâtiment doivent totaliser exactement le prix d’acquisition. Les frais restent à part.",
@@ -300,11 +306,11 @@ export default function OperationsPage() {
             <p>Acquisition : {p.acquisition_price} € · Terrain : {p.land_value} € · Bâtiment : {p.building_value} €</p>
             <h4>Colocataires</h4>
             <ul>
-              {(tenants[p.id] ?? []).map((tenant) => (
+              {occupants(p.id).map((tenant) => (
                 <li key={tenant.id}>{tenant.name} · {tenant.monthly_rent} € / mois · depuis {tenant.entry_date}</li>
               ))}
             </ul>
-            {(tenants[p.id] ?? []).length === 0 && <p>Aucun colocataire. Chaque locataire a son loyer.</p>}
+            {occupants(p.id).length === 0 && <p>Aucun colocataire. Chaque locataire a son loyer.</p>}
             <button type="button" onClick={() => setEditor({
               title: "Colocataire — " + p.name,
               path: "/properties/" + p.id + "/tenants",
@@ -316,7 +322,7 @@ export default function OperationsPage() {
                 { name: "exit_date", label: "Sortie, si elle est connue", type: "date", optional: true },
               ],
             })}>Ajouter un colocataire</button>
-            <button type="button" disabled={!opYearId || !(tenants[p.id] ?? []).length} onClick={() => {
+            <button type="button" disabled={!opYearId || !occupants(p.id).length} onClick={() => {
               void action(async () => {
                 const result = await api<{ created: number; already: number }>("/properties/" + p.id + "/rents", "POST", { fiscal_year_id: opYearId });
                 setMessage(result.created + " quittance(s) préparée(s), " + result.already + " déjà présentes. Elles restent à régler.");

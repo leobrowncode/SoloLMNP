@@ -90,7 +90,7 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
             {
                 "code": "FISCAL_SCOPE",
                 "message": (
-                    "Liasse BIC recopiable pour un LMNP au réel simplifié, millésime 2025. "
+                    "Liasse de l’exercice à recopier. Pas de déclaration 2025 si l’achat est en 2026. "
                     "LMP, cession, TVA, plus-values et 2042-C-PRO restent hors de cette feuille."
                 ),
             },

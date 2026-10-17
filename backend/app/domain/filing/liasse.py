@@ -32,11 +32,11 @@ def extend_package(
     package["by_property"] = _segments(session, year)
     activity = session.get(RentalActivity, 1)
     note = (
-        "Cases lues sur la liasse 2033 millésime 2025. "
-        "Les formulaires 2026 ne sont pas archivés : recopiez ces numéros "
-        "seulement s’ils correspondent au millésime ouvert sur impots.gouv.fr."
-        if year.fiscal_vintage != "2025"
-        else "Cases lues sur les PDF 2031 et 2033 archivés pour le millésime 2025."
+        "Exercice 2026 : il n’y a pas de liasse 2025. "
+        "Les numéros sont ceux du dernier formulaire lu. "
+        "Vérifiez-les sur la déclaration que vous déposerez en 2027."
+        if year.fiscal_vintage == "2026"
+        else "Cases lues sur les PDF 2031 et 2033 archivés."
     )
     package["copy"] = {
         "transmission": False,

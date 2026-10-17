@@ -94,12 +94,12 @@ def compile_package(session: Session, year_id: int) -> dict[str, Any]:
 
 
 def _mark_copy_ready(year: Any, package: dict[str, Any]) -> None:
-    """2025 BIC liasse only. A failing gate leaves the sheet as research_only."""
+    """Copy sheet for the 2026 exercise. A failing gate stays research_only."""
     for field in package["fields"]:
         field["status"] = "research_only"
     package["status"] = "research_only"
     package["declarable"] = False
-    if year.fiscal_vintage != "2025" or package["errors"]:
+    if year.fiscal_vintage not in {"2026", "2025"} or package["errors"]:
         return
     registry = json.loads(
         (PROJECT_ROOT / "fiscal" / "2025" / "forms" / "cases.yaml").read_text(encoding="utf-8")
@@ -123,7 +123,7 @@ def _mark_copy_ready(year: Any, package: dict[str, Any]) -> None:
             package["errors"].append(
                 {
                     "code": "CASE_NON_VERIFIEE",
-                    "message": f"La case {field['code']} n’est pas au registre vérifié 2025.",
+                    "message": f"La case {field['code']} n’est pas au registre des cases lues.",
                 }
             )
             return

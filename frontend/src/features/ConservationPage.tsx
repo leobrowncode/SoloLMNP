@@ -64,7 +64,7 @@ export default function ConservationPage() {
 
   return <section className="ledger-page" aria-labelledby="conservation-title">
     <h2 id="conservation-title">Justificatifs et sauvegarde</h2>
-    <p>Le fichier est stocké sous un nom généré, hors du chemin saisi. La restauration contrôle l’archive puis écrit une copie de vérification. Elle ne remplace pas la base ouverte.</p>
+    <p>Déposez un PDF ou une photo. Une sauvegarde se crée ici. La restauration prépare une copie de contrôle : elle ne remplace pas les données en cours.</p>
     {error && <p role="alert">{error}</p>}
     {receipt && <p role="status">{receipt}</p>}
     <form onSubmit={(event) => { event.preventDefault(); void upload(); }}>
