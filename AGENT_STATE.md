@@ -39,6 +39,7 @@
 - Statements are account-level and `PROVISIONAL`, not a regulatory annual package.
 - Result centralization and allocation are not specified as an approved closing behavior.
 - `scripts/start_local.py` and `SoloLMNP.bat` are not in the repository. Startup is Docker Compose or the native commands in `docs/DEPLOYMENT.md`.
+- The Vite dev proxy must keep the browser Host header. Changing it back to the API port rejects every write.
 - Questions Q-001, Q-002 and Q-003 are waiting for the product owner. Do not treat the agent recommendation as approval.
 
 ## Validation baseline

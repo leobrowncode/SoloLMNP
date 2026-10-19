@@ -128,9 +128,11 @@ npm ci
 npm run dev
 ```
 
-Vite écoute sur l'interface locale et transmet `/api/` à `127.0.0.1:8000`.
-Les montants métier seront exprimés en Decimal côté Python ; aucune opération comptable
-n'est introduite par les scripts de lancement.
+Vite écoute sur l'interface locale et transmet `/api/` à `127.0.0.1:8000`
+en conservant l'en-tête Host du navigateur. L'API n'accepte une écriture que si
+son origine correspond à cet hôte, comme derrière Nginx. Les montants métier
+sont exprimés en Decimal côté Python ; aucune opération comptable n'est
+introduite par les scripts de lancement.
 
 ## Vérifications reproductibles
 
