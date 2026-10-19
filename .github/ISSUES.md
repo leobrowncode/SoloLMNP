@@ -1,5 +1,7 @@
 # Suivi des phases
 
+État au 19 octobre 2026 : ne pas recréer ce backlog. L'issue #4 est fermée. Les issues #2, #3 et #5 à #13 sont ouvertes. P3 est la seule phase dont l'issue est fermée. P5 est partielle sur `main` ; P6 à P12 ne sont pas implémentées. La phrase historique ci-dessous, qui désignait P2 comme prochaine phase, est dépassée.
+
 Issues créées le 16 septembre 2026 dans le dépôt SoloLMNP :
 
 - [[P1] Fondations persistantes et migration initiale](https://github.com/leobrowncode/SoloLMNP/issues/2)

@@ -57,6 +57,33 @@ describe("Foundation status", () => {
     expect(isApplicationStatus(null)).toBe(false);
   });
 
+  it("opens provisional statements and describes the delivered scope", async () => {
+    const assetsReady = {
+      ...ready,
+      application_version: "0.5.0",
+      phase: "assets" as const,
+      database: { status: "ready", schema_revision: "0005_opening", expected_revision: "0005_opening" },
+    };
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      const path = String(url);
+      if (path.endsWith("/api/status")) return Promise.resolve(reply(assetsReady));
+      if (path.endsWith("/api/ledger/setup")) {
+        return Promise.resolve(reply({ activity: null, years: [] }));
+      }
+      return Promise.resolve(reply({ detail: { message: "unused" } }, 404));
+    }));
+    render(<App />);
+    expect(await screen.findByText("Phase 5 · États provisoires")).toBeInTheDocument();
+    expect(screen.getByText(/inventaire manuel justifié/)).toBeInTheDocument();
+    expect(screen.getByText(/Aucun montant déclarable/)).toBeInTheDocument();
+    expect(screen.queryByText(/L’inventaire, la continuité, le moteur fiscal/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Comptabilité" })).toHaveAttribute("aria-current", "page");
+    await userEvent.click(screen.getByRole("link", { name: "États comptables" }));
+    expect(await screen.findByRole("heading", { name: "États comptables provisoires" })).toBeInTheDocument();
+    expect(screen.getByText(/Créez un exercice dans Comptabilité/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "États comptables" })).toHaveAttribute("aria-current", "page");
+  });
+
   it("aborts the pending request on unmount", async () => {
     const request = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
       expect(init.signal?.aborted).toBe(false);

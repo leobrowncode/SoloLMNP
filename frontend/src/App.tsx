@@ -12,10 +12,17 @@ const stages = [
   ["02", "Comptabilité", "Écritures en partie double, journal, grand livre et balance.", "Disponible"],
   ["03", "Opérations", "Recettes, dépenses, banque CSV, rapprochement et emprunts.", "Disponible"],
   ["04", "Immobilisations", "Registre, composants, prorata et dotations comptables.", "Disponible"],
-  ["05", "États comptables", "Bilan et résultat provisoires ; inventaire et continuité à suivre.", "En cours"],
+  ["05", "États comptables", "Bilan et résultat provisoires, inventaire manuel et prévisualisation des à-nouveaux. La clôture n’est pas livrée.", "En cours"],
   ["06–10", "Fiscalité & déclaration", "Règles sourcées, reports, clôture, FEC et préparation de la saisie EFI.", "À développer"],
   ["11–12", "Conservation & fiabilité", "Justificatifs, sauvegarde, restauration et parcours complets.", "À développer"],
 ];
+
+const workspaces = [
+  ["ledger", "Comptabilité"],
+  ["operations", "Opérations & banque"],
+  ["assets", "Immobilisations"],
+  ["statements", "États comptables"],
+] as const;
 
 export default function App() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
@@ -47,11 +54,10 @@ export default function App() {
         </a>
         <p className="sidebar-label">VOTRE ESPACE LOCAL</p>
         <nav aria-label="Navigation principale">
-          <a href="#main" className="nav-active"><span aria-hidden="true">◫</span> Vue d’ensemble</a>
-          <a href="#main" onClick={() => setPage("ledger")}>Comptabilité</a>
-          <a href="#main" onClick={() => setPage("operations")}>Opérations & banque</a>
-          <a href="#main" onClick={() => setPage("assets")}>Immobilisations</a>
-          <a href="#main" onClick={() => setPage("statements")}>États comptables</a>
+          <a href="#main"><span aria-hidden="true">◫</span> Vue d’ensemble</a>
+          {workspaces.map(([id, label]) => (
+            <a key={id} href="#main" className={page === id ? "nav-active" : undefined} aria-current={page === id ? "page" : undefined} onClick={() => setPage(id)}>{label}</a>
+          ))}
           <a href="#installation"><span aria-hidden="true">◎</span> État de l’installation</a>
           <a href="#roadmap"><span aria-hidden="true">↗</span> Étapes du projet</a>
         </nav>
@@ -66,13 +72,13 @@ export default function App() {
       <main id="main" tabIndex={-1}>
         <header className="topbar">
           <span>ESPACE DE GESTION</span>
-          <span className="phase-badge">Phase 4 · Immobilisations</span>
+          <span className="phase-badge">Phase 5 · États provisoires</span>
         </header>
         <div className="content">
           <section className="intro" aria-labelledby="welcome-title">
             <p className="eyebrow">UNE COMPTABILITÉ QUE VOUS POURREZ EXPLIQUER</p>
-            <h1 id="welcome-title">Des actifs documentés,<br /><span>des dotations traçables.</span></h1>
-            <p className="intro-description">Tenez le registre des immobilisations, séparez le terrain, documentez les composants et comptabilisez chaque dotation dans le ledger.</p>
+            <h1 id="welcome-title">Tenez votre comptabilité LMNP,<br /><span>du journal au bilan provisoire.</span></h1>
+            <p className="intro-description">Saisissez les recettes, les dépenses, la banque et les emprunts, suivez les immobilisations, puis consultez le journal, le bilan et le résultat issus des écritures validées.</p>
           </section>
 
           {ready && ["ledger", "operations", "assets"].includes(status?.phase ?? "") && (page === "ledger" ? <LedgerPage /> : page === "operations" ? <OperationsPage /> : page === "assets" ? <AssetsPage /> : <StatementsPage />)}
@@ -125,13 +131,13 @@ export default function App() {
           <section className="scope-note" aria-label="Périmètre disponible">
             <span className="scope-icon" aria-hidden="true">i</span>
             <div><h2>Ce que permet cette version</h2>
-            <p>Gérer les opérations courantes, la banque, les emprunts, les immobilisations et consulter le bilan et le résultat provisoires issus des écritures validées. L’inventaire, la continuité, le moteur fiscal, le FEC et la liasse restent à développer. Aucun montant déclarable n’est produit aujourd’hui.</p></div>
+            <p>Cette version permet de gérer l’activité et les biens, les recettes et dépenses à l’engagement, la banque, les emprunts, les immobilisations et les dotations, l’inventaire manuel justifié, ainsi que le bilan et le résultat provisoires. La prévisualisation des à-nouveaux est disponible ; leur génération exige un exercice précédent clôturé, et le parcours de clôture n’est pas encore livré. Le moteur fiscal, le FEC, la liasse et la sauvegarde applicative restent à développer. Aucun montant déclarable n’est produit.</p></div>
           </section>
 
           <section id="roadmap" className="roadmap" aria-labelledby="roadmap-title">
             <div className="section-heading"><div><p className="eyebrow">DANS LE BON ORDRE</p><h2 id="roadmap-title">De l’écriture à la déclaration</h2></div><span className="subtle">Un socle vérifié à chaque étape</span></div>
             <ol className="stage-list">{stages.map(([number, title, description, label]) => (
-              <li key={number}><span className="stage-number">{number}</span><div className="stage-description"><h3>{title}</h3><p>{description}</p></div><span className={number === "01" ? "stage-label current" : "stage-label"}>{label}</span></li>
+              <li key={number}><span className="stage-number">{number}</span><div className="stage-description"><h3>{title}</h3><p>{description}</p></div><span className={number === "05" ? "stage-label current" : "stage-label"}>{label}</span></li>
             ))}</ol>
           </section>
           <footer>Comptabilité d’abord. Fiscalité sourcée. Données sous votre contrôle.</footer>

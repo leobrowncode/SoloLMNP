@@ -1,13 +1,22 @@
 # Roadmap
 
+## État au 19 octobre 2026
+
+Contrôle sur `main`, commit `0a59960`. Aucune pull request ouverte.
+
+- P0 à P4 : le code est sur `main`. Les issues #2, #3 et #5 restent ouvertes ; leur conformité n'a pas été rejouée le 19 octobre 2026.
+- P5 : partielle. États provisoires, inventaire manuel, prévisualisation et génération des à-nouveaux sont livrés. La génération est inutilisable tant qu'aucun parcours de clôture n'existe. La présentation réglementaire, la centralisation et l'affectation du résultat manquent. L'issue #6 reste ouverte.
+- P6 à P12 : non implémentées. Les issues #7 à #13 restent ouvertes.
+- La section du 16 septembre conserve l'historique des livraisons. En cas d'écart, cette section prévaut.
+
 ## État au 16 septembre 2026
 
 - P0 : architecture et catalogue de scénarios livrés dans la PR #1. La recherche fiscale reste à compléter avant toute règle exécutable.
-- P1 : implémentation, contrôles natifs et [CI Linux/Windows/frontend/Docker réussis](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132). Revue et intégration de la [PR #14](https://github.com/leobrowncode/SoloLMNP/pull/14) en attente.
+- P1 : implémentation, contrôles natifs et [CI Linux/Windows/frontend/Docker réussis](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132). La [PR #14](https://github.com/leobrowncode/SoloLMNP/pull/14) est fusionnée. L'issue #2 reste ouverte.
 - P2 : ledger, API et interface implémentés ; 120 tests backend et 10 frontend passent en local. Voir [le rapport](docs/PHASE2_REPORT.md).
 - P3 : recettes/dépenses à l'engagement, règlements, banque CSV, rapprochement et emprunts implémentés. Voir [le rapport](docs/PHASE3_REPORT.md).
 - P4 : registre immuable, composants, prorata en jours et dotations ledger implémentés. Voir [le rapport](docs/PHASE4_REPORT.md).
-- P5 : en cours. Bilan/résultat provisoires, prévisualisation et génération idempotente des à-nouveaux, contrôle par compte et scénario de règlement en deuxième année livrés. La génération exige une source clôturée (parcours de clôture prévu en P7). Inventaire, présentation réglementaire et validation complète de continuité restent à terminer ; l’issue #6 reste ouverte. Voir [le rapport](docs/PHASE5_REPORT.md).
+- P5 : en cours. Bilan/résultat provisoires, inventaire manuel justifié, prévisualisation et génération idempotente des à-nouveaux, contrôle par compte et scénario de règlement en deuxième année livrés. La génération exige une source clôturée (parcours de clôture prévu en P7). Présentation réglementaire, centralisation, affectation et validation complète de continuité restent à terminer ; l’issue #6 reste ouverte. Voir [le rapport](docs/PHASE5_REPORT.md).
   - Intégration P3/P4/P5 : scénario sur deux exercices avec règlements métier, emprunt et dotations ; correction du double comptage du capital après reprise et filtres du journal étendus aux dotations/à-nouveaux. La clôture reste simulée uniquement dans les fixtures de test.
   - Inventaire P5 : API de saisie manuelle justifiée, atomique et idempotente, audit et filtre journal livrés dans la PR #18. Formulaire dédié livré dans la PR #19 ; pièces archivées et traitements automatiques restent à développer.
   - Suite de l’issue #6 livrée dans la PR #19 fusionnée : formulaire d’inventaire manuel, revue avant validation, reçu et reprise de la même demande après réponse perdue. Les pièces archivées, traitements automatiques et autres limites P5 restent à livrer.

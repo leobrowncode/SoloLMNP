@@ -129,7 +129,7 @@ export default function OperationsPage() {
       </>}
       {details && <div className="ledger-table"><h3>{details.entry_number} · {details.label}</h3><table><thead><tr><th>Compte</th><th>Libellé</th><th>Débit</th><th>Crédit</th></tr></thead><tbody>{details.lines.map((line, i) => <tr key={i}><td>{line.account_number}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td></tr>)}</tbody></table></div>}
       {tab === "Biens" && <>
-        <p>Le registre des biens ne génère pas d’écriture d’acquisition. Les immobilisations et leur financement seront rapprochés dans les phases suivantes.</p>
+        <p>Le registre des biens décrit le logement et ne génère pas l’écriture d’acquisition. Pour comptabiliser le terrain et les composants, ouvrez Immobilisations et rattachez-les à ce bien. La ventilation terrain/bâtiment reste manuelle.</p>
         <button onClick={() => setEditor({ title: "Ajouter un bien", path: "/properties", fields: [
           { name: "name", label: "Nom du bien" }, { name: "address", label: "Adresse" }, { name: "acquisition_date", label: "Date d’acquisition", type: "date" },
           { name: "rental_start_date", label: "Début de location", type: "date", optional: true },

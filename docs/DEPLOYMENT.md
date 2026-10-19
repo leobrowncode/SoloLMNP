@@ -1,7 +1,8 @@
-# Déploiement et vérification des fondations
+# Déploiement et vérification
 
-Cette phase fournit l'infrastructure de l'application. Elle ne permet pas encore de tenir
-une comptabilité ni de produire une déclaration fiscale.
+Ce guide décrit l'installation Docker et le développement natif. Le périmètre
+fonctionnel courant est celui du README : comptabilité, opérations, immobilisations
+et états provisoires. Aucun montant déclarable n'est produit.
 
 ## Docker Compose
 
