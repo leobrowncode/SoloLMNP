@@ -20,7 +20,7 @@
 
 - Issue: #6 — inventaire, bilan, résultat et continuité
 - Branch: `cursor/sololmnp-conformit-livraison-1423`
-- Pull request: opened by the 2026-10-19 compliance run
+- Pull request: #22
 - Status: review
 
 ## Important decisions

@@ -2,7 +2,7 @@
 
 ## 2026-10-19
 
-- Référence : `main` `0a59960`. Branche `cursor/sololmnp-conformit-livraison-1423`.
+- Référence : `main` `0a59960`. Branche `cursor/sololmnp-conformit-livraison-1423`, commits `787887c` et `a7b7377`. PR : https://github.com/leobrowncode/SoloLMNP/pull/22
 - Anomalies confirmées :
   - P5 incomplète et P6–P12 absentes. Issues #6 à #13 ouvertes. Seule l'issue #4 est fermée.
   - Les à-nouveaux sont inutilisables sans clôture. Gravité P1, preuve `OpeningPosting.tsx` et `docs/PHASE5_REPORT.md`.
