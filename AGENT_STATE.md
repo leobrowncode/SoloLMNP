@@ -20,7 +20,7 @@
 
 - Issue: #6 — inventaire, bilan, résultat et continuité
 - Branch: `cursor/sololmnp-livraison-produit-5280`
-- Pull request: opened by the 2026-10-20 run for validation messages
+- Pull request: #23 — validation messages shown to the user
 - Earlier pull request: #22 remains open and must not be redone. It covers the displayed scope and the Vite Host proxy.
 
 ## Important decisions

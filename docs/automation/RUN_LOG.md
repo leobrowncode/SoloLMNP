@@ -8,7 +8,7 @@
 
 ## 2026-10-20
 
-- Référence : `main` `0a59960`. Branche `cursor/sololmnp-livraison-produit-5280`.
+- Référence : `main` `0a59960`. Branche `cursor/sololmnp-livraison-produit-5280`, commit `a999b4f`. PR : https://github.com/leobrowncode/SoloLMNP/pull/23
 - Écarts confirmés, hors du lot du jour : pas de clôture (P1, à-nouveaux bloqués), P6–P12 absents, accueil et README en retard sur `main` (PR #22), proxy Vite qui rejette les écritures locales (PR #22), lanceurs `scripts/start_local.py` et `SoloLMNP.bat` absents.
 - Écart traité : un refus Pydantic 422 remplaçait la phrase métier par « Opération refusée… ». L'écran des états disait encore que l'inventaire restait à contrôler.
 - Travail : `refusalMessage` affiche `detail.message` ou la phrase française de `detail[].msg`, sans le préfixe `Value error, ` ni le corps saisi. Le texte des états distingue l'inventaire manuel, livré, de la clôture et des états réglementaires, absents.
