@@ -44,7 +44,7 @@ export default function StatementsPage() {
   }
   return <section className="ledger-page" aria-labelledby="statements-title">
     <h2 id="statements-title">États comptables provisoires</h2>
-    <p>Calculés uniquement sur les écritures validées. Inventaire et continuité entre exercices restent à contrôler. Aucun montant déclarable.</p>
+    <p>Calculés uniquement sur les écritures validées. L’inventaire manuel se saisit dans Comptabilité. La clôture d’exercice et les états réglementaires ne sont pas livrés. Aucun montant déclarable.</p>
     {setup && setup.years.length === 0 && <p>Créez un exercice dans Comptabilité pour consulter ses états.</p>}
     {setup && setup.years.length > 0 && <div className="toolbar">
       <label>Exercice <select value={year} onChange={(event) => refresh(Number(event.target.value))}>{setup.years.map((item) => <option key={item.id} value={item.id}>{item.year}</option>)}</select></label>
