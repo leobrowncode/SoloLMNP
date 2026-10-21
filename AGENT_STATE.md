@@ -20,7 +20,7 @@
 
 - Issue: #6 — inventaire, bilan, résultat et continuité
 - Branch: `cursor/sololmnp-conformit-livraison-54d3`
-- Pull request: opened by this run for exercise and account conflict messages
+- Pull request: #24 — https://github.com/leobrowncode/SoloLMNP/pull/24
 - Earlier pull requests: #22 (displayed scope and Vite Host) and #23 (validation sentences) remain open and must not be redone.
 
 ## Important decisions
@@ -63,4 +63,4 @@ Next run should:
 
 - Date: 2026-10-21
 - Main SHA: `0a59960`
-- Active PR/commit: branch `cursor/sololmnp-conformit-livraison-54d3`
+- Active PR/commit: #24, commit `d9811e9`

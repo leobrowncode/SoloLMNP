@@ -15,7 +15,7 @@
 
 ## 2026-10-21
 
-- Référence : `main` `0a59960`. Branche `cursor/sololmnp-conformit-livraison-54d3`.
+- Référence : `main` `0a59960`. Branche `cursor/sololmnp-conformit-livraison-54d3`, commit `d9811e9`. PR : https://github.com/leobrowncode/SoloLMNP/pull/24
 - Écarts confirmés, hors du lot : pas de clôture (P1), P6–P12 absents, accueil et README en retard (PR #22), proxy Vite (PR #22), messages Pydantic (PR #23), lanceurs `scripts/start_local.py` et `SoloLMNP.bat` absents.
 - Écart traité : créer un exercice chevauchant, réutiliser une année de clôture, un compte 164 ou un compte 512 renvoyait « Opération refusée par les contraintes d’intégrité. » Le formulaire ne disait pas que l'exercice suivant doit commencer le lendemain exact.
 - Travail : ces quatre refus portent un code et une phrase de correction. Le formulaire d'exercice énonce la règle de continuité. Aucune règle comptable, aucun schéma et aucune donnée de `data/` modifiés.
