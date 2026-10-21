@@ -226,6 +226,48 @@ def test_sql_cannot_validate_unbalanced_entry(client, database):
     assert client.get("/api/ledger/years/1/balance").json()["balance"] == []
 
 
+def test_year_conflicts_name_the_correction(client):
+    overlap = client.post(
+        "/api/ledger/years",
+        json={
+            "year": 2026,
+            "start_date": "2025-12-31",
+            "end_date": "2026-12-30",
+            "fiscal_vintage": "2026",
+        },
+    )
+    assert overlap.status_code == 409
+    assert overlap.json()["detail"] == {
+        "code": "OVERLAPPING_EXERCISE",
+        "message": "Ces dates chevauchent un exercice existant. L’exercice suivant doit "
+        "commencer le lendemain de la fin du précédent.",
+    }
+    assert (
+        client.post(
+            "/api/ledger/years",
+            json={
+                "year": 2026,
+                "start_date": "2026-01-01",
+                "end_date": "2026-06-30",
+                "fiscal_vintage": "2026",
+            },
+        ).status_code
+        == 201
+    )
+    duplicate = client.post(
+        "/api/ledger/years",
+        json={
+            "year": 2026,
+            "start_date": "2026-07-01",
+            "end_date": "2026-12-31",
+            "fiscal_vintage": "2026",
+        },
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"]["code"] == "DUPLICATE_CLOSING_YEAR"
+    assert "année de clôture" in duplicate.json()["detail"]["message"]
+
+
 def test_account_deactivation_and_overlapping_year(client):
     entry = draft(client)
     assert (

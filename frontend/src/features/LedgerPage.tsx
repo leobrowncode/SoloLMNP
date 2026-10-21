@@ -120,6 +120,7 @@ export default function LedgerPage() {
           end_date: data.get("end"), fiscal_vintage: data.get("vintage"),
         }), "Exercice créé.");
       }}>
+        <p>L’année de clôture est l’année civile de la date de fin et ne peut servir qu’une fois. L’exercice suivant doit commencer le lendemain exact de la fin du précédent : un chevauchement est refusé, et un trou empêche de préparer les à-nouveaux.</p>
         <label>Début de l’exercice<input name="start" type="date" required /></label>
         <label>Fin de l’exercice<input name="end" type="date" required /></label>
         <label>Millésime fiscal<input name="vintage" pattern="[0-9]{4}" required placeholder="2025" /></label>

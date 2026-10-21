@@ -125,6 +125,32 @@ def loan(client):
     return response.json()
 
 
+def test_reused_loan_and_bank_accounts_explain_the_conflict(client):
+    loan(client)
+    again = client.post(
+        "/api/operations/loans",
+        json={
+            "property_id": 1,
+            "lender": "Second prêteur fictif",
+            "start_date": "2025-02-01",
+            "initial_principal": "5000.00",
+            "interest_rate": "2.00",
+            "duration_months": 60,
+            "principal_account": "164000",
+        },
+    )
+    assert again.status_code == 409
+    assert again.json()["detail"]["code"] == "LOAN_ACCOUNT_IN_USE"
+    assert "compte de capital distinct" in again.json()["detail"]["message"]
+    bank = client.post(
+        "/api/operations/banks",
+        json={"name": "Autre banque fictive", "account_number": "512000"},
+    )
+    assert bank.status_code == 409
+    assert bank.json()["detail"]["code"] == "BANK_ACCOUNT_IN_USE"
+    assert "compte comptable distinct" in bank.json()["detail"]["message"]
+
+
 def test_full_expense_preserved_with_partial_tax_metadata(client):
     row = create(client)
     assert row["deductible_percentage"] == "80.00"

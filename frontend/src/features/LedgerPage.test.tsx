@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import LedgerPage from "./LedgerPage";
@@ -72,6 +72,37 @@ describe("ledger", () => {
     }
     expect(screen.getByRole("option", { name: "À-nouveaux" })).toHaveValue("OPENING");
     expect(screen.getByRole("option", { name: "Dotations aux amortissements" })).toHaveValue("DEPRECIATION");
+  });
+  it("explains the next fiscal year and shows an overlap refusal", async () => {
+    const fetcher = mockApi();
+    fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/api/ledger/years" && init?.method === "POST") {
+        return new Response(JSON.stringify({
+          detail: {
+            code: "OVERLAPPING_EXERCISE",
+            message: "Ces dates chevauchent un exercice existant. L’exercice suivant doit commencer le lendemain de la fin du précédent.",
+          },
+        }), { status: 409, headers: { "Content-Type": "application/json" } });
+      }
+      const path = url.replace("/api/ledger", "");
+      let data: unknown = {};
+      if (path === "/setup") data = { activity: { activity_name: "Fictif" }, years: [{ id: 1, year: 2025, start_date: "2025-01-01", end_date: "2025-12-31", status: "OPEN" }] };
+      if (path === "/accounts") data = accounts;
+      if (path === "/journals") data = [{ code: "OD", label: "Opérations", active: true }];
+      if (path.startsWith("/entries?")) data = { entries: [], count: 0 };
+      return new Response(JSON.stringify(data), { status: 200 });
+    });
+    render(<LedgerPage />);
+    expect(await screen.findByText(/lendemain exact de la fin du précédent/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Début de l’exercice"), { target: { value: "2025-12-01" } });
+    fireEvent.change(screen.getByLabelText("Fin de l’exercice"), { target: { value: "2026-12-31" } });
+    fireEvent.change(screen.getByLabelText("Millésime fiscal"), { target: { value: "2026" } });
+    await userEvent.click(screen.getByRole("button", { name: "Créer l’exercice" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("chevauchent un exercice existant");
+    const call = fetcher.mock.calls.find(([url, init]) => url === "/api/ledger/years" && init?.method === "POST");
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({
+      year: 2026, start_date: "2025-12-01", end_date: "2026-12-31", fiscal_vintage: "2026",
+    });
   });
   it("shows network errors without claiming readiness", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Hors ligne")));
