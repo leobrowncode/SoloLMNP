@@ -22,7 +22,7 @@
 
 ## 2026-10-22
 
-- Référence : `main` `0a59960`. Branche `cursor/sololmnp-conformit-livraison-5df6`.
+- Référence : `main` `0a59960`. Branche `cursor/sololmnp-conformit-livraison-5df6`, commit `9a65b5e`. PR : https://github.com/leobrowncode/SoloLMNP/pull/25
 - Écarts confirmés, hors du lot : pas de clôture (P1), P6–P12 absents, accueil et README en retard (PR #22), proxy Vite (PR #22), messages Pydantic (PR #23), conflits d'exercice génériques (PR #24), lanceurs `scripts/start_local.py` et `SoloLMNP.bat` absents.
 - Écart traité : une construction pouvait recevoir le terrain dans sa part non amortissable. Le refus parlait seulement de base, de durée et de compte 28. La fiche bien refusait aussi un total terrain + bâtiment qui incluait les frais, sans le dire.
 - Travail : le refus d'immobilisation demande d'inscrire le terrain à part sur un compte 211. Le refus de bien précise que les frais ne s'ajoutent pas au prix. Les deux écrans énoncent la règle avant la saisie. La fiche bien affiche les frais enregistrés. Aucune règle de calcul, aucun schéma et aucune donnée de `data/` modifiés.

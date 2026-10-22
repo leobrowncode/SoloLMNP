@@ -20,7 +20,7 @@
 
 - Issue: #6 — inventaire, bilan, résultat et continuité
 - Branch: `cursor/sololmnp-conformit-livraison-5df6`
-- Pull request: to be opened for the land-split explanations
+- Pull request: #25 — https://github.com/leobrowncode/SoloLMNP/pull/25
 - Earlier pull requests: #22 (displayed scope and Vite Host), #23 (validation sentences) and #24 (exercise and dedicated-account conflicts) remain open and must not be redone.
 
 ## Important decisions
@@ -64,4 +64,4 @@ Next run should:
 
 - Date: 2026-10-22
 - Main SHA: `0a59960`
-- Active PR/commit: land-split explanations on `cursor/sololmnp-conformit-livraison-5df6`
+- Active PR/commit: #25, commit `9a65b5e`
