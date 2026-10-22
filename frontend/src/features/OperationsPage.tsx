@@ -130,13 +130,14 @@ export default function OperationsPage() {
       {details && <div className="ledger-table"><h3>{details.entry_number} · {details.label}</h3><table><thead><tr><th>Compte</th><th>Libellé</th><th>Débit</th><th>Crédit</th></tr></thead><tbody>{details.lines.map((line, i) => <tr key={i}><td>{line.account_number}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td></tr>)}</tbody></table></div>}
       {tab === "Biens" && <>
         <p>Le registre des biens ne génère pas d’écriture d’acquisition. Les immobilisations et leur financement seront rapprochés dans les phases suivantes.</p>
+        <p>Le terrain et le bâtiment doivent totaliser le prix d’acquisition, sans y ajouter les frais. Ces frais sont conservés à part et ne créent ni écriture ni base d’amortissement.</p>
         <button onClick={() => setEditor({ title: "Ajouter un bien", path: "/properties", fields: [
           { name: "name", label: "Nom du bien" }, { name: "address", label: "Adresse" }, { name: "acquisition_date", label: "Date d’acquisition", type: "date" },
           { name: "rental_start_date", label: "Début de location", type: "date", optional: true },
           { name: "acquisition_price", label: "Prix d’acquisition (€)", money: true }, { name: "acquisition_costs", label: "Frais d’acquisition (€)", money: true },
           { name: "land_value", label: "Valeur du terrain (€)", money: true }, { name: "building_value", label: "Valeur du bâtiment (€)", money: true },
         ] })}>Ajouter un bien</button>
-        {properties.map((p) => <article key={p.id} className="entry-card"><h3>{p.name}</h3><p>Acquisition : {p.acquisition_price} € · Terrain : {p.land_value} € · Bâtiment : {p.building_value} €</p></article>)}
+        {properties.map((p) => <article key={p.id} className="entry-card"><h3>{p.name}</h3><p>Acquisition : {p.acquisition_price} € · Frais : {p.acquisition_costs} € · Terrain : {p.land_value} € · Bâtiment : {p.building_value} €</p></article>)}
       </>}
       {tab === "Emprunts" && <>
         <p>Chaque emprunt utilise un compte 164 distinct. Son capital restant est lu dans la comptabilité. Pour un emprunt existant, saisissez d’abord les à-nouveaux justifiés ; aucun financement historique n’est inventé.</p>

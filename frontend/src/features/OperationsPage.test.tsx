@@ -21,7 +21,7 @@ function mockApi() {
       { number: "706000", label: "Prestations", account_type: "INCOME", active: true },
     ]);
     if (url === "/api/operations/properties") return response([{
-      id: 1, name: "Bien fictif", acquisition_price: "100000.00",
+      id: 1, name: "Bien fictif", acquisition_price: "100000.00", acquisition_costs: "8000.00",
       land_value: "20000.00", building_value: "80000.00",
     }]);
     if (url === "/api/operations/banks") return response([
@@ -50,6 +50,15 @@ describe("OperationsPage", () => {
     expect(await screen.findByText(/Assurance · 100.00 €/)).toBeInTheDocument();
     expect(screen.getByText(/Reste à régler : 40.00 €/)).toBeInTheDocument();
     expect(screen.getByText(/Le pourcentage fiscal.+ne réduit jamais le montant/s)).toBeInTheDocument();
+  });
+
+  it("explains that land and building equal the price without adding fees", async () => {
+    mockApi();
+    render(<OperationsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Biens" }));
+    expect(screen.getByText(/sans y ajouter les frais/)).toBeInTheDocument();
+    expect(screen.getByText(/Frais : 8000.00 €/)).toBeInTheDocument();
+    expect(screen.getByText(/ne créent ni écriture ni base d’amortissement/)).toBeInTheDocument();
   });
 
   it("states that importing a bank file does not post accounting entries", async () => {

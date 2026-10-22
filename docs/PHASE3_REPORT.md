@@ -28,6 +28,10 @@ Une échéance ne peut pas rembourser davantage que ce solde. Le déblocage init
 unique et doit égaler le capital initial ; une reprise historique peut utiliser une
 écriture d'à-nouveaux justifiée au lieu d'un faux déblocage.
 
+La fiche d’un bien enregistre le prix, les frais, le terrain et le bâtiment.
+Le terrain et le bâtiment doivent totaliser le seul prix d’acquisition. Les frais
+restent une information séparée : ils ne créent ni écriture ni base d’amortissement.
+
 La dépense comptable conserve toujours son montant intégral. Le pourcentage et le
 traitement fiscal sont seulement des métadonnées cohérentes et explicitement « à
 vérifier » lorsqu'ils ne sont pas qualifiés. Cette phase ne calcule aucun résultat

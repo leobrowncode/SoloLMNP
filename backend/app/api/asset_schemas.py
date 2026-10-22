@@ -57,21 +57,30 @@ class AssetInput(Input):
                     self.depreciation_account is not None,
                 )
             ):
-                raise ValueError("Le terrain doit être intégralement non amortissable.")
-        elif any(
-            (
-                self.method != "LINEAR",
-                depreciable <= residual,
-                non_depreciable != 0,
-                self.useful_life_months is None,
-                self.depreciation_account is None,
-                len(self.duration_reason.strip()) < 5,
-            )
-        ):
-            raise ValueError(
-                "Un actif amortissable exige une base, une durée documentée "
-                "et un compte d’amortissement."
-            )
+                raise ValueError(
+                    "Le terrain doit être intégralement non amortissable : "
+                    "base et valeur résiduelle à 0,00 €, part non amortissable "
+                    "égale à la valeur d’acquisition, sans durée ni compte 28."
+                )
+        else:
+            if non_depreciable != 0:
+                raise ValueError(
+                    "La part non amortissable doit rester à 0,00 €. "
+                    "Inscrivez le terrain à part, sur un compte 211, sans amortissement."
+                )
+            if any(
+                (
+                    self.method != "LINEAR",
+                    depreciable <= residual,
+                    self.useful_life_months is None,
+                    self.depreciation_account is None,
+                    len(self.duration_reason.strip()) < 5,
+                )
+            ):
+                raise ValueError(
+                    "Un actif amortissable exige une base, une durée documentée "
+                    "et un compte d’amortissement."
+                )
         return self
 
 

@@ -125,6 +125,38 @@ def loan(client):
     return response.json()
 
 
+def test_property_split_excludes_acquisition_costs(client):
+    rejected = client.post(
+        "/api/operations/properties",
+        json={
+            "name": "Bien avec frais inclus à tort",
+            "address": "Adresse fictive",
+            "acquisition_date": "2025-01-02",
+            "acquisition_price": "100000.00",
+            "acquisition_costs": "8000.00",
+            "land_value": "20000.00",
+            "building_value": "88000.00",
+        },
+    )
+    assert rejected.status_code == 422
+    assert "sans y ajouter les frais" in rejected.text
+    accepted = client.post(
+        "/api/operations/properties",
+        json={
+            "name": "Bien avec frais séparés",
+            "address": "Autre adresse fictive",
+            "acquisition_date": "2025-01-02",
+            "acquisition_price": "100000.00",
+            "acquisition_costs": "8000.00",
+            "land_value": "20000.00",
+            "building_value": "80000.00",
+        },
+    )
+    assert accepted.status_code == 201, accepted.text
+    assert accepted.json()["acquisition_costs"] == "8000.00"
+    assert accepted.json()["building_value"] == "80000.00"
+
+
 def test_full_expense_preserved_with_partial_tax_metadata(client):
     row = create(client)
     assert row["deductible_percentage"] == "80.00"

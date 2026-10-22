@@ -36,7 +36,9 @@ Sources consultées le 16 septembre 2026 :
   vers l'écriture comptable.
 - Un terrain exige méthode `NONE`, base nulle, part non amortissable égale à sa
   valeur et aucun compte 28. Les contraintes Pydantic, service, SQL et triggers
-  rendent son amortissement impossible.
+  rendent son amortissement impossible. Une construction ou un équipement ne
+  peut pas porter cette part : le refus demande de créer le terrain à part,
+  sur un compte 211.
 - Les enregistrements du registre et les plans sont immuables. Une correction
   future devra être explicite et auditée, sans réécriture silencieuse.
 

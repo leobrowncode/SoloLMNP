@@ -1,7 +1,7 @@
 import { request } from "./ledger";
 export const operationsRequest = <T>(path: string, method = "GET", body?: unknown) =>
   request<T>(path, method, body, "/api/operations");
-export interface Property { id: number; name: string; acquisition_price: string; land_value: string; building_value: string }
+export interface Property { id: number; name: string; acquisition_price: string; acquisition_costs: string; land_value: string; building_value: string }
 export interface Bank { id: number; name: string; account_number: string }
 export interface Loan { id: number; lender: string; property_id: number; initial_principal: string; remaining_principal: string; monthly_payment: string; monthly_insurance: string; principal_account: string }
 export interface Operation {

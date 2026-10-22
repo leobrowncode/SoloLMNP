@@ -101,6 +101,24 @@ def component(value="40000.00", **changes):
     }
 
 
+def test_depreciable_asset_cannot_hide_land(client):
+    hidden_land = furniture(
+        category="BUILDING",
+        label="Construction fictive",
+        acquisition_value="100000.00",
+        depreciable_value="80000.00",
+        non_depreciable_value="20000.00",
+        useful_life_months=360,
+        asset_account="213000",
+        depreciation_account="281300",
+    )
+    response = client.post("/api/assets", json=hidden_land)
+    assert response.status_code == 422
+    assert "compte 211" in response.text
+    assert "part non amortissable" in response.text
+    assert client.get("/api/assets").json() == []
+
+
 def test_land_can_never_be_depreciated(client, database):
     invalid = furniture(category="LAND", asset_account="211000")
     response = client.post("/api/assets", json=invalid)

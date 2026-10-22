@@ -75,6 +75,13 @@ test("closes the posting form and clears calculation feedback when switching yea
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });
 
+test("explains that land stays on account 211 and out of a depreciable asset", async () => {
+  mockApi(async () => response([]));
+  render(<AssetsPage />);
+  expect(await screen.findByText(/part non amortissable reste à 0,00 €/)).toBeInTheDocument();
+  expect(screen.getByText(/compte 211/)).toBeInTheDocument();
+});
+
 test("shows an error from the current calculation", async () => {
   mockApi(async (url) => url.endsWith("/calculate") ? response({ detail: { message: "Calcul refusé" } }, 409) : response([]));
   render(<AssetsPage />);

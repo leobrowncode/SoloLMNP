@@ -30,7 +30,10 @@ class PropertyInput(Input):
         if to_cents(self.land_value) + to_cents(self.building_value) != to_cents(
             self.acquisition_price
         ):
-            raise ValueError("Le terrain et le bâtiment doivent totaliser le prix d’acquisition.")
+            raise ValueError(
+                "Le terrain et le bâtiment doivent totaliser le prix d’acquisition, "
+                "sans y ajouter les frais. Les frais restent une information séparée."
+            )
         return self
 
 

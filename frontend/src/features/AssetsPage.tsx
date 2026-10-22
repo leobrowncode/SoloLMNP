@@ -63,8 +63,8 @@ export default function AssetsPage() {
       { name: "acquisition_date", label: "Date d’acquisition", type: "date" },
       { name: "service_start_date", label: "Date de mise en service", type: "date" },
       { name: "acquisition_value", label: "Valeur d’acquisition (€)", money: true },
-      { name: "depreciable_value", label: "Valeur amortissable (€)", money: true, value: land ? "0.00" : undefined },
-      { name: "non_depreciable_value", label: "Valeur non amortissable (€)", money: true, value: land ? undefined : "0.00" },
+      { name: "depreciable_value", label: land ? "Valeur amortissable (€) — rester à 0,00" : "Valeur amortissable (€) — égale à l’acquisition", money: true, value: land ? "0.00" : undefined },
+      { name: "non_depreciable_value", label: land ? "Valeur non amortissable (€) — égale à l’acquisition" : "Part non amortissable (€) — rester à 0,00", money: true, value: land ? undefined : "0.00" },
       { name: "residual_value", label: "Valeur résiduelle (€)", money: true, value: "0.00" },
       { name: "method", label: "Méthode", choices: land ? [["NONE", "Aucune — terrain"]] : [["LINEAR", "Linéaire"]] },
       { name: "useful_life_months", label: "Durée d’utilisation en mois", type: "number", optional: land },
@@ -107,6 +107,7 @@ export default function AssetsPage() {
   return <section id="assets" className="ledger-page" aria-labelledby="assets-title">
     <p className="eyebrow">REGISTRE ET SOUS-LEDGER</p><h2 id="assets-title">Immobilisations & amortissements</h2>
     <p>La valeur, la durée et la mise en service sont documentées et figées. Le terrain ne peut jamais produire de dotation.</p>
+    <p>Une construction ou un équipement est intégralement amortissable : sa base égale sa valeur d’acquisition et sa part non amortissable reste à 0,00 €. Le terrain se crée à part, compte 211, avec une base nulle et une part non amortissable égale à sa valeur.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}{message && <p role="status">{message}</p>}
     {!setup?.activity ? <p>Initialisez d’abord l’activité, l’exercice et le bien.</p> : <>
       <button disabled={!properties.length} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
