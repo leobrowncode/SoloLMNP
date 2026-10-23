@@ -91,8 +91,7 @@ def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
         f"Exercice {worksheet['fiscal_year_id']} - {frozen}",
         f"Empreinte {worksheet['snapshot_sha256']}",
         worksheet.get("vintage_note") or "",
-        "2042-C-PRO - case: non verifiee - montant "
-        + worksheet["personal_return"]["amount"],
+        "2042-C-PRO - case: non verifiee - montant " + worksheet["personal_return"]["amount"],
     ]
     for field in worksheet["liasse"]["fields"]:
         case = field.get("official_case") or "sans numero"
@@ -148,11 +147,7 @@ def _plain_pdf(lines: list[str]) -> bytes:
     objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
     kid_list = b" ".join(kids)
     objects[1] = (
-        b"<< /Type /Pages /Count "
-        + str(len(pages)).encode()
-        + b" /Kids ["
-        + kid_list
-        + b"] >>"
+        b"<< /Type /Pages /Count " + str(len(pages)).encode() + b" /Kids [" + kid_list + b"] >>"
     )
     payload = bytearray(b"%PDF-1.4\n")
     offsets = [0]

@@ -94,6 +94,7 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
 
   fireEvent.click(screen.getByRole("button", { name: "Calculer le résultat fiscal" }));
   expect(await screen.findByText(/objectif LMNP atteint/i)).toBeInTheDocument();
+  expect(screen.getByRole("slider", { name: /Dotation de l’année/ })).toBeInTheDocument();
   const resultRow = screen.getByText("Résultat fiscal").closest("li");
   expect(resultRow).toBeTruthy();
   expect(within(resultRow as HTMLElement).getByText("0.00 €")).toBeInTheDocument();

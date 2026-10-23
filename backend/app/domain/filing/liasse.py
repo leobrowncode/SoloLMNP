@@ -51,9 +51,9 @@ def extend_package(
     _detail_warning(package)
 
 
-def _sheets(session: Session, year: FiscalYear, fiscal: dict[str, Any]) -> tuple[
-    list[dict[str, Any]], list[dict[str, str]], list[dict[str, str]]
-]:
+def _sheets(
+    session: Session, year: FiscalYear, fiscal: dict[str, Any]
+) -> tuple[list[dict[str, Any]], list[dict[str, str]], list[dict[str, str]]]:
     report = statements(session, year.id)
     errors: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
@@ -453,7 +453,9 @@ def _bilan(
     return [
         _field(code=code, form_ref="2033-A-SD", official_case=case, label=label, value=value)
         for code, case, label, value in rows
-        if value or code in {
+        if value
+        or code
+        in {
             "ACTIF_TOTAL_NET",
             "PASSIF_TOTAL",
             "RESULTAT_EXERCICE",
@@ -462,9 +464,7 @@ def _bilan(
     ]
 
 
-def _valeur_ajoutee(
-    report: dict[str, Any], warnings: list[dict[str, str]]
-) -> list[dict[str, Any]]:
+def _valeur_ajoutee(report: dict[str, Any], warnings: list[dict[str, str]]) -> list[dict[str, Any]]:
     income = report["income_statement"]["income"]
     expenses = report["income_statement"]["expenses"]
     services = _prefixed(income, ("70",))

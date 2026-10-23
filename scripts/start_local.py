@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import signal
@@ -171,6 +172,31 @@ def port_in_use(host: str, port: int) -> bool:
         return sock.connect_ex((host, port)) == 0
 
 
+def read_http(url: str, timeout: float = 2.0) -> bytes | None:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            if 200 <= response.status < 500:
+                return response.read()
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return None
+    return None
+
+
+def solo_already_running() -> bool:
+    if not port_in_use("127.0.0.1", 8000) or not port_in_use("127.0.0.1", 5173):
+        return False
+    if read_http(UI_URL) is None:
+        return False
+    body = read_http(API_STATUS)
+    if not body:
+        return False
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeError):
+        return False
+    return isinstance(payload, dict) and isinstance(payload.get("application_version"), str)
+
+
 def ensure_ports_free() -> None:
     busy = []
     if port_in_use("127.0.0.1", 8000):
@@ -224,6 +250,13 @@ def main() -> None:
     if not (BACKEND / "app").is_dir() or not (FRONTEND / "package.json").is_file():
         die("Lancez ce script depuis le dépôt SoloLMNP.")
 
+    if solo_already_running():
+        print(f"SoloLMNP est déjà lancé : {UI_URL}", flush=True)
+        print("Ouverture du navigateur.", flush=True)
+        webbrowser.open(UI_URL)
+        return
+
+    ensure_ports_free()
     python = ensure_venv()
     npm = ensure_frontend()
     ensure_env_and_data()

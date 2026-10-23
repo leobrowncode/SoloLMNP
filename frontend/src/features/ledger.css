@@ -101,7 +101,28 @@
   color: #173c2e;
   font-size: .92rem;
 }
-.fiscal-panel {
+.zero-cockpit { margin-bottom: 1.25rem; }
+.zero-kicker { font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; color: #5b7466; }
+.zero-figure { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: .2rem 0 .6rem; }
+.zero-figure-good { color: #1f6b3a; }
+.zero-figure-warn { color: #8a5a12; }
+.cap-track { height: 14px; background: #e4eee4; border-radius: 999px; overflow: hidden; margin: .8rem 0 .35rem; }
+.cap-fill { display: block; height: 100%; background: #2f6b45; }
+.cap-caption { font-variant-numeric: tabular-nums; color: #355245; }
+.dotation-slider { display: grid; gap: .45rem; margin-top: .8rem; }
+.dotation-slider input[type="range"] { width: 100%; }
+.dotation-slider input[type="text"], .dotation-slider input:not([type="range"]) { max-width: 8rem; }
+.cap-cats { list-style: none; margin: .35rem 0 1rem; padding: 0; }
+.cap-cats li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .4rem 0;
+  border-bottom: 1px solid #e4eee4;
+  font-variant-numeric: tabular-nums;
+}
+.cap-cats li span:last-child { color: #355245; white-space: nowrap; }
+.report-list li { margin: .25rem 0; }
   border: 1px solid #d8e0d8;
   border-radius: 12px;
   padding: 1.15rem 1.25rem 1.35rem;

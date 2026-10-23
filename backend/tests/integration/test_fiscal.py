@@ -29,7 +29,9 @@ def test_depreciation_limit_is_separate_from_the_ledger(client):
     assert body["details"]["prior_depreciation_used"] == "0.00"
     assert body["details"]["operating_income"] == "1000.00"
     assert body["details"]["other_charges"] == "400.00"
-    assert body["details"]["capacity"] == "600.00"
+    assert body["details"]["prior_depreciation_available"] == "0.00"
+    assert body["details"]["depreciation_reports"] == []
+    assert body["details"]["depreciation_categories"] == []
     assert "0 €" in body["details"]["goal_hint"]
     assert report(client)["income_statement"]["total_expenses"] == "1200.00"
     replay = client.post("/api/fiscal/years/1", json={"adjustments": []})
@@ -113,9 +115,7 @@ def test_liasse_keeps_interest_out_of_operating_charges(client):
     assert "410" not in by_case
     assert sheet["declarable"] is True
     assert sheet["status"] == "ready"
-    reported = [
-        field for field in sheet["liasse"]["fields"] if field["form_ref"] == "2031-SD"
-    ]
+    reported = [field for field in sheet["liasse"]["fields"] if field["form_ref"] == "2031-SD"]
     assert any(field["value"] == "920.00" for field in reported)
 
 

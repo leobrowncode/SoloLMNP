@@ -10,6 +10,18 @@ interface Vintage {
   executable: string[];
 }
 interface YearRow { id: number; year: number; status?: string }
+interface ReportRow {
+  origin_year: number;
+  opening: string;
+  used: string;
+  remaining_after: string;
+}
+interface DepreciationCategory {
+  label: string;
+  base: string;
+  rate_percent: string;
+  annual_max: string;
+}
 interface CarryUse {
   origin_year: number;
   used: string;
@@ -32,6 +44,10 @@ interface Computation {
       tax_loss_horizon_years?: number;
       notes?: string;
     };
+    prior_depreciation_available?: string;
+    prior_tax_loss_available?: string;
+    depreciation_reports?: ReportRow[];
+    depreciation_categories?: DepreciationCategory[];
     prior_depreciation_used?: string;
     prior_tax_loss_used?: string;
     operating_income?: string;
@@ -128,6 +144,131 @@ function parseSigned(value: string): number {
   return normalized.startsWith("-") ? -cents : cents;
 }
 
+function euros(cents: number): string {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(Math.round(cents));
+  return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
+}
+
+function projectDotation(dotation: number, base: number, priorDep: number, priorLoss: number) {
+  const capacity = Math.max(0, base);
+  const current = Math.min(Math.max(0, dotation), capacity);
+  const priorDepUsed = Math.min(Math.max(0, priorDep), capacity - current);
+  const unused = Math.max(0, dotation - current);
+  const beforeLoss = base - current - priorDepUsed;
+  const lossUsed = Math.min(Math.max(0, priorLoss), Math.max(0, beforeLoss));
+  return { capacity, current, priorDepUsed, unused, fiscal: beforeLoss - lossUsed };
+}
+
+function ZeroCockpit({
+  income, charges, additions, booked, priorDep, priorLoss, reports, categories,
+}: {
+  income: number;
+  charges: number;
+  additions: number;
+  booked: number;
+  priorDep: number;
+  priorLoss: number;
+  reports: ReportRow[];
+  categories: DepreciationCategory[];
+}) {
+  const base = income - charges + additions;
+  const ceiling = Math.max(0, base);
+  const upper = Math.max(booked, ceiling);
+  const [dotation, setDotation] = useState(booked);
+  const view = projectDotation(dotation, base, priorDep, priorLoss);
+  const fill = view.capacity === 0 ? 0 : Math.min(100, Math.round((view.current / view.capacity) * 100));
+  const simulated = dotation !== booked;
+  let reading = "Déplacez le curseur pour voir l’effet sur le résultat. Les écritures ne changent pas.";
+  if (!simulated && view.fiscal === 0 && view.unused > 0) {
+    reading = `Objectif atteint : 0 €. ${euros(view.unused)} € d’amortissement partent en report.`;
+  } else if (!simulated && view.fiscal === 0) {
+    reading = "Objectif atteint : 0 €, et rien à reporter.";
+  } else if (view.fiscal > 0) {
+    reading = `Il reste ${euros(view.fiscal)} €. Une dotation de ${euros(view.capacity)} € met le résultat à 0 €.`;
+  } else if (view.fiscal < 0) {
+    reading = `Déficit de ${euros(-view.fiscal)} €, reporté sur les LMNP suivants. Ajouter de l’amortissement ne l’augmente pas.`;
+  }
+  const stockRows: { year: number; opening: number; used: number; remaining: number }[] = [];
+  let left = view.priorDepUsed;
+  for (const row of reports) {
+    const opening = parseSigned(row.opening);
+    const used = Math.min(Math.max(0, opening), Math.max(0, left));
+    left -= used;
+    stockRows.push({ year: row.origin_year, opening, used, remaining: opening - used });
+  }
+
+  return (
+    <div className="zero-cockpit">
+      <p className="zero-kicker">Objectif : 0 €</p>
+      <p className={`zero-figure zero-figure-${view.fiscal === 0 ? "good" : "warn"}`}>
+        {euros(view.fiscal)} €
+      </p>
+      <p>{reading}</p>
+      <div className="cap-track" aria-hidden="true">
+        <span className="cap-fill" style={{ width: `${fill}%` }} />
+      </div>
+      <p className="cap-caption">
+        Plafond {euros(view.capacity)} € · déduit {euros(view.current)} € · reporté {euros(view.unused)} €
+      </p>
+      {upper > 0 && (
+        <label className="dotation-slider">
+          Dotation de l’année
+          <input
+            type="range"
+            min={0}
+            max={upper}
+            step={100}
+            value={dotation}
+            onChange={(event) => setDotation(Number(event.target.value))}
+          />
+          <input
+            inputMode="decimal"
+            value={euros(dotation)}
+            onChange={(event) => {
+              const next = parseSigned(event.target.value);
+              if (!Number.isNaN(next)) setDotation(Math.min(upper, Math.max(0, next)));
+            }}
+          />
+        </label>
+      )}
+      <p className="field-hint">
+        Comptabilisé : {euros(booked)} €. Le curseur simule une autre dotation.
+        Pour la changer vraiment, ajustez les durées dans Immobilisations.
+        {simulated ? " Les écritures actuelles ne sont pas modifiées." : ""}
+      </p>
+      <h3>Par catégorie</h3>
+      <ul className="cap-cats">
+        {categories.length === 0 && (
+          <li>Aucune immobilisation. Les plafonds apparaîtront après le registre.</li>
+        )}
+        {categories.map((row) => (
+          <li key={`${row.label}-${row.base}`}>
+            <span>{row.label}</span>
+            <span>
+              {row.rate_percent.replace(".", ",")} % / an
+              {" · "}
+              max {row.annual_max} €
+            </span>
+          </li>
+        ))}
+      </ul>
+      <h3>Reports d’amortissement</h3>
+      <p className="field-hint">Les plus anciens sont repris en premier, dans la limite du plafond.</p>
+      <ul className="report-list">
+        {stockRows.length === 0 && <li>Aucun report des années précédentes.</li>}
+        {stockRows.map((row) => (
+          <li key={row.year}>
+            {row.year} : stock {euros(row.opening)} € · repris {euros(row.used)} € · reste {euros(row.remaining)} €
+          </li>
+        ))}
+        <li>Cette année : {euros(view.unused)} € à reporter</li>
+        {priorLoss > 0 && <li>Déficits LMNP en stock : {euros(priorLoss)} €</li>}
+      </ul>
+    </div>
+  );
+}
+
 export default function FiscalPage() {
   const [vintages, setVintages] = useState<Vintage[]>([]);
   const [year, setYear] = useState(0);
@@ -159,9 +300,6 @@ export default function FiscalPage() {
   useEffect(() => {
     if (!year) return;
     let current = true;
-    setStatements(null);
-    setResult(null);
-    setWorksheet(null);
     void request<Statements>(`/years/${year}/statements`).then((value) => {
       if (current) setStatements(value);
     }, (reason: Error) => { if (current) setError(reason.message); });
@@ -287,7 +425,9 @@ export default function FiscalPage() {
             onChange={(event) => {
               setYear(Number(event.target.value));
               setAdjustments([]);
+              setStatements(null);
               setResult(null);
+              setWorksheet(null);
             }}
           >
             {years.map((item) => (
@@ -467,6 +607,17 @@ export default function FiscalPage() {
 
       {result && details && (
         <div className="fiscal-panel" aria-live="polite">
+          <ZeroCockpit
+            key={`${details.accounting_depreciation ?? "0"}-${details.capacity ?? "0"}`}
+            income={parseSigned(details.operating_income ?? "0")}
+            charges={parseSigned(details.other_charges ?? "0")}
+            additions={parseSigned(result.non_deductible)}
+            booked={parseSigned(details.accounting_depreciation ?? "0")}
+            priorDep={parseSigned(details.prior_depreciation_available ?? "0")}
+            priorLoss={parseSigned(details.prior_tax_loss_available ?? "0")}
+            reports={details.depreciation_reports ?? []}
+            categories={details.depreciation_categories ?? []}
+          />
           <h3>
             3. Capacité & amortissements
             <HelpTip label="Capacité">

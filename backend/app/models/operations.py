@@ -10,7 +10,10 @@ from app.models.base import Base, Money, utc_now
 
 
 class Tenant(Base):
-    """Colocataire d’un logement en location longue durée. Le loyer mensuel sert à préparer les quittances."""
+    """Colocataire d’un logement en location longue durée.
+
+    Le loyer mensuel sert à préparer les quittances.
+    """
 
     __tablename__ = "tenant"
     __table_args__ = (

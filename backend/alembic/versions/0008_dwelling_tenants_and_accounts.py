@@ -15,9 +15,7 @@ down_revision: str | None = "0007_filing"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-ACCOUNTS = (
-    ("614000", "Charges de copropriété", "EXPENSE"),
-)
+ACCOUNTS = (("614000", "Charges de copropriété", "EXPENSE"),)
 
 
 def upgrade() -> None:

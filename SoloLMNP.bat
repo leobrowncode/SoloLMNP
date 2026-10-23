@@ -1,6 +1,9 @@
 @echo off
 setlocal
 cd /d "%~dp0"
+chcp 65001 >nul
+set "PYTHONUNBUFFERED=1"
+set "PYTHONUTF8=1"
 
 set "PYCMD="
 

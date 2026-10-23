@@ -41,11 +41,11 @@ export default function ReviewForm({
   onSave: (data: Record<string, unknown>) => Promise<void>;
   onCancel: () => void;
   retryId?: boolean | undefined;
-  help?: string;
+  help?: string | undefined;
   /** Compute this money field from the sum of other money fields before save. */
-  sumInto?: { target: string; sources: string[] };
+  sumInto?: { target: string; sources: string[] } | undefined;
   /** Derive dependent fields after a user change. piece_reference is only applied if empty or still auto. */
-  derive?: (draft: Record<string, string>, changed: string) => Partial<Record<string, string>>;
+  derive?: ((draft: Record<string, string>, changed: string) => Partial<Record<string, string>>) | undefined;
 }) {
   const [review, setReview] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");

@@ -77,8 +77,7 @@ def compile_package(session: Session, year_id: int) -> dict[str, Any]:
             {
                 "code": "RESEARCH_ONLY",
                 "message": (
-                    "Feuille de recopie pour la déclaration. "
-                    "SoloLMNP n’envoie rien aux impôts."
+                    "Feuille de recopie pour la déclaration. SoloLMNP n’envoie rien aux impôts."
                 ),
             }
         ],
@@ -198,21 +197,13 @@ def _named(
         return sum(amounts.values()), accounts, entries
 
     def pick(source: dict[str, int], prefixes: tuple[str, ...]) -> dict[str, int]:
-        return {
-            number: amount
-            for number, amount in source.items()
-            if number.startswith(prefixes)
-        }
+        return {number: amount for number, amount in source.items() if number.startswith(prefixes)}
 
     exploitation_income = {
-        number: amount
-        for number, amount in products.items()
-        if not number.startswith(("76", "77"))
+        number: amount for number, amount in products.items() if not number.startswith(("76", "77"))
     }
     exploitation_charges = {
-        number: amount
-        for number, amount in charges.items()
-        if not number.startswith(("66", "67"))
+        number: amount for number, amount in charges.items() if not number.startswith(("66", "67"))
     }
     income_total = sum(exploitation_income.values())
     charge_total = sum(exploitation_charges.values())
@@ -255,7 +246,8 @@ def _eval(
     if op == "tax_result":
         return context["tax_result"], [], []
     if op == "named":
-        bucket = context["named"].get(str(formula.get("key", "")))
+        named: dict[str, tuple[int, list[str], list[int]]] = context["named"]
+        bucket = named.get(str(formula.get("key", "")))
         if bucket is None:
             errors.append({"code": "DSL", "message": f"Montant inconnu pour {code}."})
             return 0, [], []

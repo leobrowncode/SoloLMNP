@@ -14,7 +14,7 @@ from app.api.ledger_schemas import FiscalInput
 from app.core.money import to_cents
 from app.domain.fiscal.loader import load_vintage
 from app.models import Account, AccountingEntry, AccountingEntryLine, BusinessOperation, FiscalYear
-from app.models.assets import Asset
+from app.models.assets import Asset, AssetComponent
 from app.models.base import utc_now
 from app.models.fiscal import DepreciationCarryForward, FiscalComputation, TaxLossCarryForward
 from app.services.ledger import fail, get_year, money
@@ -123,6 +123,10 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
         "accounting_depreciation": money(depreciation),
         "capacity": money(capacity),
         "current_deductible_depreciation": money(current_deductible),
+        "prior_depreciation_available": money(sum(stock["remaining"] for stock in dep_stocks)),
+        "prior_tax_loss_available": money(sum(stock["remaining"] for stock in loss_stocks)),
+        "depreciation_reports": _report_rows(dep_stocks, dep_uses),
+        "depreciation_categories": _category_caps(session),
         "goal_hint": _goal_hint(fiscal_result, unused, prior_dep_used, prior_loss_used),
     }
     row = FiscalComputation(
@@ -353,6 +357,70 @@ def _already_consumed(
             if int(item["origin_year_id"]) == origin_year_id:
                 total += _cents(str(item["used"]))
     return total
+
+
+def _report_rows(
+    stocks: list[dict[str, int]], uses: list[dict[str, str | int]]
+) -> list[dict[str, str | int]]:
+    used_by_year = {int(item["origin_year"]): item for item in uses}
+    rows: list[dict[str, str | int]] = []
+    for stock in stocks:
+        used = used_by_year.get(stock["origin_year"])
+        rows.append(
+            {
+                "origin_year": stock["origin_year"],
+                "opening": money(stock["remaining"]),
+                "used": used["used"] if used else "0.00",
+                "remaining_after": used["remaining_after"] if used else money(stock["remaining"]),
+            }
+        )
+    return rows
+
+
+def _category_caps(session: Session) -> list[dict[str, str]]:
+    """Full-year linear maximum for each depreciable category. Land stays at zero."""
+    caps: list[dict[str, str]] = []
+    for asset in session.scalars(select(Asset).order_by(Asset.id)):
+        if asset.category == "LAND":
+            caps.append(
+                {
+                    "label": asset.label,
+                    "base": money(to_cents(asset.acquisition_value)),
+                    "rate_percent": "0.00",
+                    "annual_max": "0.00",
+                }
+            )
+            continue
+        components = list(
+            session.scalars(
+                select(AssetComponent)
+                .where(AssetComponent.asset_id == asset.id)
+                .order_by(AssetComponent.id)
+            )
+        )
+        if components:
+            pieces = [
+                (item.label, to_cents(item.value), item.useful_life_months) for item in components
+            ]
+        elif asset.useful_life_months:
+            base = to_cents(asset.depreciable_value) - to_cents(asset.residual_value)
+            pieces = [(asset.label, base, asset.useful_life_months)]
+        else:
+            pieces = []
+        for label, base, life in pieces:
+            if base <= 0 or life <= 0:
+                continue
+            annual = (base * 12 + life // 2) // life
+            rate = (Decimal(1200) / Decimal(life)).quantize(Decimal("0.01"))
+            caps.append(
+                {
+                    "label": label,
+                    "base": money(base),
+                    "rate_percent": f"{rate:.2f}",
+                    "annual_max": money(annual),
+                }
+            )
+    return caps
 
 
 def _goal_hint(fiscal_result: int, unused: int, prior_dep_used: int, prior_loss_used: int) -> str:
