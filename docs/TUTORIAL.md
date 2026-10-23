@@ -69,6 +69,7 @@ puis **Enregistrer un règlement** plus tard.
 - Copier les lignes du Google Sheet de saisie (en-tête compris) et les coller, ou charger un CSV à point-virgule
 - Colonnes : `kind;date;piece_date;type;counterparty;amount;description;piece_reference;source_file`, plus `paid` facultative
 - `kind` : Recette / Dépense (ou REVENUE / EXPENSE) ; dates JJ/MM/AAAA ou AAAA-MM-JJ ; montants « 1 200,00 € » acceptés
+- Mise en forme du Sheet (listes déroulantes Recette/Dépense, types filtrés selon la nature, dates, montants en €, `paid` oui/non, référence de pièce proposée, doublons en rouge) : coller `scripts/gsheet/format_saisie.gs` dans Extensions > Apps Script du Sheet, puis exécuter `setup` une fois
 - Choisir le bien, l’exercice et le compte des lignes payées → Prévisualiser → Comptabiliser
 - `paid` = oui : opération réglée directement sur ce compte ; sinon elle reste **à régler**. Traitement fiscal à vérifier
 - Une référence déjà comptabilisée est ignorée ; un montant différent pour la même référence est refusé
