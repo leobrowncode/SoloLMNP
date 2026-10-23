@@ -220,7 +220,7 @@ pip==26.2.1
     # via
     #   pip-api
     #   pip-tools
-setuptools==84.0.0
+setuptools==84.1.0
     # via
     #   -c requirements.lock
     #   -r requirements.in
