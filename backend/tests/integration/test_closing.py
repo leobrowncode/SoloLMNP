@@ -69,7 +69,11 @@ def test_close_reopen_fec_efi_and_documents(client, settings):
     assert archive.content == client.get("/api/filing/years/1/archive").content
     with zipfile.ZipFile(io.BytesIO(archive.content)) as bundle:
         names = set(bundle.namelist())
-        fec_name = next(name for name in names if name.startswith("123456789FEC"))
+        fec_name = next(
+            name
+            for name in sorted(names)
+            if name.startswith("123456789FEC") and not name.endswith("_description.txt")
+        )
         assert bundle.read(fec_name) == first.content
         assert "SHA256SUMS.txt" in names
         assert any(name.endswith("_description.txt") for name in names)
