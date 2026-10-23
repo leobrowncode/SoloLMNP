@@ -11,8 +11,11 @@ from app.api.ledger_schemas import (
     AccountInput,
     ActiveInput,
     ActivityInput,
+    AppropriationInput,
+    CentralizationInput,
     EditInput,
     EntryInput,
+    IdentityInput,
     InventoryInput,
     JournalInput,
     OpeningInput,
@@ -48,6 +51,12 @@ from app.services.ledger import (
 )
 from app.services.opening import opening_preview
 from app.services.opening_posting import generate_opening, opening_continuity
+from app.services.result_closing import (
+    appropriation_preview,
+    centralization_preview,
+    post_appropriation,
+    post_centralization,
+)
 from app.services.statements import statements
 
 
@@ -68,6 +77,8 @@ def build_ledger_router(database: Database) -> APIRouter:
                 "id": activity.id,
                 "activity_name": activity.activity_name,
                 "activity_start_date": activity.activity_start_date.isoformat(),
+                "siren": activity.siren,
+                "siret": activity.siret,
             }
             if activity
             else None,
@@ -97,6 +108,16 @@ def build_ledger_router(database: Database) -> APIRouter:
             if not session.get(AccountingJournal, code):
                 session.add(AccountingJournal(code=code, label=label, journal_type=kind))
         event(session, "ACTIVITY_CREATED", None, data.model_dump(mode="json"))
+        return setup(session)
+
+    @router.post("/activity/identity")
+    def update_identity(data: IdentityInput, session: Write) -> dict[str, Any]:
+        activity = session.get(RentalActivity, 1)
+        if activity is None:
+            fail("ACTIVITY_REQUIRED", "Créez l’activité avant d’indiquer le SIRET.", 422)
+        activity.siren = data.siren
+        activity.siret = data.siret
+        event(session, "ACTIVITY_IDENTITY", None, data.model_dump(mode="json"))
         return setup(session)
 
     @router.post("/years", status_code=201)
@@ -306,6 +327,22 @@ def build_ledger_router(database: Database) -> APIRouter:
     @router.get("/years/{year_id}/opening-continuity")
     def check_opening(year_id: int, session: Read) -> dict[str, Any]:
         return opening_continuity(session, year_id)
+
+    @router.get("/years/{year_id}/centralization-preview")
+    def preview_centralization(year_id: int, session: Read) -> dict[str, Any]:
+        return centralization_preview(session, year_id)
+
+    @router.post("/years/{year_id}/centralization")
+    def centralize(year_id: int, data: CentralizationInput, session: Write) -> dict[str, Any]:
+        return post_centralization(session, year_id, data)
+
+    @router.get("/years/{year_id}/appropriation-preview")
+    def preview_appropriation(year_id: int, session: Read) -> dict[str, Any]:
+        return appropriation_preview(session, year_id)
+
+    @router.post("/years/{year_id}/appropriation")
+    def appropriate(year_id: int, data: AppropriationInput, session: Write) -> dict[str, Any]:
+        return post_appropriation(session, year_id, data)
 
     @router.get("/years/{year_id}/balance")
     def balance(year_id: int, session: Read) -> dict[str, Any]:

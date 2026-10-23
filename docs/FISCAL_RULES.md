@@ -1,9 +1,13 @@
 # Registre des règles fiscales
 
-Dernière vérification documentaire : **16 septembre 2026**. Le registre et les
-fichiers `fiscal/2025/rules.yaml` et `fiscal/2026/rules.yaml` restent en recherche
-(`research_only`). Consulter un texte et confirmer sa référence ne valide pas
-une implémentation ni une déclaration. Aucun moteur fiscal n'est implémenté.
+Dernière vérification documentaire : **2 octobre 2026** (sources formulaires 2025
+archivées ; règles BOFiP encore celles du 16/09/2026). Les fichiers
+`fiscal/2025/rules.yaml` et `fiscal/2026/rules.yaml` restent en recherche
+(`research_only` pour le calcul stocké). Quatre règles sont exécutables en code avec tests. L’ordre MVP
+de consommation des reports (FIFO, exercices clôturés ; déficits horizon 10 ans)
+est implémenté et golden-testé. La liasse BIC 2025 peut être `ready` sans que le
+fichier de règles change de statut. Consulter un
+texte et confirmer sa référence ne valide pas une déclaration.
 
 ## Références consultées et portée de la vérification
 
@@ -14,10 +18,10 @@ chaque exercice et chaque millésime de formulaires.
 
 | Rule ID | Principe identifié et référence précise | Source officielle consultée | Application / tests | État restant |
 |---|---|---|---|---|
-| RULE-LMNP-BIC-001 | Champ BIC et qualification au niveau du foyer ; CGI art. 155 IV, BOI-BIC-CHAMP-40-10, notamment II § 40-50. | [BOI-BIC-CHAMP-40-10, publication du 15/04/2026](https://bofip.impots.gouv.fr/bofip/3615-PGP.html/identifiant=BOI-BIC-CHAMP-40-10-20260415) | Aucun calcul ; scénario de qualification à compléter. | Version légale consolidée de l'art. 155 et applicabilité historique 2025 à vérifier. Ne pas appliquer automatiquement la publication 2026 à 2025. |
-| RULE-LMNP-DEPRECIATION-LIMIT-001 | Limitation de la déduction fiscale pour les personnes physiques, distincte de la dotation comptabilisée ; CGI art. 39 C II-2 et II-3 ; BOI-BIC-AMT-20-40-10-20, I-B § 20 et II § 40-100. | [CGI art. 39 C, version en vigueur depuis le 01/01/2015](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000029355753/2015-01-01) ; [BOFiP, publication du 01/03/2017](https://bofip.impots.gouv.fr/bofip/4527-PGP.html/identifiant=BOI-BIC-AMT-20-40-10-20-20170301) | Aucun calcul ; scénario C à chiffrer et valider. | Assiette des loyers/charges, ventilation entre biens, ordre d'utilisation des reports et cas de cession/cessation à spécifier avant P6. |
-| RULE-LMNP-LOSS-001 | Déficits LMNP non imputables sur le revenu global ; report sur revenus LMNP des dix années suivantes sous les conditions de qualification décrites ; BOI-BIC-CHAMP-40-20, III-A § 240-250, renvoyant au CGI art. 156 I 1° ter. | [BOI-BIC-CHAMP-40-20, publication du 14/02/2024](https://bofip.impots.gouv.fr/bofip/3610-PGP.html/identifiant=BOI-BIC-CHAMP-40-20-20240214) | Aucun calcul ni expiration automatique ; scénario D à chiffrer et valider. | Version consolidée de l'art. 156 applicable à chaque exercice, ordre d'imputation et changements de statut à vérifier. |
-| RULE-LAND-NON-DEPRECIABLE-001 | Le prix du sol est exclu de la base amortissable des constructions ; BOI-BIC-AMT-10-20, I-A § 10 et I-S § 230 ; application LMNP confirmée au BOI-BIC-CHAMP-40-20 § 58. | [Publication BOFiP du 05/08/2026](https://bofip.impots.gouv.fr/bofip/4590-PGP.html/identifiant=BOI-BIC-AMT-10-20-20260805) ; [BOI LMNP du 14/02/2024](https://bofip.impots.gouv.fr/bofip/3610-PGP.html/identifiant=BOI-BIC-CHAMP-40-20-20240214) | Invariant du registre implémenté en P4 et testé à l'API et en SQL ; aucun calcul fiscal. | La ventilation reste sous la responsabilité du loueur et doit être justifiée ; aucune estimation automatique. |
+| RULE-LMNP-BIC-001 | Périmètre produit : activité déclarée LMNP. Le LMP et les seuils du foyer (CGI art. 155 IV) sont hors outil. | Décision de périmètre, pas un calcul fiscal. | Aucun seuil ni comparaison de revenus. | Le LMP n'est pas implémenté. Cette règle ne bloque plus les calculs LMNP. |
+| RULE-LMNP-DEPRECIATION-LIMIT-001 | Limitation de la déduction fiscale pour les personnes physiques, distincte de la dotation comptabilisée ; CGI art. 39 C II-2 et II-3 ; BOI-BIC-AMT-20-40-10-20, I-B § 20 et II § 40-100. | [CGI art. 39 C, version en vigueur depuis le 01/01/2015](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000029355753/2015-01-01) ; [BOFiP, publication du 01/03/2017](https://bofip.impots.gouv.fr/bofip/4527-PGP.html/identifiant=BOI-BIC-AMT-20-40-10-20-20170301) | Plafond + stock N ; reprise FIFO des reports d’exercices **clôturés** sur capacité résiduelle (`test_fiscal_carryforward`). | Cession/cessation et ventilation multi-biens hors MVP. |
+| RULE-LMNP-LOSS-001 | Déficits LMNP non imputables sur le revenu global ; report sur revenus LMNP des dix années suivantes sous les conditions de qualification décrites ; BOI-BIC-CHAMP-40-20, III-A § 240-250, renvoyant au CGI art. 156 I 1° ter. | [BOI-BIC-CHAMP-40-20, publication du 14/02/2024](https://bofip.impots.gouv.fr/bofip/3610-PGP.html/identifiant=BOI-BIC-CHAMP-40-20-20240214) | Déficit N séparé ; imputation FIFO sur résultat positif N+1, horizon 10 ans, hors revenu global (`test_fiscal_carryforward`). | Changements de statut LMP/LMNP et report en arrière hors MVP. |
+| RULE-LAND-NON-DEPRECIABLE-001 | Le prix du sol est exclu de la base amortissable des constructions ; BOI-BIC-AMT-10-20, I-A § 10 et I-S § 230 ; application LMNP confirmée au BOI-BIC-CHAMP-40-20 § 58. | [Publication BOFiP du 05/08/2026](https://bofip.impots.gouv.fr/bofip/4590-PGP.html/identifiant=BOI-BIC-AMT-10-20-20260805) ; [BOI LMNP du 14/02/2024](https://bofip.impots.gouv.fr/bofip/3610-PGP.html/identifiant=BOI-BIC-CHAMP-40-20-20240214) | Invariant registre + échec fiscal si base amortissable terrain. | Ventilation manuelle utilisateur ; aucune estimation automatique. |
 | RULE-FISCAL-VINTAGE-IMMUTABLE-001 | Les versions de calcul utilisées historiquement doivent rester reproductibles avec leurs empreintes. | Politique interne de reproductibilité ; aucune portée normative fiscale. | Le test actuel distingue les fichiers de recherche 2025/2026. | Ajouter des résultats chiffrés figés et tests d'empreintes avec les moteurs futurs. |
 
 Les associations erronées ou non vérifiées entre numéros d'article, identifiants
@@ -39,9 +43,9 @@ il ne constitue pas une vérification du texte consolidé pour 2025 ou 2026.
 
 ## Incertitudes bloquantes ciblées
 
-Qualification LMNP/LMP du foyer et historique ; articulation et ordre des reports ;
+Ordre des reports MVP : livré (FIFO). Restent hors MVP / bloquants hors chemin typique :
 cession/cessation ; TVA/parahôtellerie ; plus-values ; frais d'acquisition ;
-ventilation terrain/bâtiment ; durées et composants ; CFE ; annexes applicables.
-Ces points bloquent les futurs calculs correspondants. La disponibilité générale
-de la saisie EFI au réel simplifié est confirmée dans `FILING.md` ; les cases et
-contrôles propres à chaque millésime restent à vérifier.
+ventilation automatique terrain/bâtiment ; durées et composants ; CFE.
+Les notices/formulaires 2031/2033 millésime 2025 sont archivés dans
+`fiscal/2025/sources/` et les cases MVP listées dans `forms/cases.yaml`.
+Le millésime 2026 et la 2042-C-PRO restent hors archive déclarable.

@@ -25,9 +25,9 @@ describe("Foundation status", () => {
     const request = vi.fn().mockResolvedValue(reply());
     vi.stubGlobal("fetch", request);
     render(<App />);
-    expect(await screen.findByText("Le socle technique répond correctement")).toBeInTheDocument();
-    expect(screen.getByText("En recherche")).toBeInTheDocument();
-    expect(screen.getByText(/Aucun montant déclarable/)).toBeInTheDocument();
+    expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
+    expect(screen.getByText(/Aucun envoi n’est effectué/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Comptabilité/ })).toBeInTheDocument();
     expect(request).toHaveBeenCalledWith("/api/status", expect.objectContaining({ cache: "no-store" }));
   });
 
@@ -37,7 +37,7 @@ describe("Foundation status", () => {
     }, 503)));
     render(<App />);
     expect(await screen.findByText("Le stockage nécessite une vérification")).toBeInTheDocument();
-    expect(screen.queryByText("Le socle technique répond correctement")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Base prête/)).not.toBeInTheDocument();
   });
 
   it("allows retry after a network failure", async () => {
@@ -46,8 +46,8 @@ describe("Foundation status", () => {
     render(<App />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Connexion au service indisponible");
     await userEvent.click(screen.getByRole("button", { name: /Actualiser/ }));
-    expect(await screen.findByText("Le socle technique répond correctement")).toBeInTheDocument();
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
+    expect(request.mock.calls.filter(([url]) => url === "/api/status")).toHaveLength(2);
   });
 
   it("rejects malformed API output", async () => {

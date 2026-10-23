@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { request, type Setup } from "../api/ledger";
 import OpeningPreview from "./OpeningPreview";
+import CloseYear from "./CloseYear";
+import ResultClosing from "./ResultClosing";
 import "./ledger.css";
 
 interface Row { account_number: string; label: string; amount: string }
+interface Rubric { code: string; label: string; accounts: Row[]; total: string }
 export interface Statements {
   fiscal_year_id: number; start_date: string; end_date: string; excluded_draft_count: number;
   income_statement: { income: Row[]; expenses: Row[]; total_income: string; total_expenses: string; result: string };
   balance_sheet: { assets: Row[]; liabilities: Row[]; equity: Row[]; total_assets: string; total_liabilities: string; total_equity: string; current_result: string; total_liabilities_and_equity: string };
+  presentation?: { reclassifications_applied: boolean; balance_rubrics: Rubric[]; income_rubrics: Rubric[]; warnings: { code: string; message: string }[] };
 }
 
 function Accounts({ title, rows, total }: { title: string; rows: Row[]; total: string }) {
@@ -24,6 +28,8 @@ export default function StatementsPage() {
   const [data, setData] = useState<Statements | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   useEffect(() => {
     let current = true;
     void request<Setup>("/setup").then((value) => {
@@ -43,15 +49,20 @@ export default function StatementsPage() {
     setData(null); setError(""); setYear(nextYear); setAttempt((value) => value + 1);
   }
   return <section className="ledger-page" aria-labelledby="statements-title">
-    <h2 id="statements-title">États comptables provisoires</h2>
-    <p>Calculés uniquement sur les écritures validées. Inventaire et continuité entre exercices restent à contrôler. Aucun montant déclarable.</p>
+    <h2 id="statements-title">États comptables</h2>
+    <p>Calculés sur les écritures validées. Le FEC, pour un contrôle, se télécharge une fois l’exercice clôturé.</p>
     {setup && setup.years.length === 0 && <p>Créez un exercice dans Comptabilité pour consulter ses états.</p>}
     {setup && setup.years.length > 0 && <div className="toolbar">
       <label>Exercice <select value={year} onChange={(event) => refresh(Number(event.target.value))}>{setup.years.map((item) => <option key={item.id} value={item.id}>{item.year}</option>)}</select></label>
       <button type="button" onClick={() => refresh()}>Actualiser les états</button>
+      {setup.years.find((item) => item.id === year)?.status === "CLOSED"
+        ? <a href={`/api/filing/years/${year}/fec`}>Télécharger le FEC</a>
+        : <p>Le FEC sera disponible après la clôture.</p>}
     </div>}
     {year !== 0 && <OpeningPreview key={`${year}-${attempt}`} year={year} />}
-    {error && <p role="alert">{error}</p>}
+    {year !== 0 && <ResultClosing key={`result-${year}-${attempt}`} year={year} />}
+    {year !== 0 && <CloseYear key={`close-${year}-${attempt}`} year={year} />}
+    {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
     {!error && (!setup || (year !== 0 && !data)) && <p role="status">Chargement des états…</p>}
     {data && <div aria-live="polite">
       <p>Période : {data.start_date} — {data.end_date}. Brouillons exclus : {data.excluded_draft_count}.</p>
@@ -59,8 +70,15 @@ export default function StatementsPage() {
       <Accounts title="Produits" rows={data.income_statement.income} total={data.income_statement.total_income} />
       <Accounts title="Charges" rows={data.income_statement.expenses} total={data.income_statement.total_expenses} />
       <p><strong>Résultat comptable : {data.income_statement.result} €</strong></p>
+      {data.presentation && <div>
+        <h3>Présentation par rubriques</h3>
+        <p>{data.presentation.reclassifications_applied ? "Reclassements appliqués." : "Aucun reclassement automatique. Un solde inhabituel reste dans sa rubrique."}</p>
+        <ul>{data.presentation.warnings.map((warning) => <li key={warning.code + warning.message}>{warning.message}</li>)}</ul>
+        {data.presentation.income_rubrics.map((rubric) => <Accounts key={rubric.code} title={rubric.label} rows={rubric.accounts} total={rubric.total} />)}
+        {data.presentation.balance_rubrics.filter((rubric) => rubric.accounts.length > 0).map((rubric) => <Accounts key={rubric.code} title={rubric.label} rows={rubric.accounts} total={rubric.total} />)}
+      </div>}
       <h3>Bilan par compte</h3>
-      <p>Soldes signés selon le classement du plan de comptes. Les amortissements diminuent l’actif. La présentation réglementaire et les reclassements restent à établir.</p>
+      <p>Soldes signés selon le classement du plan de comptes. Les amortissements diminuent l’actif.</p>
       <Accounts title="Actif net" rows={data.balance_sheet.assets} total={data.balance_sheet.total_assets} />
       <Accounts title="Dettes" rows={data.balance_sheet.liabilities} total={data.balance_sheet.total_liabilities} />
       <Accounts title="Capitaux propres hors résultat" rows={data.balance_sheet.equity} total={data.balance_sheet.total_equity} />

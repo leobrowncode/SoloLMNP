@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools==84.0.0", "wheel==0.48.0"]
+requires = ["setuptools==84.1.0", "wheel==0.48.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -23,6 +23,7 @@ include = ["app*"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+addopts = "--basetemp=.pytest-tmp"
 [tool.ruff]
 target-version = "py312"
 line-length = 100

@@ -17,15 +17,25 @@ from app.api.operation_schemas import (
     LoanPaymentInput,
     MatchInput,
     OperationInput,
+    OperationsCSVInput,
     PropertyInput,
     ReasonInput,
+    RentScheduleInput,
     SettlementInput,
+    TenantInput,
 )
 from app.api.sessions import dependencies
 from app.core.database import Database
 from app.core.money import to_cents
 from app.models import AccountingEntryLine, Property, RentalActivity
-from app.models.operations import BankAccount, BankMatch, BankTransaction, BusinessOperation, Loan
+from app.models.operations import (
+    BankAccount,
+    BankMatch,
+    BankTransaction,
+    BusinessOperation,
+    Loan,
+    Tenant,
+)
 from app.services import operations as service
 from app.services.ledger import entry_json, event, fail, money
 
@@ -59,6 +69,23 @@ def build_operations_router(database: Database) -> APIRouter:
         session.add(row)
         event(session, "PROPERTY_CREATED", None, data.model_dump(mode="json"))
         return record(row)
+
+    @router.get("/properties/{property_id}/tenants")
+    def tenants(property_id: int, session: Read) -> list[dict[str, Any]]:
+        return [
+            record(row)
+            for row in session.scalars(
+                select(Tenant).where(Tenant.property_id == property_id).order_by(Tenant.id)
+            )
+        ]
+
+    @router.post("/properties/{property_id}/tenants", status_code=201)
+    def tenant_create(property_id: int, data: TenantInput, session: Write) -> dict[str, Any]:
+        return record(service.add_tenant(session, property_id, data))
+
+    @router.post("/properties/{property_id}/rents", status_code=201)
+    def rents(property_id: int, data: RentScheduleInput, session: Write) -> dict[str, int]:
+        return service.schedule_rents(session, property_id, data)
 
     @router.get("/banks")
     def banks(session: Read) -> list[dict[str, Any]]:
@@ -113,16 +140,23 @@ def build_operations_router(database: Database) -> APIRouter:
     @router.post("/loans", status_code=201)
     def loan_create(data: LoanInput, session: Write) -> dict[str, Any]:
         service.property_exists(session, data.property_id)
-        service.account(session, data.principal_account, "164")
+        principal_account = service.allocate_principal_account(session, data.principal_account)
+        payload = data.model_dump(exclude={"interest_rate", "principal_account"})
         row = Loan(
-            **data.model_dump(exclude={"interest_rate"}),
+            **payload,
+            principal_account=principal_account,
             interest_rate_basis_points=to_cents(data.interest_rate),
         )
         balance = service.principal_balance(session, row)
         if not 0 <= balance <= to_cents(data.initial_principal):
             fail("LOAN_OPENING_BALANCE", "Solde comptable incompatible avec le capital initial.")
         session.add(row)
-        event(session, "LOAN_CREATED", None, data.model_dump(mode="json"))
+        event(
+            session,
+            "LOAN_CREATED",
+            None,
+            {**data.model_dump(mode="json"), "principal_account": principal_account},
+        )
         return {**record(row), "remaining_principal": money(balance)}
 
     @router.post("/loans/{loan_id}/fund", status_code=201)
@@ -132,6 +166,28 @@ def build_operations_router(database: Database) -> APIRouter:
     @router.post("/loans/{loan_id}/payments", status_code=201)
     def payment(loan_id: int, data: LoanPaymentInput, session: Write) -> dict[str, Any]:
         return service.operation_json(session, service.loan_post(session, loan_id, data, False))
+
+    @router.post("/import/preview")
+    def operations_preview(data: OperationsCSVInput, session: Read) -> dict[str, Any]:
+        return service.import_operations_csv(
+            session,
+            data.property_id,
+            data.fiscal_year_id,
+            data.content,
+            False,
+            data.bank_account_id,
+        )
+
+    @router.post("/import")
+    def operations_import(data: OperationsCSVInput, session: Write) -> dict[str, Any]:
+        return service.import_operations_csv(
+            session,
+            data.property_id,
+            data.fiscal_year_id,
+            data.content,
+            True,
+            data.bank_account_id,
+        )
 
     @router.post("/bank/preview")
     def preview(data: CSVInput, session: Read) -> dict[str, Any]:

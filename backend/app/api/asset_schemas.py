@@ -93,6 +93,47 @@ class ComponentInput(Input):
         return self
 
 
+class LoanBalanceInput(Input):
+    loan_id: int = Field(gt=0)
+    outstanding: MoneyInput
+
+
+class PriorChargeInput(Input):
+    account_number: AccountNumber
+    amount: MoneyInput
+    label: Label
+
+    @model_validator(mode="after")
+    def expense(self) -> "PriorChargeInput":
+        if not self.account_number.startswith("6") or self.account_number.startswith("68"):
+            raise ValueError("Une charge antérieure utilise un compte 6, hors dotations 68.")
+        if to_cents(self.amount) <= 0:
+            raise ValueError("Le montant de la charge doit être positif.")
+        return self
+
+
+class PropertyEntryInput(Input):
+    """Brings a property bought before the exercise into the books, in one balanced entry."""
+
+    fiscal_year_id: int = Field(gt=0)
+    loans: list[LoanBalanceInput] = Field(default_factory=list, max_length=20)
+    bank_account_id: int | None = Field(default=None, gt=0)
+    bank_amount: MoneyInput = Decimal("0.00")
+    prior_charges: list[PriorChargeInput] = Field(default_factory=list, max_length=20)
+    piece_reference: Label
+    confirm: bool = False
+
+    @model_validator(mode="after")
+    def bank(self) -> "PropertyEntryInput":
+        if to_cents(self.bank_amount) < 0:
+            raise ValueError("Le solde bancaire repris ne peut pas être négatif.")
+        if to_cents(self.bank_amount) > 0 and self.bank_account_id is None:
+            raise ValueError("Choisissez le compte bancaire qui reçoit le solde.")
+        if len({item.loan_id for item in self.loans}) != len(self.loans):
+            raise ValueError("Un emprunt ne peut être repris qu’une fois.")
+        return self
+
+
 class DepreciationPostInput(Input):
     request_id: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{8,64}$")]
     piece_reference: Label

@@ -9,6 +9,26 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, Money, utc_now
 
 
+class Tenant(Base):
+    """Colocataire d’un logement en location longue durée.
+
+    Le loyer mensuel sert à préparer les quittances.
+    """
+
+    __tablename__ = "tenant"
+    __table_args__ = (
+        CheckConstraint("length(trim(name)) > 0", name="name_required"),
+        CheckConstraint("typeof(monthly_rent)='integer' AND monthly_rent > 0", name="rent"),
+        UniqueConstraint("property_id", "name", name="uq_tenant_property_name"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    property_id: Mapped[int] = mapped_column(ForeignKey("property.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    monthly_rent: Mapped[Decimal] = mapped_column(Money)
+    entry_date: Mapped[date] = mapped_column(Date)
+    exit_date: Mapped[date | None] = mapped_column(Date)
+
+
 class BankAccount(Base):
     __tablename__ = "bank_account"
     id: Mapped[int] = mapped_column(primary_key=True)

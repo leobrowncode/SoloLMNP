@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { assetsRequest as api, type Asset, type DepreciationPeriod } from "../api/assets";
 import { request, type Account, type Setup } from "../api/ledger";
 import { operationsRequest, type Property } from "../api/operations";
+import PropertyEntry from "./PropertyEntry";
 import ReviewForm, { type Field } from "./ReviewForm";
 import "./ledger.css";
 
@@ -18,6 +19,7 @@ export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [periods, setPeriods] = useState<DepreciationPeriod[]>([]);
   const [yearId, setYearId] = useState(0);
+  const [planProperty, setPlanProperty] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
@@ -91,6 +93,34 @@ export default function AssetsPage() {
     await api(editor.path, "POST", data);
     setEditor(null); setMessage("Enregistrement effectué."); setRevision((value) => value + 1);
   }
+  async function preparePlan() {
+    const propertyId = planProperty || properties[0]?.id;
+    if (!propertyId) return;
+    setError(""); setMessage("");
+    try {
+      const result = await api<{ labels: string[] }>(`/properties/${propertyId}/plan`, "POST");
+      setMessage(`Amortissement préparé : ${result.labels.join(", ")}. Calculez ensuite les périodes, puis comptabilisez-les.`);
+      setRevision((value) => value + 1);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Préparation impossible.");
+    }
+  }
+  async function postAll() {
+    const pending = periods.filter((row) => row.status !== "POSTED");
+    setError(""); setMessage("");
+    try {
+      for (const row of pending) {
+        await api(`/periods/${row.id}/post`, "POST", {
+          request_id: `dotation-${row.id}-poste`,
+          piece_reference: `DOT-${row.id}`,
+        });
+      }
+      setMessage(`${pending.length} dotation(s) comptabilisée(s).`);
+      setRevision((value) => value + 1);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Comptabilisation impossible.");
+    }
+  }
   async function calculate() {
     setError(""); setMessage("");
     const requestId = ++periodRequest.current;
@@ -105,12 +135,26 @@ export default function AssetsPage() {
   }
 
   return <section id="assets" className="ledger-page" aria-labelledby="assets-title">
-    <p className="eyebrow">REGISTRE ET SOUS-LEDGER</p><h2 id="assets-title">Immobilisations & amortissements</h2>
-    <p>La valeur, la durée et la mise en service sont documentées et figées. Le terrain ne peut jamais produire de dotation.</p>
+    <h2 id="assets-title">Immobilisations</h2>
+    <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}{message && <p role="status">{message}</p>}
     {!setup?.activity ? <p>Initialisez d’abord l’activité, l’exercice et le bien.</p> : <>
       <button disabled={!properties.length} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
       <button disabled={!properties.length} onClick={() => openAsset(true)}>Inscrire un terrain</button>
+      <div className="toolbar">
+        <label>Logement
+          <select value={properties.some((row) => row.id === planProperty) ? planProperty : properties[0]?.id ?? 0} onChange={(event) => setPlanProperty(Number(event.target.value))}>
+            {properties.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+          </select>
+        </label>
+        <button type="button" disabled={!properties.length} onClick={() => { void preparePlan(); }}>Préparer l’amortissement du logement</button>
+      </div>
+      <p className="form-help">Sépare le terrain, ajoute les frais de notaire et d’agence à la base du bâtiment, puis propose six composants (gros œuvre, toiture, façade, électricité, plomberie, agencements) avec des durées à confirmer. Le mobilier reste à saisir à part. Ce n’est pas un barème légal.</p>
+      <PropertyEntry
+        properties={properties}
+        years={setup.years.filter((year) => year.status === "OPEN")}
+        onDone={(text) => { setError(""); setMessage(text); setRevision((value) => value + 1); }}
+      />
       {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} />}
       {assets.map((row) => <article className="entry-card" key={row.id}><h3>{row.label}</h3>
         <p>{row.category} · Valeur {row.acquisition_value} € · Base {row.depreciable_value} € · Non amortissable {row.non_depreciable_value} €</p>
@@ -126,6 +170,7 @@ export default function AssetsPage() {
         }}>{setup.years.filter((year) => year.status === "OPEN").map((year) => <option key={year.id} value={year.id}>{year.year}</option>)}</select></label>
       </div>
       <button disabled={!yearId} onClick={() => { void calculate(); }}>Calculer les périodes</button>
+      <button type="button" disabled={!periods.some((row) => row.status !== "POSTED")} onClick={() => { void postAll(); }}>Comptabiliser toutes les dotations</button>
       <div className="ledger-table"><table><thead><tr><th>Actif / composant</th><th>Période</th><th>Jours</th><th>Dotation</th><th>Cumul</th><th>VNC de la base</th><th>État</th></tr></thead><tbody>
         {periods.map((row) => <tr key={row.id}><td>{row.target_label}</td><td>{row.period_start} → {row.period_end}</td><td>{row.days}</td><td>{row.amount} €</td><td>{row.accumulated} €</td><td>{row.net_book_value} €</td><td>{row.status === "POSTED" ? "Comptabilisée" : <button onClick={() => setEditor({ title: `Comptabiliser ${row.target_label}`, path: `/periods/${row.id}/post`, retry: true, fields: [{ name: "piece_reference", label: "Référence de la pièce d’inventaire" }] })}>Comptabiliser</button>}</td></tr>)}
       </tbody></table></div>

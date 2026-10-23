@@ -7,6 +7,7 @@ export interface ApplicationStatus {
     expected_revision: string;
   };
   fiscal: { status: "research_only"; available_vintages: string[] };
+  storage_warning?: string | null;
 }
 
 function record(value: unknown): value is Record<string, unknown> {

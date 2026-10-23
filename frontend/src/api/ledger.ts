@@ -1,5 +1,8 @@
 export interface Year { id: number; year: number; start_date: string; end_date: string; status: string }
-export interface Setup { activity: { activity_name: string } | null; years: Year[] }
+export interface Setup {
+  activity: { activity_name: string; siren?: string | null; siret?: string | null } | null;
+  years: Year[];
+}
 export interface Account { number: string; label: string; account_type: string; active: boolean }
 export interface Journal { code: string; label: string; active: boolean; journal_type?: string }
 export interface Line { account_number: string; label: string; debit: string; credit: string }
@@ -22,11 +25,22 @@ export async function request<T>(path: string, method = "GET", body?: unknown, p
     headers: { "Content-Type": "application/json", "X-SoloLMNP-Request": "1" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  const data = await response.json() as { detail?: { message?: string } | unknown[] };
+  const data = await response.json() as {
+    detail?: { message?: string } | string | Array<{ msg?: string; type?: string } | string>;
+  };
   if (!response.ok) {
     const detail = data.detail;
-    throw new Error(detail && !Array.isArray(detail) && detail.message
-      ? detail.message : "Opération refusée. Vérifiez les champs, les dates et les montants au centime.");
+    if (typeof detail === "string" && detail.trim()) throw new Error(detail);
+    if (detail && !Array.isArray(detail) && typeof detail === "object" && detail.message) {
+      throw new Error(detail.message);
+    }
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .map((item) => (typeof item === "string" ? item : item.msg))
+        .filter((item): item is string => Boolean(item && item.trim()));
+      if (messages.length) throw new Error(messages.join(" "));
+    }
+    throw new Error("Opération refusée. Vérifiez les champs, les dates et les montants au centime.");
   }
   return data as T;
 }

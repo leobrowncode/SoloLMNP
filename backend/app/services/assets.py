@@ -8,16 +8,24 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.asset_schemas import AssetInput, ComponentInput, DepreciationPostInput
+from app.api.asset_schemas import (
+    AssetInput,
+    ComponentInput,
+    DepreciationPostInput,
+    PropertyEntryInput,
+)
 from app.api.ledger_schemas import EntryInput, LineInput
 from app.core.money import from_cents, to_cents
 from app.models import (
     Account,
     AccountingEntry,
+    AccountingEntryLine,
     Asset,
     AssetComponent,
+    BankAccount,
     DepreciationPeriod,
     DepreciationSchedule,
+    Loan,
     Property,
 )
 from app.services.ledger import create_draft, fail, get_year, money, post_entry
@@ -283,6 +291,268 @@ def post_period(session: Session, period_id: int, data: DepreciationPostInput) -
     period.status = "POSTED"
     session.flush()
     return entry
+
+
+def gross_pieces(session: Session, asset: Asset) -> list[tuple[str, int, date, str]]:
+    """Gross value by balance-sheet account; components first, any remainder on the asset."""
+    components = list(
+        session.scalars(
+            select(AssetComponent)
+            .where(AssetComponent.asset_id == asset.id)
+            .order_by(AssetComponent.id)
+        )
+    )
+    pieces = [
+        (item.asset_account, to_cents(item.value), asset.acquisition_date, item.label)
+        for item in components
+    ]
+    remainder = to_cents(asset.acquisition_value) - sum(piece[1] for piece in pieces)
+    if remainder:
+        pieces.append((asset.asset_account, remainder, asset.acquisition_date, asset.label))
+    return pieces
+
+
+def _live_property_entry(session: Session, property_id: int) -> AccountingEntry | None:
+    rows = session.scalars(
+        select(AccountingEntry).where(
+            AccountingEntry.source_type == "ACQUISITION",
+            AccountingEntry.source_id == f"property:{property_id}",
+            AccountingEntry.status == "VALIDATED",
+        )
+    )
+    for row in rows:
+        reversed_by = session.scalar(
+            select(AccountingEntry.id).where(AccountingEntry.reversal_of_id == row.id)
+        )
+        if reversed_by is None:
+            return row
+    return None
+
+
+def property_entry(session: Session, property_id: int, data: PropertyEntryInput) -> dict[str, Any]:
+    """Bring a property, its loans and pre-start costs into the books at the exercise start."""
+    prop = session.get(Property, property_id)
+    if prop is None:
+        fail("PROPERTY_NOT_FOUND", "Bien introuvable.", 404)
+    year = get_year(session, data.fiscal_year_id, writable=True)
+    existing = _live_property_entry(session, prop.id)
+    if existing is not None:
+        fail(
+            "PROPERTY_ALREADY_BOOKED",
+            f"Le bien est déjà entré en comptabilité (écriture {existing.entry_number}). "
+            "Extournez-la depuis le journal pour la refaire.",
+        )
+    day = year.start_date
+    lines: list[LineInput] = []
+    label = f"Entrée du bien {prop.name}"[:200]
+    assets = session.scalars(
+        select(Asset).where(Asset.property_id == prop.id).order_by(Asset.id)
+    ).all()
+    for asset in assets:
+        if asset.acquisition_date > day:
+            continue
+        for number, cents, _acquired, piece_label in gross_pieces(session, asset):
+            if cents > 0:
+                lines.append(_line(number, cents, 0, piece_label[:200]))
+    if not lines:
+        fail(
+            "NO_ASSET_TO_BOOK",
+            "Aucune immobilisation de ce bien acquise avant le début de l’exercice. "
+            "Préparez d’abord l’amortissement du logement.",
+            422,
+        )
+    for item in data.loans:
+        loan = session.get(Loan, item.loan_id)
+        if loan is None or loan.property_id != prop.id:
+            fail("LOAN_NOT_FOUND", "Emprunt introuvable pour ce bien.", 404)
+        cents = to_cents(item.outstanding)
+        if cents < 0 or cents > to_cents(loan.initial_principal):
+            fail(
+                "LOAN_OUTSTANDING_INVALID", "Le capital restant dû dépasse le capital initial.", 422
+            )
+        if session.scalar(
+            select(AccountingEntryLine.id)
+            .join(AccountingEntry)
+            .where(
+                AccountingEntry.status == "VALIDATED",
+                AccountingEntryLine.account_number == loan.principal_account,
+            )
+            .limit(1)
+        ):
+            fail(
+                "LOAN_ALREADY_BOOKED",
+                f"L’emprunt {loan.lender} a déjà des mouvements comptables.",
+            )
+        account(session, loan.principal_account, "164")
+        if cents:
+            lines.append(
+                _line(loan.principal_account, 0, cents, f"Capital restant dû — {loan.lender}"[:200])
+            )
+    if to_cents(data.bank_amount) > 0:
+        bank = session.get(BankAccount, data.bank_account_id)
+        if bank is None:
+            fail("BANK_NOT_FOUND", "Compte bancaire introuvable.", 404)
+        lines.append(
+            _line(bank.account_number, to_cents(data.bank_amount), 0, "Solde bancaire repris")
+        )
+    for charge in data.prior_charges:
+        account(session, charge.account_number, "6")
+        lines.append(_line(charge.account_number, to_cents(charge.amount), 0, charge.label))
+    debit = sum(to_cents(line.debit) for line in lines)
+    credit = sum(to_cents(line.credit) for line in lines)
+    if debit != credit:
+        owner = "Apport de l’exploitant" if debit > credit else "Prélèvement de l’exploitant"
+        lines.append(_line("108000", max(0, credit - debit), max(0, debit - credit), owner))
+    preview = {
+        "property_id": prop.id,
+        "accounting_date": day.isoformat(),
+        "piece_date": min(prop.acquisition_date, day).isoformat(),
+        "lines": [line.model_dump(mode="json") for line in lines],
+        "owner_contribution": money(debit - credit),
+        "posted": False,
+    }
+    if not data.confirm:
+        return preview
+    account(session, "108000", "108")
+    entry = create_draft(
+        session,
+        EntryInput(
+            fiscal_year_id=year.id,
+            journal_code="OD",
+            accounting_date=day,
+            piece_reference=data.piece_reference,
+            piece_date=min(prop.acquisition_date, day),
+            label=label,
+            lines=lines,
+        ),
+    )
+    entry.source_type = "ACQUISITION"
+    entry.source_id = f"property:{prop.id}"
+    post_entry(session, entry, entry.version)
+    return {**preview, "posted": True, "entry_id": entry.id, "entry_number": entry.entry_number}
+
+
+def _line(number: str, debit: int, credit: int, label: str) -> LineInput:
+    return LineInput(account_number=number, label=label, debit=money(debit), credit=money(credit))
+
+
+DWELLING_PARTS = (
+    ("Gros œuvre", 4000, 480, "213000", "281300"),
+    ("Toiture et étanchéité", 1000, 300, "213500", "281350"),
+    ("Façade et menuiseries", 1000, 240, "213500", "281350"),
+    ("Installations électriques", 1000, 240, "213500", "281350"),
+    ("Plomberie et sanitaires", 1000, 240, "213500", "281350"),
+    ("Agencements intérieurs", 2000, 180, "213500", "281350"),
+)
+DURATION_REASON = (
+    "Durée d’usage proposée pour un logement en location longue durée, "
+    "à confirmer selon l’état du bien et les travaux. Ce n’est pas un barème légal."
+)
+
+
+def install_dwelling_plan(session: Session, property_id: int) -> dict[str, Any]:
+    """Propose a confirmed component split for a long-term furnished dwelling."""
+    prop = session.get(Property, property_id)
+    if prop is None:
+        fail("PROPERTY_NOT_FOUND", "Bien introuvable.", 404)
+    if session.scalar(select(Asset.id).where(Asset.property_id == prop.id)) is not None:
+        fail(
+            "PLAN_EXISTS",
+            "Ce bien a déjà des immobilisations. Complétez le registre à la main.",
+            422,
+        )
+    base = to_cents(prop.building_value) + to_cents(prop.acquisition_costs)
+    if base <= 0:
+        fail(
+            "BUILDING_REQUIRED",
+            "Indiquez la valeur du bâtiment avant de préparer l’amortissement.",
+            422,
+        )
+    start = prop.rental_start_date or prop.acquisition_date
+    labels: list[str] = []
+    if to_cents(prop.land_value) > 0:
+        land_amount = money(to_cents(prop.land_value))
+        land = create_asset(
+            session,
+            AssetInput(
+                property_id=prop.id,
+                category="LAND",
+                label=f"Terrain — {prop.name}"[:200],
+                acquisition_date=prop.acquisition_date,
+                service_start_date=start,
+                acquisition_value=land_amount,
+                depreciable_value="0.00",
+                non_depreciable_value=land_amount,
+                method="NONE",
+                asset_account="211000",
+                basis_reason=(
+                    "Valeur de terrain saisie sur le bien. Le terrain n’est pas amortissable."
+                ),
+                duration_reason="Terrain non amortissable",
+            ),
+        )
+        labels.append(land.label)
+    shares = [base * ratio // 10000 for _label, ratio, _life, _asset, _depr in DWELLING_PARTS]
+    shares[-1] += base - sum(shares)
+    for index, part in enumerate(shares):
+        if part <= 0:
+            shares[0] += part
+            shares[index] = 0
+    building_amount = money(base)
+    building = create_asset(
+        session,
+        AssetInput(
+            property_id=prop.id,
+            category="BUILDING",
+            label=f"Construction — {prop.name}"[:200],
+            acquisition_date=prop.acquisition_date,
+            service_start_date=start,
+            acquisition_value=building_amount,
+            depreciable_value=building_amount,
+            non_depreciable_value="0.00",
+            method="LINEAR",
+            useful_life_months=480,
+            asset_account="213000",
+            depreciation_account="281300",
+            basis_reason=(
+                "Valeur du bâtiment augmentée des frais de notaire et d’agence. "
+                "Le terrain reste hors base amortissable."
+            ),
+            duration_reason=DURATION_REASON,
+        ),
+    )
+    labels.append(building.label)
+    for (label, _ratio, life, asset_account, depreciation_account), part in zip(
+        DWELLING_PARTS, shares, strict=True
+    ):
+        if part <= 0:
+            continue
+        create_component(
+            session,
+            building.id,
+            ComponentInput(
+                category="STRUCTURE" if asset_account == "213000" else "INSTALLATION",
+                label=label,
+                value=money(part),
+                useful_life_months=life,
+                service_start_date=start,
+                asset_account=asset_account,
+                depreciation_account=depreciation_account,
+                basis_reason=(
+                    "Quote-part proposée pour un logement en location longue durée. "
+                    "À confirmer selon l’état réel du bien."
+                ),
+                duration_reason=DURATION_REASON,
+            ),
+        )
+        labels.append(label)
+    return {
+        "property_id": prop.id,
+        "depreciable_base": building_amount,
+        "land": money(to_cents(prop.land_value)),
+        "acquisition_costs_included": money(to_cents(prop.acquisition_costs)),
+        "labels": labels,
+    }
 
 
 def row_json(

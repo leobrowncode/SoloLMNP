@@ -37,6 +37,38 @@ class Input(BaseModel):
 class ActivityInput(Input):
     activity_name: Label
     activity_start_date: date
+    siren: str | None = None
+    siret: str | None = None
+
+    @model_validator(mode="after")
+    def identity(self) -> "ActivityInput":
+        self.siren = _digits(self.siren, 9, "SIREN")
+        self.siret = _digits(self.siret, 14, "SIRET")
+        if self.siret and (self.siren is None or not self.siret.startswith(self.siren)):
+            raise ValueError("Le SIRET doit commencer par le SIREN.")
+        return self
+
+
+class IdentityInput(Input):
+    siren: str | None = None
+    siret: str | None = None
+
+    @model_validator(mode="after")
+    def identity(self) -> "IdentityInput":
+        self.siren = _digits(self.siren, 9, "SIREN")
+        self.siret = _digits(self.siret, 14, "SIRET")
+        if self.siret and (self.siren is None or not self.siret.startswith(self.siren)):
+            raise ValueError("Le SIRET doit commencer par le SIREN.")
+        return self
+
+
+def _digits(value: str | None, length: int, label: str) -> str | None:
+    if value is None or value.strip() == "":
+        return None
+    cleaned = value.strip()
+    if len(cleaned) != length or not cleaned.isdigit():
+        raise ValueError(f"Le {label} doit comporter {length} chiffres.")
+    return cleaned
 
 
 class YearInput(Input):
@@ -115,3 +147,46 @@ class OpeningInput(Input):
     journal_code: JournalCode
     piece_reference: Label
     result_account: AccountNumber | None = None
+
+
+def parse_signed_money(value: object) -> Decimal:
+    if not isinstance(value, str):
+        raise ValueError("Les montants JSON doivent être des chaînes décimales.")
+    try:
+        amount = Decimal(value)
+        to_cents(amount)
+    except (ArithmeticError, ValueError) as exc:
+        raise ValueError("Montant fini au centime exact requis.") from exc
+    return amount
+
+
+SignedMoneyInput = Annotated[Decimal, BeforeValidator(parse_signed_money)]
+
+
+class CentralizationInput(Input):
+    request_id: UUID
+    journal_code: JournalCode
+    piece_reference: Label
+    justification: Annotated[str, Field(min_length=10, max_length=3000)]
+    result_account: AccountNumber | None = None
+    expected_result: SignedMoneyInput
+
+
+class FiscalAdjustmentInput(Input):
+    account_number: AccountNumber
+    amount: MoneyInput
+    justification: Annotated[str, Field(min_length=10, max_length=3000)]
+
+
+class FiscalInput(Input):
+    adjustments: list[FiscalAdjustmentInput] = Field(default_factory=list, max_length=20)
+
+
+class AppropriationInput(Input):
+    request_id: UUID
+    journal_code: JournalCode
+    piece_reference: Label
+    justification: Annotated[str, Field(min_length=10, max_length=3000)]
+    source_account: AccountNumber
+    target_account: AccountNumber
+    expected_amount: MoneyInput

@@ -16,6 +16,7 @@ INITIAL_ACCOUNTS = (
     ("411000", "Clients", "ASSET"),
     ("512000", "Banques", "ASSET"),
     ("606000", "Achats non stockés de matières et fournitures", "EXPENSE"),
+    ("614000", "Charges de copropriété", "EXPENSE"),
     ("615000", "Entretien et réparations", "EXPENSE"),
     ("616000", "Primes d’assurances", "EXPENSE"),
     ("622000", "Rémunérations d’intermédiaires et honoraires", "EXPENSE"),

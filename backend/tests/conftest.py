@@ -23,6 +23,7 @@ def settings(tmp_path: Path) -> Settings:
         _env_file=None,
         app_env="test",
         database_url=f"sqlite:///{(tmp_path / 'test.sqlite3').as_posix()}",
+        documents_dir=tmp_path / "documents",
         allowed_hosts=("testserver", "localhost", "127.0.0.1"),
     )
 

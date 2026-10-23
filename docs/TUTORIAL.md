@@ -1,0 +1,162 @@
+# Tutoriel SoloLMNP — exercice 2026
+
+Guide d’utilisation pour un LMNP au réel, location longue durée, y compris une colocation.
+SoloLMNP prépare la liasse à recopier et le FEC. Il n’envoie rien
+sur [impots.gouv.fr](https://www.impots.gouv.fr).
+
+## Démarrer l’application
+
+**Windows :** double-cliquer sur `SoloLMNP.bat` à la racine du dépôt.
+
+**Linux / macOS :**
+
+```sh
+./scripts/start_local.sh
+```
+
+**Équivalent Python (tous systèmes) :**
+
+```sh
+python scripts/start_local.py
+```
+
+Prérequis : Python 3.12+ et Node.js 24 (avec `npm`). Au premier lancement, le
+script crée l’environnement, installe les dépendances, migre la base et ouvre
+[http://127.0.0.1:5173](http://127.0.0.1:5173). Les données restent dans `data/`.
+
+Alternative Docker : voir [DEPLOYMENT.md](DEPLOYMENT.md).
+
+Vérifier que l’écran « État de l’installation » affiche **Base SQLite : Prête**.
+
+---
+
+## 1. Comptabilité — initialiser
+
+Menu **Comptabilité** :
+
+1. **Créer l’activité** (nom + date de début réelle).
+2. **Identité** : saisir le **SIREN** (et le SIRET). Sans SIREN, la liasse reste « pas encore prête » et le FEC ne s’exporte pas (son nom réglementaire commence par le SIREN).
+3. **Ajouter un exercice 2026** (achat en 2026 : pas de liasse 2025). Millésime `2026`. Les numéros de cases viennent des formulaires 2025 archivés : vérifiez-les sur le formulaire en ligne au moment de déclarer en 2027.
+4. (Optionnel) Onglet **Plan comptable** pour ajouter des comptes.
+
+Pour une activité déjà existante : saisir des **à-nouveaux** justifiés. L’application
+ne reconstitue pas l’historique.
+
+---
+
+## 2. Opérations & banque — setup métier
+
+Menu **Opérations & banque**, dans cet ordre :
+
+| Onglet | Action |
+| --- | --- |
+| **Biens** | Ajouter le bien (prix, terrain, bâtiment) |
+| **Banque** | Ajouter un compte bancaire (lié à un compte 512) |
+| **Emprunts** | Si besoin : une ligne de crédit = un emprunt. Pour 15 000 € + 195 000 €, créez deux emprunts ; un compte 164 libre est attribué automatiquement. Puis déblocage et échéances (capital / intérêts / assurance / frais : total calculé auto). |
+| **Transactions** | Recettes (loyers) et dépenses (charges) |
+
+Pour chaque opération : date, bien, exercice, montant, compte 6xx/7xx.
+Si le règlement a lieu le même jour → lier la banque ; sinon choisir « Non réglé »,
+puis **Enregistrer un règlement** plus tard.
+
+**Import CSV banque** (onglet Banque) :
+
+- Format UTF-8, séparateur `;`, en-tête exact : `date;label;amount;reference`
+- Prévisualiser → Confirmer → **rapprocher** chaque mouvement
+
+**Import depuis Google Sheets ou CSV** (onglet Transactions, « Importer depuis Google Sheets ou un CSV ») :
+
+- Copier les lignes du Google Sheet de saisie (en-tête compris) et les coller, ou charger un CSV à point-virgule
+- Colonnes : `kind;date;piece_date;type;counterparty;amount;description;piece_reference;source_file`, plus `paid` facultative
+- `kind` : Recette / Dépense (ou REVENUE / EXPENSE) ; dates JJ/MM/AAAA ou AAAA-MM-JJ ; montants « 1 200,00 € » acceptés
+- Mise en forme du Sheet (listes déroulantes Recette/Dépense, types filtrés selon la nature, dates, montants en €, `paid` oui/non, référence de pièce proposée, doublons en rouge) : coller `scripts/gsheet/format_saisie.gs` dans Extensions > Apps Script du Sheet, puis exécuter `setup` une fois
+- Choisir le bien, l’exercice et le compte des lignes payées → Prévisualiser → Comptabiliser
+- `paid` = oui : opération réglée directement sur ce compte ; sinon elle reste **à régler**. Traitement fiscal à vérifier
+- Une référence déjà comptabilisée est ignorée ; un montant différent pour la même référence est refusé
+- Les échéances d’emprunt restent à saisir à la main dans l’onglet Emprunts
+
+---
+
+## 3. Immobilisations
+
+Menu **Immobilisations** :
+
+1. **Préparer l’amortissement du logement** : terrain à part, frais de notaire ajoutés au bâtiment, six composants proposés (durées à confirmer). Ou saisie manuelle : terrain, puis construction et tous ses composants.
+2. **Faire entrer le bien en comptabilité** (une seule fois, premier exercice) : indiquez le capital restant dû de chaque prêt au début de l’exercice, le solde bancaire à cette date et les frais payés avant (intérêts, assurance emprunteur, frais de dossier). **Prévisualiser**, puis **Comptabiliser**. L’écart va au compte de l’exploitant (108). Les prêts repris ainsi n’ont pas de « déblocage » à saisir : enregistrez seulement les échéances payées pendant l’exercice. Une erreur se corrige en extournant l’écriture depuis le journal.
+3. Mobilier : **Nouvelle immobilisation** avec justification de valeur et de durée.
+4. Choisir l’exercice 2026 → **Calculer les périodes** → **Comptabiliser** chaque dotation (possible à partir du 31/12, date de la dotation).
+
+---
+
+## 4. Vérifier la comptabilité
+
+Retour **Comptabilité** :
+
+- Valider tous les **brouillons** (validation = numéro définitif, plus de modification).
+- Contrôler **Journal**, **Balance** et **Grand livre**.
+- Onglet **Inventaire** pour les écritures d’inventaire manuelles justifiées.
+
+---
+
+## 5. États comptables — fin d’exercice
+
+Menu **États comptables** :
+
+1. Consulter bilan et résultat provisoires.
+2. **Préparer la centralisation** → vérifier → confirmer.
+3. Puis **affectation** du résultat (120/129 → capitaux) si proposé.
+4. **Lancer le pré-contrôle** → cocher les avertissements → **Accuser et préparer** → **Confirmer la clôture**.
+
+Après clôture, l’exercice est figé. Une réouverture exige un motif et invalide les exports.
+
+---
+
+## 6. Aperçu fiscal et feuille EFI
+
+Menu **Fiscalité LMNP** :
+
+1. Sélectionner l’exercice → **Calculer le résultat fiscal** (après la centralisation, sur le ledger final).
+2. **Liasse à recopier** : statut, points bloquants, consignes de saisie, puis les cases par formulaire (2031, 2031-bis, 2033-A, B, C, E), l’état de suivi des amortissements non déduits et les cases de la 2042-C-PRO. Télécharger le PDF.
+3. À tout moment : **Export tableur (.xlsx, Google Sheets)** — opérations, journal, balance, amortissements, liasse. À déposer dans Google Drive puis « Ouvrir avec Google Sheets ».
+4. Après clôture : **FEC** et **Dossier de contrôle** (zip : FEC, sa description réglementaire, liasse PDF/JSON, empreintes SHA-256). À garder en cas de contrôle.
+5. Recopier **soi-même** dans l’espace professionnel impots.gouv.fr (mode EFI, « Déclarer résultat »). SoloLMNP n’envoie rien.
+6. Sur la déclaration de revenus du foyer (2042-C-PRO) : résultat en **5NA** (bénéfice ou 0) ou **5NY** (déficit), déficits LMNP antérieurs en **5GA à 5GJ**.
+7. Archiver l’accusé de dépôt avec le dossier de contrôle.
+
+Voir aussi [FILING.md](FILING.md).
+
+---
+
+## 7. Conservation
+
+Menu **Conservation** :
+
+- Déposer les justificatifs (PDF, JPEG ou PNG), éventuellement liés à une écriture.
+- **Créer une sauvegarde** régulièrement.
+- La restauration écrit une **copie de contrôle** ; elle ne remplace pas la base en service.
+
+---
+
+## Ordre rapide
+
+```text
+Activité + SIREN + exercice 2026
+  → Bien + banque + emprunts (sans déblocage si achat avant l’exercice)
+  → Immobilisations : préparer l’amortissement, faire entrer le bien en comptabilité
+  → Recettes / dépenses / échéances / rapprochements
+  → Dotations (au 31/12)
+  → Valider les brouillons
+  → Centraliser / affecter
+  → Calculer le résultat fiscal
+  → Pré-contrôle → clôturer
+  → Liasse à recopier (EFI) + 2042-C-PRO
+  → Dossier de contrôle (FEC) + sauvegarde + justificatifs
+```
+
+## Limites à connaître
+
+- Périmètre LMNP uniquement (pas de LMP).
+- Cession, TVA, plus-values et ventilation automatique du terrain : désactivées. Leur présence bloque la recopie.
+- Exercice 2026 : les formulaires du millésime 2027 ne sont pas encore publiés. Vérifiez les numéros de cases sur le formulaire en ligne.
+- 2042-C-PRO : cases 5NA / 5NY / 5GA–5GJ relevées par recoupement (PDF officiel non archivé). À contrôler sur votre déclaration.
+- Aucune télétransmission.

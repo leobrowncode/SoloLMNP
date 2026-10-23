@@ -1,0 +1,1014 @@
+{
+  "vintage": "2025",
+  "version": "cases-1",
+  "status": "mvp_ready",
+  "declarable": true,
+  "consulted_at": "2026-10-02",
+  "source_manifest": "../sources/manifest.json",
+  "mvp_scope": {
+    "activity": "LMNP déclaré",
+    "regime": "réel simplifié BIC",
+    "excluded": [
+      "cession",
+      "TVA / parahôtellerie",
+      "plus-values",
+      "LMP",
+      "ventilation automatique du terrain"
+    ],
+    "notes": "Cases lues le 2 octobre 2026 sur les PDF 2031, 2033 et la notice 2033-NOT-SD archivés. La liasse BIC 2025 est recopiable lorsque le package n’a ni erreur, ni écart d’immobilisations, ni opération hors MVP. 2026, 2042-C-PRO, cession, TVA et plus-values restent hors de ce statut."
+  },
+  "annex_applicability": [
+    {
+      "form": "2031-SD",
+      "applicable": true,
+      "reason": "Obligatoire pour BIC IR au réel simplifié (notice 2033-NOT-SD)."
+    },
+    {
+      "form": "2033-A-SD",
+      "applicable": "conditional",
+      "reason": "Bilan simplifié. Dispense possible pour certaines EI IR sous seuils de CA (art. 302 septies A bis VI) ou option super-simplifiée. MVP : produire les montants si le bilan est tenu ; ne pas inventer la dispense."
+    },
+    {
+      "form": "2033-B-SD",
+      "applicable": true,
+      "reason": "Compte de résultat et détermination du résultat fiscal — cœur du MVP."
+    },
+    {
+      "form": "2033-C-SD",
+      "applicable": true,
+      "reason": "Immobilisations et amortissements. Les cadres plus-values restent hors MVP (cession désactivée)."
+    },
+    {
+      "form": "2033-D-SD",
+      "applicable": false,
+      "reason": "Notice 2033-NOT-SD, 2033-D : le cadre II « déficits reportables » est réservé à l’IS. À l’IR, les déficits se reportent sur la déclaration de revenus (2042-C-PRO, cases 5GA à 5GJ pour le LMNP). Les cases 860, 870 et 982 ne sont plus émises."
+    },
+    {
+      "form": "2033-E-SD",
+      "applicable": true,
+      "reason": "Valeur ajoutée / effectifs. À produire ; montants souvent nuls ou partiels pour une LMNP typique. Ne pas inventer de CVAE."
+    },
+    {
+      "form": "2033-F-SD",
+      "applicable": false,
+      "reason": "Notice 2033-NOT-SD : les entreprises individuelles n’ont pas à servir 2033-F."
+    },
+    {
+      "form": "2033-G-SD",
+      "applicable": false,
+      "reason": "Notice 2033-NOT-SD : les entreprises individuelles n’ont pas à servir 2033-G."
+    },
+    {
+      "form": "2042-C-PRO",
+      "applicable": "separate_product",
+      "reason": "Report du résultat LMNP sur la déclaration de revenus : 5NA (bénéfice) ou 5NY (déficit), déficits antérieurs en 5GA à 5GJ. Cases relevées par recoupement de sources secondaires le 23/10/2026 (PDF officiel indisponible, site en maintenance). Ne bloque pas la liasse BIC."
+    }
+  ],
+  "cases": [
+    {
+      "id": "2033B-217",
+      "form": "2033-B-SD",
+      "official_case": "217",
+      "label": "Production vendue — services (exercice N)",
+      "mvp_role": "Loyers et prestations de services (compte 706 typique)",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "SERVICES_VENDUS"
+    },
+    {
+      "id": "2033B-232",
+      "form": "2033-B-SD",
+      "official_case": "232",
+      "label": "Total des produits d'exploitation hors TVA (I)",
+      "mvp_role": "Total produits d’exploitation",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "PRODUITS"
+    },
+    {
+      "id": "2033B-242",
+      "form": "2033-B-SD",
+      "official_case": "242",
+      "label": "Autres charges externes",
+      "mvp_role": "Charges externes (hors dotations, hors impôts isolés)",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CHARGES_EXTERNES"
+    },
+    {
+      "id": "2033B-244",
+      "form": "2033-B-SD",
+      "official_case": "244",
+      "label": "Impôts, taxes et versements assimilés (dont CFE et CVAE)",
+      "mvp_role": "Impôts et taxes déductibles comptabilisés",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "IMPOTS_TAXES"
+    },
+    {
+      "id": "2033B-254",
+      "form": "2033-B-SD",
+      "official_case": "254",
+      "label": "Dotations aux amortissements",
+      "mvp_role": "Dotation comptable 681 (distincte du plafond fiscal)",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "DOTATIONS"
+    },
+    {
+      "id": "2033B-264",
+      "form": "2033-B-SD",
+      "official_case": "264",
+      "label": "Total des charges d'exploitation (II)",
+      "mvp_role": "Total charges d’exploitation",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CHARGES"
+    },
+    {
+      "id": "2033B-270",
+      "form": "2033-B-SD",
+      "official_case": "270",
+      "label": "Résultat d'exploitation (I – II)",
+      "mvp_role": "Résultat d’exploitation comptable",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "RESULTAT_EXPLOITATION"
+    },
+    {
+      "id": "2033B-280",
+      "form": "2033-B-SD",
+      "official_case": "280",
+      "label": "Produits financiers (III)",
+      "mvp_role": "Produits financiers (souvent 0 en LMNP typique)",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "PRODUITS_FINANCIERS"
+    },
+    {
+      "id": "2033B-294",
+      "form": "2033-B-SD",
+      "official_case": "294",
+      "label": "Charges financières (V)",
+      "mvp_role": "Intérêts d’emprunt (compte 661 typique)",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CHARGES_FINANCIERES"
+    },
+    {
+      "id": "2033B-312",
+      "form": "2033-B-SD",
+      "official_case": "312",
+      "label": "Bénéfice comptable (col. 1)",
+      "mvp_role": "Report du bénéfice comptable vers le cadre résultat fiscal",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "BENEFICE_COMPTABLE"
+    },
+    {
+      "id": "2033B-314",
+      "form": "2033-B-SD",
+      "official_case": "314",
+      "label": "Déficit comptable (col. 2)",
+      "mvp_role": "Report du déficit comptable vers le cadre résultat fiscal",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "DEFICIT_COMPTABLE"
+    },
+    {
+      "id": "2033B-318",
+      "form": "2033-B-SD",
+      "official_case": "318",
+      "label": "Amortissements excédentaires et autres amortissements non déductibles",
+      "mvp_role": "Réintégration de la part d’amortissement non déductible (plafond LMNP)",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "rules": ["RULE-LMNP-DEPRECIATION-LIMIT-001"],
+      "work_code": "AMORT_NON_DEDUCTIBLE"
+    },
+    {
+      "id": "2033B-330",
+      "form": "2033-B-SD",
+      "official_case": "330",
+      "label": "Divers (réintégrations)",
+      "mvp_role": "Réintégrations diverses dont charges partiellement non déductibles",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "rules": ["RULE-PARTIAL-CHARGE-001"],
+      "work_code": "REINTEGRATIONS_DIVERS"
+    },
+    {
+      "id": "2033B-350",
+      "form": "2033-B-SD",
+      "official_case": "350",
+      "label": "Divers (déductions)",
+      "mvp_role": "Amortissements non déduits d’exercices antérieurs (art. 39 C) imputés sur l’exercice, détaillés sur l’état de suivi",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "rules": ["RULE-LMNP-DEPRECIATION-LIMIT-001"],
+      "work_code": "DEDUCTIONS_DIVERS"
+    },
+    {
+      "id": "2033B-352",
+      "form": "2033-B-SD",
+      "official_case": "352",
+      "label": "Résultat fiscal avant imputation des déficits antérieurs — bénéfice (col. 1)",
+      "mvp_role": "Résultat fiscal positif avant reports",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "rules": ["RULE-LMNP-DEPRECIATION-LIMIT-001", "RULE-LMNP-LOSS-001"],
+      "work_code": "RESULTAT_FISCAL_AVANT_DEFICITS_BENEFICE"
+    },
+    {
+      "id": "2033B-354",
+      "form": "2033-B-SD",
+      "official_case": "354",
+      "label": "Résultat fiscal avant imputation des déficits antérieurs — déficit (col. 2)",
+      "mvp_role": "Résultat fiscal négatif avant reports (= déficit de l’exercice)",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "rules": ["RULE-LMNP-LOSS-001"],
+      "work_code": "RESULTAT_FISCAL_AVANT_DEFICITS_DEFICIT"
+    },
+    {
+      "id": "2033B-370",
+      "form": "2033-B-SD",
+      "official_case": "370",
+      "label": "Résultat fiscal après imputation des déficits — bénéfice (col. 1)",
+      "mvp_role": "Résultat fiscal final à reporter sur 2031 (bénéfice)",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "rules": ["RULE-LMNP-LOSS-001"],
+      "work_code": "RESULTAT_FISCAL",
+      "report_to_2031": "cadre 1 col. 1 (bénéfice)"
+    },
+    {
+      "id": "2033B-372",
+      "form": "2033-B-SD",
+      "official_case": "372",
+      "label": "Résultat fiscal après imputation des déficits — déficit (col. 2)",
+      "mvp_role": "Résultat fiscal final à reporter sur 2031 (déficit)",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "rules": ["RULE-LMNP-LOSS-001"],
+      "work_code": "RESULTAT_FISCAL_DEFICIT",
+      "report_to_2031": "cadre 1 col. 2 (déficit)"
+    },
+    {
+      "id": "2033C-420",
+      "form": "2033-C-SD",
+      "official_case": "420",
+      "label": "Terrains — valeur brute au début de l'exercice",
+      "mvp_role": "Terrain non amortissable. Le PDF place les terrains en 420, pas en 410.",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "rules": ["RULE-LAND-NON-DEPRECIABLE-001"],
+      "work_code": "TERRAINS_BRUT_DEBUT"
+    },
+    {
+      "id": "2033C-422",
+      "form": "2033-C-SD",
+      "official_case": "422",
+      "label": "Terrains — augmentations de la valeur brute",
+      "mvp_role": "Acquisitions de terrains de l'exercice",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "rules": ["RULE-LAND-NON-DEPRECIABLE-001"],
+      "work_code": "TERRAINS_BRUT_AUGMENTATION"
+    },
+    {
+      "id": "2033C-426",
+      "form": "2033-C-SD",
+      "official_case": "426",
+      "label": "Terrains — valeur brute à la fin de l'exercice",
+      "mvp_role": "Terrain en fin d'exercice",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "TERRAINS_BRUT_FIN"
+    },
+    {
+      "id": "2033C-430",
+      "form": "2033-C-SD",
+      "official_case": "430",
+      "label": "Constructions — valeur brute au début de l'exercice",
+      "mvp_role": "Constructions au début",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CONSTRUCTIONS_BRUT_DEBUT"
+    },
+    {
+      "id": "2033C-432",
+      "form": "2033-C-SD",
+      "official_case": "432",
+      "label": "Constructions — augmentations de la valeur brute",
+      "mvp_role": "Acquisitions de constructions de l'exercice",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CONSTRUCTIONS_BRUT_AUGMENTATION"
+    },
+    {
+      "id": "2033C-436",
+      "form": "2033-C-SD",
+      "official_case": "436",
+      "label": "Constructions — valeur brute à la fin de l'exercice",
+      "mvp_role": "Constructions en fin d'exercice",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CONSTRUCTIONS_BRUT_FIN"
+    },
+    {
+      "id": "2033C-450",
+      "form": "2033-C-SD",
+      "official_case": "450",
+      "label": "Installations générales, agencements — valeur brute au début",
+      "mvp_role": "Agencements au début",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AGENCEMENTS_BRUT_DEBUT"
+    },
+    {
+      "id": "2033C-452",
+      "form": "2033-C-SD",
+      "official_case": "452",
+      "label": "Installations générales, agencements — augmentations",
+      "mvp_role": "Acquisitions d'agencements",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AGENCEMENTS_BRUT_AUGMENTATION"
+    },
+    {
+      "id": "2033C-456",
+      "form": "2033-C-SD",
+      "official_case": "456",
+      "label": "Installations générales, agencements — valeur brute à la fin",
+      "mvp_role": "Agencements en fin d'exercice",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AGENCEMENTS_BRUT_FIN"
+    },
+    {
+      "id": "2033C-470",
+      "form": "2033-C-SD",
+      "official_case": "470",
+      "label": "Autres immobilisations corporelles — valeur brute au début",
+      "mvp_role": "Mobilier et matériel au début",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AUTRES_CORP_BRUT_DEBUT"
+    },
+    {
+      "id": "2033C-472",
+      "form": "2033-C-SD",
+      "official_case": "472",
+      "label": "Autres immobilisations corporelles — augmentations",
+      "mvp_role": "Acquisitions de mobilier et matériel",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AUTRES_CORP_BRUT_AUGMENTATION"
+    },
+    {
+      "id": "2033C-476",
+      "form": "2033-C-SD",
+      "official_case": "476",
+      "label": "Autres immobilisations corporelles — valeur brute à la fin",
+      "mvp_role": "Mobilier et matériel en fin d'exercice",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AUTRES_CORP_BRUT_FIN"
+    },
+    {
+      "id": "2033C-490",
+      "form": "2033-C-SD",
+      "official_case": "490",
+      "label": "Total des valeurs brutes au début de l'exercice",
+      "mvp_role": "Total brut début",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "IMMO_BRUT_DEBUT"
+    },
+    {
+      "id": "2033C-492",
+      "form": "2033-C-SD",
+      "official_case": "492",
+      "label": "Total des augmentations de valeurs brutes",
+      "mvp_role": "Total des acquisitions",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "IMMO_BRUT_AUGMENTATION"
+    },
+    {
+      "id": "2033C-496",
+      "form": "2033-C-SD",
+      "official_case": "496",
+      "label": "Total des valeurs brutes à la fin de l'exercice",
+      "mvp_role": "Total brut fin",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "IMMO_BRUT_FIN"
+    },
+    {
+      "id": "2033C-520",
+      "form": "2033-C-SD",
+      "official_case": "520",
+      "label": "Constructions — amortissements au début de l'exercice",
+      "mvp_role": "Amortissements des constructions en début",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CONSTRUCTIONS_AMORT_DEBUT"
+    },
+    {
+      "id": "2033C-522",
+      "form": "2033-C-SD",
+      "official_case": "522",
+      "label": "Constructions — dotations aux amortissements de l'exercice",
+      "mvp_role": "Dotation de l'exercice sur constructions",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CONSTRUCTIONS_AMORT_DOTATION"
+    },
+    {
+      "id": "2033C-526",
+      "form": "2033-C-SD",
+      "official_case": "526",
+      "label": "Constructions — amortissements à la fin de l'exercice",
+      "mvp_role": "Amortissements des constructions en fin",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CONSTRUCTIONS_AMORT_FIN"
+    },
+    {
+      "id": "2033C-540",
+      "form": "2033-C-SD",
+      "official_case": "540",
+      "label": "Agencements — amortissements au début de l'exercice",
+      "mvp_role": "Amortissements des agencements en début",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AGENCEMENTS_AMORT_DEBUT"
+    },
+    {
+      "id": "2033C-542",
+      "form": "2033-C-SD",
+      "official_case": "542",
+      "label": "Agencements — dotations aux amortissements de l'exercice",
+      "mvp_role": "Dotation de l'exercice sur agencements",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AGENCEMENTS_AMORT_DOTATION"
+    },
+    {
+      "id": "2033C-546",
+      "form": "2033-C-SD",
+      "official_case": "546",
+      "label": "Agencements — amortissements à la fin de l'exercice",
+      "mvp_role": "Amortissements des agencements en fin",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AGENCEMENTS_AMORT_FIN"
+    },
+    {
+      "id": "2033C-560",
+      "form": "2033-C-SD",
+      "official_case": "560",
+      "label": "Autres immobilisations corporelles — amortissements au début",
+      "mvp_role": "Amortissements du mobilier en début",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AUTRES_CORP_AMORT_DEBUT"
+    },
+    {
+      "id": "2033C-562",
+      "form": "2033-C-SD",
+      "official_case": "562",
+      "label": "Autres immobilisations corporelles — dotations de l'exercice",
+      "mvp_role": "Dotation de l'exercice sur mobilier et matériel",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AUTRES_CORP_AMORT_DOTATION"
+    },
+    {
+      "id": "2033C-566",
+      "form": "2033-C-SD",
+      "official_case": "566",
+      "label": "Autres immobilisations corporelles — amortissements à la fin",
+      "mvp_role": "Amortissements du mobilier en fin",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AUTRES_CORP_AMORT_FIN"
+    },
+    {
+      "id": "2033C-570",
+      "form": "2033-C-SD",
+      "official_case": "570",
+      "label": "Total des amortissements au début de l'exercice",
+      "mvp_role": "Total amortissements début",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "IMMO_AMORT_DEBUT"
+    },
+    {
+      "id": "2033C-572",
+      "form": "2033-C-SD",
+      "official_case": "572",
+      "label": "Total des dotations aux amortissements de l'exercice",
+      "mvp_role": "Total des dotations",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "IMMO_AMORT_DOTATION"
+    },
+    {
+      "id": "2033C-576",
+      "form": "2033-C-SD",
+      "official_case": "576",
+      "label": "Total des amortissements à la fin de l'exercice",
+      "mvp_role": "Total amortissements fin",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "IMMO_AMORT_FIN"
+    },
+    {
+      "id": "2033A-028",
+      "form": "2033-A-SD",
+      "official_case": "028",
+      "label": "Immobilisations corporelles — brut",
+      "mvp_role": "Terrains, constructions, agencements et mobilier, notice 2033-A case 028",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CORPORELLES_BRUT"
+    },
+    {
+      "id": "2033A-030",
+      "form": "2033-A-SD",
+      "official_case": "030",
+      "label": "Immobilisations corporelles — net",
+      "mvp_role": "Brut diminué des amortissements",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CORPORELLES_NET"
+    },
+    {
+      "id": "2033A-044",
+      "form": "2033-A-SD",
+      "official_case": "044",
+      "label": "Total I actif — brut",
+      "mvp_role": "Total de l'actif immobilisé, brut",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "ACTIF_IMMOBILISE_BRUT"
+    },
+    {
+      "id": "2033A-048",
+      "form": "2033-A-SD",
+      "official_case": "048",
+      "label": "Total I actif — net",
+      "mvp_role": "Total de l'actif immobilisé, net",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "ACTIF_IMMOBILISE_NET"
+    },
+    {
+      "id": "2033A-068",
+      "form": "2033-A-SD",
+      "official_case": "068",
+      "label": "Clients et comptes rattachés — brut",
+      "mvp_role": "Créances clients",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CLIENTS_BRUT"
+    },
+    {
+      "id": "2033A-070",
+      "form": "2033-A-SD",
+      "official_case": "070",
+      "label": "Clients et comptes rattachés — net",
+      "mvp_role": "Créances clients nettes",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CLIENTS_NET"
+    },
+    {
+      "id": "2033A-084",
+      "form": "2033-A-SD",
+      "official_case": "084",
+      "label": "Disponibilités — brut",
+      "mvp_role": "Banques et caisse",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "DISPONIBILITES_BRUT"
+    },
+    {
+      "id": "2033A-086",
+      "form": "2033-A-SD",
+      "official_case": "086",
+      "label": "Disponibilités — net",
+      "mvp_role": "Banques et caisse, net",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "DISPONIBILITES_NET"
+    },
+    {
+      "id": "2033A-096",
+      "form": "2033-A-SD",
+      "official_case": "096",
+      "label": "Total II actif — brut",
+      "mvp_role": "Total de l'actif circulant, brut",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "ACTIF_CIRCULANT_BRUT"
+    },
+    {
+      "id": "2033A-098",
+      "form": "2033-A-SD",
+      "official_case": "098",
+      "label": "Total II actif — net",
+      "mvp_role": "Total de l'actif circulant, net",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "ACTIF_CIRCULANT_NET"
+    },
+    {
+      "id": "2033A-110",
+      "form": "2033-A-SD",
+      "official_case": "110",
+      "label": "Total général actif — brut",
+      "mvp_role": "Total actif brut",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "ACTIF_TOTAL_BRUT"
+    },
+    {
+      "id": "2033A-112",
+      "form": "2033-A-SD",
+      "official_case": "112",
+      "label": "Total général actif — net",
+      "mvp_role": "Total actif net, à rapprocher du passif 180",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "ACTIF_TOTAL_NET"
+    },
+    {
+      "id": "2033A-120",
+      "form": "2033-A-SD",
+      "official_case": "120",
+      "label": "Capital social ou individuel",
+      "mvp_role": "Compte de l'exploitant, notice 2033-A case 120",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CAPITAL"
+    },
+    {
+      "id": "2033A-134",
+      "form": "2033-A-SD",
+      "official_case": "134",
+      "label": "Report à nouveau",
+      "mvp_role": "Reports à nouveau",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "REPORT_A_NOUVEAU"
+    },
+    {
+      "id": "2033A-136",
+      "form": "2033-A-SD",
+      "official_case": "136",
+      "label": "Résultat de l'exercice",
+      "mvp_role": "Résultat comptable de l'exercice",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "RESULTAT_EXERCICE"
+    },
+    {
+      "id": "2033A-142",
+      "form": "2033-A-SD",
+      "official_case": "142",
+      "label": "Total I passif — capitaux propres",
+      "mvp_role": "Total des capitaux propres",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CAPITAUX_TOTAL"
+    },
+    {
+      "id": "2033A-154",
+      "form": "2033-A-SD",
+      "official_case": "154",
+      "label": "Provisions pour risques et charges",
+      "mvp_role": "Total II du passif",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "PROVISIONS"
+    },
+    {
+      "id": "2033A-156",
+      "form": "2033-A-SD",
+      "official_case": "156",
+      "label": "Emprunts et dettes assimilées",
+      "mvp_role": "Emprunts",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "EMPRUNTS"
+    },
+    {
+      "id": "2033A-166",
+      "form": "2033-A-SD",
+      "official_case": "166",
+      "label": "Fournisseurs et comptes rattachés",
+      "mvp_role": "Dettes fournisseurs",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "FOURNISSEURS"
+    },
+    {
+      "id": "2033A-172",
+      "form": "2033-A-SD",
+      "official_case": "172",
+      "label": "Dettes fiscales et sociales",
+      "mvp_role": "Dettes fiscales et sociales",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "DETTES_FISCALES"
+    },
+    {
+      "id": "2033A-175",
+      "form": "2033-A-SD",
+      "official_case": "175",
+      "label": "Autres dettes",
+      "mvp_role": "Dettes non classées ailleurs",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "AUTRES_DETTES"
+    },
+    {
+      "id": "2033A-176",
+      "form": "2033-A-SD",
+      "official_case": "176",
+      "label": "Total III passif — dettes",
+      "mvp_role": "Total des dettes",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "DETTES_TOTAL"
+    },
+    {
+      "id": "2033A-180",
+      "form": "2033-A-SD",
+      "official_case": "180",
+      "label": "Total général passif",
+      "mvp_role": "Capitaux, provisions et dettes",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "PASSIF_TOTAL"
+    },
+    {
+      "id": "2033E-108",
+      "form": "2033-E-SD",
+      "official_case": "108",
+      "label": "Ventes de produits fabriqués, prestations de services et marchandises",
+      "mvp_role": "Comptes 701 à 709, notice 2033-E. Loyers LMNP compris.",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CVAE_PRESTATIONS"
+    },
+    {
+      "id": "2033E-106",
+      "form": "2033-E-SD",
+      "official_case": "106",
+      "label": "Chiffre d'affaires de référence CVAE",
+      "mvp_role": "Total 1. Le formulaire n'est exigé qu'au-dessus de 152 500 €.",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CVAE_CA"
+    },
+    {
+      "id": "2033E-121",
+      "form": "2033-E-SD",
+      "official_case": "121",
+      "label": "Achats",
+      "mvp_role": "Comptes 601 à 609 hors 603, notice 2033-E",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CVAE_ACHATS"
+    },
+    {
+      "id": "2033E-125",
+      "form": "2033-E-SD",
+      "official_case": "125",
+      "label": "Services extérieurs, à l'exception de certains loyers",
+      "mvp_role": "Comptes 611 et 614 à 629. Les comptes 612 et 613 vont en case 146.",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CVAE_SERVICES"
+    },
+    {
+      "id": "2033E-135",
+      "form": "2033-E-SD",
+      "official_case": "135",
+      "label": "Dotations déductibles — biens donnés en location plus de 6 mois",
+      "mvp_role": "Compte 681. Location longue durée du périmètre LMNP. Ce n'est pas la cotisation CVAE.",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CVAE_DOTATIONS_LOCATION"
+    },
+    {
+      "id": "2033E-146",
+      "form": "2033-E-SD",
+      "official_case": "146",
+      "label": "Loyers et redevances non déductibles de la valeur ajoutée",
+      "mvp_role": "Comptes 612 et 613. Ligne informative, hors total 3.",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CVAE_LOYERS"
+    },
+    {
+      "id": "2033E-144",
+      "form": "2033-E-SD",
+      "official_case": "144",
+      "label": "Total 2 — autres produits retenus pour la valeur ajoutée",
+      "mvp_role": "Total des autres produits",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CVAE_TOTAL_2"
+    },
+    {
+      "id": "2033E-152",
+      "form": "2033-E-SD",
+      "official_case": "152",
+      "label": "Total 3 — charges retenues pour la valeur ajoutée",
+      "mvp_role": "Total des charges déductibles de la valeur ajoutée",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CVAE_TOTAL_3"
+    },
+    {
+      "id": "2033E-137",
+      "form": "2033-E-SD",
+      "official_case": "137",
+      "label": "Valeur ajoutée produite",
+      "mvp_role": "Total 1 + total 2 − total 3, notice case 137",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CVAE_VALEUR_AJOUTEE"
+    },
+    {
+      "id": "2033E-117",
+      "form": "2033-E-SD",
+      "official_case": "117",
+      "label": "Valeur ajoutée assujettie à la CVAE",
+      "mvp_role": "Base, pas la cotisation. Zéro sous 152 500 € de chiffre d'affaires ou si la valeur ajoutée est négative.",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "work_code": "CVAE_BASE"
+    },
+    {
+      "id": "2031-RESULT-BENEFICE",
+      "form": "2031-SD",
+      "official_case": null,
+      "label": "Récapitulation — résultat fiscal bénéfice (cadre 1 col. 1)",
+      "mvp_role": "Report depuis 2033-B case 370. Le PDF 2031-SD millésime 2025 ne numérote pas cette case comme les 2033 ; traçabilité via renvoi notice « 370 ou 372 du 2033-B-SD ».",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031_RESULTAT_BENEFICE",
+      "maps_from": "370"
+    },
+    {
+      "id": "2031-RESULT-DEFICIT",
+      "form": "2031-SD",
+      "official_case": null,
+      "label": "Récapitulation — résultat fiscal déficit (cadre 1 col. 2)",
+      "mvp_role": "Report depuis 2033-B case 372.",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031_RESULTAT_DEFICIT",
+      "maps_from": "372"
+    },
+    {
+      "id": "2031-IMPOSABLE-BENEFICE",
+      "form": "2031-SD",
+      "official_case": null,
+      "label": "Récapitulation — ligne 4, bénéfice imposable (col. 1)",
+      "mvp_role": "Égal à la ligne 1 en l’absence de revenus mobiliers (ligne 2) et de quote-part de frais (ligne 3).",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031_IMPOSABLE_BENEFICE",
+      "maps_from": "370"
+    },
+    {
+      "id": "2031-IMPOSABLE-DEFICIT",
+      "form": "2031-SD",
+      "official_case": null,
+      "label": "Récapitulation — ligne 4, déficit déductible (col. 2)",
+      "mvp_role": "Égal à la ligne 1 col. 2 en l’absence des lignes 2 et 3.",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031_IMPOSABLE_DEFICIT",
+      "maps_from": "372"
+    },
+    {
+      "id": "2031-BIC-NON-PRO-BENEFICE",
+      "form": "2031-SD",
+      "official_case": null,
+      "label": "Récapitulation — ligne 7 « dont BIC non professionnels (2031 Bis-SD) », a. bénéfice",
+      "mvp_role": "Activité LMNP : tout le résultat est non professionnel.",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031_BIC_NON_PRO_BENEFICE",
+      "maps_from": "370"
+    },
+    {
+      "id": "2031-BIC-NON-PRO-DEFICIT",
+      "form": "2031-SD",
+      "official_case": null,
+      "label": "Récapitulation — ligne 7 « dont BIC non professionnels (2031 Bis-SD) », b. déficit",
+      "mvp_role": "Activité LMNP : tout le résultat est non professionnel.",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031_BIC_NON_PRO_DEFICIT",
+      "maps_from": "372"
+    },
+    {
+      "id": "2031BIS-LMNP-BENEFICE",
+      "form": "2031-BIS-SD",
+      "official_case": null,
+      "label": "Cadre I BIC non professionnels — « Autres locations meublées non professionnelles », bénéfice",
+      "mvp_role": "Résultat avant imputation des déficits antérieurs, reporté case 7a de la 2031.",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031BIS_LMNP_BENEFICE",
+      "maps_from": "370"
+    },
+    {
+      "id": "2031BIS-LMNP-DEFICIT",
+      "form": "2031-BIS-SD",
+      "official_case": null,
+      "label": "Cadre I BIC non professionnels — « Autres locations meublées non professionnelles », déficit",
+      "mvp_role": "Résultat avant imputation des déficits antérieurs, reporté case 7b de la 2031.",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031BIS_LMNP_DEFICIT",
+      "maps_from": "372"
+    },
+    {
+      "id": "2042CPRO-5NA",
+      "form": "2042-C-PRO",
+      "official_case": "5NA",
+      "label": "Locations meublées non professionnelles, régime réel — bénéfice (déclarant 2 : 5OA)",
+      "mvp_role": "Report du résultat 2031 ligne 7a. Formulaire séparé de la liasse.",
+      "source_document": null,
+      "verification": "verified_by_cross_reference",
+      "consulted_at": "2026-10-23",
+      "work_code": "PERSONAL_5NA"
+    },
+    {
+      "id": "2042CPRO-5NY",
+      "form": "2042-C-PRO",
+      "official_case": "5NY",
+      "label": "Locations meublées non professionnelles, régime réel — déficit (déclarant 2 : 5OY)",
+      "mvp_role": "Report du résultat 2031 ligne 7b, sans signe.",
+      "source_document": null,
+      "verification": "verified_by_cross_reference",
+      "consulted_at": "2026-10-23",
+      "work_code": "PERSONAL_5NY"
+    },
+    {
+      "id": "2042CPRO-5GA-5GJ",
+      "form": "2042-C-PRO",
+      "official_case": "5GA-5GJ",
+      "label": "Déficits LMNP des dix années antérieures non encore déduits, une case par année d’origine",
+      "mvp_role": "5GJ = année précédant les revenus déclarés ; 5GA = dix ans avant. Souvent prérempli.",
+      "source_document": null,
+      "verification": "verified_by_cross_reference",
+      "consulted_at": "2026-10-23",
+      "work_code": "PERSONAL_PRIOR_DEFICITS"
+    }
+  ],
+  "blocked_cases": [
+    {
+      "form": "2033-C-SD",
+      "area": "III Plus-values / moins-values",
+      "reason": "Cession et plus-values désactivées dans le MVP. Aucun montant inventé.",
+      "status": "blocked"
+    },
+    {
+      "form": "2033-B-SD",
+      "official_case": "356",
+      "label": "Déficit de l'exercice reporté en arrière",
+      "reason": "Report en arrière hors périmètre MVP LMNP typique ; non mappé.",
+      "status": "blocked"
+    },
+    {
+      "form": "2033-B-SD",
+      "official_case": "360",
+      "label": "Déficits antérieurs reportables",
+      "reason": "Notice 2033-NOT-SD : ligne réservée à l’IS. Les déficits LMNP antérieurs s’imputent sur la 2042-C-PRO.",
+      "status": "blocked"
+    },
+    {
+      "form": "2033-D-SD",
+      "area": "II Déficits reportables (860, 870, 982 à 984)",
+      "reason": "Notice 2033-NOT-SD : cadre servi par les seules entreprises à l’IS, sauf stock d’ARD antérieur à 2004.",
+      "status": "blocked"
+    }
+  ],
+  "ready_gate": {
+    "all_used_cases_must_be": ["verified", "verified_by_cross_reference"],
+    "refuse": ["null official_case on a declarable 2033 field", "case_not_verified on the BIC liasse path"],
+    "2042_c_pro": "May remain case_not_verified without blocking BIC liasse READY if documented as separate product."
+  }
+}

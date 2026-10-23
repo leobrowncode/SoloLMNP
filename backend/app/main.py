@@ -13,12 +13,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.assets import build_assets_router
+from app.api.filing import build_filing_router
+from app.api.fiscal import build_fiscal_router
 from app.api.ledger import build_ledger_router
 from app.api.operations import build_operations_router
 from app.core.config import Settings, get_settings
 from app.core.database import SCHEMA_REVISION, Database
-
-APPLICATION_VERSION = "0.5.0"
+from app.core.version import APPLICATION_VERSION
+from app.domain.fiscal.loader import available_vintages
 
 
 class DatabaseStatus(BaseModel):
@@ -37,6 +39,7 @@ class ApplicationStatus(BaseModel):
     phase: Literal["assets"] = "assets"
     database: DatabaseStatus
     fiscal: FiscalStatus = Field(default_factory=FiscalStatus)
+    storage_warning: str | None = None
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -99,6 +102,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(build_ledger_router(database))
     application.include_router(build_operations_router(database))
     application.include_router(build_assets_router(database))
+    application.include_router(build_fiscal_router(database))
+    application.include_router(build_filing_router(database, configuration))
 
     @application.get("/api/health", tags=["system"])
     def health() -> dict[str, str]:
@@ -133,17 +138,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "asset_component",
                     "depreciation_schedule",
                     "depreciation_period",
+                    "fiscal_computation",
+                    "depreciation_carry_forward",
+                    "tax_loss_carry_forward",
+                    "audit_event",
+                    "tax_return_snapshot",
+                    "supporting_document",
+                    "tenant",
                 }.issubset(tables)
         except SQLAlchemyError:
             # Never expose a local path, SQL statement or exception to the client.
             ready = False
         response.status_code = 200 if ready else 503
         response.headers["Cache-Control"] = "no-store"
+        on_cloud_drive = "onedrive" in str(configuration.database_path).lower()
         return ApplicationStatus(
             database=DatabaseStatus(
                 status="ready" if ready else "not_ready",
                 schema_revision=revision,
-            )
+            ),
+            fiscal=FiscalStatus(available_vintages=available_vintages() if ready else []),
+            storage_warning=(
+                "La base est dans un dossier synchronisé (OneDrive). "
+                "Copiez le projet hors de ce dossier : la synchro peut corrompre SQLite."
+                if on_cloud_drive
+                else None
+            ),
         )
 
     return application

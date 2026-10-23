@@ -219,7 +219,18 @@ def reverse_entry(
 ) -> AccountingEntry:
     from app.models.operations import BankMatch
 
-    if original.source_type not in {"MANUAL", "REVERSAL", "INVENTORY"} and not business:
+    if (
+        original.source_type
+        not in {
+            "MANUAL",
+            "REVERSAL",
+            "INVENTORY",
+            "CENTRALIZATION",
+            "APPROPRIATION",
+            "ACQUISITION",
+        }
+        and not business
+    ):
         fail("BUSINESS_REVERSAL_REQUIRED", "Extournez cette écriture depuis son opération métier.")
     if session.scalar(
         select(BankMatch)
