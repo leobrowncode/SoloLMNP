@@ -2,7 +2,7 @@
 
 Une recommandation de l'agent n'est pas une décision approuvée. Tant que la colonne Décision est vide, le statut reste `EN_ATTENTE_UTILISATEUR` et le comportement correspondant ne doit pas être implémenté.
 
-Ces trois questions ont été posées le 19 octobre 2026 dans la PR #22. Aucune réponse n'est enregistrée au 23 octobre 2026.
+Ces trois questions ont été posées le 19 octobre 2026 dans la PR #22. Q-001 et Q-002 ont été tranchées le 23 octobre 2026. Q-003 reste sans réponse.
 
 ## Q-001 — Prochaine capacité
 
@@ -13,10 +13,10 @@ Ces trois questions ont été posées le 19 octobre 2026 dans la PR #22. Aucune 
   - B. Finir d'abord une présentation réglementaire du bilan et du résultat, en laissant les à-nouveaux bloqués.
   - C. Ouvrir le moteur fiscal versionné, toujours en `research_only`.
 - Recommandation : A. C'est le seul blocage qui empêche un dossier réel d'enchaîner deux exercices. La présentation réglementaire et la fiscalité restent des lots séparés.
-- Décision approuvée : —
-- Date et référence : —
-- Statut : `EN_ATTENTE_UTILISATEUR`
-- Implémentation : non commencée
+- Décision approuvée : A
+- Date et référence : 23 octobre 2026, réponse « Q-001 A, Q-002 A »
+- Statut : approuvée
+- Implémentation : clôture minimale `OPEN` vers `CLOSED` et réouverture motivée, sans centralisation des classes 6/7. Le pré-contrôle réglementaire reste à livrer.
 
 ## Q-002 — Reprise du résultat
 
@@ -27,10 +27,10 @@ Ces trois questions ont été posées le 19 octobre 2026 dans la PR #22. Aucune 
   - B. Ajouter dans le même parcours une affectation vers le compte de l'exploitant.
   - C. Laisser le résultat dans les comptes de charges et de produits, sans écriture de reprise du résultat.
 - Recommandation : A. Elle est déjà celle du service d'à-nouveaux et elle n'invente pas d'affectation.
-- Décision approuvée : —
-- Date et référence : —
-- Statut : `EN_ATTENTE_UTILISATEUR`
-- Implémentation : non commencée
+- Décision approuvée : A
+- Date et référence : 23 octobre 2026, réponse « Q-001 A, Q-002 A »
+- Statut : approuvée
+- Implémentation : déjà celle de la génération des à-nouveaux. Aucun compte 120 ou 129 n'est créé automatiquement. Aucune affectation au compte de l'exploitant n'est ajoutée.
 
 ## Q-003 — Écritures d'inventaire guidées
 

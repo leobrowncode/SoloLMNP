@@ -16,6 +16,7 @@ from app.api.ledger_schemas import (
     InventoryInput,
     JournalInput,
     OpeningInput,
+    ReopenInput,
     ReversalInput,
     VersionInput,
     YearInput,
@@ -32,6 +33,7 @@ from app.models import (
     LedgerEvent,
     RentalActivity,
 )
+from app.services.closing import close_year, reopen_year
 from app.services.inventory import post_inventory
 from app.services.ledger import (
     check_draft,
@@ -114,6 +116,14 @@ def build_ledger_router(database: Database) -> APIRouter:
         session.add(year)
         event(session, "YEAR_CREATED", None, data.model_dump(mode="json"))
         return setup(session)
+
+    @router.post("/years/{year_id}/close")
+    def close_fiscal_year(year_id: int, session: Write) -> dict[str, Any]:
+        return close_year(session, year_id)
+
+    @router.post("/years/{year_id}/reopen")
+    def reopen_fiscal_year(year_id: int, data: ReopenInput, session: Write) -> dict[str, Any]:
+        return reopen_year(session, year_id, data.reason)
 
     @router.get("/accounts")
     def accounts(session: Read) -> list[dict[str, Any]]:

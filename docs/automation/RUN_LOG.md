@@ -37,3 +37,9 @@
 - Questions : Q-001, Q-002, Q-003, toujours sans réponse.
 - Bloquant : pas de clôture tant que Q-001 n'est pas tranchée.
 - Prochaine priorité : trancher Q-001. En parallèle, fusionner les PR #22, #23, #24 et #25, qui corrigent des blocages de saisie déjà prouvés.
+
+## 2026-10-23 — décision de clôture
+
+- Réponse utilisateur : Q-001 A, Q-002 A. Enregistrée dans `docs/automation/DECISIONS.md`. Q-003 reste `EN_ATTENTE_UTILISATEUR`.
+- Travail : clôture minimale `OPEN` vers `CLOSED`, réouverture avec motif et événement d’audit. Aucune écriture de centralisation, aucun compte 120 ou 129 créé. Le résultat continue d’être repris seulement sur le compte choisi à la génération des à-nouveaux.
+- Branche : `cursor/sololmnp-conformit-livraison-8484`, PR #26.

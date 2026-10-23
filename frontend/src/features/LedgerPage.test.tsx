@@ -73,6 +73,35 @@ describe("ledger", () => {
     expect(screen.getByRole("option", { name: "À-nouveaux" })).toHaveValue("OPENING");
     expect(screen.getByRole("option", { name: "Dotations aux amortissements" })).toHaveValue("DEPRECIATION");
   });
+  it("closes an open year only after confirmation and can record a reopen reason", async () => {
+    let status = "OPEN";
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+      const path = url.replace("/api/ledger", "");
+      if (path === "/years/1/close" && init?.method === "POST") status = "CLOSED";
+      if (path === "/years/1/reopen" && init?.method === "POST") status = "OPEN";
+      const data = path === "/setup"
+        ? { activity: { activity_name: "Fictif" }, years: [{ id: 1, year: 2025, start_date: "2025-01-01", end_date: "2025-12-31", status }] }
+        : path === "/accounts" ? accounts
+        : path === "/journals" ? [{ code: "OD", label: "Opérations", active: true }]
+        : path.startsWith("/entries?") ? { entries: [], count: 0 }
+        : { status };
+      return new Response(JSON.stringify(data), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetcher);
+    render(<LedgerPage />);
+    expect(await screen.findByRole("option", { name: "2025 · Ouvert" })).toBeInTheDocument();
+    expect(screen.getByText(/ne crée aucun compte/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("checkbox", { name: /Je confirme le verrouillage/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Clôturer l’exercice" }));
+    expect(await screen.findByRole("option", { name: "2025 · Clôturé" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Nouvelle écriture" })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText(/Motif de la réouverture/), "Oubli d’une facture");
+    await userEvent.click(screen.getByRole("button", { name: "Rouvrir l’exercice" }));
+    const reopen = fetcher.mock.calls.find(([url, init]) => url === "/api/ledger/years/1/reopen" && init?.method === "POST");
+    expect(JSON.parse(String(reopen?.[1]?.body)).reason).toBe("Oubli d’une facture");
+    expect(await screen.findByRole("option", { name: "2025 · Ouvert" })).toBeInTheDocument();
+  });
+
   it("shows network errors without claiming readiness", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Hors ligne")));
     render(<LedgerPage />);

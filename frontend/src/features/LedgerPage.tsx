@@ -128,8 +128,26 @@ export default function LedgerPage() {
     </details>}
     {!!setup?.years.length && <>
       <label>Exercice<select value={year} onChange={(e) => { setYear(Number(e.target.value)); setDraft(null); setConfirmation(null); setOffset(0); setBalance(null); setLedger([]); setEntries([]); }}>
-        {setup.years.map((y) => <option key={y.id} value={y.id}>{y.year} · {y.status}</option>)}
+        {setup.years.map((y) => <option key={y.id} value={y.id}>{y.year} · {y.status === "CLOSED" ? "Clôturé" : y.status === "OPEN" ? "Ouvert" : y.status}</option>)}
       </select></label>
+      {selectedYear?.status === "OPEN" && <form onSubmit={(e) => {
+        formData(e);
+        void mutate(() => request("/years/" + year + "/close", "POST"), "Exercice clôturé. Ses écritures validées sont verrouillées.");
+      }}>
+        <h3>Clôturer l’exercice {selectedYear.year}</h3>
+        <p>La clôture verrouille cet exercice. Elle ne transfère pas le résultat et ne crée aucun compte. Le bénéfice ou la perte sera repris à l’ouverture de l’exercice suivant, sur un compte 120 ou 129 que vous choisirez.</p>
+        <label><input name="confirm" type="checkbox" required /> Je confirme le verrouillage de cet exercice.</label>
+        <button disabled={busy}>Clôturer l’exercice</button>
+      </form>}
+      {selectedYear?.status === "CLOSED" && <form onSubmit={(e) => {
+        const data = formData(e);
+        void mutate(() => request("/years/" + year + "/reopen", "POST", { reason: data.get("reason") }), "Exercice rouvert. Les écritures déjà validées restent intangibles.");
+      }}>
+        <h3>Rouvrir l’exercice {selectedYear.year}</h3>
+        <p>La réouverture est conservée avec son motif. Une correction d’écriture validée passe par une extourne. Si l’exercice suivant a déjà des à-nouveaux, leur contrôle signalera que cette source n’est plus clôturée.</p>
+        <label>Motif de la réouverture (au moins 5 caractères)<input name="reason" required minLength={5} maxLength={300} /></label>
+        <button disabled={busy}>Rouvrir l’exercice</button>
+      </form>}
       <nav aria-label="Vues comptables" className="ledger-tabs">{["Brouillons", "Journal", "Grand livre", "Balance", "Plan comptable", "Inventaire"].map((name) =>
         <button key={name} aria-pressed={tab === name} onClick={() => { setTab(name); setOffset(0); setEntries([]); if (name === "Inventaire") setDraft(null); }}>{name}</button>)}</nav>
       {tab === "Brouillons" && <button disabled={!writable || busy} onClick={() => startDraft()}>Nouvelle écriture</button>}

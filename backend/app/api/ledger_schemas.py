@@ -110,6 +110,10 @@ class ReversalInput(Input):
     reason: Annotated[str, Field(min_length=5, max_length=300)]
 
 
+class ReopenInput(Input):
+    reason: Annotated[str, Field(min_length=5, max_length=300)]
+
+
 class OpeningInput(Input):
     preview_token: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
     journal_code: JournalCode
