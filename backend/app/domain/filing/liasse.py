@@ -190,7 +190,7 @@ def _immobilisations(
                 }
             )
             continue
-        for account, gross_value, acquired in gross_pieces(session, asset):
+        for account, gross_value, acquired, _label in gross_pieces(session, asset):
             if acquired > year.end_date:
                 continue
             # Assets bought before the first exercise enter the business during it.

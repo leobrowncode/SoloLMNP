@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { request } from "../api/ledger";
+import LiasseSheet, { type Worksheet } from "./LiasseSheet";
 import "./ledger.css";
 
 interface Vintage {
@@ -68,41 +69,6 @@ interface Statements {
     total_income: string;
     total_expenses: string;
     result: string;
-  };
-}
-interface Field {
-  code: string;
-  form_ref?: string;
-  official_case: string | null;
-  label: string;
-  value: string;
-  expression: string;
-  rules?: string[];
-  accounts?: string[];
-  entries?: number[];
-}
-interface PropertySegment {
-  property_id: number;
-  name: string;
-  rents: string;
-  expenses: string;
-  depreciation: string;
-}
-interface Worksheet {
-  transmission: boolean;
-  declarable?: boolean;
-  frozen?: boolean;
-  disclaimer: string;
-  portal?: string;
-  vintage_note?: string;
-  declarant?: { name: string; siren: string | null; siret: string | null };
-  by_property?: PropertySegment[];
-  liasse?: { form: string; vintage: string; fields: Field[] };
-  personal_return: {
-    form: string;
-    official_case: string | null;
-    status: string;
-    amount: string;
   };
 }
 interface AdjustmentDraft {
@@ -752,91 +718,7 @@ export default function FiscalPage() {
         </div>
       )}
 
-      {worksheet && (
-        <div className="fiscal-panel" aria-live="polite">
-          <h3>Liasse à recopier</h3>
-          <p>{worksheet.disclaimer}</p>
-          <p>
-            Liasse BIC : {worksheet.declarable ? "prête à recopier" : "non déclarable"}.
-            Télétransmission : {worksheet.transmission ? "oui" : "non"}.
-          </p>
-          <p>
-            {worksheet.frozen
-              ? "Montants figés à la clôture."
-              : "Calcul en cours. Clôturez l’exercice pour figer cette feuille."}
-          </p>
-          {worksheet.vintage_note && <p>{worksheet.vintage_note}</p>}
-          {worksheet.declarant && (
-            <p>
-              {worksheet.declarant.name}
-              {worksheet.declarant.siret ? ` · SIRET ${worksheet.declarant.siret}` : " · SIRET non renseigné"}
-            </p>
-          )}
-          <p>
-            <a href={worksheet.portal ?? "https://www.impots.gouv.fr/professionnel/teleprocedures-efi-ou-edi"}>
-              Ouvrir la page EFI des impôts
-            </a>
-            {" · "}
-            <a href={`/api/filing/years/${year}/efi.pdf`}>Télécharger le PDF de recopie</a>
-            {" · "}
-            <a href={`/api/filing/years/${year}/fec`}>Télécharger le FEC</a>
-          </p>
-          <div className="ledger-table">
-            <table>
-              <caption>Cases à reporter sur la liasse</caption>
-              <thead>
-                <tr>
-                  <th>Formulaire</th>
-                  <th>Case</th>
-                  <th>Libellé</th>
-                  <th>Montant (€)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(worksheet.liasse?.fields ?? []).map((field) => (
-                  <tr key={field.code}>
-                    <td>{field.form_ref ?? worksheet.liasse?.form}</td>
-                    <td>{field.official_case ?? "sans numéro"}</td>
-                    <td>{field.label}</td>
-                    <td>{field.value}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p>
-            {worksheet.personal_return.form} · case officielle :{" "}
-            {worksheet.personal_return.official_case ?? "non vérifiée"} · statut{" "}
-            {worksheet.personal_return.status} · montant {worksheet.personal_return.amount} €.
-            Ce report sur le revenu du foyer n’a pas encore de numéro de case archivé.
-          </p>
-          {(worksheet.by_property ?? []).length > 0 && (
-            <div className="ledger-table">
-              <table>
-                <caption>Segmentation par bien</caption>
-                <thead>
-                  <tr>
-                    <th>Bien</th>
-                    <th>Loyers (€)</th>
-                    <th>Charges (€)</th>
-                    <th>Dotations (€)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {worksheet.by_property?.map((row) => (
-                    <tr key={row.property_id}>
-                      <td>{row.name}</td>
-                      <td>{row.rents}</td>
-                      <td>{row.expenses}</td>
-                      <td>{row.depreciation}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+      {worksheet && <LiasseSheet worksheet={worksheet} yearId={year} />}
 
       <details className="fiscal-panel">
         <summary>Millésimes chargés (technique)</summary>

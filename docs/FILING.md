@@ -43,11 +43,29 @@ case émise est dans ce registre et que le package n’a ni erreur ni écart blo
 (immobilisations, classement, effectifs, cession, TVA). Le millésime 2026 et la
 2042-C-PRO restent non déclarables.
 
+## Règles LMNP à l’impôt sur le revenu (notice 2033-NOT-SD 2025)
+
+Relu sur le PDF archivé le 23 octobre 2026 :
+
+- Ligne 360 du 2033-B (déficits antérieurs) : réservée à l’IS. Les cases 370/372 reprennent donc 352/354.
+- 2033-D cadre II (déficits reportables, cases 860, 870, 982) : servi par les seules entreprises à l’IS. Il n’est plus émis.
+- Les déficits LMNP antérieurs s’imputent sur la déclaration de revenus du foyer : 2042-C-PRO, cases 5GA à 5GJ (une par année d’origine, 5GJ = année précédente).
+- Amortissement non déduit de l’exercice (art. 39 C) : réintégré ligne 318. Reprise d’années antérieures : déduite ligne 350 « divers », détaillée sur l’état de suivi joint à la feuille.
+- 2033-B : case 018 « déposé au titre de l’IR » à cocher.
+- 2031 cadre C : ligne 1 (370/372), ligne 4, ligne 7 « dont BIC non professionnels ». 2031-bis cadre I : « Autres locations meublées non professionnelles ».
+- 2042-C-PRO : 5NA (bénéfice ou 0) / 5NY (déficit), déclarant 2 : 5OA / 5OY. Relevé par recoupement de sources secondaires concordantes ; le PDF officiel n’était pas téléchargeable (site en maintenance).
+
+Le calcul fiscal interne garde une imputation FIFO des déficits antérieurs : c’est une estimation au niveau du foyer, pas une ligne de la liasse.
+
+## Premier exercice et achat antérieur
+
+Un bien acheté avant le début de l’exercice entre en comptabilité par une écriture unique datée du premier jour de l’exercice (Immobilisations → « Faire entrer le bien en comptabilité ») : immobilisations du registre au débit, capital restant dû des emprunts au crédit, solde bancaire et frais payés avant le début (intérêts, assurance, frais de dossier) au débit, écart au compte de l’exploitant 108. Au 2033-C, ces biens figurent en augmentations du premier exercice.
+
 ## Hors de la feuille recopiable
 
 - 2033-F et 2033-G : non applicables aux entreprises individuelles.
-- 2042-C-PRO : produit séparé, case non archivée.
-- Millésime 2026 : formulaires non archivés.
+- 2033-D cadre II : réservé à l’IS.
+- Millésime 2026 : formulaires de 2027 non publiés ; numéros repris du registre 2025, à vérifier en ligne.
 - Cession, TVA, plus-values : la présence de ces opérations refuse `ready`.
 - La cotisation CVAE n’est pas calculée. La case 117 reste une base, nulle jusqu’à 152 500 € de chiffre d’affaires.
 - L’accès à l’espace professionnel du contribuable n’est pas testé ici.

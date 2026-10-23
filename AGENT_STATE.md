@@ -5,44 +5,42 @@
 
 ## Current project status
 
-Current roadmap position:
-
-- Completed through: feuille de l’exercice 2026, achat 2026, pas de liasse 2025
-- Current phase: exercice 2026
-- Current objective: recopier la feuille 2026 ; revérifier les numéros en 2027
+- Completed through: liasse LMNP IR conforme à la notice 2033, entrée du bien au premier exercice, dossier de contrôle FEC
+- Current phase: exercice 2026 (premier exercice réel : achat 09/01/2026, location et exercice depuis le 06/04/2026)
+- Current objective: saisie des données réelles 2026 par l’utilisateur, clôture début 2027, recopie EFI
 
 ## Completed
 
-- P0–P12 et liasse 2025 : 2033-A, B, C, D, E et renvoi 2031, cases lues sur les PDF archivés
-- Le package et l’EFI passent à `ready` seulement si le registre vérifié est respecté et qu’aucun écart bloquant n’est présent
-- Le calcul fiscal stocké, le millésime 2026 et la 2042-C-PRO restent `research_only`
+- P0–P12 et liasse 2025 : 2033-A, B, C, E, 2031 et 2031-bis, cases lues sur les PDF archivés
+- 23/10/2026 : 370/372 = 352/354 (ligne 360 réservée à l’IS), ligne 350 = reprise d’amortissements 39 C antérieurs, 2033-D cadre II retiré, consignes de saisie (case 018…), état de suivi 39 C
+- 2042-C-PRO : 5NA / 5NY / 5GA–5GJ, statut `verified_by_cross_reference` (PDF officiel non téléchargé)
+- `POST /api/assets/properties/{id}/entry` : entrée du bien (immobilisations, emprunts, banque, frais d’avant début, 108), aperçu puis confirmation, extournable
+- FEC nommé `SirenFECAAAAMMJJ.txt`, bloqué sans SIREN ; `GET /api/filing/years/{id}/archive` : zip FEC + description A47 A-1 + liasse + SHA256SUMS
+- Contrôle immobilisations et 2033-E lus hors centralisation (bug qui bloquait toute clôture avec immobilisations)
+- `test_first_exercise.py` : parcours complet achat → clôture → liasse `ready` → FEC → dossier
 
 ## Active work
 
-- Issue: résidus #7 (cession/TVA/PV), #10/#11 hors 2025, #12 restauration manuelle, #13 authentification
-- Branch: branche de travail locale
-- Pull request: none
-- Status: V1 2025 recopiable ; pas de faux READY sur 2026 ni sur la 2042-C-PRO
+- Issue: résidus #7 (cession/TVA/PV), #12 restauration manuelle, #13 authentification
+- Branch: main (local)
+- Status: produit utilisable pour la déclaration 2027 (exercice 2026), sous réserve de vérifier les cases sur le formulaire 2027
 
 ## Important decisions
 
 - Montants en centimes entiers. Le ledger est la seule source du journal, du bilan et du FEC.
 - Les couches fiscales ne modifient pas les écritures.
-- Aucun statut `ready` sur une case absente du registre, un millésime autre que 2026 ou 2025, ou un écart d’immobilisations, de classement, d’effectifs, de cession ou de TVA.
-- Un achat en 2026 n’a pas de liasse 2025.
-- 2042-C-PRO reste un produit séparé, non numéroté.
+- `ready` exige : registre de cases respecté, aucun écart d’immobilisations, de classement, d’effectifs, de cession ou de TVA, et un SIREN.
+- La liasse n’impute pas les déficits LMNP antérieurs ; le calcul interne garde une estimation FIFO au niveau du foyer.
 - Les comptes 120 et 129 ne sont pas créés automatiquement.
-- La restauration écrit `restore-check.sqlite3` et ne remplace pas la base ouverte.
 - SoloLMNP ne télétransmet pas.
 
 ## Known limitations / blockers
 
 - Périmètre LMNP déclaré. Le LMP n’est pas calculé.
 - Cession, TVA, plus-values et ventilation automatique du terrain : désactivées, et bloquantes si elles apparaissent
-- 2026 : sources non archivées
-- 2042-C-PRO : notice non archivée
+- Millésime 2026 : formulaires 2027 non publiés au 23/10/2026 ; numéros repris du registre 2025
+- SQLite refuse les écritures datées dans le futur : dotations au 31/12 validables à partir de cette date
 - Pas d’authentification ; l’instance doit rester privée
-- Remplacement de la base en service après restauration : action manuelle après arrêt
 
 ## Validation baseline
 
@@ -50,19 +48,13 @@ Current roadmap position:
 python scripts/check.py
 ```
 
-- Backend tests: 253 passed le 17 octobre 2026 sur la suite `backend/tests`
-- CI: non relancée sur ce lot
+- 23/10/2026 : backend 255 tests, frontend 65 tests, ruff, mypy, ESLint, tsc et build verts
 
 ## Next action
 
-Next run should:
-
-1. Archiver les formulaires 2026 avant d’étendre `ready`.
-2. Laisser la 2042-C-PRO non déclarable tant que sa notice n’est pas archivée.
-3. Ne pas calculer de cotisation CVAE : la case 117 est une base, nulle sous 152 500 €.
+1. Archiver les PDF 2031/2033 et 2042-C-PRO du millésime 2027 dès publication, puis créer `fiscal/2026/forms/cases.yaml`.
+2. Comparer les numéros de cases avec le registre 2025 et ajuster si besoin.
 
 ## Last updated
 
-- Date: 2026-10-17
-- Main SHA: à renseigner après commit
-- Active PR/commit: V1 liasse 2025
+- Date: 2026-10-23

@@ -35,8 +35,9 @@ Vérifier que l’écran « État de l’installation » affiche **Base SQLite :
 Menu **Comptabilité** :
 
 1. **Créer l’activité** (nom + date de début réelle).
-2. **Ajouter un exercice 2026** (achat en 2026 : pas de liasse 2025). Millésime `2026`. Les numéros de cases viennent du dernier formulaire lu : vérifiez-les au moment de la déclaration 2027.
-3. (Optionnel) Onglet **Plan comptable** pour ajouter des comptes.
+2. **Identité** : saisir le **SIREN** (et le SIRET). Sans SIREN, la liasse reste « pas encore prête » et le FEC ne s’exporte pas (son nom réglementaire commence par le SIREN).
+3. **Ajouter un exercice 2026** (achat en 2026 : pas de liasse 2025). Millésime `2026`. Les numéros de cases viennent des formulaires 2025 archivés : vérifiez-les sur le formulaire en ligne au moment de déclarer en 2027.
+4. (Optionnel) Onglet **Plan comptable** pour ajouter des comptes.
 
 Pour une activité déjà existante : saisir des **à-nouveaux** justifiés. L’application
 ne reconstitue pas l’historique.
@@ -78,10 +79,10 @@ puis **Enregistrer un règlement** plus tard.
 
 Menu **Immobilisations** :
 
-1. **Inscrire un terrain** (non amortissable).
-2. **Nouvelle immobilisation** (construction, mobilier…) avec justification de valeur et de durée.
-3. Pour un bâtiment : **ajouter tous les composants** avant le premier calcul (total = base amortissable).
-4. Choisir l’exercice 2026 → **Calculer les périodes** → **Comptabiliser** chaque dotation.
+1. **Préparer l’amortissement du logement** : terrain à part, frais de notaire ajoutés au bâtiment, six composants proposés (durées à confirmer). Ou saisie manuelle : terrain, puis construction et tous ses composants.
+2. **Faire entrer le bien en comptabilité** (une seule fois, premier exercice) : indiquez le capital restant dû de chaque prêt au début de l’exercice, le solde bancaire à cette date et les frais payés avant (intérêts, assurance emprunteur, frais de dossier). **Prévisualiser**, puis **Comptabiliser**. L’écart va au compte de l’exploitant (108). Les prêts repris ainsi n’ont pas de « déblocage » à saisir : enregistrez seulement les échéances payées pendant l’exercice. Une erreur se corrige en extournant l’écriture depuis le journal.
+3. Mobilier : **Nouvelle immobilisation** avec justification de valeur et de durée.
+4. Choisir l’exercice 2026 → **Calculer les périodes** → **Comptabiliser** chaque dotation (possible à partir du 31/12, date de la dotation).
 
 ---
 
@@ -112,11 +113,12 @@ Après clôture, l’exercice est figé. Une réouverture exige un motif et inva
 
 Menu **Fiscalité LMNP** :
 
-1. Sélectionner l’exercice → **Calculer le résultat fiscal**.
-2. **Liasse à recopier** : formulaire, numéro de case, libellé, montant. Télécharger le PDF.
-3. Après clôture, **télécharger le FEC** (contrôle fiscal). Il n’est pas la déclaration.
-4. Recopier **soi-même** dans l’espace professionnel impots.gouv.fr (mode EFI). SoloLMNP n’envoie rien.
-5. Archiver l’accusé du portail.
+1. Sélectionner l’exercice → **Calculer le résultat fiscal** (après la centralisation, sur le ledger final).
+2. **Liasse à recopier** : statut, points bloquants, consignes de saisie, puis les cases par formulaire (2031, 2031-bis, 2033-A, B, C, E), l’état de suivi des amortissements non déduits et les cases de la 2042-C-PRO. Télécharger le PDF.
+3. Après clôture : **FEC** et **Dossier de contrôle** (zip : FEC, sa description réglementaire, liasse PDF/JSON, empreintes SHA-256). À garder en cas de contrôle.
+4. Recopier **soi-même** dans l’espace professionnel impots.gouv.fr (mode EFI, « Déclarer résultat »). SoloLMNP n’envoie rien.
+5. Sur la déclaration de revenus du foyer (2042-C-PRO) : résultat en **5NA** (bénéfice ou 0) ou **5NY** (déficit), déficits LMNP antérieurs en **5GA à 5GJ**.
+6. Archiver l’accusé de dépôt avec le dossier de contrôle.
 
 Voir aussi [FILING.md](FILING.md).
 
@@ -135,21 +137,23 @@ Menu **Conservation** :
 ## Ordre rapide
 
 ```text
-Activité + exercice 2026
-  → Bien + banque (+ emprunt)
-  → Recettes / dépenses / rapprochements
-  → Immobilisations + dotations
+Activité + SIREN + exercice 2026
+  → Bien + banque + emprunts (sans déblocage si achat avant l’exercice)
+  → Immobilisations : préparer l’amortissement, faire entrer le bien en comptabilité
+  → Recettes / dépenses / échéances / rapprochements
+  → Dotations (au 31/12)
   → Valider les brouillons
   → Centraliser / affecter
+  → Calculer le résultat fiscal
   → Pré-contrôle → clôturer
-  → Feuille EFI → recopie manuelle
-  → Sauvegarde + justificatifs
+  → Liasse à recopier (EFI) + 2042-C-PRO
+  → Dossier de contrôle (FEC) + sauvegarde + justificatifs
 ```
 
 ## Limites à connaître
 
 - Périmètre LMNP uniquement (pas de LMP).
 - Cession, TVA, plus-values et ventilation automatique du terrain : désactivées. Leur présence bloque la recopie.
-- Exercice 2026 seulement. Il n’y a pas de liasse 2025. Vérifiez les numéros de cases sur la déclaration déposée en 2027.
-- 2042-C-PRO : case non archivée, à part de la liasse BIC.
+- Exercice 2026 : les formulaires du millésime 2027 ne sont pas encore publiés. Vérifiez les numéros de cases sur le formulaire en ligne.
+- 2042-C-PRO : cases 5NA / 5NY / 5GA–5GJ relevées par recoupement (PDF officiel non archivé). À contrôler sur votre déclaration.
 - Aucune télétransmission.

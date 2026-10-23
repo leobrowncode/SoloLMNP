@@ -123,6 +123,10 @@
 }
 .cap-cats li span:last-child { color: #355245; white-space: nowrap; }
 .report-list li { margin: .25rem 0; }
+.liasse-links a { font-weight: 600; }
+.liasse-sheet .ledger-error ul { margin: .35rem 0 0; padding-left: 1.2rem; }
+.property-entry { margin: 1rem 0; }
+.fiscal-panel {
   border: 1px solid #d8e0d8;
   border-radius: 12px;
   padding: 1.15rem 1.25rem 1.35rem;

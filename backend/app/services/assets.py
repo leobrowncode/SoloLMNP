@@ -293,7 +293,7 @@ def post_period(session: Session, period_id: int, data: DepreciationPostInput) -
     return entry
 
 
-def gross_pieces(session: Session, asset: Asset) -> list[tuple[str, int, date]]:
+def gross_pieces(session: Session, asset: Asset) -> list[tuple[str, int, date, str]]:
     """Gross value by balance-sheet account; components first, any remainder on the asset."""
     components = list(
         session.scalars(
@@ -303,11 +303,12 @@ def gross_pieces(session: Session, asset: Asset) -> list[tuple[str, int, date]]:
         )
     )
     pieces = [
-        (item.asset_account, to_cents(item.value), asset.acquisition_date) for item in components
+        (item.asset_account, to_cents(item.value), asset.acquisition_date, item.label)
+        for item in components
     ]
-    remainder = to_cents(asset.acquisition_value) - sum(cents for _, cents, _ in pieces)
+    remainder = to_cents(asset.acquisition_value) - sum(piece[1] for piece in pieces)
     if remainder:
-        pieces.append((asset.asset_account, remainder, asset.acquisition_date))
+        pieces.append((asset.asset_account, remainder, asset.acquisition_date, asset.label))
     return pieces
 
 
@@ -350,9 +351,9 @@ def property_entry(session: Session, property_id: int, data: PropertyEntryInput)
     for asset in assets:
         if asset.acquisition_date > day:
             continue
-        for number, cents, _acquired in gross_pieces(session, asset):
+        for number, cents, _acquired, piece_label in gross_pieces(session, asset):
             if cents > 0:
-                lines.append(_line(number, cents, 0, f"{asset.label}"[:200]))
+                lines.append(_line(number, cents, 0, piece_label[:200]))
     if not lines:
         fail(
             "NO_ASSET_TO_BOOK",

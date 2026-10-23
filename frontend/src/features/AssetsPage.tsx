@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { assetsRequest as api, type Asset, type DepreciationPeriod } from "../api/assets";
 import { request, type Account, type Setup } from "../api/ledger";
 import { operationsRequest, type Property } from "../api/operations";
+import PropertyEntry from "./PropertyEntry";
 import ReviewForm, { type Field } from "./ReviewForm";
 import "./ledger.css";
 
@@ -149,6 +150,11 @@ export default function AssetsPage() {
         <button type="button" disabled={!properties.length} onClick={() => { void preparePlan(); }}>Préparer l’amortissement du logement</button>
       </div>
       <p className="form-help">Sépare le terrain, ajoute les frais de notaire et d’agence à la base du bâtiment, puis propose six composants (gros œuvre, toiture, façade, électricité, plomberie, agencements) avec des durées à confirmer. Le mobilier reste à saisir à part. Ce n’est pas un barème légal.</p>
+      <PropertyEntry
+        properties={properties}
+        years={setup.years.filter((year) => year.status === "OPEN")}
+        onDone={(text) => { setError(""); setMessage(text); setRevision((value) => value + 1); }}
+      />
       {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} />}
       {assets.map((row) => <article className="entry-card" key={row.id}><h3>{row.label}</h3>
         <p>{row.category} · Valeur {row.acquisition_value} € · Base {row.depreciable_value} € · Non amortissable {row.non_depreciable_value} €</p>

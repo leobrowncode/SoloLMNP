@@ -6,7 +6,9 @@ Base légale : [LPF article L47 A](https://www.legifrance.gouv.fr/codes/article_
 
 ## Export livré
 
-`GET /api/filing/years/{id}/fec` n’accepte qu’un exercice `CLOSED`. Le contenu est UTF-8, séparateur tabulation, fin de ligne CRLF, dates `YYYYMMDD`, montants avec virgule. Le nom suit `FEC` plus la date de fin d’exercice. L’empreinte SHA-256 est renvoyée dans `X-Content-SHA256` et reste identique tant que les écritures validées ne changent pas. Les écritures `CENTRALIZATION` sont omises. Un ERROR du validateur interdit l’export. Cet export n’affirme pas que le contribuable est tenu de remettre un FEC.
+`GET /api/filing/years/{id}/fec` n’accepte qu’un exercice `CLOSED` dont l’activité a un SIREN. Le contenu est UTF-8 (admis par l’article A47 A-1 depuis l’arrêté de 2013), séparateur tabulation, fin de ligne CRLF, dates `YYYYMMDD`, montants avec virgule. Le nom suit la nomenclature `SirenFECAAAAMMJJ.txt` (IX de l’article A47 A-1).
+
+`GET /api/filing/years/{id}/archive` produit le dossier de contrôle : FEC, sa description (XI de l’article A47 A-1 : zones, codes, jeu de caractères, séparateurs), feuille de liasse PDF et JSON figée à la clôture, `LISEZMOI.txt` et `SHA256SUMS.txt`. Le zip est reproductible (horodatages fixes). L’empreinte SHA-256 est renvoyée dans `X-Content-SHA256` et reste identique tant que les écritures validées ne changent pas. Les écritures `CENTRALIZATION` sont omises. Un ERROR du validateur interdit l’export. Cet export n’affirme pas que le contribuable est tenu de remettre un FEC.
 
 ## Contrat prévu
 

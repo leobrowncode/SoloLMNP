@@ -63,14 +63,40 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
     if (url.includes("/efi")) {
       return response({
         transmission: false,
+        declarable: false,
+        frozen: false,
         disclaimer: "Aucun envoi n’est effectué.",
         portal: "https://www.impots.gouv.fr/professionnel/teleprocedures-efi-ou-edi",
-        liasse: { form: "2033-B", vintage: "2025", fields: [] },
+        exercise: { start: "2025-04-06", end: "2025-12-31" },
+        declarant: { name: "Mérignac", siren: null, siret: null },
+        blocking: [{ code: "SIREN_MANQUANT", message: "Indiquez le SIREN de l’activité." }],
+        instructions: ["2033-B : cocher la case 018 « Formulaire déposé au titre de l’IR »."],
+        depreciation_tracking: {
+          accounting_depreciation: "800.00",
+          capacity: "600.00",
+          deducted_current: "600.00",
+          deferred_current: "200.00",
+          prior_used: "0.00",
+          prior: [],
+          remaining_total: "200.00",
+        },
+        liasse: {
+          form: "2033-B",
+          vintage: "2025",
+          fields: [
+            { code: "AMORT_NON_DEDUCTIBLE", form_ref: "2033-B-SD", official_case: "318", label: "Amortissements non déductibles", value: "200.00", expression: "x" },
+            { code: "2031BIS_LMNP_BENEFICE", form_ref: "2031-BIS-SD", official_case: null, label: "Autres locations meublées non professionnelles — bénéfice", value: "0.00", expression: "x" },
+          ],
+        },
         personal_return: {
           form: "2042-C-PRO",
-          official_case: null,
-          status: "case_not_verified",
-          amount: "0.00",
+          status: "verified_by_cross_reference",
+          lines: [
+            { case: "5NA", case_declarant_2: "5OA", label: "LMNP réel — bénéfice", amount: "0.00" },
+            { case: "5NY", case_declarant_2: "5OY", label: "LMNP réel — déficit", amount: "0.00" },
+          ],
+          prior_deficits: [],
+          note: "Une seule des deux lignes porte un montant.",
         },
       });
     }
@@ -101,10 +127,16 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
 
   fireEvent.click(screen.getByRole("button", { name: "Liasse à recopier" }));
   expect(await screen.findByText(/Aucun envoi n’est effectué/)).toBeInTheDocument();
-  expect(screen.getByText(/Télétransmission : non/)).toBeInTheDocument();
-  expect(screen.getByText(/non vérifiée/)).toBeInTheDocument();
+  expect(screen.getByText("Pas encore prête")).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent("Indiquez le SIREN");
+  expect(screen.getByText(/case 018/)).toBeInTheDocument();
+  expect(screen.getByText("2033-B — compte de résultat et résultat fiscal")).toBeInTheDocument();
+  expect(screen.getByText("2031-bis — BIC non professionnels")).toBeInTheDocument();
+  expect(screen.getByText("5NA")).toBeInTheDocument();
+  expect(screen.getByText(/État de suivi des amortissements non déduits/)).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /PDF de recopie/ })).toHaveAttribute(
     "href",
     "/api/filing/years/1/efi.pdf",
   );
+  expect(screen.queryByRole("link", { name: /Dossier de contrôle/ })).not.toBeInTheDocument();
 });

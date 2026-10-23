@@ -2,7 +2,7 @@
 
 Application libre, mono-utilisateur et auto-hébergeable pour une activité LMNP au réel simplifié BIC.
 
-**Version 1.0.0 — comptabilité LMNP de l’exercice 2026.** Le ledger, les opérations, la banque, les emprunts, les immobilisations, les états, la clôture, le FEC et la feuille à recopier sont disponibles. Un achat en 2026 n’a pas de liasse 2025. SoloLMNP n’envoie rien. La 2042-C-PRO, le LMP, la cession, la TVA et les plus-values restent hors de cette feuille.
+**Version 1.0.0 — comptabilité LMNP de l’exercice 2026.** Le ledger, les opérations, la banque, les emprunts, l’entrée du bien au premier exercice, les immobilisations, les états, la clôture, la liasse à recopier (2031, 2031-bis, 2033-A/B/C/E, cases 2042-C-PRO, état de suivi des amortissements non déduits) et le dossier de contrôle (FEC `SirenFECAAAAMMJJ` + description + empreintes) sont disponibles. SoloLMNP n’envoie rien : la liasse se recopie en mode EFI sur impots.gouv.fr. Le LMP, la cession, la TVA et les plus-values restent hors périmètre.
 
 ## Démarrer
 
