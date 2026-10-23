@@ -67,7 +67,10 @@ def restore_backup(settings: Settings, filename: str, destination: Path) -> dict
     archive_path = _archive_path(settings, filename)
     _validate_archive(archive_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(archive_path) as archive, tempfile.TemporaryDirectory() as folder:
+    with (
+        zipfile.ZipFile(archive_path) as archive,
+        tempfile.TemporaryDirectory(dir=destination.parent) as folder,
+    ):
         database = Path(folder) / "database.sqlite3"
         archive.extract("database.sqlite3", folder)
         _check_database(database)
