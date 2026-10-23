@@ -90,18 +90,27 @@ export default function OperationsPage() {
     try { await fn(); } catch (e) { setError(e instanceof Error ? e.message : "Service indisponible."); }
     finally { setBusy(false); }
   }
+  function sameSignedAmount(value: string, line: { debit: string; credit: string }) {
+    return value.startsWith("-")
+      ? line.credit === value.slice(1) && line.debit === "0.00"
+      : line.debit === value && line.credit === "0.00";
+  }
   async function findCandidates(transaction: BankTransaction) {
     const y = setup?.years.find((item) => item.start_date <= transaction.date && transaction.date <= item.end_date);
     if (!y) throw new Error("Créez l’exercice correspondant dans Comptabilité.");
     const number = banks.find((b) => b.id === bankId)?.account_number;
-    const result = await request<{ lines: { entry_id: number }[] }>("/years/" + y.id + "/general-ledger?account_number=" + number);
-    const uniqueIds = [...new Set(result.lines.map((line) => line.entry_id))];
-    if (uniqueIds.length > 500) throw new Error("Plus de 500 écritures candidates : utilisez le rapprochement par l’API ou affinez votre compte bancaire.");
+    if (!number) throw new Error("Sélectionnez le compte bancaire du mouvement.");
+    const result = await request<{ lines: { entry_id: number; date: string }[] }>("/years/" + y.id + "/general-ledger?account_number=" + encodeURIComponent(number));
+    const uniqueIds = [...new Set(result.lines.filter((line) => line.date === transaction.date).map((line) => line.entry_id))];
+    if (uniqueIds.length > 500) throw new Error("Plus de 500 écritures à cette date : utilisez le rapprochement par l’API ou affinez votre compte bancaire.");
     const entries = await Promise.all(uniqueIds.map((id) => request<Entry>("/entries/" + id)));
-    const lines = entries.flatMap((entry) => entry.lines.filter((line) => line.account_number === number && (transaction.amount.startsWith("-") ? line.credit === transaction.amount.slice(1) && line.debit === "0.00" : line.debit === transaction.amount && line.credit === "0.00")).map((line) => ({
-      id: line.id,
-      label: entry.entry_number + " · " + entry.accounting_date + " · " + entry.label,
-    })));
+    const lines = entries.flatMap((entry) => {
+      if (entry.status !== "VALIDATED" || entry.accounting_date !== transaction.date) return [];
+      return entry.lines.filter((line) => line.account_number === number && sameSignedAmount(transaction.amount, line)).map((line) => ({
+        id: line.id,
+        label: entry.entry_number + " · " + entry.accounting_date + " · " + entry.label,
+      }));
+    });
     setMatchCandidates({ transaction, lines });
   }
 
@@ -182,8 +191,8 @@ export default function OperationsPage() {
           <button disabled={!bankOffset} onClick={() => setBankOffset(bankOffset - 50)}>Mouvements précédents</button><button disabled={transactions.length < 50} onClick={() => setBankOffset(bankOffset + 50)}>Mouvements suivants</button>
           {matchCandidates && <form onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); void action(async () => {
             await api("/bank/transactions/" + matchCandidates.transaction.id + "/match", "POST", { entry_line_id: Number(data.get("line")) }); setMatchCandidates(null); setRevision((v) => v + 1); setMessage("Rapprochement enregistré sans nouvelle écriture.");
-          }); }}><h3>Rapprocher : {matchCandidates.transaction.label}</h3><p>Vérifiez la référence et la date : un montant égal ne suffit pas à identifier une opération.</p>
-            {matchCandidates.lines.length ? <><label>Écriture de même montant<select name="line" required>{matchCandidates.lines.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}</select></label><button disabled={busy}>Confirmer le rapprochement</button></> : <p>Aucune écriture de même montant.</p>}
+          }); }}><h3>Rapprocher : {matchCandidates.transaction.label}</h3><p>Seules les écritures validées du même compte, du même montant signé et de la même date peuvent être rapprochées.</p>
+            {matchCandidates.lines.length ? <><label>Écriture compatible<select name="line" required>{matchCandidates.lines.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}</select></label><button disabled={busy}>Confirmer le rapprochement</button></> : <p>Aucune écriture validée de ce compte, de ce montant et de cette date. Une écriture à une autre date, même de même montant, ne peut pas être rapprochée.</p>}
             <button type="button" onClick={() => setMatchCandidates(null)}>Annuler</button>
           </form>}
         </>}

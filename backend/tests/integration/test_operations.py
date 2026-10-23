@@ -304,6 +304,57 @@ def test_bank_link_posting_and_cancel_releases_match(client):
     )
 
 
+def test_match_states_why_same_amount_on_another_date_is_refused(client):
+    create(client)
+    imported = client.post(
+        "/api/operations/bank/import",
+        json={
+            "bank_account_id": 1,
+            "content": "date;label;amount;reference\n2025-03-01;Assurance;-100,00;BANK-002\n",
+        },
+    )
+    assert imported.status_code == 200, imported.text
+    entry = client.get("/api/ledger/entries/1").json()
+    line = next(item for item in entry["lines"] if item["account_number"] == "512000")
+    response = client.post(
+        "/api/operations/bank/transactions/1/match",
+        json={"entry_line_id": line["id"]},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == {
+        "code": "MATCH_DATE",
+        "message": "La date de l’écriture doit être exactement celle du mouvement bancaire.",
+    }
+    assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 1
+    assert (
+        client.get("/api/operations/bank/transactions?bank_account_id=1").json()[0][
+            "matched_entry_id"
+        ]
+        is None
+    )
+
+
+def test_match_states_that_a_reversed_entry_cannot_be_reconciled(client):
+    create(client)
+    assert client.post("/api/operations/1/reverse", json=reversal()).status_code == 201
+    assert (
+        client.post(
+            "/api/operations/bank/import",
+            json={"bank_account_id": 1, "content": CSV},
+        ).status_code
+        == 200
+    )
+    entry = client.get("/api/ledger/entries/1").json()
+    line = next(item for item in entry["lines"] if item["account_number"] == "512000")
+    response = client.post(
+        "/api/operations/bank/transactions/1/match",
+        json={"entry_line_id": line["id"]},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "ENTRY_REVERSED"
+    assert "extournée" in response.json()["detail"]["message"]
+
+
 def test_matching_existing_entry_creates_no_extra_posting(client):
     create(client)
     client.post("/api/operations/bank/import", json={"bank_account_id": 1, "content": CSV})

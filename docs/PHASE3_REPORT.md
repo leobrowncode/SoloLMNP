@@ -46,7 +46,9 @@ référence portant un contenu différent. Une prévisualisation précède l'imp
 Un mouvement importé ne crée aucune écriture. L'utilisateur peut :
 
 1. créer une recette ou dépense liée, ce qui crée exactement une écriture ;
-2. rapprocher une ligne 512 existante de même compte, montant signé, date et exercice ;
+2. rapprocher une ligne 512 existante de même compte, montant signé, date et exercice.
+   L'écran ne propose que ces lignes. Un refus indique la condition manquante
+   (date, montant, compte, extourne ou ligne déjà rapprochée) ;
 3. laisser le mouvement en attente.
 
 Une ligne comptable et un mouvement ne peuvent chacun participer qu'à un seul

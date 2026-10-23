@@ -52,6 +52,66 @@ describe("OperationsPage", () => {
     expect(screen.getByText(/Le pourcentage fiscal.+ne réduit jamais le montant/s)).toBeInTheDocument();
   });
 
+  it("offers only a validated entry of the same bank amount and date", async () => {
+    const fetcher = vi.fn((url: string) => {
+      if (url === "/api/ledger/setup") return response({
+        activity: { activity_name: "Fictif" },
+        years: [{ id: 1, year: 2025, start_date: "2025-01-01", end_date: "2025-12-31", status: "OPEN" }],
+      });
+      if (url === "/api/ledger/accounts") return response([]);
+      if (url === "/api/operations/properties") return response([{ id: 1, name: "Bien fictif", acquisition_price: "1.00", land_value: "0.00", building_value: "1.00" }]);
+      if (url === "/api/operations/banks") return response([{ id: 1, name: "Banque fictive", account_number: "512000" }]);
+      if (url === "/api/operations/loans" || url.startsWith("/api/operations?")) return response([]);
+      if (url.startsWith("/api/operations/bank/transactions")) return response([{
+        id: 4, date: "2025-03-15", label: "Loyer mars", amount: "800.00",
+        external_reference: "VIR-03", matched_entry_id: null,
+      }]);
+      if (url.startsWith("/api/ledger/years/1/general-ledger")) return response({ lines: [
+        { entry_id: 10, date: "2025-02-15" },
+        { entry_id: 11, date: "2025-03-15" },
+      ] });
+      if (url === "/api/ledger/entries/11") return response({
+        id: 11, status: "VALIDATED", entry_number: "2025-000011", accounting_date: "2025-03-15",
+        label: "Loyer", reversal_of_id: null,
+        lines: [{ id: 70, account_number: "512000", label: "Banque", debit: "800.00", credit: "0.00" }],
+      });
+      return response({});
+    });
+    vi.stubGlobal("fetch", fetcher);
+    render(<OperationsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Banque" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Rapprocher une écriture existante" }));
+    expect(await screen.findByRole("option", { name: /2025-000011 · 2025-03-15/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /2025-02-15/ })).not.toBeInTheDocument();
+    expect(fetcher.mock.calls.some(([url]) => url === "/api/ledger/entries/10")).toBe(false);
+  });
+
+  it("explains when no entry shares the bank movement date", async () => {
+    const fetcher = vi.fn((url: string) => {
+      if (url === "/api/ledger/setup") return response({
+        activity: { activity_name: "Fictif" },
+        years: [{ id: 1, year: 2025, start_date: "2025-01-01", end_date: "2025-12-31", status: "OPEN" }],
+      });
+      if (url === "/api/ledger/accounts") return response([]);
+      if (url === "/api/operations/properties") return response([{ id: 1, name: "Bien fictif", acquisition_price: "1.00", land_value: "0.00", building_value: "1.00" }]);
+      if (url === "/api/operations/banks") return response([{ id: 1, name: "Banque fictive", account_number: "512000" }]);
+      if (url === "/api/operations/loans" || url.startsWith("/api/operations?")) return response([]);
+      if (url.startsWith("/api/operations/bank/transactions")) return response([{
+        id: 4, date: "2025-03-15", label: "Loyer mars", amount: "800.00",
+        external_reference: "VIR-03", matched_entry_id: null,
+      }]);
+      if (url.startsWith("/api/ledger/years/1/general-ledger")) return response({ lines: [{ entry_id: 10, date: "2025-02-15" }] });
+      return response({});
+    });
+    vi.stubGlobal("fetch", fetcher);
+    render(<OperationsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Banque" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Rapprocher une écriture existante" }));
+    expect(await screen.findByText(/de ce montant et de cette date/)).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Écriture compatible" })).not.toBeInTheDocument();
+    expect(fetcher.mock.calls.some(([url]) => String(url).includes("/entries/"))).toBe(false);
+  });
+
   it("states that importing a bank file does not post accounting entries", async () => {
     mockApi();
     render(<OperationsPage />);

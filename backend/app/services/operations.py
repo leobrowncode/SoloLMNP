@@ -411,20 +411,39 @@ def match(session: Session, transaction_id: int, line_id: int) -> BankMatch:
     entry = get_entry(session, row.accounting_entry_id)
     year = get_year(session, entry.fiscal_year_id, writable=True)
     number = bank(session, transaction.bank_account_id).account_number
-    if (
-        entry.status != "VALIDATED"
-        or reversed_entry(session, entry.id)
-        or row.account_number != number
-        or to_cents(row.debit) - to_cents(row.credit) != to_cents(transaction.amount)
-        or not year.start_date <= transaction.date <= year.end_date
-        or entry.accounting_date != transaction.date
-    ):
-        fail("MATCH_INCONSISTENT", "Compte, montant signé, exercice ou écriture incompatibles.")
+    if entry.status != "VALIDATED":
+        fail("ENTRY_NOT_VALIDATED", "Seule une écriture validée peut être rapprochée.")
+    if reversed_entry(session, entry.id):
+        fail(
+            "ENTRY_REVERSED",
+            "Cette écriture a été extournée. Rapprochez une écriture encore en vigueur, "
+            "à la même date que le mouvement.",
+        )
+    if row.account_number != number:
+        fail("MATCH_ACCOUNT", "Cette ligne n’appartient pas au compte bancaire du mouvement.")
+    if to_cents(row.debit) - to_cents(row.credit) != to_cents(transaction.amount):
+        fail(
+            "MATCH_AMOUNT",
+            "Le montant signé de la ligne ne correspond pas au mouvement bancaire.",
+        )
+    if not year.start_date <= transaction.date <= year.end_date:
+        fail("MATCH_YEAR", "La date du mouvement est hors de l’exercice de l’écriture.")
+    if entry.accounting_date != transaction.date:
+        fail(
+            "MATCH_DATE",
+            "La date de l’écriture doit être exactement celle du mouvement bancaire.",
+        )
     old = session.get(BankMatch, transaction_id)
     if old:
         if old.entry_line_id == line_id:
             return old
         fail("ALREADY_MATCHED", "Ce mouvement est déjà rapproché.")
+    taken = session.scalar(select(BankMatch).where(BankMatch.entry_line_id == line_id))
+    if taken is not None:
+        fail(
+            "LINE_ALREADY_MATCHED",
+            "Cette ligne d’écriture est déjà rapprochée avec un autre mouvement.",
+        )
     result = BankMatch(transaction_id=transaction_id, entry_line_id=line_id)
     session.add(result)
     event(session, "BANK_MATCHED", entry, {"transaction_id": transaction_id, "line_id": line_id})

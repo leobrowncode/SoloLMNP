@@ -1,84 +1,68 @@
 # Agent State
 
-> This file is a compact resume point for autonomous development agents.  
+> This file is a compact resume point for autonomous development agents.
 > Git, GitHub PRs/issues and the actual repository remain the source of truth.
 
 ## Current project status
 
 Current roadmap position:
 
-- Completed through: [milestone / phase]
-- Current phase: [phase]
-- Current objective: [short description]
+- Completed through: P4 on `main` (`0a59960`). P5 partial: provisional statements, manual inventory, opening preview and generation.
+- Current phase: P5, blocked on closing before a real second-year opening.
+- Current objective: keep accounting correct while the product owner answers Q-001, Q-002 and Q-003.
 
 ## Completed
 
-- [Major completed milestone]
-- [Major completed milestone]
-- [Major completed milestone]
-
-Do not list every individual commit here.
+- Ledger, operations, bank CSV, loans, assets, depreciation, provisional statements, manual inventory and idempotent openings are on `main`.
+- Open automation PRs, not merged and not to be redone: #22 scope and Vite Host, #23 Pydantic sentences, #24 exercise and dedicated-account messages, #25 land and acquisition-cost explanation.
+- Bank reconciliation on this branch only offers same-date validated lines and names the refused condition.
 
 ## Active work
 
-- Issue: #[number] — [title]
-- Branch: `[branch-name]`
-- Pull request: #[number]
-- Status: [implementation / fixing CI / review / ready for merge]
-
-If there is no active work:
-
-- Issue: none
-- Branch: none
-- Pull request: none
+- Issue: #6 — inventaire, bilan, résultat et continuité
+- Branch: `cursor/sololmnp-conformit-livraison-8484`
+- Pull request: opened by the 2026-10-23 automation run
+- Status: implementation, awaiting review
 
 ## Important decisions
 
-- [Important architectural decision or invariant]
-- [API/data model compatibility requirement]
-- [Business/domain invariant future agents must preserve]
-
-Only keep decisions that still constrain future development.
+- Validated entries are corrected only by reversal. Closed years stay immutable. Money is `Decimal` / integer cents / API strings / browser `BigInt`.
+- Account 211 is never depreciated. Land and building are split manually. Do not create accounts 120 and 129 automatically.
+- Fiscal vintages stay `research_only`. Do not invent tax-form boxes and do not implement electronic filing.
+- Q-001, Q-002 and Q-003 in `docs/automation/DECISIONS.md` are `EN_ATTENTE_UTILISATEUR`. Do not implement closing, result allocation, or guided inventory templates until they are explicitly approved.
 
 ## Known limitations / blockers
 
-- [Current limitation]
-- [External dependency]
-- [Missing specification or decision]
-
-Remove resolved blockers.
+- No closing screen, so opening generation cannot be used on a real file.
+- P6–P12 are not implemented. `scripts/start_local.py` and `SoloLMNP.bat` do not exist.
+- This environment has Python 3.12 and Node 22, not Node 24.
+- Do not modify `data/` or a real accounting database.
 
 ## Validation baseline
 
 Relevant commands:
 
 ```bash
-[project test command]
-[lint command]
-[typecheck command]
-[build command]
+python scripts/check.py
 ```
 
-Current known baseline:
+Current known baseline on 2026-10-23:
 
-- Backend tests: [count or N/A]
-- Frontend tests: [count or N/A]
-- CI: [passing / failing / unknown]
-
-Do not update test counts unless they are useful for detecting regressions.
+- Backend tests: 224 passed, coverage 94 %
+- Frontend tests: 53 passed
+- CI: not re-run remotely. Docker and browser flows were not executed.
 
 ## Next action
 
 Next run should:
 
-1. Fetch latest GitHub state.
-2. Check whether the active PR still exists.
-3. [Specific next development action.]
-
-Do not start another roadmap item while an active automation PR exists.
+1. Fetch latest GitHub state and read `docs/automation/`.
+2. Check whether PRs #22, #23, #24, #25 and this branch's PR are still open.
+3. If Q-001 is answered A, specify then deliver the minimal audited close. Otherwise do not implement closing.
+4. Do not redo the open pull requests.
 
 ## Last updated
 
-- Date: YYYY-MM-DD
-- Main SHA: `[sha]`
-- Active PR/commit: [reference]
+- Date: 2026-10-23
+- Main SHA: `0a59960`
+- Active PR/commit: branch `cursor/sololmnp-conformit-livraison-8484`
