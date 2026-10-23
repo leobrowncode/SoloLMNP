@@ -11,7 +11,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_cents
-from app.models import Account, AccountingEntry, AccountingEntryLine, AccountingJournal
+from app.models import (
+    Account,
+    AccountingEntry,
+    AccountingEntryLine,
+    AccountingJournal,
+    RentalActivity,
+)
 from app.services.ledger import fail, get_year
 
 COLUMNS = (
@@ -38,6 +44,8 @@ COLUMNS = (
 
 def render_fec(session: Session, year_id: int) -> dict[str, Any]:
     year = get_year(session, year_id)
+    activity = session.get(RentalActivity, year.rental_activity_id)
+    siren = activity.siren if activity else None
     rows = session.execute(
         select(AccountingEntryLine, AccountingEntry, AccountingJournal, Account)
         .join(AccountingEntry, AccountingEntry.id == AccountingEntryLine.accounting_entry_id)
@@ -63,10 +71,14 @@ def render_fec(session: Session, year_id: int) -> dict[str, Any]:
     )
     return {
         "fiscal_year_id": year.id,
-        "filename": f"FEC{year.end_date.strftime('%Y%m%d')}.txt",
+        "filename": f"{siren or ''}FEC{year.end_date.strftime('%Y%m%d')}.txt",
+        "siren": siren,
+        "start_date": year.start_date,
+        "end_date": year.end_date,
         "sha256": hashlib.sha256(payload).hexdigest(),
         "content": payload,
         "line_count": len(lines),
+        "entry_count": len({line["EcritureNum"] for line in lines}),
         "validation": validate_fec(payload, year.start_date, year.end_date),
     }
 
@@ -76,9 +88,65 @@ def export_fec(session: Session, year_id: int) -> dict[str, Any]:
     if year.status != "CLOSED":
         fail("YEAR_NOT_CLOSED", "Le FEC s’exporte depuis un exercice clôturé.")
     rendered = render_fec(session, year_id)
+    if not rendered["siren"]:
+        fail(
+            "SIREN_REQUIRED",
+            "Le nom du FEC commence par le SIREN. Indiquez-le dans Comptabilité → Identité.",
+        )
     if rendered["validation"]["errors"]:
         fail("FEC_INVALID", "Le FEC contient des erreurs et n’est pas exportable.")
     return rendered
+
+
+def fec_description(rendered: dict[str, Any]) -> str:
+    """Description that must accompany the file (LPF art. A47 A-1)."""
+    fields = (
+        ("JournalCode", "Code du journal (AN à-nouveaux, BQ banque, VE ventes, AC achats, OD)"),
+        ("JournalLib", "Libellé du journal"),
+        ("EcritureNum", "Numéro de l’écriture, attribué à la validation, continu par exercice"),
+        ("EcritureDate", "Date comptable de l’écriture, AAAAMMJJ"),
+        ("CompteNum", "Numéro de compte du plan comptable général"),
+        ("CompteLib", "Libellé du compte"),
+        ("CompAuxNum", "Compte auxiliaire : non utilisé, vide"),
+        ("CompAuxLib", "Libellé auxiliaire : non utilisé, vide"),
+        ("PieceRef", "Référence de la pièce justificative"),
+        ("PieceDate", "Date de la pièce justificative, AAAAMMJJ"),
+        ("EcritureLib", "Libellé de la ligne d’écriture"),
+        ("Debit", "Montant au débit, virgule décimale, sans séparateur de milliers"),
+        ("Credit", "Montant au crédit, virgule décimale, sans séparateur de milliers"),
+        ("EcritureLet", "Lettrage : non utilisé, vide"),
+        ("DateLet", "Date de lettrage : non utilisée, vide"),
+        ("ValidDate", "Date de validation de l’écriture, AAAAMMJJ"),
+        ("Montantdevise", "Montant en devise : non utilisé, vide (euro uniquement)"),
+        ("Idevise", "Code devise : non utilisé, vide (euro uniquement)"),
+    )
+    start: date = rendered["start_date"]
+    end: date = rendered["end_date"]
+    lines = [
+        "Description du fichier des écritures comptables (LPF art. L47 A et A47 A-1)",
+        "",
+        f"Fichier : {rendered['filename']}",
+        f"SIREN : {rendered['siren']}",
+        f"Exercice : du {start:%d/%m/%Y} au {end:%d/%m/%Y}",
+        f"Écritures : {rendered['entry_count']} ; lignes : {rendered['line_count']}",
+        f"Empreinte SHA-256 : {rendered['sha256']}",
+        "Logiciel : SoloLMNP",
+        "",
+        "Caractéristiques techniques",
+        "- Fichier à plat, structure zonée, longueur variable",
+        "- Jeu de caractères : UTF-8 (ISO/CEI 10646), sans BOM",
+        "- Séparateur de zones : tabulation ; séparateur d’enregistrements : CR LF",
+        "- Première ligne : noms des 18 zones",
+        "- Montants en euros, deux décimales, virgule décimale, sans signe",
+        "- Contenu : écritures validées de l’exercice, à-nouveaux et inventaire compris,",
+        "  hors écritures de centralisation et de solde des comptes de charges et de produits",
+        "",
+        "Zones, dans l’ordre",
+    ]
+    lines.extend(
+        f"{index:2d}. {name} : {meaning}" for index, (name, meaning) in enumerate(fields, 1)
+    )
+    return "\r\n".join(lines) + "\r\n"
 
 
 def validate_fec(payload: bytes, start: date, end: date) -> dict[str, Any]:

@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.asset_schemas import AssetInput, ComponentInput, DepreciationPostInput
+from app.api.asset_schemas import (
+    AssetInput,
+    ComponentInput,
+    DepreciationPostInput,
+    PropertyEntryInput,
+)
 from app.api.sessions import dependencies
 from app.core.database import Database
 from app.models import Asset, AssetComponent, DepreciationPeriod, DepreciationSchedule
@@ -40,6 +45,12 @@ def build_assets_router(database: Database) -> APIRouter:
     @router.post("/properties/{property_id}/plan", status_code=201)
     def dwelling_plan(property_id: int, session: Write) -> dict[str, Any]:
         return service.install_dwelling_plan(session, property_id)
+
+    @router.post("/properties/{property_id}/entry")
+    def property_entry(
+        property_id: int, data: PropertyEntryInput, session: Write
+    ) -> dict[str, Any]:
+        return service.property_entry(session, property_id, data)
 
     @router.post("", status_code=201)
     def create(data: AssetInput, session: Write) -> dict[str, Any]:

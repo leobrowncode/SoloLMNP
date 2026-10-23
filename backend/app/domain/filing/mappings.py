@@ -17,6 +17,15 @@ from app.services.ledger import fail, get_year, money
 from app.services.statements import statements
 
 OPS = {"sum_accounts", "balance", "tax_result", "add", "subtract", "named", "nonneg", "absneg"}
+BLOCKING_WARNINGS = frozenset(
+    {
+        "IMMOBILISATIONS_ECART",
+        "EFFECTIFS",
+        "RESULTAT_MIXTE",
+        "CLASSEMENT_INCOMPLET",
+        "SIREN_MANQUANT",
+    }
+)
 
 
 def compile_package(session: Session, year_id: int) -> dict[str, Any]:
@@ -116,8 +125,10 @@ def _mark_copy_ready(year: Any, package: dict[str, Any]) -> None:
             or case["form"] != form
             or (form.startswith("2033") and case.get("official_case") != field.get("official_case"))
             or (form.startswith("2033") and case.get("verification") != "verified")
-            or (form == "2031-SD" and case.get("verification") != "verified_by_cross_reference")
-            or form not in {case["form"]}
+            or (
+                form.startswith("2031")
+                and case.get("verification") != "verified_by_cross_reference"
+            )
         ):
             package["errors"].append(
                 {
@@ -134,13 +145,7 @@ def _mark_copy_ready(year: Any, package: dict[str, Any]) -> None:
                 }
             )
             return
-    blocking = {
-        "IMMOBILISATIONS_ECART",
-        "EFFECTIFS",
-        "RESULTAT_MIXTE",
-        "CLASSEMENT_INCOMPLET",
-    }
-    if any(item["code"] in blocking for item in package["warnings"]):
+    if any(item["code"] in BLOCKING_WARNINGS for item in package["warnings"]):
         return
     package["status"] = "ready"
     package["declarable"] = True
@@ -232,6 +237,11 @@ def _named(
         "accounting": (_cents(fiscal["accounting_result"]), [], []),
         "unused": (_cents(fiscal["unused_depreciation"]), [], []),
         "additions": (_cents(fiscal["non_deductible"]), [], []),
+        "prior_depreciation_used": (
+            _cents(str(details.get("prior_depreciation_used", "0.00"))),
+            [],
+            [],
+        ),
         "fiscal_before": (_cents(str(before)), [], []),
     }
 

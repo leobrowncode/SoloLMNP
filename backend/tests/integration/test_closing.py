@@ -1,4 +1,5 @@
 import base64
+import io
 import json
 import zipfile
 from uuid import uuid4
@@ -38,6 +39,8 @@ def centralize(client, result):
 
 
 def test_close_reopen_fec_efi_and_documents(client, settings):
+    identity = client.post("/api/ledger/activity/identity", json={"siren": "123456789"})
+    assert identity.status_code == 200, identity.text
     book(client, "512000", "706000", "100.00")
     book(client, "615000", "401000", "40.00")
     centralize(client, "60.00")
@@ -60,10 +63,24 @@ def test_close_reopen_fec_efi_and_documents(client, settings):
     assert first.headers["x-content-sha256"] == second.headers["x-content-sha256"]
     assert b"JournalCode" in first.content
     assert b"\tCENT\t" not in first.content
+    assert 'filename="123456789FEC' in first.headers["content-disposition"]
+    archive = client.get("/api/filing/years/1/archive")
+    assert archive.status_code == 200, archive.text
+    assert archive.content == client.get("/api/filing/years/1/archive").content
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as bundle:
+        names = set(bundle.namelist())
+        fec_name = next(name for name in names if name.startswith("123456789FEC"))
+        assert bundle.read(fec_name) == first.content
+        assert "SHA256SUMS.txt" in names
+        assert any(name.endswith("_description.txt") for name in names)
+        assert any(name.endswith(".pdf") for name in names)
+        description = bundle.read(fec_name.replace(".txt", "_description.txt")).decode()
+        assert "A47 A-1" in description
     efi = client.get("/api/filing/years/1/efi").json()
     assert efi["transmission"] is False
-    assert efi["personal_return"]["official_case"] is None
+    assert efi["frozen"] is True
     assert efi["personal_return"]["separated_from_liasse"] is True
+    assert [line["case"] for line in efi["personal_return"]["lines"]] == ["5NA", "5NY"]
     assert efi["liasse"]["fields"][0]["expression"]
     pdf = client.get("/api/filing/years/1/efi.pdf")
     assert pdf.status_code == 200

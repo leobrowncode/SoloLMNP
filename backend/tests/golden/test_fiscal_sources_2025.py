@@ -37,15 +37,16 @@ def test_cases_registry_refuses_unverified_declarable_path() -> None:
     }
     for case in registry["cases"]:
         if case["form"] == "2042-C-PRO":
-            assert case["official_case"] is None
-            assert case["verification"] == "case_not_verified"
+            assert case["official_case"] in {"5NA", "5NY", "5GA-5GJ"}
+            assert case["verification"] == "verified_by_cross_reference"
+            assert case["consulted_at"] == "2026-10-23"
             continue
         if case["form"].startswith("2033"):
             assert case["official_case"] is not None
             assert case["verification"] == "verified"
             assert case["source_document"] == "2033-SD-LIASSE-2025"
             continue
-        if case["form"] == "2031-SD":
+        if case["form"] in {"2031-SD", "2031-BIS-SD"}:
             assert case["verification"] == "verified_by_cross_reference"
             assert case["maps_from"] in {"370", "372"}
             assert case["source_document"] == "2031-SD-2025"
@@ -56,6 +57,8 @@ def test_cases_registry_refuses_unverified_declarable_path() -> None:
     assert annexes["2033-F-SD"]["applicable"] is False
     assert annexes["2033-G-SD"]["applicable"] is False
     assert annexes["2042-C-PRO"]["applicable"] == "separate_product"
+    assert annexes["2033-D-SD"]["applicable"] is False
+    assert not any(case.get("work_code") == "DEFICITS_EXERCICE" for case in registry["cases"])
     terrains = next(
         case for case in registry["cases"] if case["work_code"] == "TERRAINS_BRUT_DEBUT"
     )

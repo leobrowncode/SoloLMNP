@@ -40,8 +40,8 @@
     },
     {
       "form": "2033-D-SD",
-      "applicable": true,
-      "reason": "Déficits reportables. Requis pour tracer le déficit LMNP de l’exercice et les reports."
+      "applicable": false,
+      "reason": "Notice 2033-NOT-SD, 2033-D : le cadre II « déficits reportables » est réservé à l’IS. À l’IR, les déficits se reportent sur la déclaration de revenus (2042-C-PRO, cases 5GA à 5GJ pour le LMNP). Les cases 860, 870 et 982 ne sont plus émises."
     },
     {
       "form": "2033-E-SD",
@@ -61,7 +61,7 @@
     {
       "form": "2042-C-PRO",
       "applicable": "separate_product",
-      "reason": "Report du résultat BIC non professionnel. Cases non archivées dans ce lot ; official_case reste null / case_not_verified sans bloquer la liasse BIC si hors MVP strict."
+      "reason": "Report du résultat LMNP sur la déclaration de revenus : 5NA (bénéfice) ou 5NY (déficit), déficits antérieurs en 5GA à 5GJ. Cases relevées par recoupement de sources secondaires le 23/10/2026 (PDF officiel indisponible, site en maintenance). Ne bloque pas la liasse BIC."
     }
   ],
   "cases": [
@@ -196,6 +196,17 @@
       "verification": "verified",
       "rules": ["RULE-PARTIAL-CHARGE-001"],
       "work_code": "REINTEGRATIONS_DIVERS"
+    },
+    {
+      "id": "2033B-350",
+      "form": "2033-B-SD",
+      "official_case": "350",
+      "label": "Divers (déductions)",
+      "mvp_role": "Amortissements non déduits d’exercices antérieurs (art. 39 C) imputés sur l’exercice, détaillés sur l’état de suivi",
+      "source_document": "2033-SD-LIASSE-2025",
+      "verification": "verified",
+      "rules": ["RULE-LMNP-DEPRECIATION-LIMIT-001"],
+      "work_code": "DEDUCTIONS_DIVERS"
     },
     {
       "id": "2033B-352",
@@ -514,39 +525,6 @@
       "source_document": "2033-SD-LIASSE-2025",
       "verification": "verified",
       "work_code": "IMMO_AMORT_FIN"
-    },
-    {
-      "id": "2033D-860",
-      "form": "2033-D-SD",
-      "official_case": "860",
-      "label": "Déficits de l'exercice",
-      "mvp_role": "Déficit fiscal de l’exercice (registre pertes LMNP)",
-      "source_document": "2033-SD-LIASSE-2025",
-      "verification": "verified",
-      "rules": ["RULE-LMNP-LOSS-001"],
-      "work_code": "DEFICITS_EXERCICE"
-    },
-    {
-      "id": "2033D-870",
-      "form": "2033-D-SD",
-      "official_case": "870",
-      "label": "Total des déficits restant à reporter",
-      "mvp_role": "Stock de déficits reportables en fin d’exercice",
-      "source_document": "2033-SD-LIASSE-2025",
-      "verification": "verified",
-      "rules": ["RULE-LMNP-LOSS-001"],
-      "work_code": "DEFICITS_A_REPORTER"
-    },
-    {
-      "id": "2033D-982",
-      "form": "2033-D-SD",
-      "official_case": "982",
-      "label": "Déficits restant à reporter au titre de l'exercice précédent",
-      "mvp_role": "Reports antérieurs en entrée (consommation FIFO MVP sur exercices clôturés)",
-      "source_document": "2033-SD-LIASSE-2025",
-      "verification": "verified",
-      "rules": ["RULE-LMNP-LOSS-001"],
-      "work_code": "DEFICITS_ANTERIEURS"
     },
     {
       "id": "2033A-028",
@@ -901,14 +879,103 @@
       "maps_from": "372"
     },
     {
-      "id": "2042CPRO-RESULT",
-      "form": "2042-C-PRO",
+      "id": "2031-IMPOSABLE-BENEFICE",
+      "form": "2031-SD",
       "official_case": null,
-      "label": "BIC non professionnels — résultat à reporter",
-      "mvp_role": "Produit séparé ; non déclarable tant que la notice 2042-C-PRO du millésime n’est pas archivée.",
+      "label": "Récapitulation — ligne 4, bénéfice imposable (col. 1)",
+      "mvp_role": "Égal à la ligne 1 en l’absence de revenus mobiliers (ligne 2) et de quote-part de frais (ligne 3).",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031_IMPOSABLE_BENEFICE",
+      "maps_from": "370"
+    },
+    {
+      "id": "2031-IMPOSABLE-DEFICIT",
+      "form": "2031-SD",
+      "official_case": null,
+      "label": "Récapitulation — ligne 4, déficit déductible (col. 2)",
+      "mvp_role": "Égal à la ligne 1 col. 2 en l’absence des lignes 2 et 3.",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031_IMPOSABLE_DEFICIT",
+      "maps_from": "372"
+    },
+    {
+      "id": "2031-BIC-NON-PRO-BENEFICE",
+      "form": "2031-SD",
+      "official_case": null,
+      "label": "Récapitulation — ligne 7 « dont BIC non professionnels (2031 Bis-SD) », a. bénéfice",
+      "mvp_role": "Activité LMNP : tout le résultat est non professionnel.",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031_BIC_NON_PRO_BENEFICE",
+      "maps_from": "370"
+    },
+    {
+      "id": "2031-BIC-NON-PRO-DEFICIT",
+      "form": "2031-SD",
+      "official_case": null,
+      "label": "Récapitulation — ligne 7 « dont BIC non professionnels (2031 Bis-SD) », b. déficit",
+      "mvp_role": "Activité LMNP : tout le résultat est non professionnel.",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031_BIC_NON_PRO_DEFICIT",
+      "maps_from": "372"
+    },
+    {
+      "id": "2031BIS-LMNP-BENEFICE",
+      "form": "2031-BIS-SD",
+      "official_case": null,
+      "label": "Cadre I BIC non professionnels — « Autres locations meublées non professionnelles », bénéfice",
+      "mvp_role": "Résultat avant imputation des déficits antérieurs, reporté case 7a de la 2031.",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031BIS_LMNP_BENEFICE",
+      "maps_from": "370"
+    },
+    {
+      "id": "2031BIS-LMNP-DEFICIT",
+      "form": "2031-BIS-SD",
+      "official_case": null,
+      "label": "Cadre I BIC non professionnels — « Autres locations meublées non professionnelles », déficit",
+      "mvp_role": "Résultat avant imputation des déficits antérieurs, reporté case 7b de la 2031.",
+      "source_document": "2031-SD-2025",
+      "verification": "verified_by_cross_reference",
+      "work_code": "2031BIS_LMNP_DEFICIT",
+      "maps_from": "372"
+    },
+    {
+      "id": "2042CPRO-5NA",
+      "form": "2042-C-PRO",
+      "official_case": "5NA",
+      "label": "Locations meublées non professionnelles, régime réel — bénéfice (déclarant 2 : 5OA)",
+      "mvp_role": "Report du résultat 2031 ligne 7a. Formulaire séparé de la liasse.",
       "source_document": null,
-      "verification": "case_not_verified",
-      "work_code": "PERSONAL_RETURN"
+      "verification": "verified_by_cross_reference",
+      "consulted_at": "2026-10-23",
+      "work_code": "PERSONAL_5NA"
+    },
+    {
+      "id": "2042CPRO-5NY",
+      "form": "2042-C-PRO",
+      "official_case": "5NY",
+      "label": "Locations meublées non professionnelles, régime réel — déficit (déclarant 2 : 5OY)",
+      "mvp_role": "Report du résultat 2031 ligne 7b, sans signe.",
+      "source_document": null,
+      "verification": "verified_by_cross_reference",
+      "consulted_at": "2026-10-23",
+      "work_code": "PERSONAL_5NY"
+    },
+    {
+      "id": "2042CPRO-5GA-5GJ",
+      "form": "2042-C-PRO",
+      "official_case": "5GA-5GJ",
+      "label": "Déficits LMNP des dix années antérieures non encore déduits, une case par année d’origine",
+      "mvp_role": "5GJ = année précédant les revenus déclarés ; 5GA = dix ans avant. Souvent prérempli.",
+      "source_document": null,
+      "verification": "verified_by_cross_reference",
+      "consulted_at": "2026-10-23",
+      "work_code": "PERSONAL_PRIOR_DEFICITS"
     }
   ],
   "blocked_cases": [
@@ -923,6 +990,19 @@
       "official_case": "356",
       "label": "Déficit de l'exercice reporté en arrière",
       "reason": "Report en arrière hors périmètre MVP LMNP typique ; non mappé.",
+      "status": "blocked"
+    },
+    {
+      "form": "2033-B-SD",
+      "official_case": "360",
+      "label": "Déficits antérieurs reportables",
+      "reason": "Notice 2033-NOT-SD : ligne réservée à l’IS. Les déficits LMNP antérieurs s’imputent sur la 2042-C-PRO.",
+      "status": "blocked"
+    },
+    {
+      "form": "2033-D-SD",
+      "area": "II Déficits reportables (860, 870, 982 à 984)",
+      "reason": "Notice 2033-NOT-SD : cadre servi par les seules entreprises à l’IS, sauf stock d’ARD antérieur à 2004.",
       "status": "blocked"
     }
   ],

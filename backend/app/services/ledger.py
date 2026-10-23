@@ -221,7 +221,14 @@ def reverse_entry(
 
     if (
         original.source_type
-        not in {"MANUAL", "REVERSAL", "INVENTORY", "CENTRALIZATION", "APPROPRIATION"}
+        not in {
+            "MANUAL",
+            "REVERSAL",
+            "INVENTORY",
+            "CENTRALIZATION",
+            "APPROPRIATION",
+            "ACQUISITION",
+        }
         and not business
     ):
         fail("BUSINESS_REVERSAL_REQUIRED", "Extournez cette écriture depuis son opération métier.")

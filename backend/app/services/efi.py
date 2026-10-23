@@ -1,14 +1,26 @@
 """Manual EFI worksheet. Nothing is sent to the tax authority."""
 
 import json
+import textwrap
+from datetime import date
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.filing.mappings import compile_package
+from app.domain.filing.mappings import BLOCKING_WARNINGS, compile_package
 from app.models.filing import TaxReturnSnapshot
 from app.services.ledger import get_year
+
+FORM_ORDER = ("2031-SD", "2031-BIS-SD", "2033-A-SD", "2033-B-SD", "2033-C-SD", "2033-E-SD")
+FORM_TITLES = {
+    "2031-SD": "2031-SD — déclaration de résultat BIC",
+    "2031-BIS-SD": "2031-bis-SD — BIC non professionnels",
+    "2033-A-SD": "2033-A — bilan simplifié",
+    "2033-B-SD": "2033-B — compte de résultat et résultat fiscal",
+    "2033-C-SD": "2033-C — immobilisations et amortissements",
+    "2033-E-SD": "2033-E — valeur ajoutée",
+}
 
 
 def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
@@ -28,9 +40,15 @@ def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
         frozen = True
         digest = snapshot.sha256
     copy = package.get("copy") or {}
+    declarable = bool(package.get("declarable"))
+    blocking = [
+        *package.get("errors", []),
+        *[item for item in package.get("warnings", []) if item["code"] in BLOCKING_WARNINGS],
+    ]
     return {
         "fiscal_year_id": year.id,
-        "declarable": bool(package.get("declarable")),
+        "year": year.year,
+        "declarable": declarable,
         "status": package.get("status", "research_only"),
         "transmission": False,
         "frozen": frozen,
@@ -41,19 +59,23 @@ def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
         ),
         "vintage_note": copy.get("vintage_note", ""),
         "declarant": copy.get("declarant"),
+        "exercise": copy.get(
+            "exercise",
+            {"start": year.start_date.isoformat(), "end": year.end_date.isoformat()},
+        ),
+        "instructions": copy.get("instructions", []),
+        "depreciation_tracking": copy.get("depreciation_tracking"),
+        "blocking": blocking,
+        "warnings": [
+            item for item in package.get("warnings", []) if item["code"] not in BLOCKING_WARNINGS
+        ],
         "by_property": package.get("by_property", []),
         "disclaimer": (
-            (
-                "Feuille de l’exercice 2026, à recopier. Pas de déclaration 2025. "
-                "Aucun envoi n’est effectué."
-                if package.get("vintage") == "2026"
-                else "Feuille prête à recopier. Aucun envoi n’est effectué."
-            )
-            if package.get("declarable")
-            else (
-                "Feuille de recopie non déclarable. Aucune case 2042-C-PRO n’est affirmée. "
-                "Aucun envoi n’est effectué."
-            )
+            "Feuille prête à recopier dans votre espace professionnel impots.gouv.fr. "
+            "Aucun envoi n’est effectué par SoloLMNP."
+            if declarable
+            else "Feuille non prête : corrigez les points bloquants avant de la recopier. "
+            "Aucun envoi n’est effectué par SoloLMNP."
         ),
         "liasse": {
             "form": package["form"],
@@ -73,70 +95,160 @@ def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
                 for field in package["fields"]
             ],
         },
-        "personal_return": {
+        "personal_return": package.get("personal_return")
+        or {
             "form": "2042-C-PRO",
-            "official_case": None,
             "status": "case_not_verified",
-            "amount": package["fiscal_result"],
             "separated_from_liasse": True,
+            "lines": [],
+            "prior_deficits": [],
+            "note": "",
         },
     }
 
 
 def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
-    frozen = "figee a la cloture" if worksheet.get("frozen") else "calcul en cours, non fige"
-    lines = [
-        "SoloLMNP - feuille de recopie - " + str(worksheet.get("status", "research_only")),
-        "Transmission: non. Aucun envoi.",
-        f"Exercice {worksheet['fiscal_year_id']} - {frozen}",
-        f"Empreinte {worksheet['snapshot_sha256']}",
-        worksheet.get("vintage_note") or "",
-        "2042-C-PRO - case: non verifiee - montant " + worksheet["personal_return"]["amount"],
-    ]
-    for field in worksheet["liasse"]["fields"]:
-        case = field.get("official_case") or "sans numero"
-        form = field.get("form_ref") or ""
-        lines.append(f"{form} case {case} - {field['label']} = {field['value']}")
-    for row in worksheet.get("by_property") or []:
-        lines.append(
-            f"Bien {row['name']} loyers {row['rents']} charges {row['expenses']} "
-            f"dotations {row['depreciation']}"
+    lines: list[tuple[str, bool]] = []
+
+    def title(text: str) -> None:
+        lines.append(("", False))
+        lines.append((text, True))
+
+    def text(value: str) -> None:
+        for chunk in textwrap.wrap(value, 100) or [""]:
+            lines.append((chunk, False))
+
+    exercise = worksheet.get("exercise") or {}
+    declarant = worksheet.get("declarant") or {}
+    status = (
+        "prête à recopier (ready)"
+        if worksheet.get("declarable")
+        else "non prête (" + str(worksheet.get("status", "research_only")) + ")"
+    )
+    lines.append(
+        (
+            "SoloLMNP — liasse LMNP à recopier — exercice du "
+            f"{_fr(exercise.get('start'))} au {_fr(exercise.get('end'))}",
+            True,
         )
-    return _plain_pdf([line for line in lines if line])
+    )
+    text(f"Statut : {status}. Aucune transmission : à recopier soi-même en mode EFI.")
+    text(
+        f"Déclarant : {declarant.get('name') or '—'} · SIREN {declarant.get('siren') or 'manquant'}"
+        f" · SIRET {declarant.get('siret') or '—'}"
+    )
+    frozen = "figée à la clôture" if worksheet.get("frozen") else "calcul en cours, non figée"
+    text(f"Feuille {frozen}. Empreinte {worksheet.get('snapshot_sha256', '')}")
+    if worksheet.get("vintage_note"):
+        text(str(worksheet["vintage_note"]))
+    if worksheet.get("blocking"):
+        title("Points bloquants")
+        for item in worksheet["blocking"]:
+            text(f"- {item['message']}")
+    if worksheet.get("instructions"):
+        title("Consignes de saisie")
+        for item in worksheet["instructions"]:
+            text(f"- {item}")
+    fields = worksheet["liasse"]["fields"]
+    for form in FORM_ORDER:
+        rows = [field for field in fields if field.get("form_ref") == form]
+        if not rows:
+            continue
+        title(FORM_TITLES[form])
+        for field in rows:
+            case = field.get("official_case")
+            prefix = f"Case {case} — " if case else ""
+            text(f"{prefix}{field['label']} : {_euros(field['value'])}")
+    tracking = worksheet.get("depreciation_tracking")
+    if tracking:
+        title("État de suivi des amortissements non déduits (art. 39 C II du CGI)")
+        text(
+            f"Dotation comptable {_euros(tracking['accounting_depreciation'])} · plafond "
+            f"{_euros(tracking['capacity'])} · déduite {_euros(tracking['deducted_current'])} · "
+            f"non déduite de l’exercice (ligne 318) {_euros(tracking['deferred_current'])}"
+        )
+        text(f"Reprise d’amortissements antérieurs (ligne 350) : {_euros(tracking['prior_used'])}")
+        for row in tracking.get("prior", []):
+            text(
+                f"- Origine {row['origin_year']} : stock {_euros(row['opening'])}, "
+                f"repris {_euros(row['used'])}, reste {_euros(row['remaining'])}"
+            )
+        text(f"Stock total reporté en fin d’exercice : {_euros(tracking['remaining_total'])}")
+    personal = worksheet.get("personal_return") or {}
+    if personal.get("lines"):
+        title("2042-C-PRO — déclaration de revenus du foyer (à part de la liasse)")
+        for line in personal["lines"]:
+            text(
+                f"Case {line['case']} (déclarant 2 : {line['case_declarant_2']}) — "
+                f"{line['label']} : {_euros(line['amount'])}"
+            )
+        for row in personal.get("prior_deficits", []):
+            case = row.get("case") or "case à vérifier"
+            text(
+                f"Case {case} — déficit LMNP {row['origin_year']} restant : {_euros(row['amount'])}"
+            )
+        if personal.get("note"):
+            text(str(personal["note"]))
+    properties = worksheet.get("by_property") or []
+    if properties:
+        title("Répartition par bien (information)")
+    for row in properties:
+        text(
+            f"{row['name']} : loyers {_euros(row['rents'])}, charges {_euros(row['expenses'])}, "
+            f"dotations {_euros(row['depreciation'])}"
+        )
+    return _plain_pdf(lines)
 
 
-def _plain_pdf(lines: list[str]) -> bytes:
-    pages = [lines[index : index + 45] for index in range(0, max(len(lines), 1), 45)]
-    page_objects: list[bytes] = []
+def _fr(value: object) -> str:
+    if not isinstance(value, str):
+        return "—"
+    try:
+        return date.fromisoformat(value).strftime("%d/%m/%Y")
+    except ValueError:
+        return value
+
+
+def _euros(value: object) -> str:
+    raw = str(value)
+    negative = raw.startswith("-")
+    whole, _, cents = raw.lstrip("-").partition(".")
+    grouped = f"{int(whole or '0'):,}".replace(",", " ")
+    return f"{'-' if negative else ''}{grouped},{(cents or '00')[:2].ljust(2, '0')} €"
+
+
+def _escape(value: str) -> bytes:
+    encoded = value.replace("→", "->").encode("cp1252", "replace")
+    return encoded.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
+
+
+def _plain_pdf(lines: list[tuple[str, bool]]) -> bytes:
+    per_page = 52
+    pages = [lines[index : index + per_page] for index in range(0, max(len(lines), 1), per_page)]
     content_objects: list[bytes] = []
     for page in pages:
-        commands = ["BT", "/F1 9 Tf", "40 800 Td"]
-        for index, line in enumerate(page):
-            if index:
-                commands.append("0 -16 Td")
-            encoded = line.encode("latin-1", "replace").decode("latin-1")
-            escaped = encoded.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-            commands.append(f"({escaped}) Tj")
-        commands.append("ET")
-        content_objects.append("\n".join(commands).encode("latin-1"))
-    font_number = 3 + len(pages) * 2
+        commands = [b"BT", b"40 805 Td", b"14 TL"]
+        for text, bold in page:
+            commands.append(b"/F2 9 Tf" if bold else b"/F1 9 Tf")
+            commands.append(b"(" + _escape(text) + b") Tj T*")
+        commands.append(b"ET")
+        content_objects.append(b"\n".join(commands))
+    regular = 3 + len(pages) * 2
+    bold_font = regular + 1
     kids = []
-    objects: list[bytes] = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
-        b"",
-    ]
+    objects: list[bytes] = [b"<< /Type /Catalog /Pages 2 0 R >>", b""]
     for content in content_objects:
         page_number = len(objects) + 1
-        content_number = page_number + 1
         kids.append(f"{page_number} 0 R".encode())
-        page_objects.append(
+        objects.append(
             b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents "
-            + str(content_number).encode()
+            + str(page_number + 1).encode()
             + b" 0 R /Resources << /Font << /F1 "
-            + str(font_number).encode()
+            + str(regular).encode()
+            + b" 0 R /F2 "
+            + str(bold_font).encode()
             + b" 0 R >> >> >>"
         )
-        objects.append(page_objects[-1])
         objects.append(
             b"<< /Length "
             + str(len(content)).encode()
@@ -144,10 +256,18 @@ def _plain_pdf(lines: list[str]) -> bytes:
             + content
             + b"\nendstream"
         )
-    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
-    kid_list = b" ".join(kids)
+    objects.append(
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
+    )
+    objects.append(
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
+    )
     objects[1] = (
-        b"<< /Type /Pages /Count " + str(len(pages)).encode() + b" /Kids [" + kid_list + b"] >>"
+        b"<< /Type /Pages /Count "
+        + str(len(pages)).encode()
+        + b" /Kids ["
+        + b" ".join(kids)
+        + b"] >>"
     )
     payload = bytearray(b"%PDF-1.4\n")
     offsets = [0]

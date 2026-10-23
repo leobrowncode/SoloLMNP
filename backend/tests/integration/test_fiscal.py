@@ -96,30 +96,53 @@ def test_vintages_stay_research_only(client):
     assert client.get("/api/status").json()["fiscal"]["status"] == "research_only"
 
 
+def identify(client):
+    response = client.post("/api/ledger/activity/identity", json={"siren": "123456789"})
+    assert response.status_code == 200, response.text
+
+
 def test_liasse_keeps_interest_out_of_operating_charges(client):
     book(client, "512000", "706000", "1000.00")
     book(client, "661000", "512000", "80.00")
     fiscal = client.post("/api/fiscal/years/1", json={"adjustments": []})
     assert fiscal.status_code == 200, fiscal.text
+    missing = client.get("/api/filing/years/1/efi").json()
+    assert missing["declarable"] is False
+    assert [item["code"] for item in missing["blocking"]] == ["SIREN_MANQUANT"]
+    identify(client)
     sheet = client.get("/api/filing/years/1/efi").json()
     assert sheet["transmission"] is False
     assert sheet["frozen"] is False
+    assert sheet["blocking"] == []
     by_case = {field["official_case"]: field["value"] for field in sheet["liasse"]["fields"]}
     assert by_case["217"] == "1000.00"
     assert by_case["264"] == "0.00"
     assert by_case["294"] == "80.00"
+    assert by_case["350"] == "0.00"
+    assert by_case["352"] == "920.00"
     assert by_case["370"] == "920.00"
     assert by_case["372"] == "0.00"
     assert by_case["420"] == "0.00"
     assert by_case["430"] == "0.00"
     assert "410" not in by_case
+    assert not {"860", "870", "982"} & set(by_case)
     assert sheet["declarable"] is True
     assert sheet["status"] == "ready"
-    reported = [field for field in sheet["liasse"]["fields"] if field["form_ref"] == "2031-SD"]
-    assert any(field["value"] == "920.00" for field in reported)
+    by_code = {field["code"]: field["value"] for field in sheet["liasse"]["fields"]}
+    assert by_code["2031_BIC_NON_PRO_BENEFICE"] == "920.00"
+    assert by_code["2031BIS_LMNP_BENEFICE"] == "920.00"
+    assert by_code["2031BIS_LMNP_DEFICIT"] == "0.00"
+    personal = {line["case"]: line["amount"] for line in sheet["personal_return"]["lines"]}
+    assert personal == {"5NA": "920.00", "5NY": "0.00"}
+    assert any("018" in item for item in sheet["instructions"])
+    pdf = client.get("/api/filing/years/1/efi.pdf")
+    assert pdf.status_code == 200
+    assert "Case 5NA".encode("cp1252") in pdf.content
+    assert "2033-B — compte de résultat".encode("cp1252") in pdf.content
 
 
 def test_2026_purchase_skips_the_2025_return(client):
+    identify(client)
     created = client.post(
         "/api/ledger/years",
         json={
@@ -135,6 +158,6 @@ def test_2026_purchase_skips_the_2025_return(client):
     assert fiscal.status_code == 200, fiscal.text
     sheet = client.get(f"/api/filing/years/{year_id}/efi").json()
     assert sheet["declarable"] is True
-    assert "pas de liasse 2025" in sheet["vintage_note"]
-    assert "2026" in sheet["disclaimer"]
-    assert "Pas de déclaration 2025" in sheet["disclaimer"]
+    assert "millésime 2027" in sheet["vintage_note"]
+    assert sheet["exercise"] == {"start": "2026-01-01", "end": "2026-12-31"}
+    assert "Aucun envoi" in sheet["disclaimer"]

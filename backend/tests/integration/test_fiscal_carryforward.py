@@ -106,6 +106,19 @@ def test_prior_unused_depreciation_is_consumed_fifo_on_capacity(client):
     assert uses[0]["origin_year"] == 2025
     assert uses[0]["used"] == "200.00"
     assert uses[0]["remaining_after"] == "0.00"
+    sheet = client.get("/api/filing/years/2/efi").json()
+    by_case = {field["official_case"]: field["value"] for field in sheet["liasse"]["fields"]}
+    assert by_case["318"] == "0.00"
+    assert by_case["350"] == "200.00"
+    assert by_case["352"] == "500.00"
+    assert by_case["370"] == "500.00"
+    assert not any(item["code"] == "INTERFORM" for item in sheet["blocking"])
+    tracking = sheet["depreciation_tracking"]
+    assert tracking["prior_used"] == "200.00"
+    assert tracking["prior"] == [
+        {"origin_year": 2025, "opening": "200.00", "used": "200.00", "remaining": "0.00"}
+    ]
+    assert tracking["remaining_total"] == "0.00"
 
 
 def test_prior_tax_loss_is_consumed_fifo_without_global_income(client):
@@ -134,6 +147,18 @@ def test_prior_tax_loss_is_consumed_fifo_without_global_income(client):
     assert uses[0]["origin_year"] == 2025
     assert uses[0]["used"] == "150.00"
     assert uses[0]["remaining_after"] == "0.00"
+    # La liasse IR n'impute pas les déficits antérieurs : ils vont sur la 2042-C-PRO.
+    sheet = client.get("/api/filing/years/2/efi").json()
+    by_case = {field["official_case"]: field["value"] for field in sheet["liasse"]["fields"]}
+    assert by_case["352"] == "400.00"
+    assert by_case["370"] == "400.00"
+    assert not any(item["code"] == "INTERFORM" for item in sheet["blocking"])
+    personal = sheet["personal_return"]
+    assert {line["case"]: line["amount"] for line in personal["lines"]} == {
+        "5NA": "400.00",
+        "5NY": "0.00",
+    }
+    assert personal["prior_deficits"] == [{"origin_year": 2025, "case": "5GJ", "amount": "150.00"}]
 
 
 def test_open_prior_year_is_not_consumed_until_closed(client):

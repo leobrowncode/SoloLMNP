@@ -13,7 +13,8 @@ from app.models import AccountingEntry, Asset, FiscalYear, Property
 from app.models.assets import AssetComponent, DepreciationPeriod, DepreciationSchedule
 from app.models.foundation import RentalActivity
 from app.models.operations import BusinessOperation
-from app.services.fiscal import _prior_remaining
+from app.services.assets import gross_pieces
+from app.services.fiscal import _operating, _prior_remaining
 from app.services.ledger import money
 from app.services.statements import statements
 
@@ -31,10 +32,20 @@ def extend_package(
     package["warnings"].extend(warnings)
     package["by_property"] = _segments(session, year)
     activity = session.get(RentalActivity, 1)
+    if activity is None or not activity.siren:
+        package["warnings"].append(
+            {
+                "code": "SIREN_MANQUANT",
+                "message": (
+                    "Indiquez le SIREN de l’activité (Comptabilité → Identité). "
+                    "Il est requis sur la 2031 et dans le nom du FEC."
+                ),
+            }
+        )
     note = (
-        "Exercice 2026 : il n’y a pas de liasse 2025. "
-        "Les numéros sont ceux du dernier formulaire lu. "
-        "Vérifiez-les sur la déclaration que vous déposerez en 2027."
+        "Exercice 2026 : les formulaires du millésime 2027 ne sont pas encore publiés. "
+        "Les numéros de cases sont ceux des formulaires 2025 archivés, stables d’une année "
+        "sur l’autre. Vérifiez-les sur le formulaire en ligne au moment de déclarer."
         if year.fiscal_vintage == "2026"
         else "Cases lues sur les PDF 2031 et 2033 archivés."
     )
@@ -47,7 +58,14 @@ def extend_package(
             "siren": activity.siren if activity else None,
             "siret": activity.siret if activity else None,
         },
+        "exercise": {
+            "start": year.start_date.isoformat(),
+            "end": year.end_date.isoformat(),
+        },
+        "instructions": _instructions(year),
+        "depreciation_tracking": _depreciation_tracking(year, fiscal),
     }
+    package["personal_return"] = _personal_return(session, year, fiscal)
     _detail_warning(package)
 
 
@@ -55,16 +73,33 @@ def _sheets(
     session: Session, year: FiscalYear, fiscal: dict[str, Any]
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]], list[dict[str, str]]]:
     report = statements(session, year.id)
+    # Classes 6 and 7 before centralization: the closing entry zeroes them in the statements.
+    _income, _expenses, _depreciation, charges, products = _operating(session, year.id)
+    activity = {
+        "income": [
+            {"account_number": number, "amount": money(amount)}
+            for number, amount in sorted(products.items())
+        ],
+        "expenses": [
+            {"account_number": number, "amount": money(amount)}
+            for number, amount in sorted(charges.items())
+        ],
+    }
     errors: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
     fields = [
         *_bilan(report, errors, warnings),
-        *_immobilisations(session, year, report, errors, warnings),
-        *_deficits(session, year, fiscal),
-        *_valeur_ajoutee(report, warnings),
+        *_immobilisations(session, year, report, activity, errors, warnings),
+        *_valeur_ajoutee(activity, warnings),
         *_result_2031(fiscal),
     ]
     return fields, errors, warnings
+
+
+def _fiscal_before(fiscal: dict[str, Any]) -> int:
+    """Liasse result: LMNP deficits of prior years are imputed on the 2042-C-PRO, not here."""
+    details = fiscal.get("details") or {}
+    return _amount(details.get("fiscal_result_before_prior_losses", fiscal["fiscal_result"]))
 
 
 def _field(
@@ -129,11 +164,21 @@ def _immobilisations(
     session: Session,
     year: FiscalYear,
     report: dict[str, Any],
+    activity: dict[str, list[dict[str, str]]],
     errors: list[dict[str, str]],
     warnings: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
     gross = {key: [0, 0, 0] for key in _GROSS}
     amort = {key: [0, 0, 0] for key in _AMORT}
+    first_exercise = (
+        session.scalar(
+            select(FiscalYear.id).where(
+                FiscalYear.rental_activity_id == year.rental_activity_id,
+                FiscalYear.start_date < year.start_date,
+            )
+        )
+        is None
+    )
     for asset in session.scalars(select(Asset)):
         if asset.disposed_at is not None:
             errors.append(
@@ -145,18 +190,12 @@ def _immobilisations(
                 }
             )
             continue
-        components = list(
-            session.scalars(select(AssetComponent).where(AssetComponent.asset_id == asset.id))
-        )
-        pieces = (
-            [(item.asset_account, item.value, item.service_start_date) for item in components]
-            if components
-            else [(asset.asset_account, asset.acquisition_value, asset.acquisition_date)]
-        )
-        for account, gross_value, acquired in pieces:
-            slot = 0 if acquired < year.start_date else 1 if acquired <= year.end_date else None
-            if slot is not None:
-                gross[_gross_key(account)][slot] += to_cents(gross_value)
+        for account, gross_value, acquired in gross_pieces(session, asset):
+            if acquired > year.end_date:
+                continue
+            # Assets bought before the first exercise enter the business during it.
+            slot = 0 if acquired < year.start_date and not first_exercise else 1
+            gross[_gross_key(account)][slot] += gross_value
     for period in session.scalars(
         select(DepreciationPeriod).where(DepreciationPeriod.status == "POSTED")
     ):
@@ -303,7 +342,7 @@ def _immobilisations(
             ),
         ]
     )
-    ledger_gross, ledger_amort, ledger_dotation = _ledger_immobilisations(report)
+    ledger_gross, ledger_amort, ledger_dotation = _ledger_immobilisations(report, activity)
     register_end = (totals[2], amort_totals[2], amort_totals[1])
     if (ledger_gross, ledger_amort, ledger_dotation) != register_end:
         warnings.append(
@@ -318,7 +357,9 @@ def _immobilisations(
     return fields
 
 
-def _ledger_immobilisations(report: dict[str, Any]) -> tuple[int, int, int]:
+def _ledger_immobilisations(
+    report: dict[str, Any], activity: dict[str, list[dict[str, str]]]
+) -> tuple[int, int, int]:
     gross = amort = dotation = 0
     for row in report["balance_sheet"]["assets"]:
         number = row["account_number"]
@@ -329,7 +370,7 @@ def _ledger_immobilisations(report: dict[str, Any]) -> tuple[int, int, int]:
             gross += amount
         elif number.startswith(("28", "29")):
             amort += -amount
-    for row in report["income_statement"]["expenses"]:
+    for row in activity["expenses"]:
         if row["account_number"].startswith("681"):
             dotation += _amount(row["amount"])
     return gross, amort, dotation
@@ -464,9 +505,11 @@ def _bilan(
     ]
 
 
-def _valeur_ajoutee(report: dict[str, Any], warnings: list[dict[str, str]]) -> list[dict[str, Any]]:
-    income = report["income_statement"]["income"]
-    expenses = report["income_statement"]["expenses"]
+def _valeur_ajoutee(
+    activity: dict[str, list[dict[str, str]]], warnings: list[dict[str, str]]
+) -> list[dict[str, Any]]:
+    income = activity["income"]
+    expenses = activity["expenses"]
     services = _prefixed(income, ("70",))
     purchases = _prefixed(expenses, ("60",), skip=("603",))
     external = _prefixed(expenses, ("61", "62"), skip=("612", "613"))
@@ -570,56 +613,164 @@ def _period_asset(session: Session, period: DepreciationPeriod) -> Asset | None:
     return session.get(Asset, component.asset_id)
 
 
-def _deficits(session: Session, year: FiscalYear, fiscal: dict[str, Any]) -> list[dict[str, Any]]:
-    opening = sum(stock["remaining"] for stock in _prior_remaining(session, year, "tax_loss"))
-    used = _amount((fiscal.get("details") or {}).get("prior_tax_loss_used", "0"))
-    current = _amount(fiscal["tax_loss"])
-    remaining = opening - used + current
-    return [
-        _field(
-            code="DEFICITS_ANTERIEURS",
-            form_ref="2033-D-SD",
-            official_case="982",
-            label="Déficits restant à reporter au titre des exercices précédents",
-            value=opening,
-        ),
-        _field(
-            code="DEFICITS_EXERCICE",
-            form_ref="2033-D-SD",
-            official_case="860",
-            label="Déficits de l’exercice",
-            value=current,
-        ),
-        _field(
-            code="DEFICITS_A_REPORTER",
-            form_ref="2033-D-SD",
-            official_case="870",
-            label="Total des déficits restant à reporter",
-            value=remaining,
-        ),
-    ]
-
-
 def _result_2031(fiscal: dict[str, Any]) -> list[dict[str, Any]]:
-    result = _amount(fiscal["fiscal_result"])
+    result = _fiscal_before(fiscal)
     benefit = max(0, result)
     deficit = max(0, -result)
-    return [
-        _field(
-            code="2031_RESULTAT_BENEFICE",
-            form_ref="2031-SD",
-            official_case=None,
-            label="2031 cadre 1 — bénéfice (report de la case 370 du 2033-B)",
-            value=benefit,
+    rows = (
+        (
+            "2031_RESULTAT_BENEFICE",
+            "2031-SD",
+            "Cadre C, ligne 1 « Résultat fiscal » — bénéfice, col. 1 (case 370 du 2033-B)",
+            benefit,
         ),
-        _field(
-            code="2031_RESULTAT_DEFICIT",
-            form_ref="2031-SD",
-            official_case=None,
-            label="2031 cadre 1 — déficit (report de la case 372 du 2033-B)",
-            value=deficit,
+        (
+            "2031_RESULTAT_DEFICIT",
+            "2031-SD",
+            "Cadre C, ligne 1 « Résultat fiscal » — déficit, col. 2 (case 372 du 2033-B)",
+            deficit,
+        ),
+        (
+            "2031_IMPOSABLE_BENEFICE",
+            "2031-SD",
+            "Cadre C, ligne 4 — bénéfice imposable, col. 1",
+            benefit,
+        ),
+        (
+            "2031_IMPOSABLE_DEFICIT",
+            "2031-SD",
+            "Cadre C, ligne 4 — déficit déductible, col. 2",
+            deficit,
+        ),
+        (
+            "2031_BIC_NON_PRO_BENEFICE",
+            "2031-SD",
+            "Cadre C, ligne 7 « dont BIC non professionnels » — a. bénéfice",
+            benefit,
+        ),
+        (
+            "2031_BIC_NON_PRO_DEFICIT",
+            "2031-SD",
+            "Cadre C, ligne 7 « dont BIC non professionnels » — b. déficit",
+            deficit,
+        ),
+        (
+            "2031BIS_LMNP_BENEFICE",
+            "2031-BIS-SD",
+            "Cadre I, « Autres locations meublées non professionnelles » — bénéfice",
+            benefit,
+        ),
+        (
+            "2031BIS_LMNP_DEFICIT",
+            "2031-BIS-SD",
+            "Cadre I, « Autres locations meublées non professionnelles » — déficit",
+            deficit,
+        ),
+    )
+    return [
+        _field(code=code, form_ref=form, official_case=None, label=label, value=value)
+        for code, form, label, value in rows
+    ]
+
+
+def _instructions(year: FiscalYear) -> list[str]:
+    return [
+        (
+            f"2031 : exercice ouvert le {year.start_date:%d/%m/%Y} et clos le "
+            f"{year.end_date:%d/%m/%Y}, régime « simplifié d’imposition »."
+        ),
+        "2031 : rubrique 9 « Comptabilité informatisée » : OUI, logiciel SoloLMNP.",
+        "2031-bis : cadre I « BIC non professionnels » ; les montants sont listés ci-dessous.",
+        "2033-B : cocher la case 018 « Formulaire déposé au titre de l’IR ».",
+        (
+            "2033-B : laisser la ligne 360 (déficits antérieurs) vide. En LMNP, les déficits "
+            "antérieurs s’imputent sur la 2042-C-PRO, pas dans la liasse."
+        ),
+        (
+            "2033-D : ne pas servir le cadre II « déficits reportables » "
+            "(réservé à l’impôt sur les sociétés, notice 2033-NOT-SD)."
+        ),
+        "2033-F et 2033-G : non servis par une entreprise individuelle.",
+        (
+            "Amortissements non déduits (art. 39 C) : conservez l’état de suivi ci-dessous avec "
+            "la liasse. Il justifie la ligne 318 et les déductions ultérieures en ligne 350."
         ),
     ]
+
+
+def _depreciation_tracking(year: FiscalYear, fiscal: dict[str, Any]) -> dict[str, Any]:
+    details = fiscal.get("details") or {}
+    reports = details.get("depreciation_reports") or []
+    prior = [
+        {
+            "origin_year": int(row["origin_year"]),
+            "opening": str(row["opening"]),
+            "used": str(row["used"]),
+            "remaining": str(row["remaining_after"]),
+        }
+        for row in reports
+    ]
+    unused = _amount(fiscal["unused_depreciation"])
+    remaining_total = sum(_amount(row["remaining"]) for row in prior) + unused
+    return {
+        "rule": "CGI art. 39 C II ; BOI-BIC-AMT-20-40-10-20",
+        "accounting_depreciation": str(details.get("accounting_depreciation", "0.00")),
+        "capacity": str(details.get("capacity", "0.00")),
+        "deducted_current": str(details.get("current_deductible_depreciation", "0.00")),
+        "deferred_current": money(unused),
+        "prior_used": str(details.get("prior_depreciation_used", "0.00")),
+        "prior": prior,
+        "current_year": year.year,
+        "remaining_total": money(remaining_total),
+    }
+
+
+def _personal_return(session: Session, year: FiscalYear, fiscal: dict[str, Any]) -> dict[str, Any]:
+    result = _fiscal_before(fiscal)
+    first_origin = year.year - 10
+    letters = "ABCDEFGHIJ"
+    prior = []
+    for stock in _prior_remaining(session, year, "tax_loss", min_origin_year=first_origin):
+        index = stock["origin_year"] - first_origin
+        prior.append(
+            {
+                "origin_year": stock["origin_year"],
+                "case": f"5G{letters[index]}" if 0 <= index < len(letters) else None,
+                "amount": money(stock["remaining"]),
+            }
+        )
+    return {
+        "form": "2042-C-PRO",
+        "status": "verified_by_cross_reference",
+        "separated_from_liasse": True,
+        "lines": [
+            {
+                "case": "5NA",
+                "case_declarant_2": "5OA",
+                "label": (
+                    "Locations meublées non professionnelles, régime réel — "
+                    "bénéfice ou résultat nul"
+                ),
+                "amount": money(max(0, result)),
+            },
+            {
+                "case": "5NY",
+                "case_declarant_2": "5OY",
+                "label": (
+                    "Locations meublées non professionnelles, régime réel — déficit, sans signe"
+                ),
+                "amount": money(max(0, -result)),
+            },
+        ],
+        "prior_deficits": prior,
+        "note": (
+            "Une seule des deux lignes porte un montant ; un résultat nul se déclare 0 en 5NA. "
+            "Les déficits LMNP antérieurs encore reportables vont en 5GA à 5GJ, une case par "
+            "année d’origine (5GJ = année précédente). Ils sont souvent préremplis : "
+            "vérifiez-les. Correspondance relevée sur le formulaire 2042-C-PRO 2026, "
+            "à contrôler sur celui de votre déclaration."
+        ),
+    }
 
 
 def _segments(session: Session, year: FiscalYear) -> list[dict[str, Any]]:

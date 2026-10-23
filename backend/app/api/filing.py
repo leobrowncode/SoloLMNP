@@ -12,6 +12,7 @@ from app.core.config import Settings
 from app.core.database import Database
 from app.domain.filing.fec import export_fec
 from app.domain.filing.mappings import compile_package
+from app.services.archive import control_archive
 from app.services.backup import create_backup, restore_backup
 from app.services.closing import close_year, mark_ready, precheck, reopen_year
 from app.services.documents import store_document
@@ -66,7 +67,21 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
         return Response(
             content=worksheet_pdf(worksheet),
             media_type="application/pdf",
-            headers={"Content-Disposition": 'attachment; filename="efi-research.pdf"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="liasse-{worksheet["year"]}.pdf"'
+            },
+        )
+
+    @router.get("/years/{year_id}/archive")
+    def archive(year_id: int, session: Read) -> Response:
+        bundle = control_archive(session, year_id)
+        return Response(
+            content=bundle["content"],
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{bundle["filename"]}"',
+                "X-Content-SHA256": bundle["sha256"],
+            },
         )
 
     @router.post("/documents", status_code=201)

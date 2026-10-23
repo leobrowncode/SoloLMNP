@@ -50,6 +50,8 @@ def test_scenarios_cover_the_fictional_catalogue(client):
     catalogue = json.loads((ROOT / "tests/fixtures/scenarios.json").read_text(encoding="utf-8"))
     required = {item for scenario in catalogue["scenarios"] for item in scenario["assertions"]}
     proven: set[str] = set()
+    identity = client.post("/api/ledger/activity/identity", json={"siren": "123456789"})
+    assert identity.status_code == 200, identity.text
 
     book(client, "512000", "108000", "1000.00")
     book(client, "512000", "706000", "100.00")
@@ -203,7 +205,7 @@ def test_scenarios_cover_the_fictional_catalogue(client):
     proven.add("interform_checks")
     efi = client.get("/api/filing/years/1/efi").json()
     assert efi["transmission"] is False
-    assert efi["personal_return"]["official_case"] is None
+    assert efi["personal_return"]["separated_from_liasse"] is True
     proven.add("efi_not_transmission")
 
     missing = client.post(
