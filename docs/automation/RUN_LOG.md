@@ -29,7 +29,7 @@
 
 ## 2026-10-23
 
-- Référence : `main` `0a59960`. Branche `cursor/sololmnp-conformit-livraison-8484`.
+- Référence : `main` `0a59960`. Branche `cursor/sololmnp-conformit-livraison-8484`, commit `777c890`. PR : https://github.com/leobrowncode/SoloLMNP/pull/26
 - Écarts confirmés, hors du lot : pas de clôture (P1), P6–P12 absents, accueil et README en retard (PR #22), proxy Vite (PR #22), messages Pydantic (PR #23), conflits d'exercice génériques (PR #24), ventilation terrain mal expliquée (PR #25), lanceurs `scripts/start_local.py` et `SoloLMNP.bat` absents.
 - Écart traité : l'écran Banque proposait toute écriture de même montant, y compris à une autre date. L'API refusait ensuite avec un seul message, « Compte, montant signé, exercice ou écriture incompatibles. »
 - Travail : la liste ne charge que les écritures du jour du mouvement. Chaque refus de rapprochement nomme la condition manquante. Une ligne déjà rapprochée reçoit `LINE_ALREADY_MATCHED` au lieu d'un conflit d'intégrité générique. Aucune règle de montant, aucun schéma et aucune donnée de `data/` modifiés.

@@ -21,7 +21,7 @@ Current roadmap position:
 
 - Issue: #6 — inventaire, bilan, résultat et continuité
 - Branch: `cursor/sololmnp-conformit-livraison-8484`
-- Pull request: opened by the 2026-10-23 automation run
+- Pull request: #26 — https://github.com/leobrowncode/SoloLMNP/pull/26
 - Status: implementation, awaiting review
 
 ## Important decisions
@@ -65,4 +65,4 @@ Next run should:
 
 - Date: 2026-10-23
 - Main SHA: `0a59960`
-- Active PR/commit: branch `cursor/sololmnp-conformit-livraison-8484`
+- Active PR/commit: PR #26, commit `777c890`
