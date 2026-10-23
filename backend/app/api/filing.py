@@ -17,6 +17,7 @@ from app.services.backup import create_backup, restore_backup
 from app.services.closing import close_year, mark_ready, precheck, reopen_year
 from app.services.documents import store_document
 from app.services.efi import efi_worksheet, worksheet_pdf
+from app.services.spreadsheet import year_workbook
 
 
 def build_filing_router(database: Database, settings: Settings) -> APIRouter:
@@ -70,6 +71,15 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
             headers={
                 "Content-Disposition": f'attachment; filename="liasse-{worksheet["year"]}.pdf"'
             },
+        )
+
+    @router.get("/years/{year_id}/export.xlsx")
+    def export_workbook(year_id: int, session: Read) -> Response:
+        bundle = year_workbook(session, year_id)
+        return Response(
+            content=bundle["content"],
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{bundle["filename"]}"'},
         )
 
     @router.get("/years/{year_id}/archive")

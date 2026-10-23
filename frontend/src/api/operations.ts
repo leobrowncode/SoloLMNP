@@ -23,6 +23,6 @@ export interface ImportPreview { count: number; imported: number; rows: { date: 
 export interface OperationImportRow {
   kind: string; date: string; piece_date: string; type: string; accounting_account: string;
   counterparty: string; amount: string; description: string; piece_reference: string;
-  source_file: string; duplicate: boolean;
+  source_file: string; duplicate: boolean; paid?: boolean;
 }
 export interface OperationImportPreview { count: number; imported: number; rows: OperationImportRow[] }

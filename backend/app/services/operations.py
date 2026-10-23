@@ -632,6 +632,26 @@ OPERATIONS_CSV_HEADER = [
     "piece_reference",
     "source_file",
 ]
+OPERATIONS_PAID_COLUMN = "paid"
+KIND_ALIASES = {
+    "REVENUE": "REVENUE",
+    "RECETTE": "REVENUE",
+    "EXPENSE": "EXPENSE",
+    "DEPENSE": "EXPENSE",
+    "DÉPENSE": "EXPENSE",
+}
+PAID_VALUES = {
+    "": False,
+    "non": False,
+    "n": False,
+    "no": False,
+    "0": False,
+    "oui": True,
+    "o": True,
+    "yes": True,
+    "x": True,
+    "1": True,
+}
 OPERATION_TYPE_ACCOUNTS: dict[str, dict[str, str]] = {
     "REVENUE": {"LOY": "706000", "TROP": "706000", "CHG": "706000", "AUT": "706000"},
     "EXPENSE": {
@@ -724,16 +744,34 @@ def import_request_id(piece: str) -> str:
     return "doc-" + hashlib.sha256(piece.encode()).hexdigest()[:60]
 
 
-def parse_operations_csv(content: str) -> list[dict[str, str]]:
+def _sheet_day(value: str) -> date:
+    """ISO dates, or the dd/mm/yyyy that a French Google Sheet copies."""
+    french = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", value)
+    if french:
+        return date(int(french[3]), int(french[2]), int(french[1]))
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        raise ValueError(value)
+    return date.fromisoformat(value)
+
+
+def parse_operations_csv(content: str) -> list[dict[str, Any]]:
+    """Semicolon CSV, or cells pasted from Google Sheets (tab separated)."""
+    text = content.lstrip("\ufeff")
+    first_line = text.split("\n", 1)[0]
+    delimiter = "\t" if "\t" in first_line else ";"
     try:
-        reader = csv.DictReader(io.StringIO(content.lstrip("\ufeff")), delimiter=";", strict=True)
-        if reader.fieldnames != OPERATIONS_CSV_HEADER:
+        reader = csv.DictReader(io.StringIO(text), delimiter=delimiter, strict=True)
+        header = [name.strip() for name in reader.fieldnames or []]
+        if header not in (OPERATIONS_CSV_HEADER, [*OPERATIONS_CSV_HEADER, OPERATIONS_PAID_COLUMN]):
             fail(
                 "CSV_HEADER",
-                "En-tête attendu : " + ";".join(OPERATIONS_CSV_HEADER),
+                "En-tête attendu : "
+                + ";".join(OPERATIONS_CSV_HEADER)
+                + " (colonne paid facultative à la fin)",
                 422,
             )
-        rows: list[dict[str, str]] = []
+        reader.fieldnames = header
+        rows: list[dict[str, Any]] = []
         references: set[str] = set()
         for index, raw in enumerate(reader, 2):
             if index > 5001 or None in raw or any(value is None for value in raw.values()):
@@ -742,8 +780,13 @@ def parse_operations_csv(content: str) -> list[dict[str, str]]:
                     f"Ligne {index} invalide ou limite de 5 000 lignes dépassée.",
                     422,
                 )
-            kind = raw["kind"].strip()
-            type_code = raw["type"].strip()
+            if not any(value.strip() for value in raw.values()):
+                continue
+            kind = KIND_ALIASES.get(raw["kind"].strip().upper(), raw["kind"].strip())
+            type_code = raw["type"].strip().upper()
+            paid = PAID_VALUES.get(raw.get(OPERATIONS_PAID_COLUMN, "").strip().lower())
+            if paid is None:
+                fail("CSV_PAID", f"Colonne paid : oui ou non, ligne {index}.", 422)
             accounts = OPERATION_TYPE_ACCOUNTS.get(kind)
             if accounts is None or type_code not in accounts:
                 fail(
@@ -768,22 +811,22 @@ def parse_operations_csv(content: str) -> list[dict[str, str]]:
                     f"Tiers, libellé ou référence unique invalide, ligne {index}.",
                     422,
                 )
-            value = raw["amount"].strip().replace(",", ".")
+            value = re.sub(r"[\s\u00a0\u202f€]", "", raw["amount"]).replace(",", ".")
             if not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,2})?", value):
                 fail("CSV_AMOUNT", f"Montant positif au centime invalide, ligne {index}.", 422)
             amount = to_cents(Decimal(value))
             if not amount:
                 fail("CSV_ZERO", f"Montant nul, ligne {index}.", 422)
             raw_date, raw_piece = raw["date"].strip(), raw["piece_date"].strip()
-            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw_date) or not re.fullmatch(
-                r"\d{4}-\d{2}-\d{2}", raw_piece
-            ):
-                fail("CSV_INVALID", f"Dates ISO requises, ligne {index}.", 422)
             try:
-                day = date.fromisoformat(raw_date)
-                piece_day = date.fromisoformat(raw_piece)
+                day = _sheet_day(raw_date)
+                piece_day = _sheet_day(raw_piece) if raw_piece else day
             except ValueError:
-                fail("CSV_INVALID", f"Dates ISO requises, ligne {index}.", 422)
+                fail(
+                    "CSV_INVALID",
+                    f"Dates AAAA-MM-JJ ou JJ/MM/AAAA requises, ligne {index}.",
+                    422,
+                )
             rows.append(
                 {
                     "kind": kind,
@@ -796,6 +839,7 @@ def parse_operations_csv(content: str) -> list[dict[str, str]]:
                     "description": description,
                     "piece_reference": piece,
                     "source_file": source,
+                    "paid": paid,
                 }
             )
             references.add(piece)
@@ -839,11 +883,24 @@ def same_imported_operation(
 
 
 def import_operations_csv(
-    session: Session, property_id: int, year_id: int, content: str, commit: bool
+    session: Session,
+    property_id: int,
+    year_id: int,
+    content: str,
+    commit: bool,
+    bank_account_id: int | None = None,
 ) -> dict[str, Any]:
     property_exists(session, property_id)
     year = get_year(session, year_id, writable=True)
     rows = parse_operations_csv(content)
+    if any(row["paid"] for row in rows):
+        if bank_account_id is None:
+            fail(
+                "BANK_REQUIRED",
+                "Choisissez le compte bancaire des lignes marquées payées.",
+                422,
+            )
+        bank(session, bank_account_id)
     prepared: list[dict[str, Any]] = []
     for index, data in enumerate(rows, 2):
         day = date.fromisoformat(data["date"])
@@ -892,6 +949,7 @@ def import_operations_csv(
                         "description": data["description"],
                         "counterparty": data["counterparty"],
                         "accounting_account": data["accounting_account"],
+                        "bank_account_id": bank_account_id if data["paid"] else None,
                         "deductible_percentage": "100.00",
                         "fiscal_treatment": "REQUIRES_REVIEW",
                     }

@@ -410,6 +410,7 @@ export default function FiscalPage() {
           Liasse à recopier
         </button>
         <a href={year ? `/api/filing/years/${year}/fec` : undefined}>FEC (après clôture)</a>
+        <a href={year ? `/api/filing/years/${year}/export.xlsx` : undefined}>Export tableur (.xlsx, Google Sheets)</a>
       </div>
 
       <ul className="fiscal-rules-strip" aria-label="Règles LMNP utiles">

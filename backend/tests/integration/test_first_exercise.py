@@ -6,6 +6,7 @@ Dated one year back from the real 2026 case: SQLite refuses postings dated in th
 import io
 import zipfile
 from uuid import uuid4
+from xml.etree import ElementTree
 
 import pytest
 from fastapi.testclient import TestClient
@@ -253,3 +254,17 @@ def test_first_exercise_from_purchase_to_liasse_and_fec(client):
         pdf = bundle.read("liasse-2025.pdf")
         assert "Case 318".encode("cp1252") in pdf
         assert "État de suivi des amortissements".encode("cp1252") in pdf
+
+    workbook = client.get("/api/filing/years/1/export.xlsx")
+    assert workbook.status_code == 200, workbook.text
+    assert 'filename="SoloLMNP-2025.xlsx"' in workbook.headers["content-disposition"]
+    with zipfile.ZipFile(io.BytesIO(workbook.content)) as bundle:
+        sheets = [name for name in bundle.namelist() if name.startswith("xl/worksheets/")]
+        assert len(sheets) == 5
+        for name in bundle.namelist():
+            if name.endswith(".xml") or name.endswith(".rels"):
+                ElementTree.fromstring(bundle.read(name))  # noqa: S314 - XML produced by the app
+        assert "Mérignac" in bundle.read("xl/worksheets/sheet1.xml").decode()
+        assert "<v>7650.00</v>" not in bundle.read("xl/worksheets/sheet1.xml").decode()
+        assert "Case" in bundle.read("xl/worksheets/sheet5.xml").decode()
+        assert "Gros œuvre" in bundle.read("xl/worksheets/sheet4.xml").decode()

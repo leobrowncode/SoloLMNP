@@ -145,6 +145,7 @@ class OperationsCSVInput(Input):
     property_id: int = Field(gt=0)
     fiscal_year_id: int = Field(gt=0)
     content: Annotated[str, Field(min_length=1, max_length=1_000_000)]
+    bank_account_id: int | None = Field(default=None, gt=0)
 
 
 class MatchInput(Input):

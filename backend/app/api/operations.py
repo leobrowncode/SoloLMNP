@@ -170,13 +170,23 @@ def build_operations_router(database: Database) -> APIRouter:
     @router.post("/import/preview")
     def operations_preview(data: OperationsCSVInput, session: Read) -> dict[str, Any]:
         return service.import_operations_csv(
-            session, data.property_id, data.fiscal_year_id, data.content, False
+            session,
+            data.property_id,
+            data.fiscal_year_id,
+            data.content,
+            False,
+            data.bank_account_id,
         )
 
     @router.post("/import")
     def operations_import(data: OperationsCSVInput, session: Write) -> dict[str, Any]:
         return service.import_operations_csv(
-            session, data.property_id, data.fiscal_year_id, data.content, True
+            session,
+            data.property_id,
+            data.fiscal_year_id,
+            data.content,
+            True,
+            data.bank_account_id,
         )
 
     @router.post("/bank/preview")

@@ -64,12 +64,13 @@ puis **Enregistrer un règlement** plus tard.
 - Format UTF-8, séparateur `;`, en-tête exact : `date;label;amount;reference`
 - Prévisualiser → Confirmer → **rapprocher** chaque mouvement
 
-**Import CSV de justificatifs** (onglet Transactions) :
+**Import depuis Google Sheets ou CSV** (onglet Transactions, « Importer depuis Google Sheets ou un CSV ») :
 
-- Factures et quittances déjà extraites en CSV
-- En-tête exact : `kind;date;piece_date;type;counterparty;amount;description;piece_reference;source_file`
-- Choisir le bien et l’exercice → Prévisualiser → Comptabiliser
-- Chaque ligne devient une recette ou une dépense **non réglée**, traitement fiscal à vérifier
+- Copier les lignes du Google Sheet de saisie (en-tête compris) et les coller, ou charger un CSV à point-virgule
+- Colonnes : `kind;date;piece_date;type;counterparty;amount;description;piece_reference;source_file`, plus `paid` facultative
+- `kind` : Recette / Dépense (ou REVENUE / EXPENSE) ; dates JJ/MM/AAAA ou AAAA-MM-JJ ; montants « 1 200,00 € » acceptés
+- Choisir le bien, l’exercice et le compte des lignes payées → Prévisualiser → Comptabiliser
+- `paid` = oui : opération réglée directement sur ce compte ; sinon elle reste **à régler**. Traitement fiscal à vérifier
 - Une référence déjà comptabilisée est ignorée ; un montant différent pour la même référence est refusé
 - Les échéances d’emprunt restent à saisir à la main dans l’onglet Emprunts
 
@@ -115,10 +116,11 @@ Menu **Fiscalité LMNP** :
 
 1. Sélectionner l’exercice → **Calculer le résultat fiscal** (après la centralisation, sur le ledger final).
 2. **Liasse à recopier** : statut, points bloquants, consignes de saisie, puis les cases par formulaire (2031, 2031-bis, 2033-A, B, C, E), l’état de suivi des amortissements non déduits et les cases de la 2042-C-PRO. Télécharger le PDF.
-3. Après clôture : **FEC** et **Dossier de contrôle** (zip : FEC, sa description réglementaire, liasse PDF/JSON, empreintes SHA-256). À garder en cas de contrôle.
-4. Recopier **soi-même** dans l’espace professionnel impots.gouv.fr (mode EFI, « Déclarer résultat »). SoloLMNP n’envoie rien.
-5. Sur la déclaration de revenus du foyer (2042-C-PRO) : résultat en **5NA** (bénéfice ou 0) ou **5NY** (déficit), déficits LMNP antérieurs en **5GA à 5GJ**.
-6. Archiver l’accusé de dépôt avec le dossier de contrôle.
+3. À tout moment : **Export tableur (.xlsx, Google Sheets)** — opérations, journal, balance, amortissements, liasse. À déposer dans Google Drive puis « Ouvrir avec Google Sheets ».
+4. Après clôture : **FEC** et **Dossier de contrôle** (zip : FEC, sa description réglementaire, liasse PDF/JSON, empreintes SHA-256). À garder en cas de contrôle.
+5. Recopier **soi-même** dans l’espace professionnel impots.gouv.fr (mode EFI, « Déclarer résultat »). SoloLMNP n’envoie rien.
+6. Sur la déclaration de revenus du foyer (2042-C-PRO) : résultat en **5NA** (bénéfice ou 0) ou **5NY** (déficit), déficits LMNP antérieurs en **5GA à 5GJ**.
+7. Archiver l’accusé de dépôt avec le dossier de contrôle.
 
 Voir aussi [FILING.md](FILING.md).
 

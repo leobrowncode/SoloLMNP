@@ -508,8 +508,8 @@ export default function OperationsPage() {
       {tab === "Transactions" && <>
         <p className="form-help">Enregistrez les loyers et charges. La part déductible ne change pas l’écriture : elle est proposée ensuite dans les réintégrations de la liasse. Ne saisissez pas les intérêts déjà ventilés dans une échéance d’emprunt.</p>
         <details>
-          <summary>Importer des justificatifs (CSV)</summary>
-          <p>UTF-8, séparateur point-virgule, en-tête exact : <code>kind;date;piece_date;type;counterparty;amount;description;piece_reference;source_file</code>. Chaque ligne crée une recette ou une dépense non réglée. Le traitement fiscal reste à vérifier. Une référence déjà comptabilisée est ignorée ; la même référence avec un autre montant est refusée.</p>
+          <summary>Importer depuis Google Sheets ou un CSV</summary>
+          <p>Copiez les lignes du Google Sheet de saisie (en-tête compris) et collez-les ci-dessous, ou chargez un CSV à point-virgule. Colonnes : <code>kind date piece_date type counterparty amount description piece_reference source_file</code>, plus <code>paid</code> facultative. <code>kind</code> : Recette ou Dépense ; dates JJ/MM/AAAA ou AAAA-MM-JJ ; <code>paid</code> = oui pour une ligne déjà payée sur le compte choisi, sinon elle reste à régler. Le traitement fiscal reste à vérifier. Une référence déjà comptabilisée est ignorée ; la même référence avec un autre montant est refusée.</p>
           {!!properties.length && !!openYears.length && <>
             <label className="toolbar-field">Bien
               <select value={opPropertyId} onChange={(e) => { setOpPropertyId(Number(e.target.value)); setOpPreview(null); }}>
@@ -523,6 +523,11 @@ export default function OperationsPage() {
                 ))}
               </select>
             </label>
+            {!!banks.length && <label className="toolbar-field">Compte des lignes payées
+              <select value={bankId} onChange={(e) => { setBankId(Number(e.target.value)); setOpPreview(null); }}>
+                {banks.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.account_number})</option>)}
+              </select>
+            </label>}
           </>}
           <label>Fichier CSV (1 Mo maximum)<input type="file" accept=".csv,text/csv" onChange={(e) => {
             const file = e.target.files?.[0]; setOpPreview(null);
@@ -531,22 +536,23 @@ export default function OperationsPage() {
               setOpCsv(await file.text());
             });
           }} /></label>
-          <label>Contenu CSV<textarea rows={6} value={opCsv} onChange={(e) => { setOpCsv(e.target.value); setOpPreview(null); }} /></label>
+          <label>Lignes collées ou contenu CSV<textarea rows={6} value={opCsv} onChange={(e) => { setOpCsv(e.target.value); setOpPreview(null); }} /></label>
           <button type="button" disabled={busy || !opCsv || !opPropertyId || !opYearId} onClick={() => {
             void action(async () => setOpPreview(await api<OperationImportPreview>("/import/preview", "POST", {
-              property_id: opPropertyId, fiscal_year_id: opYearId, content: opCsv,
+              property_id: opPropertyId, fiscal_year_id: opYearId, content: opCsv, bank_account_id: bankId || null,
             })));
           }}>Prévisualiser les justificatifs</button>
           {opPreview && <>
             <p>{opPreview.count} opération(s) · {opPreview.rows.filter((row) => row.duplicate).length} déjà importée(s)</p>
             <div className="ledger-table"><table>
-              <thead><tr><th>Date</th><th>Nature</th><th>Tiers</th><th>Montant</th><th>Référence</th><th>Fichier</th><th>Déjà importée</th></tr></thead>
+              <thead><tr><th>Date</th><th>Nature</th><th>Tiers</th><th>Montant</th><th>Payée</th><th>Référence</th><th>Fichier</th><th>Déjà importée</th></tr></thead>
               <tbody>{opPreview.rows.map((row) => (
                 <tr key={row.piece_reference}>
                   <td>{row.date}</td>
                   <td>{kindLabel[row.kind] || row.kind} · {row.type} · {row.accounting_account}</td>
                   <td>{row.counterparty}</td>
                   <td>{row.amount}</td>
+                  <td>{row.paid ? "Oui" : "À régler"}</td>
                   <td>{row.piece_reference}</td>
                   <td>{row.source_file || "—"}</td>
                   <td>{row.duplicate ? "Oui" : "Non"}</td>
@@ -556,9 +562,9 @@ export default function OperationsPage() {
             <button type="button" disabled={busy || opPreview.rows.every((row) => row.duplicate)} onClick={() => {
               void action(async () => {
                 const result = await api<OperationImportPreview>("/import", "POST", {
-                  property_id: opPropertyId, fiscal_year_id: opYearId, content: opCsv,
+                  property_id: opPropertyId, fiscal_year_id: opYearId, content: opCsv, bank_account_id: bankId || null,
                 });
-                setMessage(result.imported + " opération(s) comptabilisée(s), non réglées, traitement fiscal à vérifier.");
+                setMessage(result.imported + " opération(s) comptabilisée(s). Lignes non payées à régler ; traitement fiscal à vérifier.");
                 setOpPreview(null); setRevision((value) => value + 1);
               });
             }}>Comptabiliser les justificatifs</button>

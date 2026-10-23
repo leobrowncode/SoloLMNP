@@ -53,13 +53,13 @@ describe("OperationsPage", () => {
     expect(screen.getByText(/La part déductible ne change pas l’écriture/)).toBeInTheDocument();
   });
 
-  it("explains that a justificatif CSV posts unpaid operations", async () => {
+  it("explains the Google Sheets paste and the paid column", async () => {
     mockApi();
     render(<OperationsPage />);
     await userEvent.click(await screen.findByRole("button", { name: /Transactions/ }));
-    await userEvent.click(await screen.findByText("Importer des justificatifs (CSV)"));
-    expect(screen.getByText(/Chaque ligne crée une recette ou une dépense non réglée/)).toBeInTheDocument();
-    expect(screen.getByText(/kind;date;piece_date;type;counterparty;amount;description;piece_reference;source_file/)).toBeInTheDocument();
+    await userEvent.click(await screen.findByText("Importer depuis Google Sheets ou un CSV"));
+    expect(screen.getByText(/sinon elle reste à régler/)).toBeInTheDocument();
+    expect(screen.getByText(/kind date piece_date type counterparty amount description piece_reference source_file/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Prévisualiser les justificatifs" })).toBeDisabled();
   });
 

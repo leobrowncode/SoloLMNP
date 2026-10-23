@@ -465,6 +465,37 @@ def test_operations_csv_invalid_input_rejected(client, content):
     assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 0
 
 
+SHEET_PASTE = (
+    "kind\tdate\tpiece_date\ttype\tcounterparty\tamount\tdescription\tpiece_reference\t"
+    "source_file\tpaid\n"
+    "Recette\t06/04/2025\t\tloy\tMartin\t850,00 €\tLoyer avril\tLOY-2025-04\tquittance.pdf\toui\n"
+    "Dépense\t15/10/2025\t10/10/2025\tFON\tTrésor public\t1\u202f200,00\tTaxe foncière\t"
+    "FON-2025\tavis.pdf\tnon\n"
+    "\t\t\t\t\t\t\t\t\t\n"
+)
+
+
+def test_google_sheet_paste_imports_paid_and_unpaid_rows(client):
+    payload = {"property_id": 1, "fiscal_year_id": 1, "content": SHEET_PASTE}
+    refused = client.post("/api/operations/import/preview", json=payload)
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "BANK_REQUIRED"
+    preview = client.post("/api/operations/import/preview", json={**payload, "bank_account_id": 1})
+    assert preview.status_code == 200, preview.text
+    rows = preview.json()["rows"]
+    assert [row["date"] for row in rows] == ["2025-04-06", "2025-10-15"]
+    assert rows[0]["piece_date"] == "2025-04-06"
+    assert [row["amount"] for row in rows] == ["850.00", "1200.00"]
+    assert [row["paid"] for row in rows] == [True, False]
+    imported = client.post("/api/operations/import", json={**payload, "bank_account_id": 1})
+    assert imported.json()["imported"] == 2
+    operations = {row["kind"]: row for row in client.get("/api/operations").json()}
+    assert operations["REVENUE"]["remaining_to_settle"] == "0.00"
+    assert operations["EXPENSE"]["remaining_to_settle"] == "1200.00"
+    rent = client.get(f"/api/ledger/entries/{operations['REVENUE']['accounting_entry_id']}").json()
+    assert {line["account_number"] for line in rent["lines"]} == {"512000", "706000"}
+
+
 def test_migration_refuses_to_discard_business_records(client, settings, database):
     create(client)
     database.engine.dispose()
