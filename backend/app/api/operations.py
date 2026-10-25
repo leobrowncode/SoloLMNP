@@ -179,6 +179,8 @@ def build_operations_router(database: Database) -> APIRouter:
             data.bank_account_id,
             data.content,
             False,
+            data.preview_token,
+            data.confirmed_loan_reference,
         )
 
     @router.post("/loans/{loan_id}/payments/import")
@@ -192,6 +194,8 @@ def build_operations_router(database: Database) -> APIRouter:
             data.bank_account_id,
             data.content,
             True,
+            data.preview_token,
+            data.confirmed_loan_reference,
         )
 
     @router.post("/import/preview")

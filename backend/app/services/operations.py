@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.api.ledger_schemas import EntryInput, ReversalInput
@@ -23,6 +23,7 @@ from app.api.operation_schemas import (
 )
 from app.core.money import to_cents
 from app.models import Account, AccountingEntry, AccountingEntryLine, Property
+from app.models.base import utc_now
 from app.models.operations import (
     BankAccount,
     BankMatch,
@@ -369,6 +370,46 @@ def principal_balance(session: Session, loan: Loan) -> int:
     return sum(to_cents(credit) - to_cents(debit) for credit, debit in rows)
 
 
+def latest_active_principal_movement(session: Session, loan: Loan) -> date | None:
+    """Ignore reversals and the entries they reverse when checking chronology."""
+    entries = session.scalars(
+        select(AccountingEntry)
+        .join(AccountingEntryLine)
+        .where(
+            AccountingEntry.status == "VALIDATED",
+            AccountingEntry.reversal_of_id.is_(None),
+            AccountingEntryLine.account_number == loan.principal_account,
+        )
+        .order_by(AccountingEntry.accounting_date.desc(), AccountingEntry.id.desc())
+    ).unique()
+    return next(
+        (entry.accounting_date for entry in entries if reversed_entry(session, entry.id) is None),
+        None,
+    )
+
+
+def replaces_reversed_loan_payment(
+    session: Session,
+    loan_id: int,
+    payment_date: date,
+    piece_reference: str = "",
+) -> bool:
+    conditions = [BusinessOperation.date == payment_date]
+    piece_base = re.sub(r"-R\d+$", "", piece_reference)
+    if piece_base.startswith("ECH-"):
+        conditions.append(AccountingEntry.piece_reference.like(piece_base + "%"))
+    rows = session.scalars(
+        select(BusinessOperation)
+        .join(AccountingEntry)
+        .where(
+            BusinessOperation.kind == "LOAN_PAYMENT",
+            BusinessOperation.loan_id == loan_id,
+            or_(*conditions),
+        )
+    )
+    return any(reversed_entry(session, row.accounting_entry_id) is not None for row in rows)
+
+
 def loan_post(
     session: Session, loan_id: int, data: SettlementInput, funding: bool
 ) -> BusinessOperation:
@@ -385,17 +426,13 @@ def loan_post(
         fail("LOAN_NOT_FOUND", "Emprunt introuvable.", 404)
     account(session, loan.principal_account, "164")
     bank_number = bank(session, data.bank_account_id).account_number
-    latest = session.scalar(
-        select(AccountingEntry.accounting_date)
-        .join(AccountingEntryLine)
-        .where(
-            AccountingEntry.status == "VALIDATED",
-            AccountingEntryLine.account_number == loan.principal_account,
-        )
-        .order_by(AccountingEntry.accounting_date.desc())
-        .limit(1)
+    latest = latest_active_principal_movement(session, loan)
+    replacement = not funding and replaces_reversed_loan_payment(
+        session, loan.id, data.date, data.piece_reference
     )
-    if data.date < loan.start_date or (latest is not None and data.date < latest):
+    if data.date < loan.start_date or (
+        latest is not None and data.date < latest and not replacement
+    ):
         fail("LOAN_CHRONOLOGY", "Saisissez les mouvements de l’emprunt dans l’ordre chronologique.")
     description = ("Déblocage" if funding else "Échéance") + " : " + loan.lender
     amount = to_cents(data.amount)
@@ -983,6 +1020,10 @@ LOAN_PAYMENT_HEADER_ALIASES = {
     "n": "rank",
     "date": "date",
     "date echeance": "date",
+    "date comptable": "payment_date",
+    "date debit": "payment_date",
+    "date effective": "payment_date",
+    "date paiement": "payment_date",
     "capital": "principal",
     "principal": "principal",
     "interet": "interest",
@@ -998,7 +1039,14 @@ LOAN_PAYMENT_HEADER_ALIASES = {
     "echeance": "amount",
     "mensualite": "amount",
 }
-LOAN_PAYMENT_REQUIRED_COLUMNS = {"date", "principal", "interest", "insurance", "amount"}
+LOAN_PAYMENT_REQUIRED_COLUMNS = {
+    "loan_reference",
+    "date",
+    "principal",
+    "interest",
+    "insurance",
+    "amount",
+}
 
 
 def _loan_payment_header(value: str) -> str:
@@ -1053,12 +1101,14 @@ def parse_loan_payments_csv(content: str) -> list[dict[str, str]]:
         if missing:
             fail(
                 "LOAN_CSV_HEADER",
-                "Colonnes requises : Date, Capital, Intérêts, Assurance banque, Total banque.",
+                "Colonnes requises : Prêt, Date, Capital, Intérêts, "
+                "Assurance banque, Total banque.",
                 422,
             )
 
         rows: list[dict[str, str]] = []
         dates: set[date] = set()
+        payment_dates: set[date] = set()
         references: set[str] = set()
         for index, raw in enumerate(reader, 2):
             if index > 5001 or None in raw or any(value is None for value in raw.values()):
@@ -1070,17 +1120,34 @@ def parse_loan_payments_csv(content: str) -> list[dict[str, str]]:
             if not any(value.strip() for value in raw.values()):
                 continue
             try:
-                day = _sheet_day(raw[columns["date"]].strip())
+                due_day = _sheet_day(raw[columns["date"]].strip())
+                payment_value = (
+                    raw[columns["payment_date"]].strip() if "payment_date" in columns else ""
+                )
+                payment_day = _sheet_day(payment_value) if payment_value else due_day
             except ValueError:
                 fail(
                     "LOAN_CSV_DATE",
                     f"Date AAAA-MM-JJ ou JJ/MM/AAAA requise, ligne {index}.",
                     422,
                 )
-            if day in dates:
+            if due_day in dates:
                 fail(
                     "LOAN_CSV_DUPLICATE_DATE",
-                    f"Deux échéances portent la date {day.isoformat()}. Collez un seul prêt.",
+                    f"Deux échéances portent la date {due_day.isoformat()}. Collez un seul prêt.",
+                    422,
+                )
+            if payment_day in payment_dates:
+                fail(
+                    "LOAN_CSV_DUPLICATE_PAYMENT_DATE",
+                    f"Deux échéances portent la date comptable {payment_day.isoformat()}.",
+                    422,
+                )
+            loan_reference = raw[columns["loan_reference"]].strip()
+            if not loan_reference or len(loan_reference) > 200:
+                fail(
+                    "LOAN_CSV_REFERENCE",
+                    f"Référence de prêt requise, ligne {index}.",
                     422,
                 )
             principal = _loan_payment_money(
@@ -1124,16 +1191,13 @@ def parse_loan_payments_csv(content: str) -> list[dict[str, str]]:
                     f"le total banque, ligne {index}.",
                     422,
                 )
-            loan_reference = (
-                raw[columns["loan_reference"]].strip() if "loan_reference" in columns else ""
-            )
-            if loan_reference:
-                references.add(loan_reference)
+            references.add(loan_reference)
             rows.append(
                 {
                     "loan_reference": loan_reference,
                     "rank": raw[columns["rank"]].strip() if "rank" in columns else "",
-                    "date": day.isoformat(),
+                    "due_date": due_day.isoformat(),
+                    "date": payment_day.isoformat(),
                     "principal": principal,
                     "interest": interest,
                     "insurance": insurance,
@@ -1141,7 +1205,8 @@ def parse_loan_payments_csv(content: str) -> list[dict[str, str]]:
                     "amount": amount,
                 }
             )
-            dates.add(day)
+            dates.add(due_day)
+            payment_dates.add(payment_day)
         if not rows:
             fail("LOAN_CSV_EMPTY", "Le tableau ne contient aucune échéance.", 422)
         if len(references) > 1:
@@ -1184,6 +1249,8 @@ def import_loan_payments_csv(
     bank_id: int,
     content: str,
     commit: bool,
+    preview_token: str | None = None,
+    confirmed_loan_reference: str | None = None,
 ) -> dict[str, Any]:
     loan = session.get(Loan, loan_id)
     if loan is None:
@@ -1191,6 +1258,23 @@ def import_loan_payments_csv(
     year = get_year(session, year_id, writable=True)
     bank(session, bank_id)
     source_rows = parse_loan_payments_csv(content)
+    loan_reference = source_rows[0]["loan_reference"]
+    expected_preview_token = digest(
+        {
+            "loan_id": loan.id,
+            "fiscal_year_id": year.id,
+            "bank_account_id": bank_id,
+            "content_sha256": hashlib.sha256(content.encode()).hexdigest(),
+        }
+    )
+    if commit and (
+        preview_token != expected_preview_token or confirmed_loan_reference != loan_reference
+    ):
+        fail(
+            "LOAN_PREVIEW_REQUIRED",
+            "Prévisualisez à nouveau puis confirmez explicitement la correspondance "
+            f"avec le prêt source {loan_reference}.",
+        )
     outside_year = sum(
         not year.start_date <= date.fromisoformat(row["date"]) <= year.end_date
         for row in source_rows
@@ -1200,13 +1284,15 @@ def import_loan_payments_csv(
         for row in source_rows
         if year.start_date <= date.fromisoformat(row["date"]) <= year.end_date
     ]
-    today = date.today()
+    today = utc_now().date()
     future = sum(date.fromisoformat(row["date"]) > today for row in rows_in_year)
     eligible = [row for row in rows_in_year if date.fromisoformat(row["date"]) <= today]
 
     prepared: list[dict[str, Any]] = []
     for data in eligible:
         day = date.fromisoformat(data["date"])
+        due_day = date.fromisoformat(data["due_date"])
+        piece_base = f"ECH-{loan.principal_account}-{due_day.isoformat()}"
         if day < loan.start_date:
             fail(
                 "LOAN_CSV_BEFORE_START",
@@ -1215,10 +1301,15 @@ def import_loan_payments_csv(
             )
         prior = list(
             session.scalars(
-                select(BusinessOperation).where(
+                select(BusinessOperation)
+                .join(AccountingEntry)
+                .where(
                     BusinessOperation.kind == "LOAN_PAYMENT",
                     BusinessOperation.loan_id == loan.id,
-                    BusinessOperation.date == day,
+                    or_(
+                        BusinessOperation.date == day,
+                        AccountingEntry.piece_reference.like(piece_base + "%"),
+                    ),
                 )
             )
         )
@@ -1241,27 +1332,25 @@ def import_loan_payments_csv(
             {
                 **data,
                 "duplicate": duplicate,
-                "piece_reference": (
-                    f"ECH-{loan.principal_account}-{day.isoformat()}"
-                    + (f"-R{revision}" if revision else "")
-                ),
-                "request_id": f"loan-csv-{loan.id}-{day:%Y%m%d}-{revision}",
+                "piece_reference": (piece_base + (f"-R{revision}" if revision else "")),
+                "request_id": (f"loan-csv-{loan.id}-{due_day:%Y%m%d}-{day:%Y%m%d}-{revision}"),
             }
         )
 
     new_rows = [row for row in prepared if not row["duplicate"]]
     if new_rows:
-        latest = session.scalar(
-            select(AccountingEntry.accounting_date)
-            .join(AccountingEntryLine)
-            .where(
-                AccountingEntry.status == "VALIDATED",
-                AccountingEntryLine.account_number == loan.principal_account,
+        latest = latest_active_principal_movement(session, loan)
+        invalid_chronology = latest is not None and any(
+            date.fromisoformat(row["date"]) < latest
+            and not replaces_reversed_loan_payment(
+                session,
+                loan.id,
+                date.fromisoformat(row["date"]),
+                row["piece_reference"],
             )
-            .order_by(AccountingEntry.accounting_date.desc())
-            .limit(1)
+            for row in new_rows
         )
-        if latest is not None and any(date.fromisoformat(row["date"]) < latest for row in new_rows):
+        if invalid_chronology:
             fail(
                 "LOAN_CHRONOLOGY",
                 "Une échéance à importer précède le dernier mouvement comptable de l’emprunt.",
@@ -1315,15 +1404,13 @@ def import_loan_payments_csv(
                 "outside_year": outside_year,
                 "future": future,
                 "sha256": hashlib.sha256(content.encode()).hexdigest(),
+                "loan_reference": loan_reference,
             },
         )
 
     visible = [
         {key: value for key, value in row.items() if key != "request_id"} for row in prepared
     ]
-    loan_reference = next(
-        (row["loan_reference"] for row in source_rows if row["loan_reference"]), ""
-    )
     return {
         "rows": visible,
         "imported": imported,
@@ -1332,4 +1419,5 @@ def import_loan_payments_csv(
         "outside_year": outside_year,
         "future": future,
         "loan_reference": loan_reference,
+        "preview_token": expected_preview_token,
     }

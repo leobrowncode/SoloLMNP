@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import OperationsPage from "./OperationsPage";
@@ -9,8 +9,13 @@ function response(body: unknown) {
   }));
 }
 
-function mockApi(options: { loans?: unknown[]; loanPreview?: unknown } = {}) {
-  const fetcher = vi.fn((url: string) => {
+function mockApi(options: {
+  loans?: unknown[];
+  loanPreview?: unknown;
+  loanPreviewResponse?: Promise<Response>;
+} = {}) {
+  const fetcher = vi.fn((url: string, init?: RequestInit) => {
+    void init;
     if (url === "/api/ledger/setup") return response({
       activity: { activity_name: "Fictif" },
       years: [{ id: 1, year: 2025, start_date: "2025-01-01", end_date: "2025-12-31", status: "OPEN" }],
@@ -29,7 +34,7 @@ function mockApi(options: { loans?: unknown[]; loanPreview?: unknown } = {}) {
     ]);
     if (url === "/api/operations/loans") return response(options.loans ?? []);
     if (url === "/api/operations/loans/1/payments/import/preview") {
-      return response(options.loanPreview ?? {});
+      return options.loanPreviewResponse ?? response(options.loanPreview ?? {});
     }
     if (url === "/api/operations/loans/1/payments/import") {
       return response({ ...((options.loanPreview ?? {}) as object), imported: 1 });
@@ -92,7 +97,7 @@ describe("OperationsPage", () => {
   });
 
   it("previews and imports pasted loan payments for the selected year", async () => {
-    mockApi({
+    const fetcher = mockApi({
       loans: [{
         id: 1, lender: "Banque fictive", property_id: 1, initial_principal: "15000.00",
         remaining_principal: "15000.00", monthly_payment: "62.58",
@@ -101,9 +106,10 @@ describe("OperationsPage", () => {
       }],
       loanPreview: {
         count: 1, source_count: 2, imported: 0, outside_year: 1, future: 0,
-        loan_reference: "085644F",
+        loan_reference: "085644F", preview_token: "a".repeat(64),
         rows: [{
-          loan_reference: "085644F", rank: "1", date: "2025-03-05",
+          loan_reference: "085644F", rank: "1", due_date: "2025-03-05",
+          date: "2025-03-05",
           principal: "100.00", interest: "20.00", insurance: "5.00",
           other_costs: "0.00", amount: "125.00", duplicate: false,
           piece_reference: "ECH-164000-2025-03-05",
@@ -126,8 +132,47 @@ describe("OperationsPage", () => {
     expect(screen.getByText("100.00 €")).toBeInTheDocument();
     expect(screen.getByText("20.00 €")).toBeInTheDocument();
     expect(screen.getByText("5.00 €")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Comptabiliser les échéances" }));
+    const importButton = screen.getByRole("button", { name: "Comptabiliser les échéances" });
+    expect(importButton).toBeDisabled();
+    await userEvent.click(screen.getByRole("checkbox", { name: /prêt source 085644F/ }));
+    expect(importButton).toBeEnabled();
+    await userEvent.click(importButton);
     expect(await screen.findByText(/1 échéance\(s\) comptabilisée\(s\)/)).toBeInTheDocument();
+    const importCall = fetcher.mock.calls.find(([url]) =>
+      url === "/api/operations/loans/1/payments/import"
+    );
+    const importedBody = JSON.parse(String(importCall?.[1]?.body)) as Record<string, unknown>;
+    expect(importedBody.preview_token).toBe("a".repeat(64));
+    expect(importedBody.confirmed_loan_reference).toBe("085644F");
+  });
+
+  it("discards a late loan preview after the pasted content changes", async () => {
+    let resolvePreview: (value: Response) => void = () => undefined;
+    const pendingPreview = new Promise<Response>((resolve) => { resolvePreview = resolve; });
+    mockApi({
+      loans: [{
+        id: 1, lender: "Banque fictive", property_id: 1, initial_principal: "15000.00",
+        remaining_principal: "15000.00", monthly_payment: "62.58",
+        monthly_insurance: "4.53", principal_account: "164000",
+        interest_rate_basis_points: 150,
+      }],
+      loanPreviewResponse: pendingPreview,
+    });
+    render(<OperationsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /Emprunts/ }));
+    await userEvent.click(screen.getByText("Importer les échéances depuis Google Sheets ou un CSV"));
+    const input = screen.getByLabelText("Lignes du tableau d’amortissement");
+    fireEvent.change(input, { target: { value: "ancien contenu" } });
+    await userEvent.click(screen.getByRole("button", { name: "Prévisualiser les échéances" }));
+    fireEvent.change(input, { target: { value: "nouveau contenu" } });
+    resolvePreview(new Response(JSON.stringify({
+      count: 1, source_count: 1, imported: 0, outside_year: 0, future: 0,
+      loan_reference: "085644F", preview_token: "a".repeat(64), rows: [],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Prévisualiser les échéances" })).toBeEnabled();
+    });
+    expect(screen.queryByText(/échéance\(s\) retenue\(s\)/)).not.toBeInTheDocument();
   });
 
   it("prefills loyer type and an automatic piece reference on new revenue", async () => {

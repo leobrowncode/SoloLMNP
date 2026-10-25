@@ -77,6 +77,9 @@ puis **Enregistrer un règlement** plus tard.
   la banque, puis collez les lignes d’un seul prêt depuis Google Sheets. Les colonnes
   `Prêt`, `Rang`, `Date`, `Capital`, `Intérêts`, `Assurance banque`,
   `Assurance externe à compléter` et `Total banque` du modèle sont reconnues.
+- Vérifiez puis confirmez explicitement la correspondance entre la référence `Prêt`
+  du tableau et l’emprunt SoloLMNP sélectionné. Ajoutez si nécessaire une colonne
+  `Date débit` pour reprendre la date comptable exacte du relevé bancaire.
 - La prévisualisation conserve seulement les échéances de l’exercice déjà arrivées à
   leur date. Elle ignore les doublons identiques et refuse une ventilation différente
   pour une date déjà comptabilisée. Le capital restant dû ou le déblocage doit exister.

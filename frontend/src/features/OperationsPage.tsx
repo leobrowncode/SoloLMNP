@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { amount, cents, request, type Account, type Setup, type Entry } from "../api/ledger";
 import { operationsRequest as api, type Property, type Bank, type Loan, type Operation, type BankTransaction, type ImportPreview, type OperationImportPreview, type LoanPaymentImportPreview, type Tenant } from "../api/operations";
 import ReviewForm, { type Field } from "./ReviewForm";
@@ -22,6 +22,14 @@ interface Editor {
   derive?: (draft: Record<string, string>, changed: string) => Partial<Record<string, string>>;
 }
 
+interface LoanImportPreviewState {
+  result: LoanPaymentImportPreview;
+  loanId: number;
+  yearId: number;
+  bankId: number;
+  content: string;
+}
+
 export default function OperationsPage() {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Biens");
   const [setup, setSetup] = useState<Setup | null>(null);
@@ -40,7 +48,9 @@ export default function OperationsPage() {
   const [opPropertyId, setOpPropertyId] = useState(0);
   const [opYearId, setOpYearId] = useState(0);
   const [loanCsv, setLoanCsv] = useState("");
-  const [loanPreview, setLoanPreview] = useState<LoanPaymentImportPreview | null>(null);
+  const [loanPreview, setLoanPreview] = useState<LoanImportPreviewState | null>(null);
+  const [loanMappingConfirmed, setLoanMappingConfirmed] = useState(false);
+  const loanPreviewRequest = useRef(0);
   const [loanImportId, setLoanImportId] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [error, setError] = useState("");
@@ -231,7 +241,15 @@ export default function OperationsPage() {
     setMatchCandidates({ transaction, lines });
   }
 
+  function clearLoanPaymentPreview() {
+    loanPreviewRequest.current += 1;
+    setLoanPreview(null);
+    setLoanMappingConfirmed(false);
+  }
+
   const openYears = setup?.years.filter((year) => year.status === "OPEN") ?? [];
+  const loanPreviewData = loanPreview?.result ?? null;
+  const previewLoan = loans.find((loan) => loan.id === loanPreview?.loanId);
   function occupants(id: number) {
     const rows = tenants[id];
     return Array.isArray(rows) ? rows : [];
@@ -509,11 +527,11 @@ export default function OperationsPage() {
         ))}
         {!!loans.length && !!banks.length && !!openYears.length && <details>
           <summary>Importer les échéances depuis Google Sheets ou un CSV</summary>
-          <p>Collez l’en-tête et les lignes d’un seul prêt. Colonnes reconnues : <code>Prêt;Rang;Date;Capital (€);Intérêts (€);Assurance banque (€);Assurance externe à compléter (€);Total banque (€)</code>. Seules les échéances de l’exercice déjà arrivées à leur date seront proposées.</p>
+          <p>Collez l’en-tête et les lignes d’un seul prêt. Colonnes reconnues : <code>Prêt;Rang;Date;Capital (€);Intérêts (€);Assurance banque (€);Assurance externe à compléter (€);Total banque (€)</code>. La colonne facultative <code>Date débit</code> permet d’utiliser la date réelle du relevé bancaire. Seules les échéances de l’exercice déjà arrivées à leur date seront proposées.</p>
           <p>L’assurance externe prélevée séparément reste une dépense <code>ASS</code> : ne l’incluez pas dans le total banque.</p>
           <label className="toolbar-field">Emprunt
             <select value={loanImportId} onChange={(e) => {
-              setLoanImportId(Number(e.target.value)); setLoanPreview(null);
+              setLoanImportId(Number(e.target.value)); clearLoanPaymentPreview();
             }}>
               {loans.map((loan) => (
                 <option key={loan.id} value={loan.id}>
@@ -524,7 +542,7 @@ export default function OperationsPage() {
           </label>
           <label className="toolbar-field">Exercice
             <select value={opYearId} onChange={(e) => {
-              setOpYearId(Number(e.target.value)); setLoanPreview(null);
+              setOpYearId(Number(e.target.value)); clearLoanPaymentPreview();
             }}>
               {openYears.map((year) => (
                 <option key={year.id} value={year.id}>{year.year}</option>
@@ -533,7 +551,7 @@ export default function OperationsPage() {
           </label>
           <label className="toolbar-field">Compte bancaire
             <select value={bankId} onChange={(e) => {
-              setBankId(Number(e.target.value)); setBankOffset(0); setLoanPreview(null);
+              setBankId(Number(e.target.value)); setBankOffset(0); clearLoanPaymentPreview();
             }}>
               {banks.map((bank) => (
                 <option key={bank.id} value={bank.id}>{bank.name} · {bank.account_number}</option>
@@ -541,50 +559,78 @@ export default function OperationsPage() {
             </select>
           </label>
           <label>Fichier CSV Google Sheets ou à point-virgule (1 Mo maximum)<input type="file" accept=".csv,text/csv" onChange={(e) => {
-            const file = e.target.files?.[0]; setLoanPreview(null);
+            const file = e.target.files?.[0]; clearLoanPaymentPreview();
             if (file) void action(async () => {
               if (file.size > 1_000_000) throw new Error("Fichier trop volumineux.");
               setLoanCsv(await file.text());
             });
           }} /></label>
           <label>Lignes du tableau d’amortissement<textarea rows={8} value={loanCsv} onChange={(e) => {
-            setLoanCsv(e.target.value); setLoanPreview(null);
+            setLoanCsv(e.target.value); clearLoanPaymentPreview();
           }} /></label>
           <button type="button" disabled={busy || !loanCsv || !loanImportId || !opYearId || !bankId} onClick={() => {
-            void action(async () => setLoanPreview(await api<LoanPaymentImportPreview>(
-              "/loans/" + loanImportId + "/payments/import/preview",
-              "POST",
-              { fiscal_year_id: opYearId, bank_account_id: bankId, content: loanCsv },
-            )));
+            const requestId = ++loanPreviewRequest.current;
+            const context = {
+              loanId: loanImportId, yearId: opYearId, bankId, content: loanCsv,
+            };
+            void action(async () => {
+              const result = await api<LoanPaymentImportPreview>(
+                "/loans/" + context.loanId + "/payments/import/preview",
+                "POST",
+                {
+                  fiscal_year_id: context.yearId,
+                  bank_account_id: context.bankId,
+                  content: context.content,
+                },
+              );
+              if (loanPreviewRequest.current !== requestId) return;
+              setLoanPreview({ result, ...context });
+              setLoanMappingConfirmed(false);
+            });
           }}>Prévisualiser les échéances</button>
-          {loanPreview && <>
+          {loanPreviewData && loanPreview && <>
             <p>
-              {loanPreview.count} échéance(s) retenue(s) sur {loanPreview.source_count}
-              {" · "}{loanPreview.outside_year} hors exercice
-              {" · "}{loanPreview.future} future(s)
-              {" · "}{loanPreview.rows.filter((row) => row.duplicate).length} déjà comptabilisée(s)
-              {loanPreview.loan_reference ? " · prêt " + loanPreview.loan_reference : ""}
+              {loanPreviewData.count} échéance(s) retenue(s) sur {loanPreviewData.source_count}
+              {" · "}{loanPreviewData.outside_year} hors exercice
+              {" · "}{loanPreviewData.future} future(s)
+              {" · "}{loanPreviewData.rows.filter((row) => row.duplicate).length} déjà comptabilisée(s)
+              {" · prêt source "}{loanPreviewData.loan_reference}
             </p>
-            {loanPreview.rows.length ? <div className="ledger-table"><table>
-              <thead><tr><th>Date</th><th>Rang</th><th>Capital</th><th>Intérêts</th><th>Assurance banque</th><th>Autres frais</th><th>Total banque</th><th>État</th></tr></thead>
-              <tbody>{loanPreview.rows.map((row) => (
-                <tr key={row.date}>
-                  <td>{row.date}</td><td>{row.rank || "—"}</td><td>{row.principal} €</td>
+            {loanPreviewData.rows.length ? <div className="ledger-table"><table>
+              <thead><tr><th>Échéance</th><th>Date comptable</th><th>Rang</th><th>Capital</th><th>Intérêts</th><th>Assurance banque</th><th>Autres frais</th><th>Total banque</th><th>État</th></tr></thead>
+              <tbody>{loanPreviewData.rows.map((row) => (
+                <tr key={row.due_date + "-" + row.date}>
+                  <td>{row.due_date}</td><td>{row.date}</td><td>{row.rank || "—"}</td><td>{row.principal} €</td>
                   <td>{row.interest} €</td><td>{row.insurance} €</td>
                   <td>{row.other_costs} €</td><td>{row.amount} €</td>
                   <td>{row.duplicate ? "Déjà comptabilisée" : "À comptabiliser"}</td>
                 </tr>
               ))}</tbody>
             </table></div> : <p>Aucune échéance arrivée à sa date pour cet exercice.</p>}
-            <button type="button" disabled={busy || !loanPreview.rows.some((row) => !row.duplicate)} onClick={() => {
+            {loanPreviewData.rows.some((row) => !row.duplicate) && <label>
+              <input
+                type="checkbox"
+                checked={loanMappingConfirmed}
+                onChange={(event) => setLoanMappingConfirmed(event.target.checked)}
+              />
+              Je confirme que le prêt source {loanPreviewData.loan_reference} correspond à
+              {" "}{previewLoan?.lender} · {previewLoan?.initial_principal} € · {previewLoan?.principal_account}.
+            </label>}
+            <button type="button" disabled={busy || !loanMappingConfirmed || !loanPreviewData.rows.some((row) => !row.duplicate)} onClick={() => {
               void action(async () => {
                 const result = await api<LoanPaymentImportPreview>(
-                  "/loans/" + loanImportId + "/payments/import",
+                  "/loans/" + loanPreview.loanId + "/payments/import",
                   "POST",
-                  { fiscal_year_id: opYearId, bank_account_id: bankId, content: loanCsv },
+                  {
+                    fiscal_year_id: loanPreview.yearId,
+                    bank_account_id: loanPreview.bankId,
+                    content: loanPreview.content,
+                    preview_token: loanPreviewData.preview_token,
+                    confirmed_loan_reference: loanPreviewData.loan_reference,
+                  },
                 );
                 setMessage(result.imported + " échéance(s) comptabilisée(s). Rapprochez ensuite le relevé bancaire.");
-                setLoanPreview(null); setRevision((value) => value + 1);
+                clearLoanPaymentPreview(); setRevision((value) => value + 1);
               });
             }}>Comptabiliser les échéances</button>
           </>}

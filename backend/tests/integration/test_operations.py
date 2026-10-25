@@ -298,6 +298,7 @@ def test_loan_sheet_preview_import_reimport_and_conflict(client):
     assert body["rows"][0] == {
         "loan_reference": "085644F",
         "rank": "1",
+        "due_date": "2025-02-05",
         "date": "2025-02-05",
         "principal": "100.00",
         "interest": "20.00",
@@ -309,7 +310,25 @@ def test_loan_sheet_preview_import_reimport_and_conflict(client):
     }
     assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 1
 
-    imported = client.post("/api/operations/loans/1/payments/import", json=payload)
+    refused = client.post("/api/operations/loans/1/payments/import", json=payload)
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "LOAN_PREVIEW_REQUIRED"
+    wrong_mapping = client.post(
+        "/api/operations/loans/1/payments/import",
+        json={
+            **payload,
+            "preview_token": body["preview_token"],
+            "confirmed_loan_reference": "085645F",
+        },
+    )
+    assert wrong_mapping.status_code == 409
+    assert wrong_mapping.json()["detail"]["code"] == "LOAN_PREVIEW_REQUIRED"
+    confirmed = {
+        **payload,
+        "preview_token": body["preview_token"],
+        "confirmed_loan_reference": body["loan_reference"],
+    }
+    imported = client.post("/api/operations/loans/1/payments/import", json=confirmed)
     assert imported.status_code == 200, imported.text
     assert imported.json()["imported"] == 2
     assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 3
@@ -323,7 +342,7 @@ def test_loan_sheet_preview_import_reimport_and_conflict(client):
     assert payments["2025-02-05"]["interest"] == "20.00"
     assert payments["2025-02-05"]["insurance"] == "5.00"
 
-    repeated = client.post("/api/operations/loans/1/payments/import", json=payload)
+    repeated = client.post("/api/operations/loans/1/payments/import", json=confirmed)
     assert repeated.status_code == 200, repeated.text
     assert repeated.json()["imported"] == 0
     assert all(row["duplicate"] for row in repeated.json()["rows"])
@@ -333,7 +352,7 @@ def test_loan_sheet_preview_import_reimport_and_conflict(client):
         "100,00\t21,00\t5,00\t\t126,00",
     )
     refused = client.post(
-        "/api/operations/loans/1/payments/import",
+        "/api/operations/loans/1/payments/import/preview",
         json={**payload, "content": conflict},
     )
     assert refused.status_code == 409
@@ -372,6 +391,89 @@ def test_loan_sheet_accepts_google_csv_export(client):
     )
     assert response.status_code == 200, response.text
     assert response.json()["rows"][0]["amount"] == "125.00"
+
+
+def test_loan_sheet_uses_optional_actual_payment_date(client):
+    loan(client)
+    funded = client.post(
+        "/api/operations/loans/1/fund",
+        json=settlement(amount="10000.00"),
+    )
+    assert funded.status_code == 201, funded.text
+    content = (
+        "Prêt;Rang;Date;Date débit;Capital;Intérêts;Assurance banque;Total banque\n"
+        "085644F;1;2025-02-05;2025-02-06;100.00;20.00;5.00;125.00\n"
+    )
+    payload = {"fiscal_year_id": 1, "bank_account_id": 1, "content": content}
+    preview = client.post("/api/operations/loans/1/payments/import/preview", json=payload)
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["rows"][0]["due_date"] == "2025-02-05"
+    assert body["rows"][0]["date"] == "2025-02-06"
+    confirmed = {
+        **payload,
+        "preview_token": body["preview_token"],
+        "confirmed_loan_reference": body["loan_reference"],
+    }
+    imported = client.post("/api/operations/loans/1/payments/import", json=confirmed)
+    assert imported.status_code == 200, imported.text
+    payment = next(
+        row for row in client.get("/api/operations").json() if row["kind"] == "LOAN_PAYMENT"
+    )
+    assert payment["date"] == "2025-02-06"
+    changed_date = client.post(
+        "/api/operations/loans/1/payments/import/preview",
+        json={**payload, "content": content.replace("2025-02-06", "2025-02-07")},
+    )
+    assert changed_date.status_code == 409
+    assert changed_date.json()["detail"]["code"] == "LOAN_CSV_CONFLICT"
+
+
+def test_reversed_loan_sheet_row_can_be_corrected_after_later_payment(client):
+    loan(client)
+    client.post("/api/operations/loans/1/fund", json=settlement(amount="10000.00"))
+    payload = {"fiscal_year_id": 1, "bank_account_id": 1, "content": LOAN_SHEET}
+    preview = client.post("/api/operations/loans/1/payments/import/preview", json=payload).json()
+    confirmed = {
+        **payload,
+        "preview_token": preview["preview_token"],
+        "confirmed_loan_reference": preview["loan_reference"],
+    }
+    assert client.post("/api/operations/loans/1/payments/import", json=confirmed).status_code == 200
+    first = next(
+        row
+        for row in client.get("/api/operations").json()
+        if row["kind"] == "LOAN_PAYMENT" and row["date"] == "2025-02-05"
+    )
+    reversed_response = client.post(
+        f"/api/operations/{first['id']}/reverse",
+        json=reversal(accounting_date="2025-04-01", piece_reference="EXT-ECH-1"),
+    )
+    assert reversed_response.status_code == 201, reversed_response.text
+
+    corrected_content = LOAN_SHEET.replace(
+        "100,00\t20,00\t5,00\t\t125,00",
+        "99,00\t21,00\t5,00\t\t125,00",
+    )
+    corrected_payload = {**payload, "content": corrected_content}
+    corrected_preview = client.post(
+        "/api/operations/loans/1/payments/import/preview",
+        json=corrected_payload,
+    )
+    assert corrected_preview.status_code == 200, corrected_preview.text
+    corrected_body = corrected_preview.json()
+    assert [row["duplicate"] for row in corrected_body["rows"]] == [False, True]
+    corrected = client.post(
+        "/api/operations/loans/1/payments/import",
+        json={
+            **corrected_payload,
+            "preview_token": corrected_body["preview_token"],
+            "confirmed_loan_reference": corrected_body["loan_reference"],
+        },
+    )
+    assert corrected.status_code == 200, corrected.text
+    assert corrected.json()["imported"] == 1
+    assert client.get("/api/operations/loans").json()[0]["remaining_principal"] == "9800.00"
 
 
 @pytest.mark.parametrize(

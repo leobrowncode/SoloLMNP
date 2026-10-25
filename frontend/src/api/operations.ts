@@ -27,11 +27,11 @@ export interface OperationImportRow {
 }
 export interface OperationImportPreview { count: number; imported: number; rows: OperationImportRow[] }
 export interface LoanPaymentImportRow {
-  loan_reference: string; rank: string; date: string; principal: string; interest: string;
-  insurance: string; other_costs: string; amount: string; duplicate: boolean;
+  loan_reference: string; rank: string; due_date: string; date: string; principal: string;
+  interest: string; insurance: string; other_costs: string; amount: string; duplicate: boolean;
   piece_reference: string;
 }
 export interface LoanPaymentImportPreview {
   count: number; source_count: number; imported: number; outside_year: number; future: number;
-  loan_reference: string; rows: LoanPaymentImportRow[];
+  loan_reference: string; preview_token: string; rows: LoanPaymentImportRow[];
 }
