@@ -15,6 +15,7 @@ from app.api.operation_schemas import (
     FundingInput,
     LoanInput,
     LoanPaymentInput,
+    LoanPaymentsCSVInput,
     MatchInput,
     OperationInput,
     OperationsCSVInput,
@@ -166,6 +167,32 @@ def build_operations_router(database: Database) -> APIRouter:
     @router.post("/loans/{loan_id}/payments", status_code=201)
     def payment(loan_id: int, data: LoanPaymentInput, session: Write) -> dict[str, Any]:
         return service.operation_json(session, service.loan_post(session, loan_id, data, False))
+
+    @router.post("/loans/{loan_id}/payments/import/preview")
+    def loan_payments_preview(
+        loan_id: int, data: LoanPaymentsCSVInput, session: Read
+    ) -> dict[str, Any]:
+        return service.import_loan_payments_csv(
+            session,
+            loan_id,
+            data.fiscal_year_id,
+            data.bank_account_id,
+            data.content,
+            False,
+        )
+
+    @router.post("/loans/{loan_id}/payments/import")
+    def loan_payments_import(
+        loan_id: int, data: LoanPaymentsCSVInput, session: Write
+    ) -> dict[str, Any]:
+        return service.import_loan_payments_csv(
+            session,
+            loan_id,
+            data.fiscal_year_id,
+            data.bank_account_id,
+            data.content,
+            True,
+        )
 
     @router.post("/import/preview")
     def operations_preview(data: OperationsCSVInput, session: Read) -> dict[str, Any]:

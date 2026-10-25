@@ -9,7 +9,7 @@ function response(body: unknown) {
   }));
 }
 
-function mockApi() {
+function mockApi(options: { loans?: unknown[]; loanPreview?: unknown } = {}) {
   const fetcher = vi.fn((url: string) => {
     if (url === "/api/ledger/setup") return response({
       activity: { activity_name: "Fictif" },
@@ -27,7 +27,13 @@ function mockApi() {
     if (url === "/api/operations/banks") return response([
       { id: 1, name: "Banque fictive", account_number: "512000" },
     ]);
-    if (url === "/api/operations/loans") return response([]);
+    if (url === "/api/operations/loans") return response(options.loans ?? []);
+    if (url === "/api/operations/loans/1/payments/import/preview") {
+      return response(options.loanPreview ?? {});
+    }
+    if (url === "/api/operations/loans/1/payments/import") {
+      return response({ ...((options.loanPreview ?? {}) as object), imported: 1 });
+    }
     if (url.startsWith("/api/operations?")) return response([{
       id: 1, kind: "EXPENSE", property_id: 1, fiscal_year_id: 1,
       date: "2025-02-01", amount: "100.00", description: "Assurance",
@@ -83,6 +89,45 @@ describe("OperationsPage", () => {
       "Biens", "Banque", "Emprunts", "Transactions",
     ]);
     expect(tabs.length).toBeGreaterThan(0);
+  });
+
+  it("previews and imports pasted loan payments for the selected year", async () => {
+    mockApi({
+      loans: [{
+        id: 1, lender: "Banque fictive", property_id: 1, initial_principal: "15000.00",
+        remaining_principal: "15000.00", monthly_payment: "62.58",
+        monthly_insurance: "4.53", principal_account: "164000",
+        interest_rate_basis_points: 150,
+      }],
+      loanPreview: {
+        count: 1, source_count: 2, imported: 0, outside_year: 1, future: 0,
+        loan_reference: "085644F",
+        rows: [{
+          loan_reference: "085644F", rank: "1", date: "2025-03-05",
+          principal: "100.00", interest: "20.00", insurance: "5.00",
+          other_costs: "0.00", amount: "125.00", duplicate: false,
+          piece_reference: "ECH-164000-2025-03-05",
+        }],
+      },
+    });
+    render(<OperationsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /Emprunts/ }));
+    await userEvent.click(screen.getByText("Importer les échéances depuis Google Sheets ou un CSV"));
+    expect(screen.getByText(/Assurance externe à compléter/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Lignes du tableau d’amortissement"), {
+      target: {
+        value: "Prêt\tRang\tDate\tCapital (€)\tIntérêts (€)\tAssurance banque (€)\t"
+          + "Assurance externe à compléter (€)\tTotal banque (€)\n"
+          + "085644F\t1\t05/03/2025\t100,00\t20,00\t5,00\t\t125,00\n",
+      },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Prévisualiser les échéances" }));
+    expect(await screen.findByText(/1 échéance\(s\) retenue\(s\) sur 2/)).toBeInTheDocument();
+    expect(screen.getByText("100.00 €")).toBeInTheDocument();
+    expect(screen.getByText("20.00 €")).toBeInTheDocument();
+    expect(screen.getByText("5.00 €")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Comptabiliser les échéances" }));
+    expect(await screen.findByText(/1 échéance\(s\) comptabilisée\(s\)/)).toBeInTheDocument();
   });
 
   it("prefills loyer type and an automatic piece reference on new revenue", async () => {

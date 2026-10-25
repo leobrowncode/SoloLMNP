@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import re
+import unicodedata
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -972,3 +973,363 @@ def import_operations_csv(
         {key: value for key, value in row.items() if key != "request_id"} for row in prepared
     ]
     return {"rows": visible, "imported": imported, "count": len(rows)}
+
+
+LOAN_PAYMENT_HEADER_ALIASES = {
+    "pret": "loan_reference",
+    "reference pret": "loan_reference",
+    "rang": "rank",
+    "numero": "rank",
+    "n": "rank",
+    "date": "date",
+    "date echeance": "date",
+    "capital": "principal",
+    "principal": "principal",
+    "interet": "interest",
+    "interets": "interest",
+    "assurance": "insurance",
+    "assurance banque": "insurance",
+    "assurance externe": "external_insurance",
+    "assurance externe a completer": "external_insurance",
+    "autres frais": "other_costs",
+    "frais": "other_costs",
+    "total": "amount",
+    "total banque": "amount",
+    "echeance": "amount",
+    "mensualite": "amount",
+}
+LOAN_PAYMENT_REQUIRED_COLUMNS = {"date", "principal", "interest", "insurance", "amount"}
+
+
+def _loan_payment_header(value: str) -> str:
+    text = "".join(
+        character
+        for character in unicodedata.normalize("NFKD", value)
+        if not unicodedata.combining(character)
+    ).lower()
+    text = re.sub(r"\([^)]*\)", "", text)
+    text = re.sub(r"[_/–—-]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _loan_payment_money(value: str, index: int, label: str, blank_is_zero: bool) -> str:
+    normalized = re.sub(r"[\s\u00a0\u202f€]", "", value).replace(",", ".")
+    if not normalized and blank_is_zero:
+        return "0.00"
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,2})?", normalized):
+        fail(
+            "LOAN_CSV_AMOUNT",
+            f"{label} positif ou nul au centime invalide, ligne {index}.",
+            422,
+        )
+    try:
+        return money(to_cents(Decimal(normalized)))
+    except (ValueError, ArithmeticError):
+        fail("LOAN_CSV_AMOUNT", f"{label} invalide, ligne {index}.", 422)
+
+
+def parse_loan_payments_csv(content: str) -> list[dict[str, str]]:
+    """Parse the amortization-sheet columns pasted as TSV or exported as CSV."""
+    text = content.lstrip("\ufeff")
+    first_line = text.split("\n", 1)[0]
+    delimiter = "\t" if "\t" in first_line else ";" if ";" in first_line else ","
+    try:
+        reader = csv.DictReader(io.StringIO(text), delimiter=delimiter, strict=True)
+        fieldnames = [name.strip() for name in reader.fieldnames or []]
+        reader.fieldnames = fieldnames
+        columns: dict[str, str] = {}
+        for original in fieldnames:
+            canonical = LOAN_PAYMENT_HEADER_ALIASES.get(_loan_payment_header(original))
+            if canonical is None:
+                continue
+            if canonical in columns:
+                fail(
+                    "LOAN_CSV_HEADER",
+                    f"Colonne d’échéancier présente plusieurs fois : {original}.",
+                    422,
+                )
+            columns[canonical] = original
+        missing = sorted(LOAN_PAYMENT_REQUIRED_COLUMNS - columns.keys())
+        if missing:
+            fail(
+                "LOAN_CSV_HEADER",
+                "Colonnes requises : Date, Capital, Intérêts, Assurance banque, Total banque.",
+                422,
+            )
+
+        rows: list[dict[str, str]] = []
+        dates: set[date] = set()
+        references: set[str] = set()
+        for index, raw in enumerate(reader, 2):
+            if index > 5001 or None in raw or any(value is None for value in raw.values()):
+                fail(
+                    "LOAN_CSV_SHAPE",
+                    f"Ligne {index} invalide ou limite de 5 000 lignes dépassée.",
+                    422,
+                )
+            if not any(value.strip() for value in raw.values()):
+                continue
+            try:
+                day = _sheet_day(raw[columns["date"]].strip())
+            except ValueError:
+                fail(
+                    "LOAN_CSV_DATE",
+                    f"Date AAAA-MM-JJ ou JJ/MM/AAAA requise, ligne {index}.",
+                    422,
+                )
+            if day in dates:
+                fail(
+                    "LOAN_CSV_DUPLICATE_DATE",
+                    f"Deux échéances portent la date {day.isoformat()}. Collez un seul prêt.",
+                    422,
+                )
+            principal = _loan_payment_money(
+                raw[columns["principal"]], index, "Capital", blank_is_zero=False
+            )
+            interest = _loan_payment_money(
+                raw[columns["interest"]], index, "Intérêts", blank_is_zero=True
+            )
+            insurance = _loan_payment_money(
+                raw[columns["insurance"]], index, "Assurance banque", blank_is_zero=True
+            )
+            other_costs = _loan_payment_money(
+                raw[columns["other_costs"]] if "other_costs" in columns else "",
+                index,
+                "Autres frais",
+                blank_is_zero=True,
+            )
+            external_insurance = _loan_payment_money(
+                raw[columns["external_insurance"]] if "external_insurance" in columns else "",
+                index,
+                "Assurance externe",
+                blank_is_zero=True,
+            )
+            if to_cents(Decimal(external_insurance)):
+                fail(
+                    "LOAN_CSV_EXTERNAL_INSURANCE",
+                    "L’assurance externe est un prélèvement distinct à importer comme dépense ASS, "
+                    f"ligne {index}.",
+                    422,
+                )
+            amount = _loan_payment_money(
+                raw[columns["amount"]], index, "Total banque", blank_is_zero=False
+            )
+            expected = sum(
+                to_cents(Decimal(value)) for value in (principal, interest, insurance, other_costs)
+            )
+            if expected <= 0 or expected != to_cents(Decimal(amount)):
+                fail(
+                    "LOAN_CSV_SPLIT",
+                    "Capital + intérêts + assurance banque + autres frais doit égaler "
+                    f"le total banque, ligne {index}.",
+                    422,
+                )
+            loan_reference = (
+                raw[columns["loan_reference"]].strip() if "loan_reference" in columns else ""
+            )
+            if loan_reference:
+                references.add(loan_reference)
+            rows.append(
+                {
+                    "loan_reference": loan_reference,
+                    "rank": raw[columns["rank"]].strip() if "rank" in columns else "",
+                    "date": day.isoformat(),
+                    "principal": principal,
+                    "interest": interest,
+                    "insurance": insurance,
+                    "other_costs": other_costs,
+                    "amount": amount,
+                }
+            )
+            dates.add(day)
+        if not rows:
+            fail("LOAN_CSV_EMPTY", "Le tableau ne contient aucune échéance.", 422)
+        if len(references) > 1:
+            fail(
+                "LOAN_CSV_MULTIPLE_LOANS",
+                "Plusieurs références de prêt sont présentes. Collez un seul prêt à la fois.",
+                422,
+            )
+        return sorted(rows, key=lambda row: row["date"])
+    except csv.Error:
+        fail("LOAN_CSV_INVALID", "Tableau d’amortissement invalide.", 422)
+
+
+def _same_imported_loan_payment(
+    row: BusinessOperation,
+    data: dict[str, str],
+    loan: Loan,
+    year_id: int,
+    bank_id: int,
+) -> bool:
+    return (
+        row.kind == "LOAN_PAYMENT"
+        and row.loan_id == loan.id
+        and row.property_id == loan.property_id
+        and row.fiscal_year_id == year_id
+        and row.bank_account_id == bank_id
+        and row.date.isoformat() == data["date"]
+        and money(to_cents(row.amount)) == data["amount"]
+        and money(to_cents(row.principal)) == data["principal"]
+        and money(to_cents(row.interest)) == data["interest"]
+        and money(to_cents(row.insurance)) == data["insurance"]
+        and money(to_cents(row.other_costs)) == data["other_costs"]
+    )
+
+
+def import_loan_payments_csv(
+    session: Session,
+    loan_id: int,
+    year_id: int,
+    bank_id: int,
+    content: str,
+    commit: bool,
+) -> dict[str, Any]:
+    loan = session.get(Loan, loan_id)
+    if loan is None:
+        fail("LOAN_NOT_FOUND", "Emprunt introuvable.", 404)
+    year = get_year(session, year_id, writable=True)
+    bank(session, bank_id)
+    source_rows = parse_loan_payments_csv(content)
+    outside_year = sum(
+        not year.start_date <= date.fromisoformat(row["date"]) <= year.end_date
+        for row in source_rows
+    )
+    rows_in_year = [
+        row
+        for row in source_rows
+        if year.start_date <= date.fromisoformat(row["date"]) <= year.end_date
+    ]
+    today = date.today()
+    future = sum(date.fromisoformat(row["date"]) > today for row in rows_in_year)
+    eligible = [row for row in rows_in_year if date.fromisoformat(row["date"]) <= today]
+
+    prepared: list[dict[str, Any]] = []
+    for data in eligible:
+        day = date.fromisoformat(data["date"])
+        if day < loan.start_date:
+            fail(
+                "LOAN_CSV_BEFORE_START",
+                f"L’échéance du {data['date']} précède le début de l’emprunt.",
+                422,
+            )
+        prior = list(
+            session.scalars(
+                select(BusinessOperation).where(
+                    BusinessOperation.kind == "LOAN_PAYMENT",
+                    BusinessOperation.loan_id == loan.id,
+                    BusinessOperation.date == day,
+                )
+            )
+        )
+        active = [row for row in prior if reversed_entry(session, row.accounting_entry_id) is None]
+        if len(active) > 1:
+            fail(
+                "LOAN_CSV_CONFLICT",
+                f"Plusieurs échéances actives existent déjà le {data['date']}.",
+            )
+        duplicate = False
+        if active:
+            if not _same_imported_loan_payment(active[0], data, loan, year.id, bank_id):
+                fail(
+                    "LOAN_CSV_CONFLICT",
+                    f"L’échéance du {data['date']} existe avec une ventilation différente.",
+                )
+            duplicate = True
+        revision = len(prior)
+        prepared.append(
+            {
+                **data,
+                "duplicate": duplicate,
+                "piece_reference": (
+                    f"ECH-{loan.principal_account}-{day.isoformat()}"
+                    + (f"-R{revision}" if revision else "")
+                ),
+                "request_id": f"loan-csv-{loan.id}-{day:%Y%m%d}-{revision}",
+            }
+        )
+
+    new_rows = [row for row in prepared if not row["duplicate"]]
+    if new_rows:
+        latest = session.scalar(
+            select(AccountingEntry.accounting_date)
+            .join(AccountingEntryLine)
+            .where(
+                AccountingEntry.status == "VALIDATED",
+                AccountingEntryLine.account_number == loan.principal_account,
+            )
+            .order_by(AccountingEntry.accounting_date.desc())
+            .limit(1)
+        )
+        if latest is not None and any(date.fromisoformat(row["date"]) < latest for row in new_rows):
+            fail(
+                "LOAN_CHRONOLOGY",
+                "Une échéance à importer précède le dernier mouvement comptable de l’emprunt.",
+            )
+        balance = principal_balance(session, loan)
+        principal = sum(to_cents(Decimal(row["principal"])) for row in new_rows)
+        if balance <= 0:
+            fail(
+                "LOAN_NOT_FUNDED",
+                "Reprenez le capital restant dû ou comptabilisez le déblocage avant l’import.",
+            )
+        if principal > balance:
+            fail(
+                "PRINCIPAL_EXCEEDED",
+                "Le capital des échéances à importer dépasse le solde de l’emprunt.",
+            )
+
+    imported = 0
+    if commit:
+        for data in new_rows:
+            loan_post(
+                session,
+                loan.id,
+                LoanPaymentInput.model_validate(
+                    {
+                        "request_id": data["request_id"],
+                        "fiscal_year_id": year.id,
+                        "date": data["date"],
+                        "piece_reference": data["piece_reference"],
+                        "amount": data["amount"],
+                        "bank_account_id": bank_id,
+                        "principal": data["principal"],
+                        "interest": data["interest"],
+                        "insurance": data["insurance"],
+                        "other_costs": data["other_costs"],
+                    }
+                ),
+                False,
+            )
+            imported += 1
+        event(
+            session,
+            "LOAN_PAYMENTS_IMPORTED",
+            None,
+            {
+                "loan_id": loan.id,
+                "fiscal_year_id": year.id,
+                "bank_account_id": bank_id,
+                "imported": imported,
+                "duplicates": len(prepared) - imported,
+                "outside_year": outside_year,
+                "future": future,
+                "sha256": hashlib.sha256(content.encode()).hexdigest(),
+            },
+        )
+
+    visible = [
+        {key: value for key, value in row.items() if key != "request_id"} for row in prepared
+    ]
+    loan_reference = next(
+        (row["loan_reference"] for row in source_rows if row["loan_reference"]), ""
+    )
+    return {
+        "rows": visible,
+        "imported": imported,
+        "count": len(prepared),
+        "source_count": len(source_rows),
+        "outside_year": outside_year,
+        "future": future,
+        "loan_reference": loan_reference,
+    }

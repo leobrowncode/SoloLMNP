@@ -265,6 +265,154 @@ def test_loan_payment_invalid_split_and_principal_overflow(client):
     assert client.post("/api/operations/loans/1/payments", json=interest_only).status_code == 409
 
 
+LOAN_SHEET = (
+    "Prêt\tRang\tDate\tCapital (€)\tIntérêts (€)\tAssurance banque (€)\t"
+    "Assurance externe à compléter (€)\tTotal banque (€)\n"
+    "085644F\t0\t05/12/2024\t99,00\t21,00\t5,00\t\t125,00\n"
+    "085644F\t1\t05/02/2025\t100,00\t20,00\t5,00\t\t125,00\n"
+    "085644F\t2\t05/03/2025\t101,00\t19,00\t5,00\t\t125,00\n"
+    "085644F\t3\t05/01/2026\t102,00\t18,00\t5,00\t\t125,00\n"
+)
+
+
+def test_loan_sheet_preview_import_reimport_and_conflict(client):
+    loan(client)
+    funded = client.post(
+        "/api/operations/loans/1/fund",
+        json=settlement(amount="10000.00"),
+    )
+    assert funded.status_code == 201, funded.text
+    payload = {
+        "fiscal_year_id": 1,
+        "bank_account_id": 1,
+        "content": LOAN_SHEET,
+    }
+    preview = client.post("/api/operations/loans/1/payments/import/preview", json=payload)
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["source_count"] == 4
+    assert body["outside_year"] == 2
+    assert body["future"] == 0
+    assert body["count"] == 2
+    assert body["loan_reference"] == "085644F"
+    assert body["rows"][0] == {
+        "loan_reference": "085644F",
+        "rank": "1",
+        "date": "2025-02-05",
+        "principal": "100.00",
+        "interest": "20.00",
+        "insurance": "5.00",
+        "other_costs": "0.00",
+        "amount": "125.00",
+        "duplicate": False,
+        "piece_reference": "ECH-164000-2025-02-05",
+    }
+    assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 1
+
+    imported = client.post("/api/operations/loans/1/payments/import", json=payload)
+    assert imported.status_code == 200, imported.text
+    assert imported.json()["imported"] == 2
+    assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 3
+    assert client.get("/api/operations/loans").json()[0]["remaining_principal"] == "9799.00"
+    payments = {
+        row["date"]: row
+        for row in client.get("/api/operations?fiscal_year_id=1").json()
+        if row["kind"] == "LOAN_PAYMENT"
+    }
+    assert payments["2025-02-05"]["principal"] == "100.00"
+    assert payments["2025-02-05"]["interest"] == "20.00"
+    assert payments["2025-02-05"]["insurance"] == "5.00"
+
+    repeated = client.post("/api/operations/loans/1/payments/import", json=payload)
+    assert repeated.status_code == 200, repeated.text
+    assert repeated.json()["imported"] == 0
+    assert all(row["duplicate"] for row in repeated.json()["rows"])
+
+    conflict = LOAN_SHEET.replace(
+        "100,00\t20,00\t5,00\t\t125,00",
+        "100,00\t21,00\t5,00\t\t126,00",
+    )
+    refused = client.post(
+        "/api/operations/loans/1/payments/import",
+        json={**payload, "content": conflict},
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "LOAN_CSV_CONFLICT"
+    assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 3
+
+
+def test_loan_sheet_requires_existing_principal_balance(client):
+    loan(client)
+    payload = {
+        "fiscal_year_id": 1,
+        "bank_account_id": 1,
+        "content": LOAN_SHEET,
+    }
+    response = client.post("/api/operations/loans/1/payments/import/preview", json=payload)
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "LOAN_NOT_FUNDED"
+    assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 0
+
+
+def test_loan_sheet_accepts_google_csv_export(client):
+    loan(client)
+    funded = client.post(
+        "/api/operations/loans/1/fund",
+        json=settlement(amount="10000.00"),
+    )
+    assert funded.status_code == 201, funded.text
+    content = (
+        "Prêt,Rang,Date,Capital (€),Intérêts (€),Assurance banque (€),"
+        "Assurance externe à compléter (€),Total banque (€)\n"
+        "085644F,1,2025-02-05,100.00,20.00,5.00,,125.00\n"
+    )
+    response = client.post(
+        "/api/operations/loans/1/payments/import/preview",
+        json={"fiscal_year_id": 1, "bank_account_id": 1, "content": content},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["rows"][0]["amount"] == "125.00"
+
+
+@pytest.mark.parametrize(
+    "content,code",
+    [
+        (
+            LOAN_SHEET.replace("085644F\t2", "085645F\t2"),
+            "LOAN_CSV_MULTIPLE_LOANS",
+        ),
+        (
+            LOAN_SHEET.replace(
+                "100,00\t20,00\t5,00\t\t125,00",
+                "100,00\t20,00\t5,00\t3,00\t125,00",
+            ),
+            "LOAN_CSV_EXTERNAL_INSURANCE",
+        ),
+        (
+            LOAN_SHEET.replace("100,00\t20,00\t5,00\t\t125,00", "100,00\t20,00\t5,00\t\t124,00"),
+            "LOAN_CSV_SPLIT",
+        ),
+        (
+            LOAN_SHEET.replace("05/03/2025", "05/02/2025"),
+            "LOAN_CSV_DUPLICATE_DATE",
+        ),
+        (
+            LOAN_SHEET.replace("Capital (€)", "Montant amorti"),
+            "LOAN_CSV_HEADER",
+        ),
+    ],
+)
+def test_loan_sheet_invalid_input_is_rejected(client, content, code):
+    loan(client)
+    response = client.post(
+        "/api/operations/loans/1/payments/import/preview",
+        json={"fiscal_year_id": 1, "bank_account_id": 1, "content": content},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == code
+    assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 0
+
+
 CSV = "date;label;amount;reference\n2025-02-01;Assurance;-100,00;BANK-001\n"
 
 

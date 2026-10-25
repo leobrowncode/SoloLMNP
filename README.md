@@ -65,7 +65,7 @@ Les montants Python utilisent `Decimal`, avec stockage en centimes entiers SQLit
 - Disponible : migration `0001_foundation`, activité unique, plusieurs biens, exercices, contraintes et tests d'intégrité.
 - Disponible : contrats d'écritures immuables avec validation d'équilibre ; aucun enregistrement comptable persistant.
 - Disponible : API de santé/disponibilité, interface responsive, restrictions réseau et configuration.
-- Disponible : ledger, opérations, banque CSV, import CSV de justificatifs, emprunts, immobilisations, états provisoires, centralisation, clôture, FEC, mappings de travail, feuille EFI, justificatifs et sauvegarde.
+- Disponible : ledger, opérations, banque CSV, import CSV de justificatifs et d’échéances d’emprunt, emprunts, immobilisations, états provisoires, centralisation, clôture, FEC, mappings de travail, feuille EFI, justificatifs et sauvegarde.
 - Recherche : le calcul fiscal enregistré reste `research_only`, parce que le LMP, la cession, la TVA et les plus-values sont hors périmètre. La feuille de l’exercice 2026 est recopiable si chaque case est au registre lu et qu’aucun écart ne bloque.
 
 Voir [le rapport de phase 1](docs/PHASE1_REPORT.md), [l'architecture](ARCHITECTURE.md), [la roadmap](ROADMAP.md), [le modèle de données](docs/DATA_MODEL.md), [la sécurité](SECURITY.md) et [le workflow EFI](docs/FILING.md).

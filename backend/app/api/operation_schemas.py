@@ -148,6 +148,12 @@ class OperationsCSVInput(Input):
     bank_account_id: int | None = Field(default=None, gt=0)
 
 
+class LoanPaymentsCSVInput(Input):
+    fiscal_year_id: int = Field(gt=0)
+    bank_account_id: int = Field(gt=0)
+    content: Annotated[str, Field(min_length=1, max_length=1_000_000)]
+
+
 class MatchInput(Input):
     entry_line_id: int = Field(gt=0)
 
