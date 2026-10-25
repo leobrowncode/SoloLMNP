@@ -52,7 +52,7 @@ Menu **Opérations & banque**, dans cet ordre :
 | --- | --- |
 | **Biens** | Ajouter le bien (prix, terrain, bâtiment) |
 | **Banque** | Ajouter un compte bancaire (lié à un compte 512) |
-| **Emprunts** | Si besoin : une ligne de crédit = un emprunt. Pour 15 000 € + 195 000 €, créez deux emprunts ; un compte 164 libre est attribué automatiquement. Puis déblocage et échéances (capital / intérêts / assurance / frais : total calculé auto). |
+| **Emprunts** | Si besoin : une ligne de crédit = un emprunt. Pour 15 000 € + 195 000 €, créez deux emprunts ; un compte 164 libre est attribué automatiquement. Puis déblocage et échéances (saisie unitaire ou import du tableau d’amortissement). |
 | **Transactions** | Recettes (loyers) et dépenses (charges) |
 
 Pour chaque opération : date, bien, exercice, montant, compte 6xx/7xx.
@@ -73,7 +73,18 @@ puis **Enregistrer un règlement** plus tard.
 - Choisir le bien, l’exercice et le compte des lignes payées → Prévisualiser → Comptabiliser
 - `paid` = oui : opération réglée directement sur ce compte ; sinon elle reste **à régler**. Traitement fiscal à vérifier
 - Une référence déjà comptabilisée est ignorée ; un montant différent pour la même référence est refusé
-- Les échéances d’emprunt restent à saisir à la main dans l’onglet Emprunts
+- **Import des échéances** (onglet Emprunts) : choisissez un emprunt, l’exercice et
+  la banque, puis collez les lignes d’un seul prêt depuis Google Sheets. Les colonnes
+  `Prêt`, `Rang`, `Date`, `Capital`, `Intérêts`, `Assurance banque`,
+  `Assurance externe à compléter` et `Total banque` du modèle sont reconnues.
+- Vérifiez puis confirmez explicitement la correspondance entre la référence `Prêt`
+  du tableau et l’emprunt SoloLMNP sélectionné. Ajoutez si nécessaire une colonne
+  `Date débit` pour reprendre la date comptable exacte du relevé bancaire.
+- La prévisualisation conserve seulement les échéances de l’exercice déjà arrivées à
+  leur date. Elle ignore les doublons identiques et refuse une ventilation différente
+  pour une date déjà comptabilisée. Le capital restant dû ou le déblocage doit exister.
+- Une assurance externe prélevée séparément ne fait pas partie de l’échéance bancaire :
+  importez-la dans Transactions comme dépense `ASS`.
 
 ---
 
