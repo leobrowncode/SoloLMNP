@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { request } from "../api/ledger";
+import { RequestError, request } from "../api/ledger";
 import CloseYear from "./CloseYear";
 import LiasseSheet, { type Worksheet } from "./LiasseSheet";
 import { calculationNotice, outputLabel, outputTrust } from "./outputStatus";
@@ -43,6 +43,12 @@ interface Computation {
   unused_depreciation: string;
   tax_loss: string;
   non_deductible: string;
+  computed_at?: string;
+  invalidated?: boolean;
+  ledger_sha256?: string;
+  current_ledger_sha256?: string;
+  structuring_sha256?: string | null;
+  current_structuring_sha256?: string | null;
   details?: {
     prior_carry_forward_use?: {
       status: string;
@@ -114,6 +120,45 @@ function parseSigned(value: string): number {
   const [whole = "0", fraction = ""] = normalized.replace("-", "").split(".");
   const cents = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
   return normalized.startsWith("-") ? -cents : cents;
+}
+
+function formatComputedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Europe/Paris",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function hashMoved(stored: string, current: string): boolean {
+  return stored.length === 64 && current.length === 64 && stored !== current;
+}
+
+function Freshness({ result }: { result: Computation }) {
+  const stored = result.ledger_sha256 ?? "";
+  const current = result.current_ledger_sha256 ?? "";
+  const comparable = stored.length === 64 && current.length === 64;
+  const obsolete = result.invalidated === true
+    || (comparable && stored !== current)
+    || hashMoved(result.structuring_sha256 ?? "", result.current_structuring_sha256 ?? "");
+  if (!result.computed_at && !stored) return null;
+  return (
+    <p className={`fiscal-freshness${obsolete ? " fiscal-freshness-obsolete" : ""}`}>
+      {result.computed_at && (
+        <span>
+          Calcul du <time dateTime={result.computed_at}>{formatComputedAt(result.computed_at)}</time>
+        </span>
+      )}
+      {stored && <span className="fiscal-fingerprint">Empreinte {stored}</span>}
+      {obsolete && <strong>Obsolète</strong>}
+      {comparable && !obsolete && <span>Correspond au ledger</span>}
+    </p>
+  );
 }
 
 function euros(cents: number): string {
@@ -246,6 +291,7 @@ export default function FiscalPage() {
   const [year, setYear] = useState(0);
   const [years, setYears] = useState<YearRow[]>([]);
   const refreshToken = useRef(0);
+  const resultEpoch = useRef(0);
   const [result, setResult] = useState<Computation | null>(null);
   const [statements, setStatements] = useState<Statements | null>(null);
   const [worksheet, setWorksheet] = useState<Worksheet | null>(null);
@@ -279,20 +325,37 @@ export default function FiscalPage() {
     return () => { current = false; };
   }, [year]);
 
+  useEffect(() => {
+    if (!year) return;
+    const epoch = resultEpoch.current;
+    let current = true;
+    void request<Computation>(`/years/${year}`, "GET", undefined, "/api/fiscal").then((value) => {
+      if (current && resultEpoch.current === epoch) setResult(value);
+    }, (reason: unknown) => {
+      if (!current || resultEpoch.current !== epoch) return;
+      setResult(null);
+      if (reason instanceof RequestError && reason.status === 404) return;
+      setError(reason instanceof Error ? reason.message : "Calcul fiscal indisponible.");
+    });
+    return () => { current = false; };
+  }, [year]);
+
   const chargeAccounts = useMemo(() => {
     const rows = statements?.income_statement.expenses ?? [];
     return rows.filter((row) => !row.account_number.startsWith("681") && row.amount !== "0.00");
   }, [statements]);
 
-  const fiscalCents = result ? parseSigned(result.fiscal_result) : Number.NaN;
+  const fiscalCents = result?.fiscal_result ? parseSigned(result.fiscal_result) : Number.NaN;
   const goalTone = !result || Number.isNaN(fiscalCents)
     ? "neutral"
     : fiscalCents === 0 ? "good" : fiscalCents > 0 ? "warn" : "neutral";
 
   async function compute() {
+    const epoch = ++resultEpoch.current;
     setError("");
     setBusy(true);
     setWorksheet(null);
+    setResult(null);
     try {
       const payload = {
         adjustments: adjustments.map((item) => ({
@@ -301,11 +364,14 @@ export default function FiscalPage() {
           justification: item.justification,
         })),
       };
-      setResult(await request<Computation>(`/years/${year}`, "POST", payload, "/api/fiscal"));
+      const next = await request<Computation>(`/years/${year}`, "POST", payload, "/api/fiscal");
+      if (resultEpoch.current === epoch) setResult(next);
     } catch (reason) {
-      setError((reason as Error).message);
+      if (resultEpoch.current !== epoch) return;
+      setResult(null);
+      setError(reason instanceof Error ? reason.message : "Calcul fiscal refusé.");
     } finally {
-      setBusy(false);
+      if (resultEpoch.current === epoch) setBusy(false);
     }
   }
 
@@ -323,6 +389,8 @@ export default function FiscalPage() {
 
   function chooseYear(next: number) {
     refreshToken.current += 1;
+    resultEpoch.current += 1;
+    setBusy(false);
     setYear(next);
     setAdjustments([]);
     setStatements(null);
@@ -332,6 +400,7 @@ export default function FiscalPage() {
 
   async function refreshExercise() {
     const token = refreshToken.current;
+    const epoch = resultEpoch.current;
     const selected = year;
     const hadWorksheet = worksheet !== null;
     const hadResult = result !== null;
@@ -361,10 +430,12 @@ export default function FiscalPage() {
       : Promise.resolve();
     const resultTask = selected && hadResult
       ? request<Computation>(`/years/${selected}`, "GET", undefined, "/api/fiscal").then((value) => {
-        if (current()) setResult(value);
-      }, (reason: Error) => {
-        if (current()) setResult(null);
-        failures.push(reason.message);
+        if (current() && resultEpoch.current === epoch) setResult(value);
+      }, (reason: unknown) => {
+        if (!current() || resultEpoch.current !== epoch) return;
+        setResult(null);
+        if (reason instanceof RequestError && reason.status === 404) return;
+        failures.push(reason instanceof Error ? reason.message : "Calcul fiscal indisponible.");
       })
       : Promise.resolve();
     await Promise.all([setupTask, statementTask, worksheetTask, resultTask]);
@@ -626,6 +697,7 @@ export default function FiscalPage() {
 
       {result && details && (
         <div className="fiscal-panel" aria-live="polite">
+          <Freshness result={result} />
           <ZeroCockpit
             key={`${details.accounting_depreciation ?? "0"}-${details.capacity ?? "0"}`}
             income={parseSigned(details.operating_income ?? "0")}

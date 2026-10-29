@@ -13,6 +13,8 @@ from app.domain.fiscal.output_status import apply_output_status
 from app.models.filing import TaxReturnSnapshot
 from app.services.ledger import get_year
 
+INFO_WARNING_CODES = frozenset({"RESEARCH_ONLY", "CVAE_NON_EXIGEE"})
+LEVEL_LABELS = {"info": "Information", "warning": "Avertissement", "error": "Erreur"}
 FORM_ORDER = ("2031-SD", "2031-BIS-SD", "2033-A-SD", "2033-B-SD", "2033-C-SD", "2033-E-SD")
 FORM_TITLES = {
     "2031-SD": "2031-SD — déclaration de résultat BIC",
@@ -77,7 +79,9 @@ def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
         "depreciation_tracking": copy.get("depreciation_tracking"),
         "blocking": blocking,
         "warnings": [
-            item for item in package.get("warnings", []) if item["code"] not in BLOCKING_WARNINGS
+            _with_level(item)
+            for item in package.get("warnings", [])
+            if item["code"] not in BLOCKING_WARNINGS
         ],
         "by_property": package.get("by_property", []),
         "disclaimer": str(package.get("disclaimer") or ""),
@@ -148,6 +152,11 @@ def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
         title("Points bloquants")
         for item in worksheet["blocking"]:
             text(f"- {item['message']}")
+    if worksheet.get("warnings"):
+        title("Avertissements")
+        for item in worksheet["warnings"]:
+            level = str(item.get("level") or "warning")
+            text(f"- {LEVEL_LABELS.get(level, level)} : {item['message']}")
     if worksheet.get("instructions"):
         title("Consignes de saisie")
         for item in worksheet["instructions"]:
@@ -201,6 +210,13 @@ def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
             f"dotations {_euros(row['depreciation'])}"
         )
     return _plain_pdf(lines)
+
+
+def _with_level(item: dict[str, Any]) -> dict[str, Any]:
+    level = item.get("level")
+    if level not in {"info", "warning", "error"}:
+        level = "info" if item.get("code") in INFO_WARNING_CODES else "warning"
+    return {**item, "level": level}
 
 
 def _fr(value: object) -> str:

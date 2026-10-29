@@ -19,6 +19,18 @@ export interface Entry extends Omit<EntryInput, "lines"> {
 export interface BalanceRow { account_number: string; label: string; total_debit: string; total_credit: string; debit_balance: string; credit_balance: string }
 export interface Balance { balance: BalanceRow[]; total_debit: string; total_credit: string; balanced: boolean }
 export interface LedgerLine { entry_id: number; entry_number: string; date: string; label: string; debit: string; credit: string; balance: string }
+export class RequestError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(message: string, status: number, code = "") {
+    super(message);
+    this.name = "RequestError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 export async function request<T>(path: string, method = "GET", body?: unknown, prefix = "/api/ledger"): Promise<T> {
   const response = await fetch(prefix + path, {
     method, cache: "no-store",
@@ -26,21 +38,23 @@ export async function request<T>(path: string, method = "GET", body?: unknown, p
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const data = await response.json() as {
-    detail?: { message?: string } | string | Array<{ msg?: string; type?: string } | string>;
+    detail?: { message?: string; code?: string } | string | Array<{ msg?: string; type?: string } | string>;
   };
   if (!response.ok) {
     const detail = data.detail;
-    if (typeof detail === "string" && detail.trim()) throw new Error(detail);
-    if (detail && !Array.isArray(detail) && typeof detail === "object" && detail.message) {
-      throw new Error(detail.message);
-    }
-    if (Array.isArray(detail)) {
+    let message = "Opération refusée. Vérifiez les champs, les dates et les montants au centime.";
+    let code = "";
+    if (typeof detail === "string" && detail.trim()) message = detail;
+    else if (detail && !Array.isArray(detail) && typeof detail === "object") {
+      if (detail.message) message = detail.message;
+      if (detail.code) code = detail.code;
+    } else if (Array.isArray(detail)) {
       const messages = detail
         .map((item) => (typeof item === "string" ? item : item.msg))
         .filter((item): item is string => Boolean(item && item.trim()));
-      if (messages.length) throw new Error(messages.join(" "));
+      if (messages.length) message = messages.join(" ");
     }
-    throw new Error("Opération refusée. Vérifiez les champs, les dates et les montants au centime.");
+    throw new RequestError(message, response.status, code);
   }
   return data as T;
 }

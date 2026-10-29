@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -14,7 +15,15 @@ from app.api.ledger_schemas import FiscalInput
 from app.core.money import to_cents
 from app.domain.fiscal.loader import load_vintage
 from app.domain.fiscal.output_status import calculation_status
-from app.models import Account, AccountingEntry, AccountingEntryLine, BusinessOperation, FiscalYear
+from app.models import (
+    Account,
+    AccountingEntry,
+    AccountingEntryLine,
+    BusinessOperation,
+    FiscalYear,
+    Loan,
+    Property,
+)
 from app.models.assets import Asset, AssetComponent
 from app.models.base import utc_now
 from app.models.fiscal import DepreciationCarryForward, FiscalComputation, TaxLossCarryForward
@@ -49,6 +58,145 @@ def ledger_fingerprint(session: Session, year_id: int) -> str:
     return hashlib.sha256(json.dumps(payload).encode()).hexdigest()
 
 
+def structuring_fingerprint(session: Session, activity_id: int) -> str:
+    """Hypothèses de calcul : bien, immobilisation, composant, emprunt.
+
+    Colonnes, dans l’ordre : bien (id, prix, frais, terrain, bâtiment, date
+    d’acquisition) ; immobilisation (id, valeur d’achat, base amortissable,
+    valeur non amortissable, valeur résiduelle, durée en mois, mise en service,
+    compte d’actif, compte d’amortissement) ; composant (id, valeur, durée,
+    mise en service, comptes) ; emprunt (id, capital, date, taux en points de
+    base, durée, mensualité, assurance). Libellés, justificatifs, locataires
+    et banques restent dehors.
+    """
+    properties = list(
+        session.scalars(
+            select(Property).where(Property.rental_activity_id == activity_id).order_by(Property.id)
+        )
+    )
+    property_ids = [row.id for row in properties]
+    assets = (
+        list(
+            session.scalars(
+                select(Asset).where(Asset.property_id.in_(property_ids)).order_by(Asset.id)
+            )
+        )
+        if property_ids
+        else []
+    )
+    asset_ids = [row.id for row in assets]
+    components = (
+        list(
+            session.scalars(
+                select(AssetComponent)
+                .where(AssetComponent.asset_id.in_(asset_ids))
+                .order_by(AssetComponent.id)
+            )
+        )
+        if asset_ids
+        else []
+    )
+    loans = (
+        list(
+            session.scalars(
+                select(Loan).where(Loan.property_id.in_(property_ids)).order_by(Loan.id)
+            )
+        )
+        if property_ids
+        else []
+    )
+    payload = {
+        "properties": [
+            [
+                row.id,
+                to_cents(row.acquisition_price),
+                to_cents(row.acquisition_costs),
+                to_cents(row.land_value),
+                to_cents(row.building_value),
+                row.acquisition_date.isoformat(),
+            ]
+            for row in properties
+        ],
+        "assets": [
+            [
+                row.id,
+                to_cents(row.acquisition_value),
+                to_cents(row.depreciable_value),
+                to_cents(row.non_depreciable_value),
+                to_cents(row.residual_value),
+                row.useful_life_months,
+                row.service_start_date.isoformat(),
+                row.asset_account,
+                row.depreciation_account,
+            ]
+            for row in assets
+        ],
+        "components": [
+            [
+                row.id,
+                to_cents(row.value),
+                row.useful_life_months,
+                row.service_start_date.isoformat(),
+                row.asset_account,
+                row.depreciation_account,
+            ]
+            for row in components
+        ],
+        "loans": [
+            [
+                row.id,
+                to_cents(row.initial_principal),
+                row.start_date.isoformat(),
+                row.interest_rate_basis_points,
+                row.duration_months,
+                to_cents(row.monthly_payment),
+                to_cents(row.monthly_insurance),
+            ]
+            for row in loans
+        ],
+    }
+    return hashlib.sha256(json.dumps(payload).encode()).hexdigest()
+
+
+def _stored_structuring(row: FiscalComputation) -> str | None:
+    details = row.details if isinstance(row.details, dict) else {}
+    stored = details.get("structuring_sha256")
+    if isinstance(stored, str) and len(stored) == 64:
+        return stored
+    return None
+
+
+def _with_freshness(
+    session: Session, year: FiscalYear, row: FiscalComputation, payload: dict[str, Any]
+) -> dict[str, Any]:
+    """Empreintes courantes, à comparer à celles du calcul affiché.
+
+    `ledger_fingerprint` reste l’empreinte du ledger utilisée par la clôture.
+    L’empreinte structurante est séparée : une correction de calcul la change
+    sans réécrire l’empreinte figée dans un snapshot. Un exercice clôturé garde
+    son calcul comme preuve, donc cet écart n’y est pas signalé. `invalidated`
+    reste vrai après invalidation, y compris sur un exercice réouvert.
+    """
+    payload["current_ledger_sha256"] = ledger_fingerprint(session, year.id)
+    payload["invalidated"] = row.invalidated_at is not None
+    stored = _stored_structuring(row)
+    payload["structuring_sha256"] = stored
+    if year.status == "CLOSED":
+        payload["current_structuring_sha256"] = stored
+    else:
+        payload["current_structuring_sha256"] = structuring_fingerprint(
+            session, year.rental_activity_id
+        )
+    return payload
+
+
+def _iso_utc(value: datetime) -> str:
+    stamp = value.isoformat(timespec="seconds")
+    if value.tzinfo is None:
+        return stamp + "Z"
+    return stamp
+
+
 def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[str, Any]:
     year = get_year(session, year_id)
     vintage = load_vintage(year.fiscal_vintage)
@@ -57,6 +205,7 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
         session, year.id
     )
     fingerprint = ledger_fingerprint(session, year.id)
+    structuring = structuring_fingerprint(session, year.rental_activity_id)
     adjustments = [item.model_dump(mode="json") for item in data.adjustments]
     for item in adjustments:
         item["amount"] = money(to_cents(Decimal(item["amount"])))
@@ -68,8 +217,9 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
         and current.adjustments_sha256 == adjustments_hash
         and current.rules_sha256 == vintage["sha256"]
         and current.invalidated_at is None
+        and _stored_structuring(current) == structuring
     ):
-        return _json(current, replayed=True)
+        return _with_freshness(session, year, current, _json(current, replayed=True))
     if year.status != "OPEN":
         fail("YEAR_LOCKED", "Un exercice qui n’est pas ouvert ne peut pas être recalculé.")
     if current is not None:
@@ -129,6 +279,7 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
         "depreciation_reports": _report_rows(dep_stocks, dep_uses),
         "depreciation_categories": _category_caps(session),
         "goal_hint": _goal_hint(fiscal_result, unused, prior_dep_used, prior_loss_used),
+        "structuring_sha256": structuring,
     }
     row = FiscalComputation(
         fiscal_year_id=year.id,
@@ -179,7 +330,7 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
             "Consommation FIFO des reports antérieurs (horizon 10 ans) activée pour le MVP."
         )
     session.flush()
-    return _json(row, replayed=False)
+    return _with_freshness(session, year, row, _json(row, replayed=False))
 
 
 def reintegration_suggestions(session: Session, year_id: int) -> list[dict[str, str]]:
@@ -212,12 +363,31 @@ def reintegration_suggestions(session: Session, year_id: int) -> list[dict[str, 
 
 
 def latest_fiscal(session: Session, year_id: int) -> dict[str, Any]:
-    get_year(session, year_id)
+    """Calcul encore valide. La liasse et le pré-contrôle s’arrêtent s’il n’y en a pas."""
+    year = get_year(session, year_id)
     current = _current(session, year_id)
     if current is None:
         fail("FISCAL_NOT_COMPUTED", "Aucun calcul fiscal n’est enregistré pour cet exercice.", 404)
     assert current is not None  # noqa: S101
-    return _json(current, replayed=True)
+    return _with_freshness(session, year, current, _json(current, replayed=True))
+
+
+def displayed_fiscal(session: Session, year_id: int) -> dict[str, Any]:
+    """Dernier calcul pour l’écran, y compris lorsqu’il a été invalidé.
+
+    Une ligne invalidée n’est pas un calcul en cours : l’écran la marque
+    obsolète. `latest_fiscal` continue de l’ignorer.
+    """
+    year = get_year(session, year_id)
+    row = session.scalar(
+        select(FiscalComputation)
+        .where(FiscalComputation.fiscal_year_id == year_id)
+        .order_by(FiscalComputation.id.desc())
+    )
+    if row is None:
+        fail("FISCAL_NOT_COMPUTED", "Aucun calcul fiscal n’est enregistré pour cet exercice.", 404)
+    assert row is not None  # noqa: S101
+    return _with_freshness(session, year, row, _json(row, replayed=True))
 
 
 def _current(session: Session, year_id: int) -> FiscalComputation | None:
@@ -521,6 +691,7 @@ def _json(row: FiscalComputation, *, replayed: bool) -> dict[str, Any]:
         "replayed": replayed,
         "vintage": row.vintage,
         "rules_sha256": row.rules_sha256,
+        "computed_at": _iso_utc(row.created_at),
         "ledger_sha256": row.ledger_sha256,
         "accounting_result": money(row.accounting_result),
         "fiscal_result": money(row.fiscal_result),

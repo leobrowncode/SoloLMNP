@@ -10,7 +10,7 @@ from app.api.sessions import dependencies
 from app.core.database import Database
 from app.domain.fiscal.loader import available_vintages, load_vintage
 from app.domain.fiscal.output_status import calculation_status
-from app.services.fiscal import compute_fiscal, latest_fiscal, reintegration_suggestions
+from app.services.fiscal import compute_fiscal, displayed_fiscal, reintegration_suggestions
 
 
 def build_fiscal_router(database: Database) -> APIRouter:
@@ -48,7 +48,7 @@ def build_fiscal_router(database: Database) -> APIRouter:
 
     @router.get("/years/{year_id}")
     def read_year(year_id: int, session: Read) -> dict[str, Any]:
-        return latest_fiscal(session, year_id)
+        return displayed_fiscal(session, year_id)
 
     @router.get("/years/{year_id}/reintegrations")
     def reintegrations(year_id: int, session: Read) -> list[dict[str, str]]:
