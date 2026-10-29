@@ -1,7 +1,13 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { operationsPath } from "../routing/paths";
+import { renderWithRouter } from "../routing/testPage";
 import OperationsPage from "./OperationsPage";
+
+function renderOperations(tab: "Biens" | "Banque" | "Emprunts" | "Transactions" = "Biens") {
+  return renderWithRouter(<OperationsPage />, operationsPath(tab), "/operations/:tab");
+}
 
 function response(body: unknown) {
   return Promise.resolve(new Response(JSON.stringify(body), {
@@ -57,7 +63,7 @@ function mockApi(options: {
 describe("OperationsPage", () => {
   it("shows the accounting amount and outstanding settlement separately", async () => {
     mockApi();
-    render(<OperationsPage />);
+    renderOperations();
     await userEvent.click(await screen.findByRole("button", { name: /Transactions/ }));
     expect(await screen.findByText(/Assurance · 100.00 €/)).toBeInTheDocument();
     expect(screen.getByText(/Reste à régler : 40.00 €/)).toBeInTheDocument();
@@ -66,7 +72,7 @@ describe("OperationsPage", () => {
 
   it("explains the Google Sheets paste and the paid column", async () => {
     mockApi();
-    render(<OperationsPage />);
+    renderOperations();
     await userEvent.click(await screen.findByRole("button", { name: /Transactions/ }));
     await userEvent.click(await screen.findByText("Importer depuis Google Sheets ou un CSV"));
     expect(screen.getByText(/sinon elle reste à régler/)).toBeInTheDocument();
@@ -76,7 +82,7 @@ describe("OperationsPage", () => {
 
   it("states that importing a bank file does not post accounting entries", async () => {
     mockApi();
-    render(<OperationsPage />);
+    renderOperations();
     await userEvent.click(await screen.findByRole("button", { name: /Banque/ }));
     await userEvent.click(screen.getByText("Importer un relevé CSV"));
     expect(screen.getByText(/L’import seul ne comptabilise rien/)).toBeInTheDocument();
@@ -85,7 +91,7 @@ describe("OperationsPage", () => {
 
   it("orders setup tabs like the tutorial", async () => {
     mockApi();
-    render(<OperationsPage />);
+    renderOperations();
     const tabs = await screen.findAllByRole("button", { pressed: false });
     const names = screen.getAllByRole("button").map((node) => node.textContent).filter((text) =>
       text && /Biens|Banque|Emprunts|Transactions/.test(text),
@@ -116,7 +122,7 @@ describe("OperationsPage", () => {
         }],
       },
     });
-    render(<OperationsPage />);
+    renderOperations();
     await userEvent.click(await screen.findByRole("button", { name: /Emprunts/ }));
     await userEvent.click(screen.getByText("Importer les échéances depuis Google Sheets ou un CSV"));
     expect(screen.getByText(/Assurance externe à compléter/)).toBeInTheDocument();
@@ -158,7 +164,7 @@ describe("OperationsPage", () => {
       }],
       loanPreviewResponse: pendingPreview,
     });
-    render(<OperationsPage />);
+    renderOperations();
     await userEvent.click(await screen.findByRole("button", { name: /Emprunts/ }));
     await userEvent.click(screen.getByText("Importer les échéances depuis Google Sheets ou un CSV"));
     const input = screen.getByLabelText("Lignes du tableau d’amortissement");
@@ -177,7 +183,7 @@ describe("OperationsPage", () => {
 
   it("prefills loyer type and an automatic piece reference on new revenue", async () => {
     mockApi();
-    render(<OperationsPage />);
+    renderOperations();
     await userEvent.click(await screen.findByRole("button", { name: /Transactions/ }));
     await userEvent.click(await screen.findByRole("button", { name: "Nouvelle recette" }));
     expect(screen.getByRole("combobox", { name: /Type d.opération/ })).toHaveValue("LOY");
@@ -238,7 +244,7 @@ describe("OperationsPage", () => {
       if (url.startsWith("/api/operations/bank/transactions")) return response([]);
       return response({});
     }));
-    render(<OperationsPage />);
+    renderOperations();
     expect(await screen.findByText("Des immobilisations existent déjà.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Modifier Bien fictif" }));
     expect(screen.getByLabelText("Nom du bien")).toHaveValue("Bien fictif");

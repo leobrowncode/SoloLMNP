@@ -1,5 +1,6 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { amount, cents } from "../api/ledger";
+import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 
 export interface Field {
   name: string;
@@ -62,6 +63,8 @@ export default function ReviewForm({
       field.value ?? field.choices?.[0]?.[0] ?? (field.money ? "0.00" : ""),
     ])),
   );
+  const [touched, setTouched] = useState(false);
+  useUnsavedGuard(touched || review !== null);
   const formUid = useId();
   const autoRef = useRef(
     derive?.({
@@ -99,6 +102,7 @@ export default function ReviewForm({
   }, [draft, sumInto]);
 
   function applyChange(name: string, value: string) {
+    setTouched(true);
     setDraft((current) => {
       const next = { ...current, [name]: value };
       if (!derive) return next;

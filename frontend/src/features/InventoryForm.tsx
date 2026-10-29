@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { amount, cents, request, type Account, type Entry, type EntryInput, type Journal, type Year } from "../api/ledger";
+import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 
 type InventoryInput = EntryInput & { justification: string; request_id: string };
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
@@ -42,6 +43,12 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
   const [cleanupError, setCleanupError] = useState("");
   const [receipt, setReceipt] = useState<Entry | null>(null);
   const [checked, setChecked] = useState(false);
+  const inventoryDirty = !!review
+    || justification.trim().length > 0
+    || draft.piece_reference.trim().length > 0
+    || draft.label.trim().length > 0
+    || draft.lines.some((line) => line.account_number || line.label.trim() || line.debit !== "0.00" || line.credit !== "0.00");
+  useUnsavedGuard(inventoryDirty);
   let totals = "Montants au centime requis.";
   try {
     const lines = review?.lines ?? draft.lines;

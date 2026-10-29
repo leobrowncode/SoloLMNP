@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from "react";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { amount, cents, request, type Account, type Setup, type Entry } from "../api/ledger";
 import { operationsRequest as api, type Property, type Bank, type Loan, type Operation, type BankTransaction, type ImportPreview, type OperationImportPreview, type LoanPaymentImportPreview, type Tenant } from "../api/operations";
+import {
+  DEFAULT_OPERATIONS_TAB,
+  OPERATIONS_TABS,
+  operationsPath,
+  operationsTabFromSlug,
+  type OperationsTab,
+} from "../routing/paths";
+import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import ReviewForm, { type Field } from "./ReviewForm";
 import {
   PLAN_HELP, RECORD_HELP, correctionMessage, locked, readInvalidation,
@@ -12,7 +21,6 @@ const kindLabel: Record<string, string> = {
   REVENUE: "Recette", EXPENSE: "Dépense", SETTLEMENT: "Règlement",
   LOAN_PAYMENT: "Échéance", LOAN_FUNDING: "Déblocage",
 };
-const TABS = ["Biens", "Banque", "Emprunts", "Transactions"] as const;
 
 interface Editor {
   title: string;
@@ -35,7 +43,10 @@ interface LoanImportPreviewState {
 }
 
 export default function OperationsPage() {
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Biens");
+  const { tab: tabSlug } = useParams();
+  const navigate = useNavigate();
+  const resolvedTab = operationsTabFromSlug(tabSlug);
+  const tab: OperationsTab = resolvedTab ?? DEFAULT_OPERATIONS_TAB;
   const [setup, setSetup] = useState<Setup | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Record<number, Tenant[]>>({});
@@ -57,6 +68,14 @@ export default function OperationsPage() {
   const loanPreviewRequest = useRef(0);
   const [loanImportId, setLoanImportId] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
+  useUnsavedGuard(!!editor);
+
+  function openTab(next: OperationsTab) {
+    navigate(operationsPath(next));
+    setEditor(null);
+    setDetails(null);
+  }
+
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [revision, setRevision] = useState(0);
@@ -356,7 +375,9 @@ export default function OperationsPage() {
       fields,
     });
   }
-  return <section id="operations" className="ledger-page" aria-labelledby="operations-title">
+  return <>
+    {tabSlug && !resolvedTab && <Navigate to={operationsPath(DEFAULT_OPERATIONS_TAB)} replace />}
+    <section id="operations" className="ledger-page" aria-labelledby="operations-title">
     <h2 id="operations-title">Opérations et banque</h2>
     <p>Suivez l’ordre des onglets : bien, banque, emprunts, puis recettes et dépenses.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}
@@ -365,12 +386,12 @@ export default function OperationsPage() {
       <p>Initialisez votre activité et votre exercice dans <strong>Comptabilité</strong> avant de saisir vos opérations.</p>
     ) : <>
       <nav className="step-tabs" aria-label="Étapes des opérations">
-        {TABS.map((name, index) => (
+        {OPERATIONS_TABS.map((name, index) => (
           <button
             key={name}
             type="button"
             aria-pressed={tab === name}
-            onClick={() => { setTab(name); setEditor(null); setDetails(null); }}
+            onClick={() => openTab(name)}
           >
             <span className="step-index">{index + 1}</span> {name}
           </button>
@@ -886,5 +907,6 @@ export default function OperationsPage() {
         </div>
       )}
     </>}
-  </section>;
+  </section>
+  </>;
 }

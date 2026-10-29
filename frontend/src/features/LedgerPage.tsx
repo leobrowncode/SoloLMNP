@@ -1,15 +1,26 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { request, cents, amount, type Setup, type Account, type Journal, type Entry, type EntryInput, type Balance, type LedgerLine } from "../api/ledger";
+import {
+  DEFAULT_LEDGER_TAB,
+  ledgerPath,
+  ledgerTabFromSlug,
+  type LedgerTab,
+} from "../routing/paths";
+import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import "./ledger.css";
 import InventoryForm from "./InventoryForm";
 
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
 export default function LedgerPage() {
+  const { tab: tabSlug } = useParams();
+  const navigate = useNavigate();
+  const resolvedTab = ledgerTabFromSlug(tabSlug);
+  const tab: LedgerTab = resolvedTab ?? DEFAULT_LEDGER_TAB;
   const [setup, setSetup] = useState<Setup | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [journals, setJournals] = useState<Journal[]>([]);
   const [year, setYear] = useState(0);
-  const [tab, setTab] = useState("Brouillons");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [count, setCount] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -30,6 +41,14 @@ export default function LedgerPage() {
   const viewReady = loadedKey === viewKey;
   const selectedYear = setup?.years.find((item) => item.id === year);
   const writable = selectedYear?.status === "OPEN";
+  useUnsavedGuard(!!draft);
+
+  function openTab(next: LedgerTab) {
+    navigate(ledgerPath(next));
+    setOffset(0);
+    setEntries([]);
+    if (next === "Inventaire") setDraft(null);
+  }
 
   useEffect(() => {
     let active = true;
@@ -94,7 +113,9 @@ export default function LedgerPage() {
     } catch { totals = "Saisissez des montants positifs avec deux décimales au maximum."; }
   }
 
-  return <section id="comptabilite" className="ledger-page" aria-labelledby="ledger-title">
+  return <>
+    {tabSlug && !resolvedTab && <Navigate to={ledgerPath(DEFAULT_LEDGER_TAB)} replace />}
+    <section id="comptabilite" className="ledger-page" aria-labelledby="ledger-title">
     <h2 id="ledger-title">Votre comptabilité</h2>
     <p>Seules les écritures validées alimentent le journal, le grand livre et la balance. Leur validation est définitive.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}
@@ -142,8 +163,8 @@ export default function LedgerPage() {
       <label>Exercice<select value={year} onChange={(e) => { setYear(Number(e.target.value)); setDraft(null); setConfirmation(null); setOffset(0); setBalance(null); setLedger([]); setEntries([]); }}>
         {setup.years.map((y) => <option key={y.id} value={y.id}>{y.year} · {y.status === "OPEN" ? "ouvert" : y.status === "CLOSED" ? "clôturé" : "prêt à clôturer"}</option>)}
       </select></label>
-      <nav aria-label="Vues comptables" className="ledger-tabs">{["Brouillons", "Journal", "Grand livre", "Balance", "Plan comptable", "Inventaire"].map((name) =>
-        <button key={name} aria-pressed={tab === name} onClick={() => { setTab(name); setOffset(0); setEntries([]); if (name === "Inventaire") setDraft(null); }}>{name}</button>)}</nav>
+      <nav aria-label="Vues comptables" className="ledger-tabs">{(["Brouillons", "Journal", "Grand livre", "Balance", "Plan comptable", "Inventaire"] as LedgerTab[]).map((name) =>
+        <button key={name} aria-pressed={tab === name} onClick={() => openTab(name)}>{name}</button>)}</nav>
       {tab === "Brouillons" && <button disabled={!writable || busy} onClick={() => startDraft()}>Nouvelle écriture</button>}
       {tab === "Inventaire" && selectedYear && <InventoryForm key={year} year={selectedYear} accounts={accounts} journals={journals} onPosted={() => setRevision((v) => v + 1)} />}
       {draft && <form className="entry-editor" onSubmit={(e) => {
@@ -235,5 +256,6 @@ export default function LedgerPage() {
         <ul>{accounts.map((a) => <li key={a.number}>{a.number} · {a.label} · {a.active ? "Actif" : "Inactif"} <button disabled={busy} onClick={() => { void mutate(() => request("/accounts/" + a.number + "/active", "PATCH", { active: !a.active }), "Compte mis à jour."); }}>{a.active ? "Désactiver" : "Réactiver"} {a.number}</button></li>)}</ul>
       </>}
     </>}
-  </section>;
+  </section>
+  </>;
 }
