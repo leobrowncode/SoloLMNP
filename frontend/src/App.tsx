@@ -87,6 +87,12 @@ export default function App() {
           {ready && <p>Base prête. Vous recopiez la liasse vous-même. Aucun envoi n’est effectué.</p>}
         </header>
         <div className="content">
+          {status?.storage_warning && (
+            <div className="notice notice-error" role="alert">
+              <strong>Stockage non sûr</strong>
+              <p>{status.storage_warning}</p>
+            </div>
+          )}
           {workspace}
 
           {page === "overview" && ready && (
@@ -118,7 +124,6 @@ export default function App() {
                     <p>La base n’est pas disponible ou sa migration est incomplète. Version actuelle : {status.database.schema_revision ?? "non initialisée"}. Version attendue : {status.database.expected_revision}.</p>
                   </div>
                 )}
-                {status?.storage_warning && <p className="notice" role="status">{status.storage_warning}</p>}
               </div>
             </section>
           )}

@@ -62,6 +62,7 @@ Docker Desktop gère le partage du dossier Windows ; autoriser son partage si Do
 Pour déplacer les données, arrêter l'instance et transférer le dossier complet vers un
 répertoire local existant, accessible en écriture, puis régler `SOLOLMNP_DATA_DIR`.
 SQLite doit rester sur un disque local, pas sur un partage réseau.
+Un chemin de base qui contient « OneDrive » fait renvoyer `storage_warning` par `GET /api/status`. L’interface affiche alors l’alerte « Stockage non sûr » sur chaque vue, y compris lorsque la base est prête. Copiez le projet hors du dossier synchronisé : la synchronisation peut corrompre SQLite.
 Ne pas faire fonctionner deux instances sur la même base.
 
 ### Configuration

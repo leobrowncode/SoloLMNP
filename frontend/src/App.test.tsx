@@ -57,6 +57,49 @@ describe("Foundation status", () => {
     expect(isApplicationStatus(null)).toBe(false);
   });
 
+  it("keeps the OneDrive alert visible on a ready database and after navigation", async () => {
+    const warning = "La base est dans un dossier synchronisé (OneDrive). Copiez le projet hors de ce dossier : la synchro peut corrompre SQLite.";
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url === "/api/status") return Promise.resolve(reply({ ...ready, storage_warning: warning }));
+      if (url.endsWith("/setup")) return Promise.resolve(reply({ activity: null, years: [] }));
+      if (url.endsWith("/accounts") || url.endsWith("/journals")) return Promise.resolve(reply([]));
+      return Promise.resolve(reply({}));
+    }));
+    render(<App />);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Stockage non sûr");
+    expect(alert).toHaveTextContent("peut corrompre SQLite");
+    expect(alert).toHaveTextContent("Copiez le projet hors de ce dossier");
+    expect(alert).not.toHaveTextContent("Base prête");
+    expect(screen.getByText(/Base prête/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: "Comptabilité" }));
+    expect(screen.getByRole("link", { name: "Comptabilité" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("alert")).toHaveTextContent(warning);
+    expect(await screen.findByRole("heading", { name: "Votre comptabilité" })).toBeInTheDocument();
+  });
+
+  it("does not show a storage alert when a ready database has no warning", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply({ ...ready, storage_warning: null })));
+    render(<App />);
+    expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText(/OneDrive|Stockage non sûr/)).not.toBeInTheDocument();
+  });
+
+  it("shows the OneDrive alert when the database is not ready", async () => {
+    const warning = "La base est dans un dossier synchronisé (OneDrive). Copiez le projet hors de ce dossier : la synchro peut corrompre SQLite.";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply({
+      ...ready,
+      storage_warning: warning,
+      database: { ...ready.database, status: "not_ready", schema_revision: null },
+    }, 503)));
+    render(<App />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Stockage non sûr");
+    expect(screen.getByRole("alert")).toHaveTextContent(warning);
+    expect(screen.getByText("Le stockage nécessite une vérification")).toBeInTheDocument();
+    expect(screen.queryByText(/Base prête/)).not.toBeInTheDocument();
+  });
+
   it("aborts the pending request on unmount", async () => {
     const request = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
       expect(init.signal?.aborted).toBe(false);

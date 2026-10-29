@@ -24,6 +24,8 @@ Prérequis : Python 3.12+ et Node.js 24 (avec `npm`). Au premier lancement, le
 script crée l’environnement, installe les dépendances, migre la base et ouvre
 [http://127.0.0.1:5173](http://127.0.0.1:5173). Les données restent dans `data/`.
 
+Si l’alerte « Stockage non sûr » apparaît, la base est dans OneDrive. Elle reste visible sur toutes les vues, même quand la base est prête. Copiez le projet hors de ce dossier synchronisé avant de saisir : la synchronisation peut corrompre SQLite.
+
 Alternative Docker : voir [DEPLOYMENT.md](DEPLOYMENT.md).
 
 Vérifier que l’écran « État de l’installation » affiche **Base SQLite : Prête**.
