@@ -23,7 +23,7 @@ effectués pendant cette vérification documentaire.
 ## Workflow cible
 
 1. Centraliser les charges et produits sur les états comptables.
-2. Calculer le résultat fiscal sur le ledger final. L’écran recharge le dernier calcul valide, avec sa date et l’empreinte du ledger. Une empreinte différente marque ce résultat obsolète. Un recalcul refusé ne le laisse pas affiché comme calcul en cours.
+2. Calculer le résultat fiscal sur le ledger final. L’écran recharge le dernier calcul, avec sa date et l’empreinte du ledger. Une empreinte de ledger différente, ou une correction des hypothèses de calcul (bien, immobilisation, composant, emprunt), marque ce résultat obsolète. Un recalcul refusé ne le laisse pas affiché comme calcul en cours.
 3. Lancer le pré-contrôle, accuser les avertissements, puis clôturer. La clôture fige le package.
 4. Contrôler les écritures, calculs et formulaires figés.
 5. Exporter le rapport et la feuille de saisie EFI.

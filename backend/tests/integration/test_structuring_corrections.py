@@ -127,10 +127,22 @@ def test_custom_accounts_realign_an_existing_schedule(client, database):
         assert schedule.end_date == date(2030, 6, 30)
 
 
+def _shown_fiscal(client) -> dict[str, object]:
+    response = client.get("/api/fiscal/years/1")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert isinstance(body, dict)
+    return body
+
+
 def test_open_dependents_are_invalidated_with_the_plan(client, database):
     assert client.post("/api/assets", json=furniture()).status_code == 201
     assert client.post("/api/assets/years/1/calculate").status_code == 200
     assert client.post("/api/fiscal/years/1", json={"adjustments": []}).status_code == 200
+    prior = _shown_fiscal(client)
+    assert prior["invalidated"] is False
+    assert prior["ledger_sha256"] == prior["current_ledger_sha256"]
+    assert prior["structuring_sha256"] == prior["current_structuring_sha256"]
     with database.sessions.begin() as session:
         session.add(
             TaxReturnSnapshot(
@@ -156,7 +168,22 @@ def test_open_dependents_are_invalidated_with_the_plan(client, database):
     assert body["invalidation"]["ready_years_reset"] == [1]
     assert body["invalidation"]["snapshots_superseded"] == 1
     assert client.get("/api/assets/years/1/periods").json() == []
-    assert client.get("/api/fiscal/years/1").status_code == 404
+    shown = _shown_fiscal(client)
+    assert shown["id"] == prior["id"]
+    assert shown["invalidated"] is True
+    assert shown["fiscal_result"] == prior["fiscal_result"]
+    assert shown["status"] == "research_only"
+    assert shown["declarable"] is False
+    assert shown["ledger_sha256"] == prior["ledger_sha256"]
+    assert shown["structuring_sha256"] == prior["structuring_sha256"]
+    assert shown["current_structuring_sha256"] != shown["structuring_sha256"]
+    precheck = client.get("/api/filing/years/1/precheck")
+    assert precheck.status_code == 200, precheck.text
+    codes = [item["code"] for item in precheck.json()["errors"]]
+    assert "FISCAL_NOT_COMPUTED" in codes
+    liasse = client.get("/api/filing/years/1/package")
+    assert liasse.status_code == 404
+    assert liasse.json()["detail"]["code"] == "FISCAL_NOT_COMPUTED"
     with database.sessions.begin() as session:
         year = session.get(FiscalYear, 1)
         assert year is not None and year.status == "OPEN"
@@ -201,7 +228,10 @@ def test_posted_dotation_freezes_plan_inputs_not_the_justification(client, datab
     assert clarified.status_code == 200, clarified.text
     assert clarified.json()["invalidation"]["fiscal_computations"] == 0
     assert client.get("/api/assets/years/1/periods").json()[0]["status"] == "POSTED"
-    assert client.get("/api/fiscal/years/1").status_code == 200
+    kept = _shown_fiscal(client)
+    assert kept["invalidated"] is False
+    assert kept["structuring_sha256"] == kept["current_structuring_sha256"]
+    assert kept["ledger_sha256"] == kept["current_ledger_sha256"]
     with pytest.raises(IntegrityError) as caught, database.sessions.begin() as session:
         session.execute(text("UPDATE asset SET useful_life_months=84 WHERE id=1"))
     assert "ASSET_HAS_POSTED_DEPRECIATION" in str(caught.value)
@@ -439,7 +469,9 @@ def test_loan_terms_stay_editable_after_a_movement(client, database):
     )
     assert renamed.status_code == 200, renamed.text
     assert renamed.json()["invalidation"]["fiscal_computations"] == 0
-    assert client.get("/api/fiscal/years/1").status_code == 200
+    renamed_fiscal = _shown_fiscal(client)
+    assert renamed_fiscal["invalidated"] is False
+    assert renamed_fiscal["structuring_sha256"] == renamed_fiscal["current_structuring_sha256"]
     rated = client.patch(
         "/api/operations/loans/1",
         json={"interest_rate": "2.50", "reason": "Taux contractuel corrigé"},
@@ -447,6 +479,10 @@ def test_loan_terms_stay_editable_after_a_movement(client, database):
     assert rated.status_code == 200, rated.text
     assert rated.json()["interest_rate_basis_points"] == 250
     assert rated.json()["invalidation"]["fiscal_computations"] == 1
+    rated_fiscal = _shown_fiscal(client)
+    assert rated_fiscal["invalidated"] is True
+    assert rated_fiscal["fiscal_result"] == renamed_fiscal["fiscal_result"]
+    assert rated_fiscal["current_structuring_sha256"] != rated_fiscal["structuring_sha256"]
     event = _audits(database, "loan")[-1]
     assert event.before["interest_rate_basis_points"] == 350
     assert event.after["interest_rate_basis_points"] == 250
@@ -472,7 +508,10 @@ def test_property_financials_lock_when_an_asset_exists(client, database):
     )
     assert renamed.status_code == 200, renamed.text
     assert renamed.json()["invalidation"]["fiscal_computations"] == 0
-    assert client.get("/api/fiscal/years/1").status_code == 200
+    renamed_fiscal = _shown_fiscal(client)
+    assert renamed_fiscal["invalidated"] is False
+    assert renamed_fiscal["structuring_sha256"] == renamed_fiscal["current_structuring_sha256"]
+    assert renamed_fiscal["ledger_sha256"] == renamed_fiscal["current_ledger_sha256"]
     with pytest.raises(IntegrityError) as caught, database.sessions.begin() as session:
         session.execute(text("UPDATE property SET land_value=1 WHERE id=1"))
     assert "PROPERTY_HAS_ASSETS" in str(caught.value)

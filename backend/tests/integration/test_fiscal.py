@@ -104,6 +104,9 @@ def test_latest_computation_exposes_its_date_and_a_moved_ledger(client):
     assert current["declarable"] is False
     assert current["ledger_sha256"] == current["current_ledger_sha256"] == body["ledger_sha256"]
     assert len(current["ledger_sha256"]) == 64
+    assert current["invalidated"] is False
+    assert current["structuring_sha256"] == current["current_structuring_sha256"]
+    assert len(current["structuring_sha256"]) == 64
     book(client, "615000", "401000", "15.00")
     stale = client.get("/api/fiscal/years/1")
     assert stale.status_code == 200, stale.text
@@ -112,6 +115,9 @@ def test_latest_computation_exposes_its_date_and_a_moved_ledger(client):
     assert moved["fiscal_result"] == body["fiscal_result"]
     assert moved["ledger_sha256"] == body["ledger_sha256"]
     assert moved["current_ledger_sha256"] != moved["ledger_sha256"]
+    assert moved["invalidated"] is False
+    assert moved["structuring_sha256"] == current["structuring_sha256"]
+    assert moved["current_structuring_sha256"] == current["structuring_sha256"]
     missing = client.get("/api/fiscal/years/999")
     assert missing.status_code == 404
 

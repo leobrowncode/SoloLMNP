@@ -438,6 +438,32 @@ test("reloads the last calculation with its date and ledger fingerprint", async 
   expect(screen.getByText(/Aperçu fiscal/)).toBeInTheDocument();
 });
 
+test("marks an invalidated calculation obsolete even when the fingerprints still match", async () => {
+  fiscalScreen((url, method) => (
+    isFiscalRead(url, method) ? response({ ...storedComputation(), invalidated: true }) : null
+  ));
+  render(<FiscalPage />);
+  expect(await screen.findByText("Obsolète")).toBeInTheDocument();
+  expect(screen.getByText("12.34 €")).toBeInTheDocument();
+  expect(screen.queryByText("Correspond au ledger")).not.toBeInTheDocument();
+});
+
+test("marks a stored result obsolete when the structuring fingerprint differs", async () => {
+  fiscalScreen((url, method) => (
+    isFiscalRead(url, method)
+      ? response({
+        ...storedComputation(),
+        structuring_sha256: STORED,
+        current_structuring_sha256: MOVED,
+      })
+      : null
+  ));
+  render(<FiscalPage />);
+  expect(await screen.findByText("Obsolète")).toBeInTheDocument();
+  expect(screen.getByText("12.34 €")).toBeInTheDocument();
+  expect(screen.queryByText("Correspond au ledger")).not.toBeInTheDocument();
+});
+
 test("marks a stored result obsolete as soon as the ledger fingerprint differs", async () => {
   fiscalScreen((url, method) => (
     isFiscalRead(url, method) ? response(storedComputation(MOVED)) : null

@@ -39,8 +39,11 @@ interface Computation {
   tax_loss: string;
   non_deductible: string;
   computed_at?: string;
+  invalidated?: boolean;
   ledger_sha256?: string;
   current_ledger_sha256?: string;
+  structuring_sha256?: string | null;
+  current_structuring_sha256?: string | null;
   details?: {
     prior_carry_forward_use?: {
       status: string;
@@ -127,11 +130,17 @@ function formatComputedAt(value: string): string {
   }).format(date);
 }
 
+function hashMoved(stored: string, current: string): boolean {
+  return stored.length === 64 && current.length === 64 && stored !== current;
+}
+
 function Freshness({ result }: { result: Computation }) {
   const stored = result.ledger_sha256 ?? "";
   const current = result.current_ledger_sha256 ?? "";
   const comparable = stored.length === 64 && current.length === 64;
-  const obsolete = comparable && stored !== current;
+  const obsolete = result.invalidated === true
+    || (comparable && stored !== current)
+    || hashMoved(result.structuring_sha256 ?? "", result.current_structuring_sha256 ?? "");
   if (!result.computed_at && !stored) return null;
   return (
     <p className={`fiscal-freshness${obsolete ? " fiscal-freshness-obsolete" : ""}`}>
