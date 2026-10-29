@@ -6,12 +6,17 @@ import {
   alignAssetDraft, assetAccountChoices, componentAssetChoices, DEFAULT_ASSET,
   depreciationAccountChoices, mirrorDepreciation, preferredAccount,
 } from "./assetAccounts";
+import {
+  PLAN_HELP, correctionMessage, editTitle, locked, readInvalidation, type CorrectionState,
+} from "./correction";
 import PropertyEntry from "./PropertyEntry";
 import ReviewForm, { type Field } from "./ReviewForm";
 import "./ledger.css";
 
 interface Editor {
   title: string; path: string; fields: Field[]; retry?: boolean;
+  method?: "POST" | "PATCH";
+  help?: string;
   derive?: ((draft: Record<string, string>, changed: string) => Partial<Record<string, string>>) | undefined;
 }
 const categories: [string, string][] = [
@@ -157,8 +162,128 @@ export default function AssetsPage() {
   }
   async function save(data: Record<string, unknown>) {
     if (!editor) return;
-    await api(editor.path, "POST", data);
-    setEditor(null); setMessage("Enregistrement effectué."); setRevision((value) => value + 1);
+    const result = await api<Record<string, unknown>>(editor.path, editor.method ?? "POST", data);
+    const invalidation = readInvalidation(result.invalidation);
+    setEditor(null);
+    setMessage(invalidation ? correctionMessage(invalidation) : "Enregistrement effectué.");
+    setRevision((value) => value + 1);
+  }
+  function correctionOf(row: { correction?: CorrectionState }): CorrectionState | undefined {
+    return row.correction;
+  }
+  function openAssetCorrection(row: Asset) {
+    const state = correctionOf(row);
+    const land = row.category === "LAND";
+    const groups = land ? ["value", "dates", "account"] : ["value", "life", "dates", "account"];
+    const fields: Field[] = [
+      { name: "label", label: "Libellé", value: row.label, group: "Identification" },
+    ];
+    if (!locked(state, "dates")) {
+      fields.push(
+        { name: "acquisition_date", label: "Date d’acquisition", type: "date", value: row.acquisition_date ?? "", group: "Dates" },
+        { name: "service_start_date", label: "Date de mise en service", type: "date", value: row.service_start_date ?? "", group: "Dates" },
+      );
+    }
+    if (!locked(state, "value")) {
+      fields.push({ name: "acquisition_value", label: "Valeur d’acquisition (€)", money: true, value: row.acquisition_value, group: "Valeur" });
+      if (!land) {
+        fields.push(
+          { name: "depreciable_value", label: "Valeur amortissable (€)", money: true, value: row.depreciable_value, group: "Valeur" },
+          { name: "non_depreciable_value", label: "Valeur non amortissable (€)", money: true, value: row.non_depreciable_value, group: "Valeur" },
+          { name: "residual_value", label: "Valeur résiduelle (€)", money: true, value: row.residual_value, group: "Valeur" },
+        );
+      } else {
+        fields.push({ name: "non_depreciable_value", label: "Valeur non amortissable (€)", money: true, value: row.non_depreciable_value, group: "Valeur" });
+      }
+    }
+    if (!land && !locked(state, "life")) {
+      fields.push({
+        name: "useful_life_months", label: "Durée d’utilisation en mois", type: "number",
+        value: row.useful_life_months == null ? "" : String(row.useful_life_months), group: "Durée",
+      });
+    }
+    if (!locked(state, "account")) {
+      fields.push({
+        name: "asset_account", label: "Compte d’immobilisation", value: row.asset_account, group: "Comptes",
+        choicesFor: (draft) => assetAccountChoices(accounts, land ? "LAND" : draft.category ?? row.category),
+      });
+      if (!land) {
+        fields.push({
+          name: "depreciation_account", label: "Compte d’amortissement", value: row.depreciation_account ?? "", group: "Comptes",
+          choicesFor: (draft) => depreciationAccountChoices(accounts, draft.asset_account ?? row.asset_account),
+        });
+      }
+    }
+    fields.push(
+      { name: "basis_reason", label: "Justification de la valeur", value: row.basis_reason ?? "", group: "Justification" },
+      {
+        name: "duration_reason", label: "Justification de la durée",
+        value: row.duration_reason ?? (land ? "Terrain non amortissable" : ""),
+        optional: land, group: "Justification",
+      },
+      { name: "notes", label: "Notes", value: row.notes ?? "", optional: true, group: "Justification" },
+      { name: "reason", label: "Motif de la correction (au moins 5 caractères)", group: "Motif" },
+    );
+    setEditor({
+      title: editTitle(row.label, state, groups),
+      path: `/${row.id}`,
+      method: "PATCH",
+      help: PLAN_HELP,
+      fields,
+      derive: (draft, changed) => {
+        const aligned = alignAssetDraft(
+          accounts, { ...draft, category: row.category }, changed, land ? "land" : "asset",
+        );
+        if (!land || changed !== "acquisition_value") return aligned;
+        return { ...aligned, non_depreciable_value: draft.acquisition_value ?? "0.00" };
+      },
+    });
+  }
+  function openComponentCorrection(asset: Asset, part: Asset["components"][number]) {
+    const state = correctionOf(part);
+    const fields: Field[] = [
+      { name: "label", label: "Libellé", value: part.label, group: "Identification" },
+    ];
+    if (!locked(state, "value")) {
+      fields.push({ name: "value", label: "Valeur du composant (€)", money: true, value: part.value, group: "Valeur" });
+    }
+    if (!locked(state, "life")) {
+      fields.push({
+        name: "useful_life_months", label: "Durée d’utilisation en mois", type: "number",
+        value: String(part.useful_life_months), group: "Durée",
+      });
+    }
+    if (!locked(state, "dates")) {
+      fields.push({
+        name: "service_start_date", label: "Date de mise en service", type: "date",
+        value: part.service_start_date, group: "Dates",
+      });
+    }
+    if (!locked(state, "account")) {
+      fields.push(
+        {
+          name: "asset_account", label: "Compte d’immobilisation", value: part.asset_account ?? "", group: "Comptes",
+          choicesFor: () => componentAssetChoices(accounts),
+        },
+        {
+          name: "depreciation_account", label: "Compte d’amortissement", value: part.depreciation_account ?? "", group: "Comptes",
+          choicesFor: (draft) => depreciationAccountChoices(accounts, draft.asset_account ?? ""),
+        },
+      );
+    }
+    fields.push(
+      { name: "basis_reason", label: "Justification de la ventilation", value: part.basis_reason ?? "", group: "Justification" },
+      { name: "duration_reason", label: "Justification de la durée", value: part.duration_reason ?? "", group: "Justification" },
+      { name: "reason", label: "Motif de la correction (au moins 5 caractères)", group: "Motif" },
+    );
+    setEditor({
+      title: editTitle(part.label, state, ["value", "life", "dates", "account"]),
+      path: `/${asset.id}/components/${part.id}`,
+      method: "PATCH",
+      help: PLAN_HELP,
+      fields,
+      derive: (draft, changed) => alignAssetDraft(accounts, draft, changed, "component"),
+    });
   }
   const selectedProperty = properties.some((row) => row.id === planProperty)
     ? planProperty
@@ -244,7 +369,7 @@ export default function AssetsPage() {
 
   return <section id="assets" className="ledger-page" aria-labelledby="assets-title">
     <h2 id="assets-title">Immobilisations</h2>
-    <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations. Le formulaire ne propose que les comptes de la catégorie. Un couple déjà enregistré et incohérent est signalé ; il n’est pas réécrit.</p>
+    <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations. Le formulaire ne propose que les comptes de la catégorie. Un couple déjà enregistré et incohérent est signalé ; il n’est pas réécrit. Modifier une fiche demande un motif : tant qu’aucune dotation n’est comptabilisée, la valeur, la durée et les comptes peuvent être corrigés.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}{message && <p role="status">{message}</p>}
     {!setup?.activity ? <p>Initialisez d’abord l’activité, l’exercice et le bien.</p> : <>
       <button disabled={!properties.length} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
@@ -294,15 +419,27 @@ export default function AssetsPage() {
         years={setup.years.filter((year) => year.status === "OPEN")}
         onDone={(text) => { setError(""); setMessage(text); setRevision((value) => value + 1); }}
       />
-      {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} derive={editor.derive} />}
+      {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} help={editor.help} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} derive={editor.derive} />}
       {assets.map((row) => <article className="entry-card" key={row.id}><h3>{row.label}</h3>
         <p>{row.category} · Valeur {row.acquisition_value} € · Base {row.depreciable_value} € · Non amortissable {row.non_depreciable_value} €</p>
         <p>{row.category === "LAND" ? "Terrain protégé : aucun plan d’amortissement" : `Linéaire sur ${row.useful_life_months} mois · ${row.asset_account} / ${row.depreciation_account}`}</p>
         {row.account_warning && <p role="alert" className="ledger-error">{row.account_warning}</p>}
-        {row.category === "BUILDING" && <><p>Ajoutez tous les composants avant le premier calcul ; leur total doit couvrir exactement la base.</p><button onClick={() => openComponent(row)}>Ajouter un composant</button></>}
+        {row.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
+        {(row.correction?.calculated_periods ?? 0) > 0 && !locked(row.correction, "value") && (
+          <p className="form-help">{row.correction?.calculated_periods} période(s) calculée(s) seront effacées si la valeur, la durée, les dates ou les comptes changent.</p>
+        )}
+        <div className="entry-actions">
+          {row.category === "BUILDING" && <button type="button" onClick={() => openComponent(row)}>Ajouter un composant</button>}
+          <button type="button" onClick={() => openAssetCorrection(row)}>{editTitle(row.label, row.correction, row.category === "LAND" ? ["value", "dates", "account"] : ["value", "life", "dates", "account"])}</button>
+        </div>
+        {row.category === "BUILDING" && <p>Ajoutez tous les composants avant le premier calcul ; leur total doit couvrir exactement la base.</p>}
         {row.components.map((part) => <div key={part.id}>
           <p>↳ {part.label} · {part.value} € · {part.useful_life_months} mois</p>
           {part.account_warning && <p role="alert" className="ledger-error">{part.account_warning}</p>}
+          {part.correction?.locks.map((lock) => <p className="form-help" key={`${part.id}-${lock.code}`}>{lock.message}</p>)}
+          <div className="entry-actions">
+            <button type="button" onClick={() => openComponentCorrection(row, part)}>{editTitle(part.label, part.correction, ["value", "life", "dates", "account"])}</button>
+          </div>
         </div>)}
       </article>)}
       <div className="section-heading"><div><h3>Dotations comptables</h3><p>Le calcul en jours calendaires ne modifie jamais la couche fiscale.</p></div>

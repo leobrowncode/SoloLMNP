@@ -30,6 +30,15 @@ def parse_money(value: object) -> Decimal:
 MoneyInput = Annotated[Decimal, BeforeValidator(parse_money)]
 
 
+def parse_optional_money(value: object) -> Decimal | None:
+    if value is None:
+        return None
+    return parse_money(value)
+
+
+OptionalMoney = Annotated[Decimal | None, BeforeValidator(parse_optional_money)]
+
+
 class Input(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 

@@ -70,7 +70,7 @@ La migration 0002_ledger ajoute account, accounting_journal, accounting_entry, a
 
 ## Schéma P3
 
-La migration `0003_operations` ajoute comptes bancaires, mouvements importés, rapprochements, emprunts et opérations métier. `BusinessOperation.accounting_entry_id` est unique ; `request_id` rend les créations idempotentes. `BankMatch` est une relation un-à-un entre mouvement et ligne comptable. Les tables métier sont immuables et les suppressions de migration sont refusées dès qu'elles contiennent des données. Voir [PHASE3_REPORT.md](PHASE3_REPORT.md).
+La migration `0003_operations` ajoute comptes bancaires, mouvements importés, rapprochements, emprunts et opérations métier. `BusinessOperation.accounting_entry_id` est unique ; `request_id` rend les créations idempotentes. `BankMatch` est une relation un-à-un entre mouvement et ligne comptable. Les opérations, les mouvements bancaires et les rapprochements restent immuables. Les emprunts, comptes bancaires, biens et locataires acceptent une correction auditée tant que leur verrou métier ne s’applique pas. Les suppressions de migration sont refusées dès qu'elles contiennent des données. Voir [PHASE3_REPORT.md](PHASE3_REPORT.md).
 
 ## Schéma P4
 
@@ -80,3 +80,24 @@ les hypothèses documentées, le plan les fige et la période porte le résultat
 exercice ainsi que le lien unique vers l'écriture. Une construction décomposée ne reçoit
 pas elle-même de plan : seuls ses composants sont amortis. Voir
 [PHASE4_REPORT.md](PHASE4_REPORT.md).
+
+## Corrections contrôlées
+
+La migration `0009_structuring` remplace les triggers d’interdiction totale de
+`UPDATE` sur l’immobilisation, le composant, le plan, l’emprunt et le compte
+bancaire. La suppression reste interdite : aucune route `DELETE`. Un plan qui a
+une période `POSTED` refuse encore la modification de la valeur, de la durée,
+des dates et des comptes (`ASSET_HAS_POSTED_DEPRECIATION`,
+`COMPONENT_HAS_POSTED_DEPRECIATION`, `SCHEDULE_IMMUTABLE`). Un emprunt déjà
+mouvementé garde son capital initial, sa date de départ, son bien et son compte
+164. Un numéro bancaire qui a des mouvements reste en place. Les colonnes
+financières d’un bien qui a déjà une immobilisation ne bougent plus. Le nom, le
+loyer et la date d’entrée d’un locataire qui a des quittances non plus.
+
+L’API `PATCH` est le chemin supporté. Elle écrit un `audit_event` (`CORRECTED`,
+avant, après, motif). Elle efface les périodes `CALCULATED` d’un exercice ouvert,
+réaligne le plan sur la fiche, invalide les calculs fiscaux ouverts, repasse
+`READY_TO_CLOSE` à `OPEN` et marque `SUPERSEDED` les instantanés ouverts. Les
+écritures validées, et donc le FEC, ne sont pas réécrites. Un calcul fiscal
+clôturé qui a mémorisé la base n’est ni invalidé ni recalculé : la valeur et la
+durée sont refusées jusqu’à réouverture.

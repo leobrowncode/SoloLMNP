@@ -52,9 +52,9 @@ Menu **Opérations & banque**, dans cet ordre :
 
 | Onglet | Action |
 | --- | --- |
-| **Biens** | Ajouter le bien (prix, terrain, bâtiment) |
-| **Banque** | Ajouter un compte bancaire (lié à un compte 512) |
-| **Emprunts** | Si besoin : une ligne de crédit = un emprunt. Pour 15 000 € + 195 000 €, créez deux emprunts ; un compte 164 libre est attribué automatiquement. Puis déblocage et échéances (saisie unitaire ou import du tableau d’amortissement). |
+| **Biens** | Ajouter le bien (prix, terrain, bâtiment). **Modifier** corrige le nom, l’adresse et les notes. Le prix, le terrain et le bâtiment se figent dès qu’une immobilisation existe : la correction se fait alors sur le registre. |
+| **Banque** | Ajouter un compte bancaire (lié à un compte 512). Le nom reste modifiable. Le numéro se fige dès qu’un mouvement ou une écriture l’utilise. |
+| **Emprunts** | Si besoin : une ligne de crédit = un emprunt. Pour 15 000 € + 195 000 €, créez deux emprunts ; un compte 164 libre est attribué automatiquement et n’est plus modifié. Puis déblocage et échéances (saisie unitaire ou import du tableau d’amortissement). Le taux, la durée et le prêteur restent corrigeables ; le capital initial et la date de départ se figent dès qu’un mouvement existe. |
 | **Transactions** | Recettes (loyers) et dépenses (charges) |
 
 Pour chaque opération : date, bien, exercice, montant, compte 6xx/7xx.
@@ -96,7 +96,7 @@ Menu **Immobilisations** :
 
 1. **Prévisualiser l’amortissement du logement**, puis **Créer les immobilisations affichées**. L’aperçu liste le terrain, la construction et six composants (montants, comptes, durées, mise en service) sans rien enregistrer : ni immobilisation, ni compte. Annuler laisse la base inchangée. Répéter la confirmation ne crée pas de doublon. Les frais de notaire et d’agence sont ajoutés au bâtiment ; les durées proposées sont à confirmer, ce n’est pas un barème légal. Ou saisie manuelle : terrain (compte 211, sans amortissement), puis construction (213000 / 281300) et tous ses composants. Le formulaire ne propose que les comptes de la catégorie, jamais un compte 28 comme compte d’immobilisation.
 2. **Faire entrer le bien en comptabilité** (une seule fois, premier exercice) : indiquez le capital restant dû de chaque prêt au début de l’exercice, le solde bancaire à cette date et les frais payés avant (intérêts, assurance emprunteur, frais de dossier). **Prévisualiser**, puis **Comptabiliser**. L’écart va au compte de l’exploitant (108). Les prêts repris ainsi n’ont pas de « déblocage » à saisir : enregistrez seulement les échéances payées pendant l’exercice. Une erreur se corrige en extournant l’écriture depuis le journal.
-3. Mobilier : **Nouvelle immobilisation**, comptes 218400 et 281840, avec justification de valeur et de durée. Un couple déjà enregistré qui ne correspond pas à sa catégorie est signalé sur la fiche. Le registre et le journal ne sont pas réécrits.
+3. Mobilier : **Nouvelle immobilisation**, comptes 218400 et 281840, avec justification de valeur et de durée. Un couple déjà enregistré qui ne correspond pas à sa catégorie est signalé sur la fiche et n’est pas réécrit tout seul. **Modifier** (ou **Préciser la justification** si la fiche est figée) demande un motif. Avant toute dotation comptabilisée, la valeur, la durée et les comptes peuvent changer : les périodes seulement calculées sont alors effacées, il faut relancer **Calculer les périodes**. Après comptabilisation, ces champs restent affichés comme figés et l’écran dit pourquoi. La même action existe pour le bien, le locataire, la banque et l’emprunt.
 4. Choisir l’exercice 2026 → **Calculer les périodes** → **Comptabiliser** chaque dotation (possible à partir du 31/12, date de la dotation).
 
 ---
