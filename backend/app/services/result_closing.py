@@ -1,6 +1,8 @@
 """User-confirmed centralisation of classes 6/7 and result appropriation.
 
 Neither operation infers a tax treatment or closes the fiscal year.
+The preview never writes. A missing canonical result account is created
+only when the confirmation lists it, in the same transaction as the entry.
 """
 
 from datetime import date
@@ -10,11 +12,17 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.ledger_schemas import AppropriationInput, CentralizationInput, EntryInput
+from app.api.ledger_schemas import AccountInput, AppropriationInput, CentralizationInput, EntryInput
 from app.core.money import to_cents
 from app.models import Account, AccountingEntry, AccountingJournal, LedgerEvent
 from app.services.ledger import create_draft, entry_json, event, fail, get_year, money, post_entry
 from app.services.statements import statements
+
+# Proposed only when no active account of the required prefix already exists.
+_CANONICAL_RESULT_ACCOUNTS: dict[str, tuple[str, str]] = {
+    "120": ("120000", "Résultat de l’exercice (bénéfice)"),
+    "129": ("129000", "Résultat de l’exercice (déficit)"),
+}
 
 
 def _cents(amount: str) -> int:
@@ -45,6 +53,7 @@ def centralization_preview(session: Session, year_id: int) -> dict[str, Any]:
         "result_account_prefix": "120" if result > 0 else "129" if result < 0 else None,
         "excluded_draft_count": report["excluded_draft_count"],
         "lines": lines,
+        "proposed_accounts": _proposed_result_accounts(session, result),
         "already_posted": live is not None,
         "existing_entry_id": live.id if live else None,
     }
@@ -69,6 +78,7 @@ def post_centralization(
         fail("RESULT_CHANGED", "Le résultat a changé. Actualisez la prévisualisation.")
     if result == 0 and not _has_class_balance(report):
         fail("NOTHING_TO_CENTRALIZE", "Les comptes de charges et de produits sont déjà soldés.")
+    _create_confirmed_accounts(session, result, data.create_accounts)
     _check_result_account(session, data.result_account, result)
     journal = _general_journal(session, data.journal_code)
     lines = _closing_lines(report, result, data.result_account)
@@ -201,6 +211,9 @@ def _parameters(data: CentralizationInput | AppropriationInput) -> dict[str, Any
     raw = data.model_dump(mode="json")
     if isinstance(data, CentralizationInput):
         raw["expected_result"] = money(to_cents(data.expected_result))
+        # Empty list matches confirmations stored before account creation existed.
+        if not raw["create_accounts"]:
+            del raw["create_accounts"]
     else:
         raw["expected_amount"] = money(to_cents(data.expected_amount))
     return raw
@@ -251,6 +264,56 @@ def _general_journal(session: Session, code: str) -> AccountingJournal:
     if journal is None or not journal.active or journal.journal_type != "GENERAL":
         fail("RESULT_JOURNAL", "Un journal actif d’opérations diverses est requis.", 422)
     return journal
+
+
+def _proposed_result_accounts(session: Session, result: int) -> list[dict[str, str]]:
+    if result == 0:
+        return []
+    prefix = "120" if result > 0 else "129"
+    if _active_result_accounts(session, prefix):
+        return []
+    number, label = _CANONICAL_RESULT_ACCOUNTS[prefix]
+    if session.get(Account, number) is not None:
+        return []
+    return [{"number": number, "label": label, "account_type": "EQUITY"}]
+
+
+def _active_result_accounts(session: Session, prefix: str) -> list[Account]:
+    rows = session.scalars(select(Account).where(Account.number.startswith(prefix))).all()
+    return [
+        account
+        for account in rows
+        if account.active
+        and account.account_type == "EQUITY"
+        and not account.number.startswith("1209")
+    ]
+
+
+def _create_confirmed_accounts(
+    session: Session, result: int, requested: list[AccountInput]
+) -> None:
+    allowed = {item["number"]: item for item in _proposed_result_accounts(session, result)}
+    seen: set[str] = set()
+    for item in requested:
+        expected = allowed.get(item.number)
+        if (
+            item.number in seen
+            or expected is None
+            or item.label != expected["label"]
+            or item.account_type != expected["account_type"]
+        ):
+            fail(
+                "UNEXPECTED_ACCOUNT_CREATION",
+                "Seuls les comptes annoncés par la prévisualisation peuvent être créés.",
+            )
+        seen.add(item.number)
+        session.add(Account(number=item.number, label=item.label, account_type=item.account_type))
+        event(
+            session,
+            "ACCOUNT_CREATED",
+            None,
+            {"number": item.number, "label": item.label, "account_type": item.account_type},
+        )
 
 
 def _check_result_account(session: Session, number: str | None, result: int) -> None:

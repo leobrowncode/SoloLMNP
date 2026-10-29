@@ -24,6 +24,11 @@ def client(seeded_client):  # noqa: F811
     return seeded_client
 
 
+@pytest.fixture
+def bare_client(seeded_client):  # noqa: F811
+    return seeded_client
+
+
 def counts(database):
     with database.engine.connect() as connection:
         return tuple(
@@ -32,18 +37,38 @@ def counts(database):
         )
 
 
-def centralize(client, result, account="120000", request_id=None):
-    return client.post(
-        "/api/ledger/years/1/centralization",
-        json={
-            "request_id": request_id or str(uuid4()),
-            "journal_code": "OD",
-            "piece_reference": "CENT-1",
-            "justification": "Centralisation confirmée après contrôle du résultat.",
-            "result_account": account,
-            "expected_result": result,
-        },
-    )
+def centralize(client, result, account="120000", request_id=None, create_accounts=None):
+    body = {
+        "request_id": request_id or str(uuid4()),
+        "journal_code": "OD",
+        "piece_reference": "CENT-1",
+        "justification": "Centralisation confirmée après contrôle du résultat.",
+        "result_account": account,
+        "expected_result": result,
+    }
+    if create_accounts is not None:
+        body["create_accounts"] = create_accounts
+    return client.post("/api/ledger/years/1/centralization", json=body)
+
+
+BENEFIT = {
+    "number": "120000",
+    "label": "Résultat de l’exercice (bénéfice)",
+    "account_type": "EQUITY",
+}
+DEFICIT = {
+    "number": "129000",
+    "label": "Résultat de l’exercice (déficit)",
+    "account_type": "EQUITY",
+}
+
+
+def chart_snapshot(client, database):
+    rows = client.get("/api/ledger/accounts").json()
+    with database.engine.connect() as connection:
+        events = connection.scalar(select(func.count()).select_from(LedgerEvent))
+    chart = [(row["number"], row["label"], row["active"]) for row in rows]
+    return chart, events
 
 
 def appropriate(client, amount, source="120000", target="108000", request_id=None):
@@ -78,6 +103,8 @@ def test_profit_rubrics_centralization_and_appropriation(client):
     assert result["presentation"]["reclassifications_applied"] is False
     preview = client.get("/api/ledger/years/1/centralization-preview").json()
     assert preview["result"] == "800.00"
+    assert preview["read_only"] is True
+    assert preview["proposed_accounts"] == []
     posted = centralize(client, "800.00")
     assert posted.status_code == 200, posted.text
     assert posted.json()["created"] is True
@@ -99,6 +126,9 @@ def test_profit_rubrics_centralization_and_appropriation(client):
 
 def test_loss_uses_129_and_cent_amounts(client):
     book(client, "615000", "401000", "10.01")
+    assert (
+        client.get("/api/ledger/years/1/centralization-preview").json()["proposed_accounts"] == []
+    )
     assert (
         centralize(client, "-10.01", "120000").json()["detail"]["code"] == "INVALID_RESULT_ACCOUNT"
     )
@@ -209,9 +239,166 @@ def test_stale_result_drafts_and_overdraft_warning(client):
 def test_zero_result_nets_classes_without_result_account(client):
     book(client, "512000", "706000", "40.00")
     book(client, "615000", "512000", "40.00")
+    preview = client.get("/api/ledger/years/1/centralization-preview").json()
+    assert preview["proposed_accounts"] == []
     refused = centralize(client, "0.00", "120000")
     assert refused.json()["detail"]["code"] == "UNEXPECTED_RESULT_ACCOUNT"
     posted = centralize(client, "0.00", None)
     assert posted.status_code == 200, posted.text
     assert report(client)["income_statement"]["result"] == "0.00"
     assert client.get("/api/ledger/years/1/appropriation-preview").json()["proposals"] == []
+
+
+def test_preview_does_not_change_chart_and_confirmation_creates_account(bare_client, database):
+    book(bare_client, "512000", "706000", "50.00")
+    before = chart_snapshot(bare_client, database)
+    preview = bare_client.get("/api/ledger/years/1/centralization-preview")
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["proposed_accounts"] == [BENEFIT]
+    assert chart_snapshot(bare_client, database) == before
+    missing = centralize(bare_client, "50.00")
+    assert missing.status_code == 409
+    assert missing.json()["detail"]["code"] == "INVALID_RESULT_ACCOUNT"
+    wrong = centralize(bare_client, "50.00", "129000", create_accounts=[DEFICIT])
+    assert wrong.status_code == 409
+    assert wrong.json()["detail"]["code"] == "UNEXPECTED_ACCOUNT_CREATION"
+    mismatched = centralize(
+        bare_client,
+        "50.00",
+        create_accounts=[{**BENEFIT, "label": "Autre libellé"}],
+    )
+    assert mismatched.status_code == 409
+    assert mismatched.json()["detail"]["code"] == "UNEXPECTED_ACCOUNT_CREATION"
+    assert chart_snapshot(bare_client, database) == before
+    request_id = str(uuid4())
+    posted = centralize(bare_client, "50.00", request_id=request_id, create_accounts=[BENEFIT])
+    assert posted.status_code == 200, posted.text
+    assert posted.json()["created"] is True
+    numbers = [row["number"] for row in bare_client.get("/api/ledger/accounts").json()]
+    assert numbers.count("120000") == 1
+    assert "129000" not in numbers
+    equity = {
+        row["account_number"]: row["amount"]
+        for row in report(bare_client)["balance_sheet"]["equity"]
+    }
+    assert equity["120000"] == "50.00"
+    replay = centralize(bare_client, "50.00", request_id=request_id, create_accounts=[BENEFIT])
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["created"] is False
+    assert replay.json()["entry"]["id"] == posted.json()["entry"]["id"]
+    conflict = centralize(bare_client, "50.00", request_id=request_id, create_accounts=[])
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["code"] == "RESULT_REQUEST_CONFLICT"
+    again = centralize(bare_client, "50.00", create_accounts=[BENEFIT])
+    assert again.status_code == 409
+    assert again.json()["detail"]["code"] == "CENTRALIZATION_EXISTS"
+    assert numbers == [row["number"] for row in bare_client.get("/api/ledger/accounts").json()]
+
+
+def test_loss_preview_proposes_only_deficit_account(bare_client, database):
+    book(bare_client, "615000", "401000", "10.01")
+    before = chart_snapshot(bare_client, database)
+    preview = bare_client.get("/api/ledger/years/1/centralization-preview").json()
+    assert preview["proposed_accounts"] == [DEFICIT]
+    assert chart_snapshot(bare_client, database) == before
+    posted = centralize(bare_client, "-10.01", "129000", create_accounts=[DEFICIT])
+    assert posted.status_code == 200, posted.text
+    numbers = {row["number"] for row in bare_client.get("/api/ledger/accounts").json()}
+    assert "129000" in numbers
+    assert "120000" not in numbers
+
+
+def test_zero_result_proposes_no_account_creation(bare_client, database):
+    book(bare_client, "512000", "706000", "40.00")
+    book(bare_client, "615000", "512000", "40.00")
+    before = chart_snapshot(bare_client, database)
+    preview = bare_client.get("/api/ledger/years/1/centralization-preview").json()
+    assert preview["result"] == "0.00"
+    assert preview["proposed_accounts"] == []
+    assert chart_snapshot(bare_client, database) == before
+    posted = centralize(bare_client, "0.00", None)
+    assert posted.status_code == 200, posted.text
+    chart, _events = chart_snapshot(bare_client, database)
+    assert chart == before[0]
+
+
+def test_rejected_centralization_does_not_create_accounts(bare_client, database):
+    book(bare_client, "512000", "706000", "50.00")
+    before = chart_snapshot(bare_client, database)
+    stale = centralize(bare_client, "1.00", create_accounts=[BENEFIT])
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "RESULT_CHANGED"
+    assert chart_snapshot(bare_client, database) == before
+    draft = bare_client.post(
+        "/api/ledger/entries",
+        json={
+            "fiscal_year_id": 1,
+            "journal_code": "OD",
+            "accounting_date": "2025-03-01",
+            "piece_reference": "BROUILLON",
+            "piece_date": "2025-03-01",
+            "label": "Brouillon exclu",
+            "lines": [
+                {"account_number": "615000", "label": "Charge", "debit": "1.00", "credit": "0.00"},
+                {"account_number": "401000", "label": "Dette", "debit": "0.00", "credit": "1.00"},
+            ],
+        },
+    )
+    assert draft.status_code == 201, draft.text
+    before = chart_snapshot(bare_client, database)
+    blocked = centralize(bare_client, "50.00", create_accounts=[BENEFIT])
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "YEAR_DRAFTS"
+    assert chart_snapshot(bare_client, database) == before
+
+
+def test_existing_prefix_account_is_not_replaced_by_canonical(bare_client, database):
+    created = bare_client.post(
+        "/api/ledger/accounts",
+        json={"number": "120100", "label": "Résultat à affecter", "account_type": "EQUITY"},
+    )
+    assert created.status_code == 201, created.text
+    book(bare_client, "512000", "706000", "50.00")
+    before = chart_snapshot(bare_client, database)
+    preview = bare_client.get("/api/ledger/years/1/centralization-preview").json()
+    assert preview["proposed_accounts"] == []
+    assert chart_snapshot(bare_client, database) == before
+    posted = centralize(bare_client, "50.00", "120100")
+    assert posted.status_code == 200, posted.text
+    numbers = {row["number"] for row in bare_client.get("/api/ledger/accounts").json()}
+    assert "120100" in numbers
+    assert "120000" not in numbers
+
+
+def test_inactive_canonical_account_is_not_recreated(bare_client, database):
+    created = bare_client.post("/api/ledger/accounts", json=BENEFIT)
+    assert created.status_code == 201, created.text
+    changed = bare_client.patch("/api/ledger/accounts/120000/active", json={"active": False})
+    assert changed.status_code == 200, changed.text
+    book(bare_client, "512000", "706000", "50.00")
+    before = chart_snapshot(bare_client, database)
+    preview = bare_client.get("/api/ledger/years/1/centralization-preview").json()
+    assert preview["proposed_accounts"] == []
+    assert chart_snapshot(bare_client, database) == before
+    refused = centralize(bare_client, "50.00", create_accounts=[BENEFIT])
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "UNEXPECTED_ACCOUNT_CREATION"
+    direct = centralize(bare_client, "50.00")
+    assert direct.status_code == 409
+    assert direct.json()["detail"]["code"] == "INVALID_RESULT_ACCOUNT"
+    assert chart_snapshot(bare_client, database) == before
+
+
+def test_account_creation_rolls_back_with_failed_centralization(bare_client, database, monkeypatch):
+    book(bare_client, "512000", "706000", "20.00")
+    before = chart_snapshot(bare_client, database)
+
+    def reject(*args, **kwargs):
+        fail("TEST_POST_FAILURE", "Échec simulé après création du compte.")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(result_closing, "post_entry", reject)
+        response = centralize(bare_client, "20.00", create_accounts=[BENEFIT])
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "TEST_POST_FAILURE"
+    assert chart_snapshot(bare_client, database) == before
