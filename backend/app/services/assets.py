@@ -18,6 +18,11 @@ from app.api.asset_schemas import (
 )
 from app.api.ledger_schemas import EntryInput, LineInput
 from app.core.money import from_cents, to_cents
+from app.domain.assets.accounts import (
+    AssetAccountError,
+    validate_asset_accounts,
+    validate_component_accounts,
+)
 from app.models import (
     Account,
     AccountingEntry,
@@ -49,27 +54,59 @@ def account(session: Session, number: str, prefix: str) -> None:
         )
 
 
+def _active_account(session: Session, number: str) -> None:
+    row = session.get(Account, number)
+    if row is None or not row.active:
+        fail("ASSET_ACCOUNT_INVALID", f"Le compte {number} est introuvable ou inactif.", 422)
+
+
+def require_asset_accounts(
+    session: Session, category: str, asset_account: str, depreciation_account: str | None
+) -> None:
+    try:
+        validate_asset_accounts(category, asset_account, depreciation_account)
+    except AssetAccountError as exc:
+        fail("ASSET_ACCOUNT_PAIR_INVALID", str(exc), 422)
+    _active_account(session, asset_account)
+    if depreciation_account is not None:
+        _active_account(session, depreciation_account)
+
+
+def require_component_accounts(
+    session: Session, asset_account: str, depreciation_account: str
+) -> None:
+    try:
+        validate_component_accounts(asset_account, depreciation_account)
+    except AssetAccountError as exc:
+        fail("ASSET_ACCOUNT_PAIR_INVALID", str(exc), 422)
+    _active_account(session, asset_account)
+    _active_account(session, depreciation_account)
+
+
+_KEPT = " Le registre et les écritures ne sont pas réécrits."
+
+
+def asset_account_warning(asset: Asset) -> str | None:
+    """Describe a stored pair that new writes would reject. Does not update the row."""
+    try:
+        validate_asset_accounts(asset.category, asset.asset_account, asset.depreciation_account)
+    except AssetAccountError as exc:
+        return f"{exc}{_KEPT}"
+    return None
+
+
+def component_account_warning(component: AssetComponent) -> str | None:
+    try:
+        validate_component_accounts(component.asset_account, component.depreciation_account)
+    except AssetAccountError as exc:
+        return f"{exc}{_KEPT}"
+    return None
+
+
 def create_asset(session: Session, data: AssetInput) -> Asset:
     if session.get(Property, data.property_id) is None:
         fail("PROPERTY_NOT_FOUND", "Bien introuvable.", 404)
-    account(session, data.asset_account, "2")
-    if data.category == "LAND":
-        if not data.asset_account.startswith("211"):
-            fail("LAND_ACCOUNT_INVALID", "Le terrain doit utiliser un compte 211.", 422)
-    else:
-        if data.depreciation_account is None:
-            fail(
-                "DEPRECIATION_ACCOUNT_REQUIRED",
-                "Le compte d’amortissement est obligatoire.",
-                422,
-            )
-        account(session, data.depreciation_account, "28")
-        if data.asset_account.startswith("28"):
-            fail(
-                "ASSET_ACCOUNT_INVALID",
-                "Le compte d’actif ne peut pas être un compte d’amortissement.",
-                422,
-            )
+    require_asset_accounts(session, data.category, data.asset_account, data.depreciation_account)
     row = Asset(**data.model_dump())
     session.add(row)
     session.flush()
@@ -88,8 +125,7 @@ def create_component(session: Session, asset_id: int, data: ComponentInput) -> A
             "La mise en service du composant précède celle de la construction.",
             422,
         )
-    account(session, data.asset_account, "2")
-    account(session, data.depreciation_account, "28")
+    require_component_accounts(session, data.asset_account, data.depreciation_account)
     used = sum(
         to_cents(row.value)
         for row in session.scalars(

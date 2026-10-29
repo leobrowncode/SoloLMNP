@@ -78,8 +78,25 @@ def furniture(**changes):
     }
 
 
+def land(**changes):
+    payload = furniture(
+        category="LAND",
+        label="Terrain fictif",
+        acquisition_value="20000.00",
+        depreciable_value="0.00",
+        non_depreciable_value="20000.00",
+        method="NONE",
+        useful_life_months=None,
+        asset_account="211000",
+        depreciation_account=None,
+        duration_reason="",
+    )
+    payload.update(changes)
+    return payload
+
+
 def building(**changes):
-    return furniture(
+    payload = furniture(
         category="BUILDING",
         label="Construction fictive",
         acquisition_date="2025-01-01",
@@ -91,8 +108,9 @@ def building(**changes):
         depreciation_account="281300",
         basis_reason="Ventilation documentée du prix d’acquisition",
         duration_reason="Durée d’utilisation estimée à trente ans",
-        **changes,
     )
+    payload.update(changes)
+    return payload
 
 
 def component(value="40000.00", **changes):
@@ -454,3 +472,300 @@ def test_raw_sql_cannot_fabricate_posted_period(client, database):
             )
         )
     assert client.get("/api/assets/years/1/periods").json() == [row]
+
+
+def _open_account(client, number: str) -> None:
+    assert (
+        client.post(
+            "/api/ledger/accounts",
+            json={"number": number, "label": f"Compte {number}", "account_type": "ASSET"},
+        ).status_code
+        == 201
+    )
+
+
+@pytest.mark.parametrize(
+    ("category", "asset_account", "depreciation_account"),
+    [
+        ("BUILDING", "213000", "281300"),
+        ("FURNITURE", "218400", "281840"),
+        ("EQUIPMENT", "218300", "281830"),
+        ("IMPROVEMENT", "213500", "281350"),
+    ],
+)
+def test_each_seeded_category_accepts_only_its_pair(
+    client, category, asset_account, depreciation_account
+):
+    created = client.post(
+        "/api/assets",
+        json=furniture(
+            category=category,
+            label=f"Actif {category}",
+            asset_account=asset_account,
+            depreciation_account=depreciation_account,
+        ),
+    )
+    assert created.status_code == 201, created.text
+    row = client.get("/api/assets").json()[-1]
+    assert row["asset_account"] == asset_account
+    assert row["depreciation_account"] == depreciation_account
+    assert row["account_warning"] is None
+
+
+@pytest.mark.parametrize(
+    ("changes", "fragment"),
+    [
+        (
+            {"category": "BUILDING", "asset_account": "211000", "depreciation_account": "281300"},
+            "Terrain",
+        ),
+        (
+            {"category": "BUILDING", "asset_account": "281300", "depreciation_account": "281300"},
+            "amortissement",
+        ),
+        (
+            {"category": "BUILDING", "asset_account": "213000", "depreciation_account": "281840"},
+            "281300",
+        ),
+        (
+            {"category": "BUILDING", "asset_account": "218400", "depreciation_account": "281840"},
+            "Mobilier",
+        ),
+        (
+            {"category": "BUILDING", "asset_account": "213500", "depreciation_account": "281350"},
+            "Travaux",
+        ),
+        (
+            {"category": "BUILDING", "asset_account": "512000", "depreciation_account": "281300"},
+            "512000",
+        ),
+        (
+            {"category": "FURNITURE", "asset_account": "211000", "depreciation_account": "281100"},
+            "Terrain",
+        ),
+        (
+            {"category": "FURNITURE", "asset_account": "213000", "depreciation_account": "281300"},
+            "Construction",
+        ),
+        (
+            {"category": "FURNITURE", "asset_account": "218400", "depreciation_account": "281300"},
+            "281840",
+        ),
+        (
+            {"category": "FURNITURE", "asset_account": "281840", "depreciation_account": "281840"},
+            "amortissement",
+        ),
+        (
+            {"category": "EQUIPMENT", "asset_account": "218400", "depreciation_account": "281840"},
+            "Mobilier",
+        ),
+        (
+            {"category": "EQUIPMENT", "asset_account": "218300", "depreciation_account": "281840"},
+            "281830",
+        ),
+        (
+            {
+                "category": "IMPROVEMENT",
+                "asset_account": "213000",
+                "depreciation_account": "281300",
+            },
+            "Construction",
+        ),
+        (
+            {
+                "category": "IMPROVEMENT",
+                "asset_account": "213500",
+                "depreciation_account": "281300",
+            },
+            "281350",
+        ),
+        (
+            {"category": "OTHER", "asset_account": "218400", "depreciation_account": "281840"},
+            "Mobilier",
+        ),
+        (
+            {"category": "OTHER", "asset_account": "211000", "depreciation_account": "281100"},
+            "Terrain",
+        ),
+    ],
+)
+def test_api_rejects_inconsistent_category_account_pairs(client, changes, fragment):
+    response = client.post("/api/assets", json=furniture(**changes))
+    assert response.status_code == 422, response.text
+    body = response.json()["detail"]
+    assert body["code"] == "ASSET_ACCOUNT_PAIR_INVALID"
+    assert fragment in body["message"]
+    assert client.get("/api/assets").json() == []
+
+
+def test_land_rejects_other_accounts_and_any_depreciation_account(client):
+    wrong_asset = client.post("/api/assets", json=land(asset_account="213000"))
+    assert wrong_asset.status_code == 422
+    assert wrong_asset.json()["detail"]["code"] == "ASSET_ACCOUNT_PAIR_INVALID"
+    assert "Construction" in wrong_asset.json()["detail"]["message"]
+    contra = client.post("/api/assets", json=land(asset_account="281300"))
+    assert contra.status_code == 422
+    assert contra.json()["detail"]["code"] == "ASSET_ACCOUNT_PAIR_INVALID"
+    assert "amortissement" in contra.json()["detail"]["message"]
+    with_depreciation = client.post("/api/assets", json=land(depreciation_account="281300"))
+    assert with_depreciation.status_code == 422
+    assert "amortissement" in with_depreciation.text
+    created = client.post("/api/assets", json=land())
+    assert created.status_code == 201, created.text
+    row = client.get("/api/assets").json()[-1]
+    assert row["asset_account"] == "211000"
+    assert row["depreciation_account"] is None
+    assert row["account_warning"] is None
+
+
+def test_configurable_subaccounts_keep_the_category_mirror(client):
+    pairs = (
+        ("212000", "281200", "BUILDING"),
+        ("214000", "281400", "BUILDING"),
+        ("215000", "281500", "EQUIPMENT"),
+        ("218100", "281810", "IMPROVEMENT"),
+        ("218200", "281820", "EQUIPMENT"),
+        ("218500", "281850", "OTHER"),
+        ("213100", "281310", "BUILDING"),
+    )
+    for asset_account, depreciation_account, category in pairs:
+        _open_account(client, asset_account)
+        _open_account(client, depreciation_account)
+        created = client.post(
+            "/api/assets",
+            json=furniture(
+                category=category,
+                label=f"{category} {asset_account}",
+                asset_account=asset_account,
+                depreciation_account=depreciation_account,
+            ),
+        )
+        assert created.status_code == 201, created.text
+    crossed = client.post(
+        "/api/assets",
+        json=building(
+            asset_account="213100", depreciation_account="281300", label="Mauvais miroir"
+        ),
+    )
+    assert crossed.status_code == 422
+    assert crossed.json()["detail"]["code"] == "ASSET_ACCOUNT_PAIR_INVALID"
+    assert "281310" in crossed.json()["detail"]["message"]
+
+
+def test_coarse_asset_account_is_rejected(client):
+    response = client.post(
+        "/api/assets",
+        json=building(
+            asset_account="213", depreciation_account="2813", label="Compte trop court"
+        ),
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "ASSET_ACCOUNT_PAIR_INVALID"
+    assert "4 chiffres" in response.json()["detail"]["message"]
+    assert client.get("/api/assets").json() == []
+
+
+def test_inactive_pair_is_rejected_even_when_the_numbers_match(client):
+    assert (
+        client.patch("/api/ledger/accounts/218400/active", json={"active": False}).status_code
+        == 200
+    )
+    response = client.post("/api/assets", json=furniture())
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "ASSET_ACCOUNT_INVALID"
+    assert client.get("/api/assets").json() == []
+
+
+def test_component_accounts_stay_on_the_building_mirror(client):
+    assert client.post("/api/assets", json=building()).status_code == 201
+    refused = (
+        component(asset_account="218400", depreciation_account="281840"),
+        component(asset_account="211000", depreciation_account="281100"),
+        component(asset_account="213000", depreciation_account="281350"),
+        component(asset_account="213500", depreciation_account="281300"),
+        component(asset_account="281300", depreciation_account="281300"),
+        component(asset_account="512000", depreciation_account="281300"),
+    )
+    for payload in refused:
+        response = client.post("/api/assets/1/components", json=payload)
+        assert response.status_code == 422, response.text
+        assert response.json()["detail"]["code"] == "ASSET_ACCOUNT_PAIR_INVALID"
+    assert (
+        client.post(
+            "/api/assets/1/components",
+            json=component(
+                asset_account="213500",
+                depreciation_account="281350",
+                label="Toiture",
+            ),
+        ).status_code
+        == 201
+    )
+    stored = client.get("/api/assets").json()[0]["components"]
+    assert stored[0]["asset_account"] == "213500"
+    assert stored[0]["account_warning"] is None
+
+
+def test_existing_inconsistent_pair_is_flagged_and_not_rewritten(client, database):
+    before = register_snapshot(database)
+    with database.sessions.begin() as session:
+        session.execute(
+            text(
+                "INSERT INTO asset (property_id,category,label,acquisition_date,"
+                "service_start_date,acquisition_value,depreciable_value,non_depreciable_value,"
+                "residual_value,method,useful_life_months,asset_account,depreciation_account,"
+                "basis_reason,duration_reason,notes,created_at) VALUES "
+                "(1,'BUILDING','Construction incohérente','2025-01-01','2025-01-01',"
+                "8000000,8000000,0,0,'LINEAR',360,'211000','281300',"
+                "'Ancien couple conservé','Durée historique','',CURRENT_TIMESTAMP)"
+            )
+        )
+    listed = client.get("/api/assets").json()
+    assert listed[0]["asset_account"] == "211000"
+    assert listed[0]["depreciation_account"] == "281300"
+    assert listed[0]["category"] == "BUILDING"
+    assert "Terrain" in listed[0]["account_warning"]
+    assert "ne sont pas réécrits" in listed[0]["account_warning"]
+    refused = client.post(
+        "/api/assets",
+        json=building(asset_account="211000", depreciation_account="281300", label="Refus"),
+    )
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "ASSET_ACCOUNT_PAIR_INVALID"
+    after = register_snapshot(database)
+    assert after["accounts"] == before["accounts"]
+    assert after["entries"] == before["entries"] == []
+    assert after["assets"][0][4:] == ("211000", "281300", 360, date(2025, 1, 1))
+    assert len(after["assets"]) == 1
+
+
+def test_existing_inconsistent_component_is_flagged_and_not_rewritten(client, database):
+    assert client.post("/api/assets", json=building()).status_code == 201
+    before = register_snapshot(database)
+    with database.sessions.begin() as session:
+        session.execute(
+            text(
+                "INSERT INTO asset_component (asset_id,category,label,value,useful_life_months,"
+                "service_start_date,asset_account,depreciation_account,basis_reason,"
+                "duration_reason,created_at) VALUES "
+                "(1,'STRUCTURE','Composant incohérent',100000,120,'2025-01-01',"
+                "'218400','281840','Ventilation historique','Durée historique',CURRENT_TIMESTAMP)"
+            )
+        )
+    listed = client.get("/api/assets").json()[0]
+    assert listed["account_warning"] is None
+    component_row = listed["components"][0]
+    assert component_row["asset_account"] == "218400"
+    assert component_row["depreciation_account"] == "281840"
+    assert "218400" in component_row["account_warning"]
+    assert "ne sont pas réécrits" in component_row["account_warning"]
+    refused = client.post(
+        "/api/assets/1/components",
+        json=component(asset_account="218400", depreciation_account="281840", label="Refus"),
+    )
+    assert refused.status_code == 422
+    after = register_snapshot(database)
+    assert after["entries"] == before["entries"]
+    assert after["accounts"] == before["accounts"]
+    assert len(after["components"]) == 1
+    assert after["components"][0][5:7] == ("218400", "281840")
