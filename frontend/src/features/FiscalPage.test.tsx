@@ -1,10 +1,23 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { expect, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import FiscalPage from "./FiscalPage";
+
+afterEach(() => vi.restoreAllMocks());
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { "Content-Type": "application/json" },
 });
+
+const notComputed = () => response({
+  detail: {
+    code: "FISCAL_NOT_COMPUTED",
+    message: "Aucun calcul fiscal n’est enregistré pour cet exercice.",
+  },
+}, 404);
+
+function isFiscalRead(url: string, method: string) {
+  return method === "GET" && /\/api\/fiscal\/years\/\d+$/.test(url);
+}
 
 test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
@@ -37,6 +50,7 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
         },
       });
     }
+    if (isFiscalRead(url, init?.method ?? "GET")) return notComputed();
     if (url.includes("/api/fiscal/years/1") && init?.method === "POST") {
       return response({
         status: "research_only",
@@ -98,6 +112,11 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
           prior_deficits: [],
           note: "Une seule des deux lignes porte un montant.",
         },
+        warnings: [
+          { code: "RESEARCH_ONLY", level: "info", message: "Feuille de recopie : aucun envoi." },
+          { code: "CVAE_BASE_SEULE", level: "warning", message: "La case 117 est une base, pas une cotisation." },
+          { code: "ECART_A_RELIRE", level: "error", message: "Écart à relire avant recopie." },
+        ],
       });
     }
     return response({
@@ -140,6 +159,13 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
   expect(screen.getByText("2031-bis — BIC non professionnels")).toBeInTheDocument();
   expect(screen.getByText("5NA")).toBeInTheDocument();
   expect(screen.getByText(/État de suivi des amortissements non déduits/)).toBeInTheDocument();
+  const warningList = screen.getByRole("list", { name: "Avertissements de la liasse" });
+  expect(within(warningList).getByText("Information")).toBeInTheDocument();
+  expect(within(warningList).getByText("Feuille de recopie : aucun envoi.")).toBeInTheDocument();
+  expect(within(warningList).getByText("Avertissement")).toBeInTheDocument();
+  expect(within(warningList).getByText("La case 117 est une base, pas une cotisation.")).toBeInTheDocument();
+  expect(within(warningList).getByText("Erreur")).toBeInTheDocument();
+  expect(within(warningList).getByText("Écart à relire avant recopie.")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /PDF de recopie/ })).toHaveAttribute(
     "href",
     "/api/filing/years/1/efi.pdf",
@@ -152,6 +178,7 @@ test("closing reloads the exercise status, the dashboard and the frozen exports"
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
+    if (isFiscalRead(url, method)) return notComputed();
     if (url.endsWith("/vintages")) {
       return response({ vintages: [{ vintage: "2025", status: "research_only", blocked: [], executable: [] }] });
     }
@@ -241,6 +268,7 @@ test("a refused close keeps the ready exercise and explains the failure", async 
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
+    if (isFiscalRead(url, method)) return notComputed();
     if (url.endsWith("/vintages")) {
       return response({ vintages: [] });
     }
@@ -291,6 +319,7 @@ test("reopening a closed exercise reloads open status and frozen exports", async
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
+    if (isFiscalRead(url, method)) return notComputed();
     if (url.endsWith("/vintages")) {
       return response({ vintages: [] });
     }
@@ -335,4 +364,141 @@ test("reopening a closed exercise reloads open status and frozen exports", async
   expect(await screen.findByRole("option", { name: "2025 · ouvert" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "Réouvrir l’exercice" })).not.toBeInTheDocument();
   expect(screen.getByText("Le FEC sera disponible après la clôture.")).toBeInTheDocument();
+});
+
+const STORED = "a".repeat(64);
+const MOVED = "b".repeat(64);
+
+function storedComputation(current = STORED, fiscal = "12.34") {
+  return {
+    status: "research_only",
+    declarable: false,
+    accounting_result: "-200.00",
+    fiscal_result: fiscal,
+    deductible_depreciation: "600.00",
+    unused_depreciation: "200.00",
+    tax_loss: "0.00",
+    non_deductible: "0.00",
+    computed_at: "2026-03-02T08:15:00Z",
+    ledger_sha256: STORED,
+    current_ledger_sha256: current,
+    details: {
+      operating_income: "1000.00",
+      other_charges: "400.00",
+      accounting_depreciation: "800.00",
+      capacity: "600.00",
+      current_deductible_depreciation: "600.00",
+      prior_depreciation_used: "0.00",
+      prior_tax_loss_used: "0.00",
+      goal_hint: `Lecture du résultat ${fiscal}.`,
+      prior_carry_forward_use: { status: "enabled", depreciation: [], tax_loss: [] },
+    },
+  };
+}
+
+function fiscalScreen(handler: (url: string, method: string) => Response | null) {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    const extra = handler(url, method);
+    if (extra) return extra;
+    if (url.endsWith("/vintages")) {
+      return response({ vintages: [{ vintage: "2025", status: "research_only", blocked: [], executable: [] }] });
+    }
+    if (url.endsWith("/setup")) return response({ years: [{ id: 1, year: 2025, status: "OPEN" }] });
+    if (url.endsWith("/statements")) {
+      return response({
+        income_statement: {
+          income: [],
+          expenses: [],
+          total_income: "1000.00",
+          total_expenses: "1200.00",
+          result: "-200.00",
+        },
+      });
+    }
+    if (url.endsWith("/precheck")) {
+      return response({ blocking: false, year_status: "OPEN", errors: [], warnings: [] });
+    }
+    throw new Error(`unexpected ${method} ${url}`);
+  });
+}
+
+test("reloads the last calculation with its date and ledger fingerprint", async () => {
+  fiscalScreen((url, method) => (
+    isFiscalRead(url, method) ? response(storedComputation()) : null
+  ));
+  render(<FiscalPage />);
+  expect(await screen.findByText("12.34 €")).toBeInTheDocument();
+  expect(document.querySelector("time")).toHaveAttribute("datetime", "2026-03-02T08:15:00Z");
+  expect(screen.getByText(/Calcul du/)).toBeInTheDocument();
+  expect(screen.getByText(`Empreinte ${STORED}`)).toBeInTheDocument();
+  expect(screen.getByText("Correspond au ledger")).toBeInTheDocument();
+  expect(screen.queryByText("Obsolète")).not.toBeInTheDocument();
+  expect(screen.getByText(/Aperçu fiscal/)).toBeInTheDocument();
+});
+
+test("marks an invalidated calculation obsolete even when the fingerprints still match", async () => {
+  fiscalScreen((url, method) => (
+    isFiscalRead(url, method) ? response({ ...storedComputation(), invalidated: true }) : null
+  ));
+  render(<FiscalPage />);
+  expect(await screen.findByText("Obsolète")).toBeInTheDocument();
+  expect(screen.getByText("12.34 €")).toBeInTheDocument();
+  expect(screen.queryByText("Correspond au ledger")).not.toBeInTheDocument();
+});
+
+test("marks a stored result obsolete when the structuring fingerprint differs", async () => {
+  fiscalScreen((url, method) => (
+    isFiscalRead(url, method)
+      ? response({
+        ...storedComputation(),
+        structuring_sha256: STORED,
+        current_structuring_sha256: MOVED,
+      })
+      : null
+  ));
+  render(<FiscalPage />);
+  expect(await screen.findByText("Obsolète")).toBeInTheDocument();
+  expect(screen.getByText("12.34 €")).toBeInTheDocument();
+  expect(screen.queryByText("Correspond au ledger")).not.toBeInTheDocument();
+});
+
+test("marks a stored result obsolete as soon as the ledger fingerprint differs", async () => {
+  fiscalScreen((url, method) => (
+    isFiscalRead(url, method) ? response(storedComputation(MOVED)) : null
+  ));
+  render(<FiscalPage />);
+  expect(await screen.findByText("Obsolète")).toBeInTheDocument();
+  expect(screen.getByText("12.34 €")).toBeInTheDocument();
+  expect(screen.getByText(`Empreinte ${STORED}`)).toBeInTheDocument();
+  expect(screen.queryByText("Correspond au ledger")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Calculer le résultat fiscal" })).toBeEnabled();
+});
+
+test("a failed recalculation drops the previous result and a later success replaces it", async () => {
+  let attempts = 0;
+  fiscalScreen((url, method) => {
+    if (isFiscalRead(url, method)) return response(storedComputation());
+    if (url.includes("/api/fiscal/years/1") && method === "POST") {
+      attempts += 1;
+      if (attempts === 1) {
+        return response({ detail: { message: "La réintégration dépasse la charge." } }, 422);
+      }
+      return response(storedComputation(STORED, "56.78"));
+    }
+    return null;
+  });
+  render(<FiscalPage />);
+  expect(await screen.findByText("12.34 €")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Calculer le résultat fiscal" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("La réintégration dépasse la charge.");
+  expect(screen.queryByText("12.34 €")).not.toBeInTheDocument();
+  expect(screen.queryByText("Correspond au ledger")).not.toBeInTheDocument();
+  expect(screen.queryByText("Obsolète")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Calculer le résultat fiscal" }));
+  expect(await screen.findByText("56.78 €")).toBeInTheDocument();
+  expect(screen.getByText("Correspond au ledger")).toBeInTheDocument();
+  expect(screen.queryByText("Obsolète")).not.toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });

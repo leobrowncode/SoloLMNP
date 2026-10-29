@@ -16,7 +16,7 @@ interface PropertySegment {
   expenses: string;
   depreciation: string;
 }
-interface Notice { code: string; message: string }
+interface Notice { code: string; message: string; level?: string }
 interface PersonalLine { case: string; case_declarant_2: string; label: string; amount: string }
 interface Tracking {
   accounting_depreciation: string;
@@ -52,6 +52,17 @@ export interface Worksheet {
   };
 }
 
+const LEVEL_LABELS: Record<string, string> = {
+  info: "Information",
+  warning: "Avertissement",
+  error: "Erreur",
+};
+
+function levelLabel(level?: string): string {
+  if (!level) return "Avertissement";
+  return LEVEL_LABELS[level] ?? level;
+}
+
 const FORMS: [string, string][] = [
   ["2031-SD", "2031 — déclaration de résultat"],
   ["2031-BIS-SD", "2031-bis — BIC non professionnels"],
@@ -70,6 +81,7 @@ function frDate(value?: string): string {
 export default function LiasseSheet({ worksheet, yearId }: { worksheet: Worksheet; yearId: number }) {
   const fields = worksheet.liasse?.fields ?? [];
   const blocking = worksheet.blocking ?? [];
+  const warnings = worksheet.warnings ?? [];
   const tracking = worksheet.depreciation_tracking;
   const personal = worksheet.personal_return;
   return (
@@ -94,6 +106,20 @@ export default function LiasseSheet({ worksheet, yearId }: { worksheet: Workshee
           <p><strong>À corriger avant de déclarer</strong></p>
           <ul>{blocking.map((item) => <li key={item.code + item.message}>{item.message}</li>)}</ul>
         </div>
+      )}
+
+      {warnings.length > 0 && (
+        <ul className="worksheet-warnings" aria-label="Avertissements de la liasse">
+          {warnings.map((item) => (
+            <li
+              key={item.code + item.level + item.message}
+              className={`worksheet-warning worksheet-warning-${item.level ?? "warning"}`}
+            >
+              <strong>{levelLabel(item.level)}</strong>
+              <span>{item.message}</span>
+            </li>
+          ))}
+        </ul>
       )}
 
       <p className="liasse-links">

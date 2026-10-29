@@ -84,6 +84,42 @@ def test_partial_charge_stays_in_the_ledger(client):
     )
     assert too_much.status_code == 422
     assert too_much.json()["detail"]["code"] == "ADJUSTMENT_TOO_LARGE"
+    kept = client.get("/api/fiscal/years/1")
+    assert kept.status_code == 200, kept.text
+    assert kept.json()["id"] == body["id"]
+    assert kept.json()["fiscal_result"] == body["fiscal_result"]
+
+
+def test_latest_computation_exposes_its_date_and_a_moved_ledger(client):
+    book(client, "512000", "706000", "1000.00")
+    created = client.post("/api/fiscal/years/1", json={"adjustments": []})
+    assert created.status_code == 200, created.text
+    body = created.json()
+    loaded = client.get("/api/fiscal/years/1")
+    assert loaded.status_code == 200, loaded.text
+    current = loaded.json()
+    assert current["id"] == body["id"]
+    assert current["computed_at"].endswith("Z")
+    assert current["status"] == "research_only"
+    assert current["declarable"] is False
+    assert current["ledger_sha256"] == current["current_ledger_sha256"] == body["ledger_sha256"]
+    assert len(current["ledger_sha256"]) == 64
+    assert current["invalidated"] is False
+    assert current["structuring_sha256"] == current["current_structuring_sha256"]
+    assert len(current["structuring_sha256"]) == 64
+    book(client, "615000", "401000", "15.00")
+    stale = client.get("/api/fiscal/years/1")
+    assert stale.status_code == 200, stale.text
+    moved = stale.json()
+    assert moved["id"] == body["id"]
+    assert moved["fiscal_result"] == body["fiscal_result"]
+    assert moved["ledger_sha256"] == body["ledger_sha256"]
+    assert moved["current_ledger_sha256"] != moved["ledger_sha256"]
+    assert moved["invalidated"] is False
+    assert moved["structuring_sha256"] == current["structuring_sha256"]
+    assert moved["current_structuring_sha256"] == current["structuring_sha256"]
+    missing = client.get("/api/fiscal/years/999")
+    assert missing.status_code == 404
 
 
 def test_vintages_stay_research_only(client):
@@ -139,6 +175,12 @@ def test_liasse_keeps_interest_out_of_operating_charges(client):
     assert pdf.status_code == 200
     assert "Case 5NA".encode("cp1252") in pdf.content
     assert "2033-B — compte de résultat".encode("cp1252") in pdf.content
+    assert "Avertissements".encode("cp1252") in pdf.content
+    assert "Information".encode("cp1252") in pdf.content
+    levels = {item["level"] for item in sheet["warnings"]}
+    assert levels <= {"info", "warning", "error"}
+    assert "info" in levels
+    assert all(item["message"] for item in sheet["warnings"])
 
 
 def test_2026_purchase_skips_the_2025_return(client):
