@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { RequestError, request } from "../api/ledger";
+import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import CloseYear from "./CloseYear";
 import LiasseSheet, { type Worksheet } from "./LiasseSheet";
 import { calculationNotice, outputLabel, outputTrust } from "./outputStatus";
@@ -301,6 +302,11 @@ export default function FiscalPage() {
   const [draft, setDraft] = useState<AdjustmentDraft>({
     account_number: "", amount: "", justification: "",
   });
+  const fiscalDraftDirty = adjustments.length > 0
+    || draft.account_number.trim() !== ""
+    || draft.amount.trim() !== ""
+    || draft.justification.trim() !== "";
+  useUnsavedGuard(fiscalDraftDirty);
 
   useEffect(() => {
     let current = true;

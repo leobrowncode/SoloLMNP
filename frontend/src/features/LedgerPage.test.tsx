@@ -1,6 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { ledgerPath } from "../routing/paths";
+import { renderWithRouter } from "../routing/testPage";
 import LedgerPage from "./LedgerPage";
 import { cents, amount } from "../api/ledger";
 
@@ -23,6 +25,9 @@ function mockApi() {
   vi.stubGlobal("fetch", fetcher);
   return fetcher;
 }
+function renderLedger(tab: "Brouillons" | "Journal" | "Balance" = "Brouillons") {
+  return renderWithRouter(<LedgerPage />, ledgerPath(tab), "/comptabilite/:tab");
+}
 describe("ledger", () => {
   it("preserves exact cents beyond JavaScript safe integer range", () => {
     expect(amount(cents("90071992547409,91") + cents("0.09"))).toBe("90071992547410.00");
@@ -30,7 +35,7 @@ describe("ledger", () => {
   });
   it("saves decimal strings and requires a distinct validation action", async () => {
     const fetcher = mockApi();
-    render(<LedgerPage />);
+    renderLedger();
     await userEvent.click(await screen.findByRole("button", { name: "Nouvelle écriture" }));
     await userEvent.type(screen.getByLabelText("Référence de la pièce"), "TEST-1");
     await userEvent.type(screen.getByLabelText("Libellé de l’écriture"), "Test");
@@ -51,15 +56,13 @@ describe("ledger", () => {
     expect(fetcher.mock.calls.some(([url]) => url.endsWith("/validate"))).toBe(false);
   });
   it("loads the balance from the ledger API", async () => {
-    mockApi(); render(<LedgerPage />);
-    await userEvent.click(await screen.findByRole("button", { name: "Balance" }));
+    mockApi(); renderLedger("Balance");
     expect(await screen.findByText("Balance équilibrée")).toBeInTheDocument();
     expect(screen.getByRole("table")).toHaveTextContent("123.45");
   });
   it("filters generated and business entries with readable source choices", async () => {
-    const fetcher = mockApi(); render(<LedgerPage />);
-    await userEvent.click(await screen.findByRole("button", { name: "Journal" }));
-    const source = screen.getByRole("combobox", { name: "Source" });
+    const fetcher = mockApi(); renderLedger("Journal");
+    const source = await screen.findByRole("combobox", { name: "Source" });
     for (const value of ["DEPRECIATION", "OPENING", "INVENTORY", "SETTLEMENT", ""]) {
       await userEvent.selectOptions(source, value);
       await waitFor(() => {
@@ -75,7 +78,7 @@ describe("ledger", () => {
   });
   it("shows network errors without claiming readiness", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Hors ligne")));
-    render(<LedgerPage />);
+    renderLedger();
     expect(await screen.findByRole("alert")).toHaveTextContent("Hors ligne");
     expect(screen.queryByText("Balance équilibrée")).not.toBeInTheDocument();
   });

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { assetsRequest as api } from "../api/assets";
 import { operationsRequest, type Bank, type Loan, type Property } from "../api/operations";
+import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 
 interface YearOption { id: number; year: number; start_date?: string }
 interface EntryLine { account_number: string; label: string; debit: string; credit: string }
@@ -45,6 +46,17 @@ export default function PropertyEntry({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const entryDirty = open && (
+    preview !== null
+    || bankAmount.trim() !== ""
+    || piece !== "Acte d’acquisition"
+    || Object.values(charges).some((value) => value.trim() !== "")
+    || Object.entries(outstanding).some(([id, value]) => {
+      const loan = loans.find((row) => row.id === Number(id));
+      return loan && value !== loan.initial_principal;
+    })
+  );
+  useUnsavedGuard(entryDirty);
 
   async function start() {
     setError("");
