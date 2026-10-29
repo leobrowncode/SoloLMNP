@@ -72,5 +72,24 @@ Un composant de construction n’utilise que les comptes construction ou agencem
 comptes d’immobilisation.
 
 Un couple déjà enregistré qui ne respecte pas cette règle est signalé sur la fiche.
-Le registre est immuable : ni la ligne, ni le composant, ni le journal ne sont
-réécrits. La correction reste un acte explicite.
+Il n’est pas réécrit automatiquement. Une correction de justification peut
+préciser le motif sans changer les comptes ; un changement de compte ne passe
+que s’il respecte le couple de la catégorie.
+
+La correction d’une fiche structurante est un `PATCH` motivé. L’historique
+`audit_event` conserve l’ancienne valeur, la nouvelle et le motif. Tant qu’aucune
+dotation n’est comptabilisée, la valeur, la durée, les dates et les comptes d’une
+immobilisation ou d’un composant peuvent être corrigés : les périodes calculées
+non comptabilisées de cette fiche sont effacées, le plan est réaligné, les calculs
+fiscaux des exercices ouverts sont invalidés, leurs instantanés `CURRENT` passent
+`SUPERSEDED` et un exercice `READY_TO_CLOSE` redevient `OPEN`. Les écritures
+validées ne sont pas réécrites : le FEC, qui n’en est que la lecture, ne change
+donc pas tant que le journal ne change pas. Une dotation déjà comptabilisée fige
+la valeur, la durée, les dates et les comptes (l’extourne d’une dotation n’est
+pas proposée ici). Un calcul fiscal clôturé qui a conservé la base ou la durée
+refuse leur modification jusqu’à réouverture ; il n’est pas invalidé en silence.
+Une écriture d’acquisition encore en vie fige la valeur et les comptes. Le terrain
+reste non amortissable. Les composants ne peuvent pas dépasser la base, et ils
+doivent la couvrir exactement dès qu’un plan existe. Le bien, le locataire, la
+banque et l’emprunt suivent la même règle : modifier ce qui est encore libre, ou
+expliquer le verrou. Aucune de ces fiches n’est supprimée.

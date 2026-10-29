@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { amount, cents, request, type Account, type Setup, type Entry } from "../api/ledger";
 import { operationsRequest as api, type Property, type Bank, type Loan, type Operation, type BankTransaction, type ImportPreview, type OperationImportPreview, type LoanPaymentImportPreview, type Tenant } from "../api/operations";
 import ReviewForm, { type Field } from "./ReviewForm";
+import {
+  PLAN_HELP, RECORD_HELP, correctionMessage, locked, readInvalidation,
+} from "./correction";
 import { buildPieceReference, defaultType, findType, typesFor } from "./operationTypes";
 import "./ledger.css";
 
@@ -15,6 +18,7 @@ interface Editor {
   title: string;
   fields: Field[];
   path: string;
+  method?: "POST" | "PATCH";
   retry?: boolean;
   fixed?: Record<string, unknown>;
   help?: string;
@@ -209,8 +213,11 @@ export default function OperationsPage() {
 
   async function save(data: Record<string, unknown>) {
     if (!editor) return;
-    await api(editor.path, "POST", { ...data, ...editor.fixed });
-    setEditor(null); setDetails(null); setMessage("Enregistrement effectué."); setRevision((v) => v + 1);
+    const result = await api<Record<string, unknown>>(editor.path, editor.method ?? "POST", { ...data, ...editor.fixed });
+    const invalidation = readInvalidation(result.invalidation);
+    setEditor(null); setDetails(null);
+    setMessage(invalidation ? correctionMessage(invalidation) : "Enregistrement effectué.");
+    setRevision((v) => v + 1);
   }
 
   async function action(fn: () => Promise<unknown>) {
@@ -253,6 +260,101 @@ export default function OperationsPage() {
   function occupants(id: number) {
     const rows = tenants[id];
     return Array.isArray(rows) ? rows : [];
+  }
+  function reasonField(): Field {
+    return { name: "reason", label: "Motif de la correction (au moins 5 caractères)", group: "Motif" };
+  }
+  function openProperty(row: Property) {
+    const financial = !locked(row.correction, "financial");
+    const fields: Field[] = [
+      { name: "name", label: "Nom du bien", value: row.name, group: "Identification" },
+      { name: "address", label: "Adresse", value: row.address ?? "", group: "Identification" },
+      { name: "rental_start_date", label: "Début de location", type: "date", optional: true, value: row.rental_start_date ?? "", group: "Dates" },
+      { name: "notes", label: "Notes", optional: true, value: row.notes ?? "", group: "Identification" },
+    ];
+    if (financial) {
+      fields.push(
+        { name: "acquisition_date", label: "Date d’acquisition", type: "date", value: row.acquisition_date ?? "", group: "Valeurs" },
+        { name: "acquisition_price", label: "Prix d’acquisition (€)", money: true, value: row.acquisition_price, group: "Valeurs" },
+        { name: "acquisition_costs", label: "Frais de notaire et d’agence (€)", money: true, value: row.acquisition_costs ?? "0.00", group: "Valeurs" },
+        { name: "land_value", label: "Valeur du terrain (€)", money: true, value: row.land_value, group: "Valeurs" },
+        { name: "building_value", label: "Valeur du bâtiment (€)", money: true, value: row.building_value, group: "Valeurs" },
+      );
+    }
+    fields.push(reasonField());
+    setEditor({
+      title: `Modifier ${row.name}`,
+      path: `/properties/${row.id}`,
+      method: "PATCH",
+      help: financial ? PLAN_HELP : RECORD_HELP,
+      fields,
+    });
+  }
+  function openTenant(tenant: Tenant) {
+    const identity = !locked(tenant.correction, "identity");
+    const fields: Field[] = [];
+    if (identity) {
+      fields.push(
+        { name: "name", label: "Nom du locataire", value: tenant.name },
+        { name: "monthly_rent", label: "Loyer mensuel (€)", money: true, value: tenant.monthly_rent },
+        { name: "entry_date", label: "Entrée dans les lieux", type: "date", value: tenant.entry_date },
+      );
+    }
+    fields.push(
+      { name: "exit_date", label: "Sortie, si elle est connue", type: "date", optional: true, value: tenant.exit_date ?? "" },
+      reasonField(),
+    );
+    setEditor({
+      title: identity ? `Modifier ${tenant.name}` : `Préciser la sortie de ${tenant.name}`,
+      path: `/properties/${tenant.property_id}/tenants/${tenant.id}`,
+      method: "PATCH",
+      help: RECORD_HELP,
+      fields,
+    });
+  }
+  function openBank(row: Bank) {
+    const numberLocked = locked(row.correction, "account_number");
+    const fields: Field[] = [
+      { name: "name", label: "Nom du compte bancaire", value: row.name, group: "Banque" },
+    ];
+    if (!numberLocked) {
+      fields.push(accountField("account_number", "Compte comptable dédié", "512", row.account_number, "Banque"));
+    }
+    fields.push(reasonField());
+    setEditor({
+      title: `Modifier ${row.name}`,
+      path: `/banks/${row.id}`,
+      method: "PATCH",
+      help: RECORD_HELP,
+      fields,
+    });
+  }
+  function openLoan(row: Loan) {
+    const identity = !locked(row.correction, "identity");
+    const rate = row.interest_rate ?? (Number(row.interest_rate_basis_points ?? 0) / 100).toFixed(2);
+    const fields: Field[] = [];
+    if (identity) {
+      fields.push(
+        { name: "start_date", label: "Début de l’emprunt", type: "date", value: row.start_date ?? "", group: "Emprunt" },
+        { name: "initial_principal", label: "Capital de cette ligne (€)", money: true, value: row.initial_principal, group: "Conditions" },
+      );
+    }
+    fields.push(
+      { name: "lender", label: "Prêteur", value: row.lender, group: "Emprunt" },
+      { name: "interest_rate", label: "Taux annuel (%)", money: true, value: rate, group: "Conditions" },
+      { name: "duration_months", label: "Durée en mois", type: "number", value: row.duration_months == null ? "" : String(row.duration_months), group: "Conditions" },
+      { name: "monthly_payment", label: "Mensualité contractuelle (€)", money: true, value: row.monthly_payment, group: "Conditions" },
+      { name: "monthly_insurance", label: "Assurance mensuelle (€)", money: true, value: row.monthly_insurance, group: "Conditions" },
+      { name: "notes", label: "Notes", optional: true, value: row.notes ?? "", group: "Emprunt" },
+      reasonField(),
+    );
+    setEditor({
+      title: `Modifier ${row.lender}`,
+      path: `/loans/${row.id}`,
+      method: "PATCH",
+      help: PLAN_HELP,
+      fields,
+    });
   }
   return <section id="operations" className="ledger-page" aria-labelledby="operations-title">
     <h2 id="operations-title">Opérations et banque</h2>
@@ -326,10 +428,23 @@ export default function OperationsPage() {
           <article key={p.id} className="entry-card">
             <h3>{p.name}</h3>
             <p>Acquisition : {p.acquisition_price} € · Terrain : {p.land_value} € · Bâtiment : {p.building_value} €</p>
+            {p.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
+            <div className="entry-actions">
+              <button type="button" onClick={() => openProperty(p)}>Modifier {p.name}</button>
+            </div>
             <h4>Colocataires</h4>
             <ul>
               {occupants(p.id).map((tenant) => (
-                <li key={tenant.id}>{tenant.name} · {tenant.monthly_rent} € / mois · depuis {tenant.entry_date}</li>
+                <li key={tenant.id}>
+                  {tenant.name} · {tenant.monthly_rent} € / mois · depuis {tenant.entry_date}
+                  {tenant.exit_date ? ` · sortie ${tenant.exit_date}` : ""}
+                  {tenant.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
+                  <div className="entry-actions">
+                    <button type="button" onClick={() => openTenant(tenant)}>
+                      {locked(tenant.correction, "identity") ? `Préciser la sortie de ${tenant.name}` : `Modifier ${tenant.name}`}
+                    </button>
+                  </div>
+                </li>
               ))}
             </ul>
             {occupants(p.id).length === 0 && <p>Aucun colocataire. Chaque locataire a son loyer.</p>}
@@ -364,6 +479,16 @@ export default function OperationsPage() {
             accountField("account_number", "Compte comptable dédié", "512", undefined, "Banque"),
           ],
         })}>Ajouter un compte bancaire</button>
+        {banks.map((row) => (
+          <article key={row.id} className="entry-card">
+            <h3>{row.name}</h3>
+            <p>Compte {row.account_number}</p>
+            {row.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
+            <div className="entry-actions">
+              <button type="button" onClick={() => openBank(row)}>Modifier {row.name}</button>
+            </div>
+          </article>
+        ))}
         {!!banks.length && <>
           <label className="toolbar-field">Banque sélectionnée
             <select value={bankId} onChange={(e) => {
@@ -486,6 +611,10 @@ export default function OperationsPage() {
           <article className="entry-card" key={l.id}>
             <h3>{l.lender}</h3>
             <p>Capital initial : {l.initial_principal} € · Solde comptable : {l.remaining_principal} € · Mensualité : {l.monthly_payment} € + assurance {l.monthly_insurance} € · Compte {l.principal_account}</p>
+            {l.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
+            <div className="entry-actions">
+              <button type="button" onClick={() => openLoan(l)}>Modifier {l.lender}</button>
+            </div>
             <button type="button" disabled={!banks.length} onClick={() => setEditor({
               title: "Déblocage initial : " + l.lender,
               path: "/loans/" + l.id + "/fund",

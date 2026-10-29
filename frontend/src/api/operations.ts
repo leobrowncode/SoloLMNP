@@ -1,16 +1,28 @@
 import { request } from "./ledger";
 export const operationsRequest = <T>(path: string, method = "GET", body?: unknown) =>
   request<T>(path, method, body, "/api/operations");
-export interface Property { id: number; name: string; acquisition_price: string; land_value: string; building_value: string }
-export interface Bank { id: number; name: string; account_number: string }
+interface CorrectionView {
+  locks: { code: string; fields: string[]; message: string }[];
+  calculated_periods: number;
+}
+export interface Property {
+  id: number; name: string; address?: string; acquisition_date?: string;
+  rental_start_date?: string | null; acquisition_price: string; acquisition_costs?: string;
+  land_value: string; building_value: string; notes?: string;
+  correction?: CorrectionView;
+}
+export interface Bank { id: number; name: string; account_number: string; correction?: CorrectionView }
 export interface Loan {
   id: number; lender: string; property_id: number; initial_principal: string;
   remaining_principal: string; monthly_payment: string; monthly_insurance: string;
   principal_account: string; interest_rate_basis_points?: number;
+  interest_rate?: string; start_date?: string; duration_months?: number; notes?: string;
+  correction?: CorrectionView;
 }
 export interface Tenant {
   id: number; property_id: number; name: string; monthly_rent: string;
   entry_date: string; exit_date: string | null;
+  correction?: CorrectionView;
 }
 export interface Operation {
   id: number; kind: string; property_id: number; fiscal_year_id: number; date: string;

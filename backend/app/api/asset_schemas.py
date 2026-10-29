@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from app.api.ledger_schemas import AccountNumber, Input, Label, MoneyInput
+from app.api.ledger_schemas import AccountNumber, Input, Label, MoneyInput, OptionalMoney
 from app.core.money import to_cents
 
 Reason = Annotated[str, Field(min_length=5, max_length=2000)]
@@ -92,6 +92,37 @@ class ComponentInput(Input):
         if to_cents(self.value) <= 0:
             raise ValueError("La valeur du composant doit être positive.")
         return self
+
+
+class AssetCorrectionInput(Input):
+    """Partial audited correction. Omitted fields stay; null is not a silent wipe."""
+
+    reason: Reason
+    label: Label | None = None
+    acquisition_date: date | None = None
+    service_start_date: date | None = None
+    acquisition_value: OptionalMoney = None
+    depreciable_value: OptionalMoney = None
+    non_depreciable_value: OptionalMoney = None
+    residual_value: OptionalMoney = None
+    useful_life_months: int | None = Field(default=None, ge=1, le=2400)
+    asset_account: AccountNumber | None = None
+    depreciation_account: AccountNumber | None = None
+    basis_reason: Reason | None = None
+    duration_reason: Annotated[str, Field(max_length=2000)] | None = None
+    notes: Annotated[str, Field(max_length=2000)] | None = None
+
+
+class ComponentCorrectionInput(Input):
+    reason: Reason
+    label: Label | None = None
+    value: OptionalMoney = None
+    useful_life_months: int | None = Field(default=None, ge=1, le=2400)
+    service_start_date: date | None = None
+    asset_account: AccountNumber | None = None
+    depreciation_account: AccountNumber | None = None
+    basis_reason: Reason | None = None
+    duration_reason: Reason | None = None
 
 
 class LoanBalanceInput(Input):

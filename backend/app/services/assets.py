@@ -83,7 +83,7 @@ def require_component_accounts(
     _active_account(session, depreciation_account)
 
 
-_KEPT = " Le registre et les écritures ne sont pas réécrits."
+_KEPT = " Le registre et les écritures ne sont pas réécrits automatiquement."
 
 
 def asset_account_warning(asset: Asset) -> str | None:

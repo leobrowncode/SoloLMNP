@@ -276,3 +276,76 @@ test("shows an inconsistent stored pair without offering to rewrite it", async (
   expect(screen.getByText(/211000 \/ 281300/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Corriger" })).not.toBeInTheDocument();
 });
+
+const postedLock = {
+  locks: [{
+    code: "DEPRECIATION_POSTED",
+    fields: ["value", "life", "dates", "account"],
+    message: "Une dotation est déjà comptabilisée.",
+  }],
+  calculated_periods: 0,
+};
+
+test("hides frozen asset fields and patches the duration while it is still free", async () => {
+  const calls: { url: string; method: string; body: unknown }[] = [];
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    const body = init?.body ? JSON.parse(String(init.body)) as unknown : undefined;
+    calls.push({ url, method, body });
+    if (url === "/api/ledger/setup") return response({ activity: { id: 1 }, years: [{ id: 1, year: 2025, status: "OPEN" }] });
+    if (url === "/api/ledger/accounts") return response([
+      { number: "218400", label: "Mobilier", account_type: "ASSET", active: true },
+      { number: "281840", label: "Amort. mobilier", account_type: "ASSET", active: true },
+    ]);
+    if (url === "/api/operations/properties") return response([{ id: 1, name: "Bien fictif" }]);
+    if (url.endsWith("/periods")) return response([]);
+    if (url === "/api/assets" && method === "GET") return response([
+      {
+        id: 4, property_id: 1, category: "FURNITURE", label: "Mobilier figé",
+        acquisition_date: "2025-07-01", service_start_date: "2025-07-01",
+        acquisition_value: "1200.00", depreciable_value: "1200.00", non_depreciable_value: "0.00",
+        residual_value: "0.00", useful_life_months: 60, method: "LINEAR",
+        asset_account: "218400", depreciation_account: "281840",
+        basis_reason: "Facture fictive", duration_reason: "Cinq ans d’usage",
+        correction: postedLock, components: [],
+      },
+      {
+        id: 5, property_id: 1, category: "FURNITURE", label: "Mobilier libre",
+        acquisition_date: "2025-07-01", service_start_date: "2025-07-01",
+        acquisition_value: "1200.00", depreciable_value: "1200.00", non_depreciable_value: "0.00",
+        residual_value: "0.00", useful_life_months: 60, method: "LINEAR",
+        asset_account: "218400", depreciation_account: "281840",
+        basis_reason: "Facture fictive", duration_reason: "Cinq ans d’usage",
+        correction: { locks: [], calculated_periods: 1 }, components: [],
+      },
+    ]);
+    if (url === "/api/assets/5" && method === "PATCH") {
+      return response({
+        invalidation: {
+          dropped_period_ids: [8], fiscal_computations: 0,
+          ready_years_reset: [], snapshots_superseded: 0,
+        },
+      });
+    }
+    throw new Error(`Unexpected ${method} ${url}`);
+  });
+  render(<AssetsPage />);
+  expect(await screen.findByText("Une dotation est déjà comptabilisée.")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Préciser la justification de Mobilier figé" }));
+  expect(screen.queryByLabelText("Valeur d’acquisition (€)")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Durée d’utilisation en mois")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Compte d’immobilisation")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Justification de la valeur")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+  fireEvent.click(screen.getByRole("button", { name: "Modifier Mobilier libre" }));
+  fireEvent.change(screen.getByLabelText("Durée d’utilisation en mois"), { target: { value: "84" } });
+  fireEvent.change(screen.getByLabelText("Motif de la correction (au moins 5 caractères)"), {
+    target: { value: "Durée d’usage revue" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Vérifier avant enregistrement" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmer l’enregistrement" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("1 période(s) calculée(s)");
+  const sent = calls.find((call) => call.url === "/api/assets/5" && call.method === "PATCH");
+  expect(sent?.body).toMatchObject({ useful_life_months: 84, reason: "Durée d’usage revue" });
+});
