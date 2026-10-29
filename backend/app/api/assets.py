@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from app.api.asset_schemas import (
     AssetInput,
     ComponentInput,
     DepreciationPostInput,
+    DwellingPlanConfirm,
     PropertyEntryInput,
 )
 from app.api.sessions import dependencies
@@ -42,9 +43,25 @@ def build_assets_router(database: Database) -> APIRouter:
             )
         return rows
 
-    @router.post("/properties/{property_id}/plan", status_code=201)
-    def dwelling_plan(property_id: int, session: Write) -> dict[str, Any]:
-        return service.install_dwelling_plan(session, property_id)
+    @router.get("/properties/{property_id}/plan")
+    def preview_dwelling_plan(property_id: int, session: Read) -> dict[str, Any]:
+        return service.preview_dwelling_plan(session, property_id)
+
+    @router.post("/properties/{property_id}/plan")
+    def dwelling_plan(
+        property_id: int,
+        data: DwellingPlanConfirm,
+        session: Write,
+        response: Response,
+    ) -> dict[str, Any]:
+        result = service.install_dwelling_plan(
+            session,
+            property_id,
+            confirm=data.confirm,
+            preview_token=data.preview_token,
+        )
+        response.status_code = 201 if result["created"] else 200
+        return result
 
     @router.post("/properties/{property_id}/entry")
     def property_entry(

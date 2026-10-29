@@ -11,6 +11,29 @@ const categories: [string, string][] = [
   ["BUILDING", "Construction"], ["FURNITURE", "Mobilier"], ["EQUIPMENT", "Équipement"],
   ["IMPROVEMENT", "Travaux immobilisés"], ["OTHER", "Autre immobilisation"],
 ];
+interface PlanItem {
+  kind: "LAND" | "BUILDING" | "COMPONENT";
+  label: string;
+  amount: string;
+  asset_account: string;
+  depreciation_account: string | null;
+  useful_life_months: number | null;
+  service_start_date: string;
+}
+interface DwellingPlan {
+  property_id: number;
+  depreciable_base: string;
+  acquisition_costs_included: string;
+  labels: string[];
+  items: PlanItem[];
+  preview_token: string;
+  created: boolean;
+}
+function planKind(kind: PlanItem["kind"]): string {
+  if (kind === "LAND") return "Terrain";
+  if (kind === "BUILDING") return "Construction";
+  return "Composant";
+}
 
 export default function AssetsPage() {
   const [setup, setSetup] = useState<Setup | null>(null);
@@ -20,11 +43,15 @@ export default function AssetsPage() {
   const [periods, setPeriods] = useState<DepreciationPeriod[]>([]);
   const [yearId, setYearId] = useState(0);
   const [planProperty, setPlanProperty] = useState(0);
+  const [plan, setPlan] = useState<{ propertyId: number; preview: DwellingPlan } | null>(null);
+  const [planBusy, setPlanBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const periodRequest = useRef(0);
+  const planRequest = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -93,17 +120,58 @@ export default function AssetsPage() {
     await api(editor.path, "POST", data);
     setEditor(null); setMessage("Enregistrement effectué."); setRevision((value) => value + 1);
   }
-  async function preparePlan() {
-    const propertyId = planProperty || properties[0]?.id;
-    if (!propertyId) return;
-    setError(""); setMessage("");
+  const selectedProperty = properties.some((row) => row.id === planProperty)
+    ? planProperty
+    : properties[0]?.id ?? 0;
+  const visiblePlan = plan?.propertyId === selectedProperty ? plan.preview : null;
+  async function previewPlan() {
+    if (!selectedProperty) return;
+    const requestId = ++planRequest.current;
+    setError(""); setMessage(""); setConfirming(false); setPlanBusy(true);
     try {
-      const result = await api<{ labels: string[] }>(`/properties/${propertyId}/plan`, "POST");
-      setMessage(`Amortissement préparé : ${result.labels.join(", ")}. Calculez ensuite les périodes, puis comptabilisez-les.`);
+      const result = await api<DwellingPlan>(`/properties/${selectedProperty}/plan`);
+      if (requestId === planRequest.current) setPlan({ propertyId: selectedProperty, preview: result });
+    } catch (reason) {
+      if (requestId === planRequest.current) {
+        setError(reason instanceof Error ? reason.message : "Aperçu impossible.");
+      }
+    } finally {
+      if (requestId === planRequest.current) setPlanBusy(false);
+    }
+  }
+  async function confirmPlan() {
+    if (!visiblePlan || !selectedProperty) return;
+    const requestId = ++planRequest.current;
+    setError(""); setMessage(""); setConfirming(true); setPlanBusy(true);
+    try {
+      const result = await api<DwellingPlan>(
+        `/properties/${selectedProperty}/plan`,
+        "POST",
+        { confirm: true, preview_token: visiblePlan.preview_token },
+      );
+      if (requestId !== planRequest.current) return;
+      setPlan(null);
+      setMessage(result.created
+        ? `Immobilisations créées : ${result.labels.join(", ")}. Calculez ensuite les périodes, puis comptabilisez-les.`
+        : "Ces immobilisations existent déjà. Aucun doublon n’a été créé.");
       setRevision((value) => value + 1);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Préparation impossible.");
+      if (requestId === planRequest.current) {
+        setError(reason instanceof Error ? reason.message : "Création impossible.");
+      }
+    } finally {
+      if (requestId === planRequest.current) {
+        setPlanBusy(false);
+        setConfirming(false);
+      }
     }
+  }
+  function cancelPlan() {
+    if (confirming) return;
+    ++planRequest.current;
+    setPlan(null);
+    setPlanBusy(false);
+    setError("");
   }
   async function postAll() {
     const pending = periods.filter((row) => row.status !== "POSTED");
@@ -143,13 +211,44 @@ export default function AssetsPage() {
       <button disabled={!properties.length} onClick={() => openAsset(true)}>Inscrire un terrain</button>
       <div className="toolbar">
         <label>Logement
-          <select value={properties.some((row) => row.id === planProperty) ? planProperty : properties[0]?.id ?? 0} onChange={(event) => setPlanProperty(Number(event.target.value))}>
+          <select value={selectedProperty} disabled={confirming} onChange={(event) => {
+            if (confirming) return;
+            ++planRequest.current;
+            setPlan(null);
+            setPlanBusy(false);
+            setPlanProperty(Number(event.target.value));
+          }}>
             {properties.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
           </select>
         </label>
-        <button type="button" disabled={!properties.length} onClick={() => { void preparePlan(); }}>Préparer l’amortissement du logement</button>
+        <button type="button" disabled={!properties.length || planBusy} onClick={() => { void previewPlan(); }}>Prévisualiser l’amortissement du logement</button>
       </div>
-      <p className="form-help">Sépare le terrain, ajoute les frais de notaire et d’agence à la base du bâtiment, puis propose six composants (gros œuvre, toiture, façade, électricité, plomberie, agencements) avec des durées à confirmer. Le mobilier reste à saisir à part. Ce n’est pas un barème légal.</p>
+      <p className="form-help">La prévisualisation n’enregistre ni immobilisation ni compte. Après vérification, « Créer les immobilisations affichées » inscrit le terrain à part, ajoute les frais de notaire et d’agence à la base du bâtiment, puis crée six composants (gros œuvre, toiture, façade, électricité, plomberie, agencements). Les durées sont à confirmer : ce n’est pas un barème légal. Annuler laisse la base inchangée. Répéter la confirmation ne crée pas de doublon. Le mobilier reste à saisir à part.</p>
+      {visiblePlan && <>
+        <div className="ledger-table">
+          <table>
+            <caption>
+              Aperçu non enregistré · base amortissable {visiblePlan.depreciable_base} € · frais inclus {visiblePlan.acquisition_costs_included} €
+            </caption>
+            <thead><tr><th>Élément</th><th>Libellé</th><th>Montant</th><th>Compte</th><th>Amortissement</th><th>Durée</th><th>Mise en service</th></tr></thead>
+            <tbody>
+              {visiblePlan.items.map((item) => <tr key={`${item.kind}-${item.label}`}>
+                <td>{planKind(item.kind)}</td>
+                <td>{item.label}</td>
+                <td>{item.amount} €</td>
+                <td>{item.asset_account}</td>
+                <td>{item.depreciation_account ?? "—"}</td>
+                <td>{item.useful_life_months === null ? "Non amortissable" : `${item.useful_life_months} mois`}</td>
+                <td>{item.service_start_date}</td>
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
+        <div className="form-actions">
+          <button type="button" disabled={planBusy || !visiblePlan.preview_token} onClick={() => { void confirmPlan(); }}>Créer les immobilisations affichées</button>
+          <button type="button" disabled={confirming} onClick={cancelPlan}>Annuler l’aperçu</button>
+        </div>
+      </>}
       <PropertyEntry
         properties={properties}
         years={setup.years.filter((year) => year.status === "OPEN")}
