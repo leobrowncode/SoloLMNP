@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
+import ReopenYear from "./ReopenYear";
 
 interface Notice {
   code: string;
@@ -136,5 +137,11 @@ export default function CloseYear({
       <button type="button" disabled={!canPrepare} onClick={() => { void ready(); }}>Accuser et préparer la clôture</button>
       <button type="button" disabled={!prepared || Boolean(check.blocking) || sealed} onClick={() => { void closeYear(); }}>Confirmer la clôture</button>
     </div>}
+    {sealed && (
+      <ReopenYear
+        year={year}
+        {...(onExerciseTransition ? { onExerciseTransition } : {})}
+      />
+    )}
   </section>;
 }

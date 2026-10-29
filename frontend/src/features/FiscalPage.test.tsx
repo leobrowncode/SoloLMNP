@@ -285,3 +285,54 @@ test("a refused close keeps the ready exercise and explains the failure", async 
   expect(screen.queryByText(/Exercice clôturé/)).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Confirmer la clôture" })).toBeEnabled();
 });
+
+test("reopening a closed exercise reloads open status and frozen exports", async () => {
+  let phase: "open" | "closed" = "closed";
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    if (url.endsWith("/vintages")) {
+      return response({ vintages: [] });
+    }
+    if (url.endsWith("/setup")) {
+      return response({
+        years: [{ id: 1, year: 2025, status: phase === "closed" ? "CLOSED" : "OPEN" }],
+      });
+    }
+    if (url.endsWith("/statements")) {
+      return response({
+        income_statement: {
+          income: [], expenses: [], total_income: "0.00", total_expenses: "0.00", result: "0.00",
+        },
+      });
+    }
+    if (url.endsWith("/precheck")) {
+      return response({
+        blocking: false,
+        year_status: phase === "closed" ? "CLOSED" : "OPEN",
+        errors: [],
+        warnings: [],
+      });
+    }
+    if (url.endsWith("/reopen") && method === "POST") {
+      phase = "open";
+      return response({ fiscal_year_id: 1, status: "OPEN" });
+    }
+    throw new Error(`unexpected ${method} ${url}`);
+  });
+
+  render(<FiscalPage />);
+  expect(await screen.findByRole("option", { name: "2025 · clôturé" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  expect(await screen.findByRole("heading", { name: "Réouvrir l’exercice" })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText(/Motif de la réouverture/), {
+    target: { value: "Correction test après clôture pour réouverture guidée." },
+  });
+  fireEvent.change(screen.getByLabelText(/Confirmation/), {
+    target: { value: "ROUVRIR" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Réouvrir l’exercice" }));
+  expect(await screen.findByRole("option", { name: "2025 · ouvert" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Réouvrir l’exercice" })).not.toBeInTheDocument();
+  expect(screen.getByText("Le FEC sera disponible après la clôture.")).toBeInTheDocument();
+});
