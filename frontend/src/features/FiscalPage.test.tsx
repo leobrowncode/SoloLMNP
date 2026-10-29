@@ -117,6 +117,12 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
   expect(screen.getByText(/résultat fiscal proche de 0/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Aide : Plafond/ })).toBeInTheDocument();
   expect(await screen.findByText("Dotation — plafonnée fiscalement")).toBeInTheDocument();
+  const calculate = screen.getByRole("button", { name: "Calculer le résultat fiscal" });
+  const closing = screen.getByRole("heading", { name: "Pré-contrôle et clôture" });
+  const liasse = screen.getByRole("button", { name: "Liasse à recopier" });
+  expect(calculate.compareDocumentPosition(closing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(closing.compareDocumentPosition(liasse) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(calculate).toHaveAttribute("id", "calcul-fiscal");
 
   fireEvent.click(screen.getByRole("button", { name: "Calculer le résultat fiscal" }));
   expect(await screen.findByText(/objectif LMNP atteint/i)).toBeInTheDocument();

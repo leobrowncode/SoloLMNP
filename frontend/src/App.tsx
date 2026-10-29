@@ -15,8 +15,8 @@ const navItems: { id: PageId; label: string; step?: string; hint: string }[] = [
   { id: "ledger", label: "Comptabilité", step: "1", hint: "Activité, exercice, puis écritures validées." },
   { id: "operations", label: "Opérations & banque", step: "2", hint: "Bien, banque, emprunt, loyers et charges." },
   { id: "assets", label: "Immobilisations", step: "3", hint: "Terrain, bâtiment, mobilier, puis dotations." },
-  { id: "statements", label: "États comptables", step: "4", hint: "Bilan, résultat, puis clôture." },
-  { id: "fiscal", label: "Fiscalité LMNP", step: "5", hint: "Résultat fiscal et liasse à recopier." },
+  { id: "statements", label: "États comptables", step: "4", hint: "Bilan, résultat, puis centralisation." },
+  { id: "fiscal", label: "Fiscalité LMNP", step: "5", hint: "Calcul fiscal, pré-contrôle, clôture, puis sorties figées." },
   { id: "conservation", label: "Conservation", step: "6", hint: "Justificatifs et sauvegarde." },
 ];
 

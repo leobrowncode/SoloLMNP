@@ -21,6 +21,16 @@ describe("Foundation status", () => {
     expect(screen.getByText(/Connexion au service et vérification/)).toBeInTheDocument();
   });
 
+  it("shows centralization before the fiscal calculation, precheck and closing", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply()));
+    render(<App />);
+    const statements = await screen.findByRole("button", { name: /États comptables/ });
+    const fiscal = screen.getByRole("button", { name: /Fiscalité LMNP/ });
+    expect(statements).toHaveTextContent("Bilan, résultat, puis centralisation.");
+    expect(fiscal).toHaveTextContent("Calcul fiscal, pré-contrôle, clôture, puis sorties figées.");
+    expect(statements.compareDocumentPosition(fiscal) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("displays live readiness without claiming tax readiness", async () => {
     const request = vi.fn().mockResolvedValue(reply());
     vi.stubGlobal("fetch", request);

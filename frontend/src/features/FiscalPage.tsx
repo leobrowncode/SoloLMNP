@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { request } from "../api/ledger";
+import CloseYear from "./CloseYear";
 import LiasseSheet, { type Worksheet } from "./LiasseSheet";
 import "./ledger.css";
 
@@ -372,9 +373,10 @@ export default function FiscalPage() {
   return (
     <section className="ledger-page fiscal-dashboard" aria-labelledby="fiscal-title">
       <h2 id="fiscal-title">Charges & amortissements LMNP</h2>
-      <p className="form-help">
+        <p className="form-help">
         Le plafond d’amortissement vise un résultat fiscal proche de 0 €.
         La comptabilité ne change pas. Cession, TVA et plus-values restent hors de cet écran.
+        Ordre de fin d’exercice : calcul fiscal, pré-contrôle, clôture, puis liasse et FEC figés.
       </p>
 
       {error && <p className="ledger-error" role="alert">{error}</p>}
@@ -403,13 +405,9 @@ export default function FiscalPage() {
             ))}
           </select>
         </label>
-        <button type="button" disabled={!year || busy} onClick={() => { void compute(); }}>
+        <button id="calcul-fiscal" type="button" disabled={!year || busy} onClick={() => { void compute(); }}>
           {busy ? "Calcul…" : "Calculer le résultat fiscal"}
         </button>
-        <button type="button" disabled={!year || busy} onClick={() => { void loadWorksheet(); }}>
-          Liasse à recopier
-        </button>
-        <a href={year ? `/api/filing/years/${year}/fec` : undefined}>FEC (après clôture)</a>
         <a href={year ? `/api/filing/years/${year}/export.xlsx` : undefined}>Export tableur (.xlsx, Google Sheets)</a>
       </div>
 
@@ -719,6 +717,24 @@ export default function FiscalPage() {
         </div>
       )}
 
+      {year !== 0 && (
+        <div className="fiscal-panel">
+          <CloseYear key={year} year={year} />
+        </div>
+      )}
+
+      <div className="fiscal-panel" id="sorties-figees">
+        <h3>Sorties figées</h3>
+        <p className="field-hint">
+          Liasse et FEC après la clôture. Avant la clôture, la liasse reste un calcul en cours.
+        </p>
+        <div className="toolbar">
+          <button type="button" disabled={!year || busy} onClick={() => { void loadWorksheet(); }}>
+            Liasse à recopier
+          </button>
+          <a href={year ? `/api/filing/years/${year}/fec` : undefined}>FEC (après clôture)</a>
+        </div>
+      </div>
       {worksheet && <LiasseSheet worksheet={worksheet} yearId={year} />}
 
       <details className="fiscal-panel">

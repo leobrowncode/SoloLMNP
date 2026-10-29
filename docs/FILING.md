@@ -22,12 +22,14 @@ effectués pendant cette vérification documentaire.
 
 ## Workflow cible
 
-1. Clôturer l'exercice et calculer un package immuable.
-2. Contrôler les écritures, calculs et formulaires.
-3. Exporter le rapport et la feuille de saisie EFI.
-4. L'utilisateur ouvre lui-même son espace professionnel impots.gouv.fr.
-5. Il recopie les valeurs, contrôle puis valide lui-même la déclaration.
-6. Il archive l'accusé fourni par le portail.
+1. Centraliser les charges et produits sur les états comptables.
+2. Calculer le résultat fiscal sur le ledger final.
+3. Lancer le pré-contrôle, accuser les avertissements, puis clôturer. La clôture fige le package.
+4. Contrôler les écritures, calculs et formulaires figés.
+5. Exporter le rapport et la feuille de saisie EFI.
+6. L'utilisateur ouvre lui-même son espace professionnel impots.gouv.fr.
+7. Il recopie les valeurs, contrôle puis valide lui-même la déclaration.
+8. Il archive l'accusé fourni par le portail.
 
 L'interface SoloLMNP affichera formulaire, case, libellé, montant et origine du
 calcul. Les exports PDF/JSON/CSV servent à la préparation et à l'archivage.
