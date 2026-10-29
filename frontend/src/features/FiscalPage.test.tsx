@@ -133,7 +133,9 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
 
   fireEvent.click(screen.getByRole("button", { name: "Liasse à recopier" }));
   expect(await screen.findByText(/Aucun envoi n’est effectué/)).toBeInTheDocument();
-  expect(screen.getByText("Pas encore prête")).toBeInTheDocument();
+  expect(screen.getAllByText("Recherche").length).toBeGreaterThan(0);
+  expect(screen.queryByText(/Prête à recopier/)).not.toBeInTheDocument();
+  expect(screen.queryByText("Pas encore prête")).not.toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent("Indiquez le SIREN");
   expect(screen.getByText(/case 018/)).toBeInTheDocument();
   expect(screen.getByText("2033-B — compte de résultat et résultat fiscal")).toBeInTheDocument();

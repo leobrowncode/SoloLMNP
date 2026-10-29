@@ -157,7 +157,7 @@ def _liasse(session: Session, year_id: int) -> list[list[Cell]]:
         detail: dict[str, Any] = exc.detail if isinstance(exc.detail, dict) else {}
         return [["Liasse non disponible"], [str(detail.get("message", "Calcul fiscal absent."))]]
     rows: list[list[Cell]] = [
-        ["Statut", "prête à recopier" if sheet["declarable"] else "pas encore prête"],
+        ["Statut", str(sheet.get("output_headline") or sheet.get("output_label") or "Recherche")],
         [],
         ["Formulaire", "Case", "Libellé", "Montant"],
     ]

@@ -1,3 +1,5 @@
+import { outputLabel, outputTrust, readyToCopy } from "./outputStatus";
+
 interface Field {
   code: string;
   form_ref?: string;
@@ -31,6 +33,9 @@ export interface Worksheet {
   year?: number;
   transmission: boolean;
   declarable?: boolean;
+  output_status?: string;
+  output_label?: string;
+  copy_complete?: boolean;
   frozen?: boolean;
   disclaimer: string;
   portal?: string;
@@ -72,11 +77,16 @@ export default function LiasseSheet({ worksheet, yearId }: { worksheet: Workshee
   const blocking = worksheet.blocking ?? [];
   const tracking = worksheet.depreciation_tracking;
   const personal = worksheet.personal_return;
+  const trust = outputTrust(worksheet);
+  const ready = readyToCopy(worksheet);
+  const tone = trust === "declarable" ? "good" : trust === "provisoire" ? "warn" : "recherche";
   return (
     <div className="fiscal-panel liasse-sheet" aria-live="polite">
       <h3>Liasse à recopier</h3>
-      <p className={`fiscal-goal fiscal-goal-${worksheet.declarable ? "good" : "warn"}`}>
-        <strong>{worksheet.declarable ? "Prête à recopier" : "Pas encore prête"}</strong>
+      <p className={`fiscal-goal fiscal-goal-${tone}`} data-output-status={trust}>
+        <strong>
+          {ready ? `${outputLabel(worksheet)} — Prête à recopier` : outputLabel(worksheet)}
+        </strong>
         {" — "}{worksheet.disclaimer}
       </p>
       <p>
@@ -201,8 +211,9 @@ export default function LiasseSheet({ worksheet, yearId }: { worksheet: Workshee
         </div>
       )}
       <p className="field-hint">
-        SoloLMNP n’envoie rien. Recopiez ces montants dans votre espace professionnel, validez la
-        déclaration, puis conservez l’accusé de dépôt avec le dossier de contrôle.
+        {ready
+          ? "SoloLMNP n’envoie rien. Recopiez ces montants dans votre espace professionnel, validez la déclaration, puis conservez l’accusé de dépôt avec le dossier de contrôle."
+          : "SoloLMNP n’envoie rien. Ces montants ne sont pas une base de déclaration : ne les recopiez pas."}
       </p>
     </div>
   );

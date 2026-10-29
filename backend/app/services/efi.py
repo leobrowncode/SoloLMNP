@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.filing.mappings import BLOCKING_WARNINGS, compile_package
+from app.domain.fiscal.output_status import apply_output_status
 from app.models.filing import TaxReturnSnapshot
 from app.services.ledger import get_year
 
@@ -39,6 +40,7 @@ def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
         package = json.loads(snapshot.canonical_json)
         frozen = True
         digest = snapshot.sha256
+    apply_output_status(package, year_closed=frozen or year.status == "CLOSED")
     copy = package.get("copy") or {}
     declarable = bool(package.get("declarable"))
     blocking = [
@@ -50,6 +52,14 @@ def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
         "year": year.year,
         "declarable": declarable,
         "status": package.get("status", "research_only"),
+        "output_status": package.get("output_status", "recherche"),
+        "output_label": package.get("output_label", "Recherche"),
+        "output_headline": package.get("output_headline", "Recherche"),
+        "copy_complete": bool(package.get("copy_complete")),
+        "export_posture": package.get("export_posture", "bloquee"),
+        "export_posture_label": package.get("export_posture_label", "Bloquée"),
+        "exports": package.get("exports", {}),
+        "validation": package.get("validation"),
         "transmission": False,
         "frozen": frozen,
         "snapshot_sha256": digest,
@@ -70,13 +80,7 @@ def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
             item for item in package.get("warnings", []) if item["code"] not in BLOCKING_WARNINGS
         ],
         "by_property": package.get("by_property", []),
-        "disclaimer": (
-            "Feuille prête à recopier dans votre espace professionnel impots.gouv.fr. "
-            "Aucun envoi n’est effectué par SoloLMNP."
-            if declarable
-            else "Feuille non prête : corrigez les points bloquants avant de la recopier. "
-            "Aucun envoi n’est effectué par SoloLMNP."
-        ),
+        "disclaimer": str(package.get("disclaimer") or ""),
         "liasse": {
             "form": package["form"],
             "vintage": package["vintage"],
@@ -120,11 +124,7 @@ def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
 
     exercise = worksheet.get("exercise") or {}
     declarant = worksheet.get("declarant") or {}
-    status = (
-        "prête à recopier (ready)"
-        if worksheet.get("declarable")
-        else "non prête (" + str(worksheet.get("status", "research_only")) + ")"
-    )
+    status = str(worksheet.get("output_headline") or worksheet.get("output_label") or "Recherche")
     lines.append(
         (
             "SoloLMNP — liasse LMNP à recopier — exercice du "
@@ -132,7 +132,10 @@ def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
             True,
         )
     )
-    text(f"Statut : {status}. Aucune transmission : à recopier soi-même en mode EFI.")
+    if worksheet.get("declarable"):
+        text(f"Statut : {status}. Aucune transmission : à recopier soi-même en mode EFI.")
+    else:
+        text(f"Statut : {status}. Aucune transmission. Ne pas recopier comme déclaration.")
     text(
         f"Déclarant : {declarant.get('name') or '—'} · SIREN {declarant.get('siren') or 'manquant'}"
         f" · SIRET {declarant.get('siret') or '—'}"

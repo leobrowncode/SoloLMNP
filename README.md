@@ -2,7 +2,7 @@
 
 Application libre, mono-utilisateur et auto-hébergeable pour une activité LMNP au réel simplifié BIC.
 
-**Version 1.0.0 — comptabilité LMNP de l’exercice 2026.** Le ledger, les opérations, la banque, les emprunts, l’entrée du bien au premier exercice, les immobilisations, les états, la clôture, la liasse à recopier (2031, 2031-bis, 2033-A/B/C/E, cases 2042-C-PRO, état de suivi des amortissements non déduits) et le dossier de contrôle (FEC `SirenFECAAAAMMJJ` + description + empreintes) sont disponibles. SoloLMNP n’envoie rien : la liasse se recopie en mode EFI sur impots.gouv.fr. Le LMP, la cession, la TVA et les plus-values restent hors périmètre.
+**Version 1.0.0 — comptabilité LMNP de l’exercice 2026.** Le ledger, les opérations, la banque, les emprunts, l’entrée du bien au premier exercice, les immobilisations, les états, la clôture, la liasse (2031, 2031-bis, 2033-A/B/C/E, cases 2042-C-PRO, état de suivi des amortissements non déduits) et le dossier de contrôle (FEC `SirenFECAAAAMMJJ` + description + empreintes) sont disponibles. SoloLMNP n’envoie rien. Les millésimes 2025 et 2026 sont en **Recherche** : leurs montants ne sont pas une base de déclaration. « Prête à recopier » n’apparaît que pour une sortie **Déclarable**. Le LMP, la cession, la TVA et les plus-values restent hors périmètre.
 
 ## Démarrer
 
@@ -66,6 +66,6 @@ Les montants Python utilisent `Decimal`, avec stockage en centimes entiers SQLit
 - Disponible : contrats d'écritures immuables avec validation d'équilibre ; aucun enregistrement comptable persistant.
 - Disponible : API de santé/disponibilité, interface responsive, restrictions réseau et configuration.
 - Disponible : ledger, opérations, banque CSV, import CSV de justificatifs et d’échéances d’emprunt, emprunts, immobilisations, états provisoires, centralisation, clôture, FEC, mappings de travail, feuille EFI, justificatifs et sauvegarde.
-- Recherche : le calcul fiscal enregistré reste `research_only`, parce que le LMP, la cession, la TVA et les plus-values sont hors périmètre. La feuille de l’exercice 2026 est recopiable si chaque case est au registre lu et qu’aucun écart ne bloque.
+- Recherche : le calcul fiscal enregistré reste `research_only`. Tant que `fiscal/<millésime>/validation.json` n’est pas une attestation effective, chaque calcul et chaque export affichent **Recherche**. Les conditions de passage à **Déclarable** sont dans [docs/FISCAL_RULES.md](docs/FISCAL_RULES.md).
 
 Voir [le rapport de phase 1](docs/PHASE1_REPORT.md), [l'architecture](ARCHITECTURE.md), [la roadmap](ROADMAP.md), [le modèle de données](docs/DATA_MODEL.md), [la sécurité](SECURITY.md) et [le workflow EFI](docs/FILING.md).

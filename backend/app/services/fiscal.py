@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.api.ledger_schemas import FiscalInput
 from app.core.money import to_cents
 from app.domain.fiscal.loader import load_vintage
+from app.domain.fiscal.output_status import calculation_status
 from app.models import Account, AccountingEntry, AccountingEntryLine, BusinessOperation, FiscalYear
 from app.models.assets import Asset, AssetComponent
 from app.models.base import utc_now
@@ -509,11 +510,14 @@ def _replace_register(
 
 
 def _json(row: FiscalComputation, *, replayed: bool) -> dict[str, Any]:
+    presented = calculation_status(row.vintage)
     return {
         "id": row.id,
         "fiscal_year_id": row.fiscal_year_id,
         "status": "research_only",
-        "declarable": False,
+        "declarable": presented["declarable"],
+        "output_status": presented["output_status"],
+        "output_label": presented["output_label"],
         "replayed": replayed,
         "vintage": row.vintage,
         "rules_sha256": row.rules_sha256,

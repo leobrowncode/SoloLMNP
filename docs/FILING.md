@@ -40,10 +40,12 @@ télétransmet rien, ne pilote pas le portail et n'effectue aucun scraping.
 
 Formulaires et notice 2031 / 2033 du millésime 2025 sont archivés avec URL, date de
 consultation et empreinte dans `fiscal/2025/sources/`. Le registre des cases est
-dans `fiscal/2025/forms/cases.yaml`. La liasse BIC 2025 est `ready` lorsque chaque
-case émise est dans ce registre et que le package n’a ni erreur ni écart bloquant
-(immobilisations, classement, effectifs, cession, TVA). Le millésime 2026 et la
-2042-C-PRO restent non déclarables.
+dans `fiscal/2025/forms/cases.yaml`. Les contrôles de cases peuvent être
+satisfaits sans que la feuille soit déclarable. Le statut affiché (Recherche,
+Provisoire ou Déclarable) vient de `fiscal/<millésime>/validation.json` et des
+mêmes portes pour la clôture et les exports. Les conditions exactes sont dans
+[FISCAL_RULES.md](FISCAL_RULES.md). Les millésimes 2025 et 2026 restent en
+Recherche : une sortie Recherche n’affiche jamais « Prête à recopier ».
 
 ## Règles LMNP à l’impôt sur le revenu (notice 2033-NOT-SD 2025)
 
@@ -68,7 +70,7 @@ Un bien acheté avant le début de l’exercice entre en comptabilité par une �
 - 2033-F et 2033-G : non applicables aux entreprises individuelles.
 - 2033-D cadre II : réservé à l’IS.
 - Millésime 2026 : formulaires de 2027 non publiés ; numéros repris du registre 2025, à vérifier en ligne.
-- Cession, TVA, plus-values : la présence de ces opérations refuse `ready`.
+- Cession, TVA, plus-values : la présence de ces opérations empêche la feuille d’être complète. Un millésime non validé reste Recherche même si la feuille est complète.
 - La cotisation CVAE n’est pas calculée. La case 117 reste une base, nulle jusqu’à 152 500 € de chiffre d’affaires.
 - L’accès à l’espace professionnel du contribuable n’est pas testé ici.
 

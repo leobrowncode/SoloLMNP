@@ -10,6 +10,8 @@ interface Notice {
 interface Check {
   blocking: boolean;
   year_status?: string;
+  output_status?: string;
+  output_label?: string;
   errors: Notice[];
   warnings: Notice[];
   infos?: Notice[];
@@ -131,6 +133,12 @@ export default function CloseYear({
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
     {receipt && <p role="status">{receipt}</p>}
     {check && <div>
+      {check.output_label && (
+        <p className={`fiscal-output-status fiscal-output-${check.output_status ?? "recherche"}`}>
+          <strong>{check.output_label}</strong>
+          <span>Même statut pour le calcul, la liasse et les exports.</span>
+        </p>
+      )}
       {(check.infos ?? []).map((item) => <p key={item.code}>{item.message}</p>)}
       {check.errors.map((item) => <p key={`${item.code}-${item.message}`} role="alert">{item.message}{FISCAL_FIX_CODES.has(item.code) && <> <a href="#calcul-fiscal">Calculer le résultat fiscal</a></>}</p>)}
       {check.warnings.map((item) => <label key={item.code}><input type="checkbox" checked={acks.includes(item.code)} onChange={(event) => toggle(item.code, event.target.checked)} />{item.message}</label>)}

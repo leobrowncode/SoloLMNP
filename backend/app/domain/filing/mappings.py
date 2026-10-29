@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import PROJECT_ROOT
 from app.core.money import to_cents
 from app.domain.filing.liasse import extend_package
+from app.domain.fiscal.output_status import apply_output_status
 from app.models import AccountingEntry, AccountingEntryLine
 from app.services.fiscal import _operating, latest_fiscal
 from app.services.ledger import fail, get_year, money
@@ -82,14 +83,7 @@ def compile_package(session: Session, year_id: int) -> dict[str, Any]:
         "fiscal_result": fiscal["fiscal_result"],
         "fields": fields,
         "errors": errors,
-        "warnings": [
-            {
-                "code": "RESEARCH_ONLY",
-                "message": (
-                    "Feuille de recopie pour la déclaration. SoloLMNP n’envoie rien aux impôts."
-                ),
-            }
-        ],
+        "warnings": [],
         "by_property": [],
         "copy": {
             "transmission": False,
@@ -97,16 +91,18 @@ def compile_package(session: Session, year_id: int) -> dict[str, Any]:
         },
     }
     extend_package(session, year, fiscal, package)
-    _mark_copy_ready(year, package)
+    _mark_copy_complete(year, package)
+    apply_output_status(package, year_closed=year.status == "CLOSED")
     return package
 
 
-def _mark_copy_ready(year: Any, package: dict[str, Any]) -> None:
-    """Copy sheet for the 2026 exercise. A failing gate stays research_only."""
+def _mark_copy_complete(year: Any, package: dict[str, Any]) -> None:
+    """Mechanical case gates. They never make a research vintage declarable."""
     for field in package["fields"]:
         field["status"] = "research_only"
     package["status"] = "research_only"
     package["declarable"] = False
+    package["copy_complete"] = False
     if year.fiscal_vintage not in {"2026", "2025"} or package["errors"]:
         return
     registry = json.loads(
@@ -147,10 +143,7 @@ def _mark_copy_ready(year: Any, package: dict[str, Any]) -> None:
             return
     if any(item["code"] in BLOCKING_WARNINGS for item in package["warnings"]):
         return
-    package["status"] = "ready"
-    package["declarable"] = True
-    for field in package["fields"]:
-        field["status"] = "ready"
+    package["copy_complete"] = True
 
 
 def _context(

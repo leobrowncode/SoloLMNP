@@ -227,8 +227,10 @@ def test_first_exercise_from_purchase_to_liasse_and_fec(client):
 
     sheet = client.get("/api/filing/years/1/efi").json()
     assert sheet["frozen"] is True
-    assert sheet["declarable"] is True, sheet["blocking"]
-    assert sheet["status"] == "ready"
+    assert sheet["declarable"] is False, sheet["blocking"]
+    assert sheet["status"] == "research_only"
+    assert sheet["output_status"] == "recherche"
+    assert sheet["copy_complete"] is True, sheet["blocking"]
     assert sheet["exercise"] == {"start": "2025-04-06", "end": "2025-12-31"}
     by_case = {field["official_case"]: field["value"] for field in sheet["liasse"]["fields"]}
     assert by_case["217"] == "7650.00"

@@ -5,9 +5,48 @@ archivées ; règles BOFiP encore celles du 16/09/2026). Les fichiers
 `fiscal/2025/rules.yaml` et `fiscal/2026/rules.yaml` restent en recherche
 (`research_only` pour le calcul stocké). Quatre règles sont exécutables en code avec tests. L’ordre MVP
 de consommation des reports (FIFO, exercices clôturés ; déficits horizon 10 ans)
-est implémenté et golden-testé. La liasse BIC 2025 peut être `ready` sans que le
-fichier de règles change de statut. Consulter un
+est implémenté et golden-testé. Aucun millésime n’est déclarable : `fiscal/2025/validation.json`
+et `fiscal/2026/validation.json` restent `research_only`. Consulter un
 texte et confirmer sa référence ne valide pas une déclaration.
+
+## Statuts affichés : Recherche, Provisoire, Déclarable
+
+Une seule fonction, `app.domain.fiscal.output_status.classify`, décide le statut
+du calcul, de la liasse, du PDF, du tableur, du dossier de contrôle et du
+pré-contrôle. L’écran ne fait que l’afficher. Le mot « Prête à recopier » n’est
+écrit que si ce statut est Déclarable.
+
+| Statut | Condition exacte |
+|---|---|
+| Recherche | `fiscal/<millésime>/validation.json` n’est pas une attestation effective. C’est le cas si le fichier manque, est illisible, ou si l’un de ces points manque : `status` = `validated`, `declarable` = `true`, `version` non vide, `rules_version` non vide, `official_source.reference` non vide, `official_source.url` en `https://`, `validated_on` au format `AAAA-MM-JJ`, `scope.activity`, `scope.regime`, et `scope.excluded` (liste non vide). Une feuille dont les contrôles de cases sont satisfaits reste Recherche. |
+| Provisoire | L’attestation est complète, mais elle ne couvre pas la sortie : `rules_version` diffère de `version` dans `fiscal/<millésime>/rules.yaml`, ou la liasse a une erreur, une case hors registre, ou un avertissement bloquant (`IMMOBILISATIONS_ECART`, `EFFECTIFS`, `RESULTAT_MIXTE`, `CLASSEMENT_INCOMPLET`, `SIREN_MANQUANT`). |
+| Déclarable | L’attestation est complète, `rules_version` est celui du fichier de règles, et la liasse n’a ni erreur ni avertissement bloquant. Seule cette sortie peut afficher « Prête à recopier ». |
+
+Le calcul stocké garde la colonne `status = research_only` (contrainte de base).
+Le statut affiché est `output_status`. Pour le calcul, les portes de cases ne
+s’appliquent pas : un millésime effectivement validé y est Déclarable, un
+millésime validé mais dont `rules_version` a bougé y est Provisoire. La liasse
+peut donc être Provisoire alors que le calcul est Déclarable. C’est le statut
+de la liasse qui autorise la recopie.
+
+Pour valider un millésime, remplacer `fiscal/<millésime>/validation.json` dans
+une revue (pas d’écran) : les champs du tableau, plus `rules_version` égal à la
+`version` courante de `rules.yaml`. Tout changement de règles renvoie la sortie
+en Provisoire tant que ce fichier n’est pas réaligné. Les millésimes 2025 et
+2026 ne sont pas validés.
+
+### Posture d’export (pour l’issue #49)
+
+`exports.liasse`, `exports.pdf`, `exports.fec` et `exports.archive` portent
+chacun `posture` : `provisoire`, `bloquee` ou `finale`. Rien ne bloque encore
+un téléchargement sur cette posture.
+
+- Liasse et PDF : Bloquée si les portes de cases échouent ; Finale seulement si
+  le statut est Déclarable et l’exercice est clôturé ; sinon Provisoire.
+- FEC et dossier de contrôle : Bloquée tant que l’exercice n’est pas clôturé
+  (ou si le FEC a une erreur) ; Finale quand l’exercice est clôturé et le FEC
+  n’a pas d’erreur. Le FEC est un fichier comptable : sa posture Finale n’exige
+  pas un millésime Déclarable.
 
 ## Références consultées et portée de la vérification
 

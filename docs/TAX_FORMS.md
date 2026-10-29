@@ -19,9 +19,12 @@ Le registre [`fiscal/2025/forms/cases.yaml`](../fiscal/2025/forms/cases.yaml) ma
 vers une source vérifiée. Les entreprises individuelles n’ont pas à servir 2033-F ni 2033-G
 (notice). La 2042-C-PRO reste un produit séparé : `official_case` nul, `case_not_verified`.
 
-`fiscal/2025/forms/2033.json` porte les formules du 2033-B. Le package 2025 passe
-à `ready` seulement après contrôle du registre `cases.yaml`. Le calcul stocké et
-le millésime 2026 restent `research_only`.
+`fiscal/2025/forms/2033.json` porte les formules du 2033-B. Le registre
+`cases.yaml` dit si les contrôles internes de la feuille sont satisfaits. Le
+passage à Déclarable est ailleurs : `fiscal/<millésime>/validation.json`
+(source officielle, date, périmètre, version). Voir
+[FISCAL_RULES.md](FISCAL_RULES.md). Le calcul stocké reste `research_only`.
+Les millésimes 2025 et 2026 ne sont pas déclarables.
 
 ## Mapping
 

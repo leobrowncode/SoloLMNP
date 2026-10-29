@@ -2,11 +2,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { request } from "../api/ledger";
 import CloseYear from "./CloseYear";
 import LiasseSheet, { type Worksheet } from "./LiasseSheet";
+import { calculationNotice, outputLabel, outputTrust } from "./outputStatus";
 import "./ledger.css";
 
 interface Vintage {
   vintage: string;
   status: string;
+  output_status?: string;
+  output_label?: string;
   blocked: string[];
   scope?: string[];
   executable: string[];
@@ -32,6 +35,8 @@ interface CarryUse {
 interface Computation {
   status: string;
   declarable: boolean;
+  output_status?: string;
+  output_label?: string;
   accounting_result: string;
   fiscal_result: string;
   deductible_depreciation: string;
@@ -758,10 +763,9 @@ export default function FiscalPage() {
             </div>
           )}
 
-          <p className="field-hint">
-            {result.declarable
-              ? "Ce résultat peut alimenter la liasse. Aucune télétransmission."
-              : "Aperçu fiscal. La liasse indique ensuite si elle est recopiable. Aucune télétransmission."}
+          <p className={`fiscal-output-status fiscal-output-${outputTrust(result)}`}>
+            <strong>{outputLabel(result)}</strong>
+            <span>{calculationNotice(outputTrust(result))}</span>
           </p>
         </div>
       )}
@@ -798,7 +802,7 @@ export default function FiscalPage() {
         <ul>
           {vintages.map((item) => (
             <li key={item.vintage}>
-              Millésime {item.vintage} · {item.status} · périmètre LMNP
+              Millésime {item.vintage} · {item.output_label ?? "Recherche"} · périmètre LMNP
               {item.blocked.length ? ` · règles bloquées : ${item.blocked.join(", ")}` : ""}
             </li>
           ))}

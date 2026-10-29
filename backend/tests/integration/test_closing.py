@@ -220,10 +220,15 @@ def test_close_reopen_fec_efi_and_documents(client, settings):
     pdf = client.get("/api/filing/years/1/efi.pdf")
     assert pdf.status_code == 200
     assert pdf.content.startswith(b"%PDF-")
-    assert b"ready" in pdf.content
+    assert b"Recherche" in pdf.content
+    assert b"pr\xeate \xe0 recopier" not in pdf.content.lower()
     package = client.get("/api/filing/years/1/package").json()
-    assert package["declarable"] is True
-    assert package["status"] == "ready"
+    assert package["declarable"] is False
+    assert package["status"] == "research_only"
+    assert package["output_status"] == "recherche"
+    assert package["copy_complete"] is True
+    assert package["exports"]["liasse"]["posture"] == "provisoire"
+    assert package["exports"]["fec"]["posture"] == "finale"
     assert package["errors"] == []
     assert package["fields"][0]["entries"]
     reopened = client.post(
