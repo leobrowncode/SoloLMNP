@@ -21,6 +21,7 @@ from app.api.operation_schemas import (
     SettlementInput,
     TenantInput,
 )
+from app.core.api_errors import import_line_fail
 from app.core.money import to_cents
 from app.models import Account, AccountingEntry, AccountingEntryLine, Property
 from app.models.base import utc_now
@@ -580,18 +581,26 @@ def parse_csv(content: str) -> list[dict[str, Any]]:
         references: set[str] = set()
         for index, raw in enumerate(reader, 2):
             if index > 5001 or None in raw or any(value is None for value in raw.values()):
-                fail(
-                    "CSV_SHAPE", f"Ligne {index} invalide ou limite de 5 000 lignes dépassée.", 422
+                import_line_fail(
+                    "CSV_SHAPE",
+                    f"Ligne {index} invalide ou limite de 5 000 lignes dépassée.",
+                    index,
                 )
             label, ref = raw["label"].strip(), raw["reference"].strip()
             value = raw["amount"].strip().replace(",", ".")
             if not label or len(label) > 300 or not ref or len(ref) > 200 or ref in references:
-                fail("CSV_REFERENCE", f"Libellé ou référence unique invalide, ligne {index}.", 422)
+                import_line_fail(
+                    "CSV_REFERENCE", f"Libellé ou référence unique invalide, ligne {index}.", index
+                )
             if not re.fullmatch(r"[+-]?[0-9]+(?:\.[0-9]{1,2})?", value):
-                fail("CSV_AMOUNT", f"Montant au centime invalide, ligne {index}.", 422)
+                import_line_fail(
+                    "CSV_AMOUNT",
+                    f"Montant au centime invalide, ligne {index}.",
+                    index,
+                )
             amount = to_cents(Decimal(value))
             if not amount:
-                fail("CSV_ZERO", f"Mouvement nul, ligne {index}.", 422)
+                import_line_fail("CSV_ZERO", f"Mouvement nul, ligne {index}.", index)
             day = date.fromisoformat(raw["date"].strip())
             normalized = {
                 "date": day.isoformat(),
@@ -813,10 +822,10 @@ def parse_operations_csv(content: str) -> list[dict[str, Any]]:
         references: set[str] = set()
         for index, raw in enumerate(reader, 2):
             if index > 5001 or None in raw or any(value is None for value in raw.values()):
-                fail(
+                import_line_fail(
                     "CSV_SHAPE",
                     f"Ligne {index} invalide ou limite de 5 000 lignes dépassée.",
-                    422,
+                    index,
                 )
             if not any(value.strip() for value in raw.values()):
                 continue
@@ -824,13 +833,13 @@ def parse_operations_csv(content: str) -> list[dict[str, Any]]:
             type_code = raw["type"].strip().upper()
             paid = PAID_VALUES.get(raw.get(OPERATIONS_PAID_COLUMN, "").strip().lower())
             if paid is None:
-                fail("CSV_PAID", f"Colonne paid : oui ou non, ligne {index}.", 422)
+                import_line_fail("CSV_PAID", f"Colonne paid : oui ou non, ligne {index}.", index)
             accounts = OPERATION_TYPE_ACCOUNTS.get(kind)
             if accounts is None or type_code not in accounts:
-                fail(
+                import_line_fail(
                     "CSV_TYPE",
                     f"Type incompatible avec la nature de l’opération, ligne {index}.",
-                    422,
+                    index,
                 )
             counterparty, description = raw["counterparty"].strip(), raw["description"].strip()
             piece, source = raw["piece_reference"].strip(), raw["source_file"].strip()
@@ -844,26 +853,30 @@ def parse_operations_csv(content: str) -> list[dict[str, Any]]:
                 or len(source) > 300
                 or piece in references
             ):
-                fail(
+                import_line_fail(
                     "CSV_REFERENCE",
                     f"Tiers, libellé ou référence unique invalide, ligne {index}.",
-                    422,
+                    index,
                 )
             value = re.sub(r"[\s\u00a0\u202f€]", "", raw["amount"]).replace(",", ".")
             if not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,2})?", value):
-                fail("CSV_AMOUNT", f"Montant positif au centime invalide, ligne {index}.", 422)
+                import_line_fail(
+                    "CSV_AMOUNT",
+                    f"Montant positif au centime invalide, ligne {index}.",
+                    index,
+                )
             amount = to_cents(Decimal(value))
             if not amount:
-                fail("CSV_ZERO", f"Montant nul, ligne {index}.", 422)
+                import_line_fail("CSV_ZERO", f"Montant nul, ligne {index}.", index)
             raw_date, raw_piece = raw["date"].strip(), raw["piece_date"].strip()
             try:
                 day = _sheet_day(raw_date)
                 piece_day = _sheet_day(raw_piece) if raw_piece else day
             except ValueError:
-                fail(
+                import_line_fail(
                     "CSV_INVALID",
                     f"Dates AAAA-MM-JJ ou JJ/MM/AAAA requises, ligne {index}.",
-                    422,
+                    index,
                 )
             rows.append(
                 {
@@ -943,7 +956,11 @@ def import_operations_csv(
     for index, data in enumerate(rows, 2):
         day = date.fromisoformat(data["date"])
         if not year.start_date <= day <= year.end_date:
-            fail("DATE_OUTSIDE_YEAR", f"Date comptable hors exercice, ligne {index}.", 422)
+            import_line_fail(
+                "DATE_OUTSIDE_YEAR",
+                f"Date comptable hors exercice, ligne {index}.",
+                index,
+            )
         request_id = import_request_id(data["piece_reference"])
         by_request = session.scalar(
             select(BusinessOperation).where(BusinessOperation.request_id == request_id)
@@ -1065,15 +1082,15 @@ def _loan_payment_money(value: str, index: int, label: str, blank_is_zero: bool)
     if not normalized and blank_is_zero:
         return "0.00"
     if not re.fullmatch(r"[0-9]+(?:\.[0-9]{1,2})?", normalized):
-        fail(
+        import_line_fail(
             "LOAN_CSV_AMOUNT",
             f"{label} positif ou nul au centime invalide, ligne {index}.",
-            422,
+            index,
         )
     try:
         return money(to_cents(Decimal(normalized)))
     except (ValueError, ArithmeticError):
-        fail("LOAN_CSV_AMOUNT", f"{label} invalide, ligne {index}.", 422)
+        import_line_fail("LOAN_CSV_AMOUNT", f"{label} invalide, ligne {index}.", index)
 
 
 def parse_loan_payments_csv(content: str) -> list[dict[str, str]]:
@@ -1112,10 +1129,10 @@ def parse_loan_payments_csv(content: str) -> list[dict[str, str]]:
         references: set[str] = set()
         for index, raw in enumerate(reader, 2):
             if index > 5001 or None in raw or any(value is None for value in raw.values()):
-                fail(
+                import_line_fail(
                     "LOAN_CSV_SHAPE",
                     f"Ligne {index} invalide ou limite de 5 000 lignes dépassée.",
-                    422,
+                    index,
                 )
             if not any(value.strip() for value in raw.values()):
                 continue
@@ -1126,10 +1143,10 @@ def parse_loan_payments_csv(content: str) -> list[dict[str, str]]:
                 )
                 payment_day = _sheet_day(payment_value) if payment_value else due_day
             except ValueError:
-                fail(
+                import_line_fail(
                     "LOAN_CSV_DATE",
                     f"Date AAAA-MM-JJ ou JJ/MM/AAAA requise, ligne {index}.",
-                    422,
+                    index,
                 )
             if due_day in dates:
                 fail(
@@ -1145,10 +1162,10 @@ def parse_loan_payments_csv(content: str) -> list[dict[str, str]]:
                 )
             loan_reference = raw[columns["loan_reference"]].strip()
             if not loan_reference or len(loan_reference) > 200:
-                fail(
+                import_line_fail(
                     "LOAN_CSV_REFERENCE",
                     f"Référence de prêt requise, ligne {index}.",
-                    422,
+                    index,
                 )
             principal = _loan_payment_money(
                 raw[columns["principal"]], index, "Capital", blank_is_zero=False
@@ -1172,11 +1189,11 @@ def parse_loan_payments_csv(content: str) -> list[dict[str, str]]:
                 blank_is_zero=True,
             )
             if to_cents(Decimal(external_insurance)):
-                fail(
+                import_line_fail(
                     "LOAN_CSV_EXTERNAL_INSURANCE",
                     "L’assurance externe est un prélèvement distinct à importer comme dépense ASS, "
                     f"ligne {index}.",
-                    422,
+                    index,
                 )
             amount = _loan_payment_money(
                 raw[columns["amount"]], index, "Total banque", blank_is_zero=False
@@ -1185,11 +1202,11 @@ def parse_loan_payments_csv(content: str) -> list[dict[str, str]]:
                 to_cents(Decimal(value)) for value in (principal, interest, insurance, other_costs)
             )
             if expected <= 0 or expected != to_cents(Decimal(amount)):
-                fail(
+                import_line_fail(
                     "LOAN_CSV_SPLIT",
                     "Capital + intérêts + assurance banque + autres frais doit égaler "
                     f"le total banque, ligne {index}.",
-                    422,
+                    index,
                 )
             references.add(loan_reference)
             rows.append(

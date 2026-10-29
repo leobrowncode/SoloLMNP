@@ -1,12 +1,12 @@
 """Atomic posting and projections from persisted lines only."""
 
-from typing import Any, NoReturn
+from typing import Any
 
-from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.ledger_schemas import EntryInput, ReversalInput
+from app.core.api_errors import fail as fail
 from app.core.money import MAX_CENTS, to_cents
 from app.models import (
     Account,
@@ -17,10 +17,6 @@ from app.models import (
     LedgerEvent,
 )
 from app.models.base import utc_now
-
-
-def fail(code: str, message: str, status: int = 409) -> NoReturn:
-    raise HTTPException(status_code=status, detail={"code": code, "message": message})
 
 
 def money(cents: int) -> str:

@@ -1,5 +1,7 @@
 import { useId, useMemo, useRef, useState } from "react";
-import { amount, cents } from "../api/ledger";
+import { amount, cents, RequestError } from "../api/ledger";
+import { formFieldName, issuesForForm, type ApiErrorIssue } from "../api/errors";
+import ApiErrorAlert from "./ApiErrorAlert";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 
 export interface Field {
@@ -56,6 +58,8 @@ export default function ReviewForm({
 }) {
   const [review, setReview] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [businessError, setBusinessError] = useState<RequestError | null>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((field) => [
@@ -76,6 +80,43 @@ export default function ReviewForm({
       ?? fields.find((field) => field.name === "piece_reference")?.value
       ?? "",
   );
+
+  const formFields = useMemo(() => new Set(fields.map((field) => field.name)), [fields]);
+
+  function applyRequestFailure(reason: unknown) {
+    if (reason instanceof RequestError) {
+      const mapped = Object.fromEntries(
+        issuesForForm(reason.detail.issues, formFields).map((issue: ApiErrorIssue) => [
+          formFieldName(issue.field) ?? "",
+          issue.message,
+        ]).filter(([name]) => name),
+      );
+      if (Object.keys(mapped).length) {
+        setReview(null);
+        setFieldErrors(mapped);
+        setBusinessError(null);
+        setError("");
+        return;
+      }
+      if (reason.detail.field) {
+        const name = formFieldName(reason.detail.field);
+        if (name && formFields.has(name)) {
+          setReview(null);
+          setFieldErrors({ [name]: reason.detail.message });
+          setBusinessError(null);
+          setError("");
+          return;
+        }
+      }
+      setFieldErrors({});
+      setBusinessError(reason);
+      setError("");
+      return;
+    }
+    setFieldErrors({});
+    setBusinessError(null);
+    setError(reason instanceof Error ? reason.message : "Champs invalides.");
+  }
 
   const groups = useMemo(() => {
     const order: string[] = [];
@@ -149,6 +190,8 @@ export default function ReviewForm({
       onSubmit={(event) => {
         event.preventDefault();
         setError("");
+        setFieldErrors({});
+        setBusinessError(null);
         if (!review) {
           try {
             setReview(buildPayload(draft));
@@ -159,13 +202,14 @@ export default function ReviewForm({
         }
         setBusy(true);
         void onSave(review)
-          .catch((reason: Error) => setError(reason.message))
+          .catch(applyRequestFailure)
           .finally(() => setBusy(false));
       }}
     >
       <h3>{title}</h3>
       {help && <p className="form-help">{help}</p>}
       {error && <p role="alert" className="ledger-error">{error}</p>}
+      {businessError && <ApiErrorAlert detail={businessError.detail} />}
 
       {!review && groups.map(({ key, fields: groupFields }) => (
         <fieldset key={key || "main"} className="form-fieldset">
@@ -174,6 +218,9 @@ export default function ReviewForm({
             {groupFields.map((field) => {
               const controlId = `${formUid}-${field.name}`;
               const hintId = field.hint ? `${controlId}-hint` : undefined;
+              const fieldError = fieldErrors[field.name];
+              const errorId = fieldError ? `${controlId}-error` : undefined;
+              const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
               const choices = choicesOf(field, draft);
               return (
                 <div key={field.name} className={field.money ? "form-field field-money" : "form-field"}>
@@ -184,10 +231,19 @@ export default function ReviewForm({
                     <select
                       id={controlId}
                       name={field.name}
-                      aria-describedby={hintId}
+                      aria-describedby={describedBy}
+                      aria-invalid={fieldError ? true : undefined}
                       value={draft[field.name] ?? ""}
                       required={!field.optional}
-                      onChange={(event) => applyChange(field.name, event.target.value)}
+                      onChange={(event) => {
+                        setFieldErrors((current) => {
+                          if (!current[field.name]) return current;
+                          const next = { ...current };
+                          delete next[field.name];
+                          return next;
+                        });
+                        applyChange(field.name, event.target.value);
+                      }}
                     >
                       {field.optional && (
                         <option value="">
@@ -202,15 +258,27 @@ export default function ReviewForm({
                     <input
                       id={controlId}
                       name={field.name}
-                      aria-describedby={hintId}
+                      aria-describedby={describedBy}
+                      aria-invalid={fieldError ? true : undefined}
                       value={draft[field.name] ?? ""}
                       type={field.type === "number" ? "number" : field.type ?? "text"}
                       min={field.type === "number" ? "1" : undefined}
                       step={field.money ? "0.01" : undefined}
                       inputMode={field.money ? "decimal" : undefined}
                       required={!field.optional}
-                      onChange={(event) => applyChange(field.name, event.target.value)}
+                      onChange={(event) => {
+                        setFieldErrors((current) => {
+                          if (!current[field.name]) return current;
+                          const next = { ...current };
+                          delete next[field.name];
+                          return next;
+                        });
+                        applyChange(field.name, event.target.value);
+                      }}
                     />
+                  )}
+                  {fieldError && (
+                    <span id={errorId} className="field-error" role="alert">{fieldError}</span>
                   )}
                   <span id={hintId} className="field-hint">{field.hint ?? ""}</span>
                 </div>

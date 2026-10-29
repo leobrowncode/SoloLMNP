@@ -162,6 +162,10 @@ describe("Application routing", () => {
       }
       if (url.endsWith("/accounts") || url.endsWith("/journals")) return Promise.resolve(reply([]));
       if (url.endsWith("/properties")) return Promise.resolve(reply([]));
+      if (url.endsWith("/banks") || url.endsWith("/loans") || url.includes("/api/operations?")) {
+        return Promise.resolve(reply([]));
+      }
+      if (url.includes("/tenants")) return Promise.resolve(reply([]));
       if (url.includes("/entries?")) return Promise.resolve(reply({ entries: [], count: 0 }));
       return Promise.resolve(reply({}));
     }));
