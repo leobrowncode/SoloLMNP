@@ -170,6 +170,7 @@ class CentralizationInput(Input):
     justification: Annotated[str, Field(min_length=10, max_length=3000)]
     result_account: AccountNumber | None = None
     expected_result: SignedMoneyInput
+    create_accounts: list[AccountInput] = Field(default_factory=list, max_length=1)
 
 
 class FiscalAdjustmentInput(Input):

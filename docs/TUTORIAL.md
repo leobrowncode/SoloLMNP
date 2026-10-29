@@ -116,7 +116,7 @@ Retour **Comptabilité** :
 Menu **États comptables** :
 
 1. Consulter bilan et résultat provisoires.
-2. **Préparer la centralisation** → vérifier → confirmer.
+2. **Préparer la centralisation** → vérifier → confirmer. La préparation ne modifie pas le plan comptable. S’il n’existe aucun compte actif 120 (hors 1209) ou 129 selon le sens du résultat, la confirmation annonce et crée le compte manquant (120000 ou 129000) dans la même opération. Corriger ou quitter avant cette confirmation laisse le plan inchangé.
 3. Puis **affectation** du résultat (120/129 → capitaux) si proposé.
 
 Cette étape ne clôture pas l’exercice. La suite est dans **Fiscalité LMNP**.
