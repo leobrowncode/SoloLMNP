@@ -655,9 +655,7 @@ def test_configurable_subaccounts_keep_the_category_mirror(client):
 def test_coarse_asset_account_is_rejected(client):
     response = client.post(
         "/api/assets",
-        json=building(
-            asset_account="213", depreciation_account="2813", label="Compte trop court"
-        ),
+        json=building(asset_account="213", depreciation_account="2813", label="Compte trop court"),
     )
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "ASSET_ACCOUNT_PAIR_INVALID"
