@@ -207,6 +207,24 @@
 .fiscal-goal-good { background: #e7f6e8; border-color: #9cbc9a; }
 .fiscal-goal-warn { background: #fff9ef; border-color: #e0c08a; }
 .fiscal-goal-neutral { background: #fff; }
+.fiscal-goal-recherche { background: #f4f7fb; border-color: #b7c9ea; }
+.fiscal-output-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .6rem;
+  align-items: baseline;
+  margin: 0 0 1rem;
+  padding: .75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid #b7c9ea;
+  background: #f4f7fb;
+  max-width: 100%;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.fiscal-output-provisoire { background: #fff9ef; border-color: #e0c08a; }
+.fiscal-output-declarable { background: #e7f6e8; border-color: #9cbc9a; }
+.fiscal-goal { overflow-wrap: anywhere; max-width: 100%; }
 .fiscal-freshness {
   display: flex;
   flex-wrap: wrap;
@@ -217,7 +235,9 @@
   border-radius: 10px;
   border: 1px solid #d8e0d8;
   background: #f7faf7;
+  max-width: 100%;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 .fiscal-freshness-obsolete { background: #fff3df; border-color: #e0c08a; }
 .fiscal-fingerprint {
@@ -242,6 +262,8 @@
   border: 1px solid #e0c08a;
   background: #fff9ef;
   line-height: 1.4;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .worksheet-warning-info { border-color: #b7c9ea; background: #f4f7fb; }
 .worksheet-warning-error { border-color: #e7b2a4; background: #fff0eb; }

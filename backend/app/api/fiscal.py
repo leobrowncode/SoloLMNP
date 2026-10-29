@@ -9,6 +9,7 @@ from app.api.ledger_schemas import FiscalInput
 from app.api.sessions import dependencies
 from app.core.database import Database
 from app.domain.fiscal.loader import available_vintages, load_vintage
+from app.domain.fiscal.output_status import calculation_status
 from app.services.fiscal import compute_fiscal, displayed_fiscal, reintegration_suggestions
 
 
@@ -23,17 +24,27 @@ def build_fiscal_router(database: Database) -> APIRouter:
         rows = []
         for vintage in available_vintages():
             loaded = load_vintage(vintage)
+            presented = calculation_status(vintage)
             rows.append(
                 {
                     "vintage": vintage,
                     "status": "research_only",
+                    "output_status": presented["output_status"],
+                    "output_label": presented["output_label"],
+                    "declarable": presented["declarable"],
                     "sha256": loaded["sha256"],
                     "executable": [rule["id"] for rule in loaded["executable"]],
                     "blocked": loaded["blocked"],
                     "scope": loaded["scope"],
                 }
             )
-        return {"status": "research_only", "declarable": False, "vintages": rows}
+        return {
+            "status": "research_only",
+            "declarable": False,
+            "output_status": "recherche",
+            "output_label": "Recherche",
+            "vintages": rows,
+        }
 
     @router.get("/years/{year_id}")
     def read_year(year_id: int, session: Read) -> dict[str, Any]:

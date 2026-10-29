@@ -1,3 +1,8 @@
+import io
+import json
+import zipfile
+from typing import Any
+
 import pytest
 
 from tests.integration.test_ledger import client as seeded_client  # noqa: F401
@@ -19,6 +24,8 @@ def test_depreciation_limit_is_separate_from_the_ledger(client):
     body = first.json()
     assert body["status"] == "research_only"
     assert body["declarable"] is False
+    assert body["output_status"] == "recherche"
+    assert body["output_label"] == "Recherche"
     assert body["accounting_result"] == before["income_statement"]["result"] == "-200.00"
     assert body["deductible_depreciation"] == "600.00"
     assert body["unused_depreciation"] == "200.00"
@@ -162,8 +169,12 @@ def test_liasse_keeps_interest_out_of_operating_charges(client):
     assert by_case["430"] == "0.00"
     assert "410" not in by_case
     assert not {"860", "870", "982"} & set(by_case)
-    assert sheet["declarable"] is True
-    assert sheet["status"] == "ready"
+    assert sheet["declarable"] is False
+    assert sheet["status"] == "research_only"
+    assert sheet["output_status"] == "recherche"
+    assert sheet["output_label"] == "Recherche"
+    assert sheet["copy_complete"] is True
+    assert "prête à recopier" not in sheet["disclaimer"].casefold()
     by_code = {field["code"]: field["value"] for field in sheet["liasse"]["fields"]}
     assert by_code["2031_BIC_NON_PRO_BENEFICE"] == "920.00"
     assert by_code["2031BIS_LMNP_BENEFICE"] == "920.00"
@@ -199,7 +210,133 @@ def test_2026_purchase_skips_the_2025_return(client):
     fiscal = client.post(f"/api/fiscal/years/{year_id}", json={"adjustments": []})
     assert fiscal.status_code == 200, fiscal.text
     sheet = client.get(f"/api/filing/years/{year_id}/efi").json()
-    assert sheet["declarable"] is True
+    assert sheet["declarable"] is False
+    assert sheet["output_status"] == "recherche"
+    assert sheet["copy_complete"] is True
+    assert "prête à recopier" not in sheet["disclaimer"].casefold()
     assert "millésime 2027" in sheet["vintage_note"]
     assert sheet["exercise"] == {"start": "2026-01-01", "end": "2026-12-31"}
     assert "Aucun envoi" in sheet["disclaimer"]
+
+
+def _xlsx_text(content: bytes) -> str:
+    with zipfile.ZipFile(io.BytesIO(content)) as bundle:
+        return "\n".join(
+            bundle.read(name).decode("utf-8", "replace")
+            for name in bundle.namelist()
+            if name.endswith(".xml")
+        )
+
+
+VALIDATED: dict[str, Any] = {
+    "vintage": "2025",
+    "version": "validation-1",
+    "status": "validated",
+    "declarable": True,
+    "official_source": {
+        "reference": "CERFA 2031-SD et liasse 2033-SD, millésime 2025",
+        "url": "https://www.impots.gouv.fr/formulaire/2031-sd/impot-sur-le-revenu",
+    },
+    "validated_on": "2026-10-02",
+    "scope": {
+        "activity": "LMNP déclaré",
+        "regime": "réel simplifié BIC",
+        "excluded": ["cession", "TVA", "plus-values", "LMP"],
+    },
+    "rules_version": "research-1",
+}
+
+
+def test_research_calculation_and_exports_hide_the_ready_phrase(client):
+    book(client, "512000", "706000", "1000.00")
+    book(client, "661000", "512000", "80.00")
+    fiscal = client.post("/api/fiscal/years/1", json={"adjustments": []})
+    assert fiscal.status_code == 200, fiscal.text
+    body = fiscal.json()
+    assert body["status"] == "research_only"
+    assert body["output_status"] == "recherche"
+    assert body["output_label"] == "Recherche"
+    assert body["declarable"] is False
+    identify(client)
+    sheet = client.get("/api/filing/years/1/efi").json()
+    assert sheet["output_status"] == "recherche"
+    assert sheet["copy_complete"] is True
+    assert sheet["declarable"] is False
+    assert sheet["exports"]["liasse"]["posture"] == "provisoire"
+    assert sheet["exports"]["fec"]["posture"] == "bloquee"
+    assert "prête à recopier" not in sheet["disclaimer"].casefold()
+    assert "prête à recopier" not in sheet["output_headline"].casefold()
+    pdf = client.get("/api/filing/years/1/efi.pdf")
+    assert b"Recherche" in pdf.content
+    assert b"pr\xeate \xe0 recopier" not in pdf.content.lower()
+    workbook = _xlsx_text(client.get("/api/filing/years/1/export.xlsx").content)
+    assert "Recherche" in workbook
+    assert "prête à recopier" not in workbook.casefold()
+    precheck = client.get("/api/filing/years/1/precheck").json()
+    assert precheck["output_status"] == "recherche"
+    assert precheck["output_label"] == "Recherche"
+    assert "FISCAL_RESEARCH" in {item["code"] for item in precheck["warnings"]}
+    vintages = client.get("/api/fiscal/vintages").json()
+    assert vintages["output_label"] == "Recherche"
+    assert {row["output_status"] for row in vintages["vintages"]} == {"recherche"}
+
+
+def test_validated_record_distinguishes_provisional_and_declarable(client, monkeypatch):
+    holder = {"record": json.loads(json.dumps(VALIDATED))}
+
+    def _load(vintage: str) -> dict[str, Any]:
+        if vintage == "2025":
+            return holder["record"]
+        return {
+            "vintage": vintage,
+            "status": "research_only",
+            "declarable": False,
+            "version": None,
+            "official_source": None,
+            "validated_on": None,
+            "scope": None,
+            "rules_version": None,
+        }
+
+    monkeypatch.setattr("app.domain.fiscal.output_status.load_validation", _load)
+    book(client, "512000", "706000", "1000.00")
+    book(client, "661000", "512000", "80.00")
+    created = client.post("/api/fiscal/years/1", json={"adjustments": []})
+    assert created.status_code == 200, created.text
+    assert created.json()["output_status"] == "declarable"
+    assert created.json()["declarable"] is True
+    blocked = client.get("/api/filing/years/1/efi").json()
+    assert blocked["output_status"] == "provisoire"
+    assert blocked["copy_complete"] is False
+    assert blocked["declarable"] is False
+    assert blocked["exports"]["liasse"]["posture"] == "bloquee"
+    assert "prête à recopier" not in blocked["output_headline"].casefold()
+    blocked_pdf = client.get("/api/filing/years/1/efi.pdf").content.lower()
+    assert b"provisoire" in blocked_pdf
+    assert b"pr\xeate \xe0 recopier" not in blocked_pdf
+    precheck = client.get("/api/filing/years/1/precheck").json()
+    assert precheck["output_status"] == "provisoire"
+    codes = {item["code"] for item in precheck["warnings"]}
+    assert "FISCAL_PROVISOIRE" in codes
+    assert "FISCAL_RESEARCH" not in codes
+
+    identify(client)
+    ready = client.get("/api/filing/years/1/efi").json()
+    assert ready["output_status"] == "declarable"
+    assert ready["output_label"] == "Déclarable"
+    assert ready["declarable"] is True
+    assert ready["copy_complete"] is True
+    assert "Prête à recopier" in ready["output_headline"]
+    assert ready["exports"]["liasse"]["posture"] == "provisoire"
+    assert ready["exports"]["fec"]["posture"] == "bloquee"
+    assert b"Pr\xeate \xe0 recopier" in client.get("/api/filing/years/1/efi.pdf").content
+    ready_book = _xlsx_text(client.get("/api/filing/years/1/export.xlsx").content)
+    assert "Déclarable — Prête à recopier" in ready_book
+
+    holder["record"] = {**VALIDATED, "rules_version": "research-0"}
+    stale = client.get("/api/filing/years/1/efi").json()
+    assert stale["output_status"] == "provisoire"
+    assert stale["copy_complete"] is True
+    assert stale["declarable"] is False
+    assert "prête à recopier" not in stale["output_headline"].casefold()
+    assert client.get("/api/fiscal/years/1").json()["output_status"] == "provisoire"

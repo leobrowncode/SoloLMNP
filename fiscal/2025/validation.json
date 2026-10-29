@@ -1,0 +1,12 @@
+{
+  "vintage": "2025",
+  "version": "validation-0",
+  "status": "research_only",
+  "declarable": false,
+  "official_source": null,
+  "validated_on": null,
+  "scope": null,
+  "rules_version": "research-1",
+  "forms_version": "cases-1",
+  "notes": "Millésime non validé. Pour le passer en Déclarable, remplacer ce fichier dans une revue : status validated, declarable true, version nouvelle, official_source.reference, official_source.url en https, validated_on AAAA-MM-JJ, scope.activity, scope.regime, scope.excluded non vide, et rules_version égal à fiscal/2025/rules.yaml. Tant que ce fichier n’est pas effectif, toute sortie reste Recherche. Voir docs/FISCAL_RULES.md."
+}

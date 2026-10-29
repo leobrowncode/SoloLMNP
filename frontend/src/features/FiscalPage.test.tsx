@@ -152,7 +152,9 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
 
   fireEvent.click(screen.getByRole("button", { name: "Liasse à recopier" }));
   expect(await screen.findByText(/Aucun envoi n’est effectué/)).toBeInTheDocument();
-  expect(screen.getByText("Pas encore prête")).toBeInTheDocument();
+  expect(screen.getAllByText("Recherche").length).toBeGreaterThan(0);
+  expect(screen.queryByText(/Prête à recopier/)).not.toBeInTheDocument();
+  expect(screen.queryByText("Pas encore prête")).not.toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent("Indiquez le SIREN");
   expect(screen.getByText(/case 018/)).toBeInTheDocument();
   expect(screen.getByText("2033-B — compte de résultat et résultat fiscal")).toBeInTheDocument();
@@ -435,7 +437,9 @@ test("reloads the last calculation with its date and ledger fingerprint", async 
   expect(screen.getByText(`Empreinte ${STORED}`)).toBeInTheDocument();
   expect(screen.getByText("Correspond au ledger")).toBeInTheDocument();
   expect(screen.queryByText("Obsolète")).not.toBeInTheDocument();
-  expect(screen.getByText(/Aperçu fiscal/)).toBeInTheDocument();
+  expect(screen.getByText("Recherche")).toBeInTheDocument();
+  expect(screen.getByText(/pas une base de déclaration/)).toBeInTheDocument();
+  expect(screen.queryByText(/Prête à recopier/)).not.toBeInTheDocument();
 });
 
 test("marks an invalidated calculation obsolete even when the fingerprints still match", async () => {

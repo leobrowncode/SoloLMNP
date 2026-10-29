@@ -48,7 +48,7 @@ def control_archive(session: Session, year_id: int) -> dict[str, Any]:
 
 
 def _readme(rendered: dict[str, Any], worksheet: dict[str, Any]) -> str:
-    status = "prête à recopier" if worksheet.get("declarable") else "non prête"
+    status = str(worksheet.get("output_headline") or worksheet.get("output_label") or "Recherche")
     return "\r\n".join(
         [
             "Dossier de contrôle SoloLMNP",

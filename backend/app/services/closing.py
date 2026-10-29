@@ -10,6 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.domain.filing.fec import render_fec
 from app.domain.filing.mappings import compile_package
+from app.domain.fiscal.output_status import (
+    OUTPUT_PROVISOIRE,
+    OUTPUT_RECHERCHE,
+    classify,
+    load_validation,
+)
 from app.models import AccountingEntry, FiscalYear
 from app.models.assets import DepreciationPeriod
 from app.models.base import utc_now
@@ -64,14 +70,9 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
         )
     elif fiscal is not None:
         fiscal_current = True
-        warnings.append(
-            {
-                "code": "FISCAL_RESEARCH",
-                "message": "Le calcul fiscal reste en recherche et n’est pas déclarable.",
-            }
-        )
     fec = render_fec(session, year.id)
-    errors.extend(fec["validation"]["errors"])
+    fec_errors = list(fec["validation"]["errors"])
+    errors.extend(fec_errors)
     # The liasse compiler reads the stored computation. Wait until that
     # computation exists and matches the ledger, so a missing or stale
     # calculation stays a single error instead of being repeated by the mapping.
@@ -81,6 +82,37 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
     if package is not None:
         errors.extend(package["errors"])
         warnings.extend(package["warnings"])
+        output_status = str(package["output_status"])
+        output_label = str(package["output_label"])
+        exports = package["exports"]
+    else:
+        summary = classify(
+            validation=load_validation(year.fiscal_vintage),
+            copy_complete=False,
+            year_closed=year.status == "CLOSED",
+            produced=False,
+            fec_blocked=bool(fec_errors),
+        )
+        output_status = str(summary["output_status"])
+        output_label = str(summary["output_label"])
+        exports = summary["exports"]
+    if fec_errors or year.status != "CLOSED":
+        blocked = {"posture": "bloquee", "label": "Bloquée"}
+        exports = {**exports, "fec": blocked, "archive": blocked}
+    if fiscal_current and output_status == OUTPUT_RECHERCHE:
+        warnings.append(
+            {
+                "code": "FISCAL_RESEARCH",
+                "message": "Statut Recherche : le calcul fiscal n’est pas déclarable.",
+            }
+        )
+    elif fiscal_current and output_status == OUTPUT_PROVISOIRE:
+        warnings.append(
+            {
+                "code": "FISCAL_PROVISOIRE",
+                "message": "Statut Provisoire : la sortie n’est pas déclarable.",
+            }
+        )
     return {
         "fiscal_year_id": year.id,
         "year_status": year.status,
@@ -96,13 +128,13 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
             },
             {
                 "code": "FISCAL_SCOPE",
-                "message": (
-                    "Liasse de l’exercice à recopier sur impots.gouv.fr. "
-                    "LMP, cession, TVA et plus-values restent hors de cette feuille."
-                ),
+                "message": ("LMP, cession, TVA et plus-values restent hors de cette feuille."),
             },
         ],
         "blocking": bool(errors),
+        "output_status": output_status,
+        "output_label": output_label,
+        "exports": exports,
     }
 
 
