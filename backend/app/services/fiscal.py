@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -48,6 +49,24 @@ def ledger_fingerprint(session: Session, year_id: int) -> str:
     return hashlib.sha256(json.dumps(payload).encode()).hexdigest()
 
 
+def _with_current_ledger(session: Session, year_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    """Empreinte courante du ledger, à comparer à `ledger_sha256`.
+
+    Élargir `ledger_fingerprint` (biens, emprunts, composants) suffit pour que
+    l’écran marque Obsolète un calcul déjà stocké. `invalidated_at` le retire
+    de cette lecture au lieu de l’afficher.
+    """
+    payload["current_ledger_sha256"] = ledger_fingerprint(session, year_id)
+    return payload
+
+
+def _iso_utc(value: datetime) -> str:
+    stamp = value.isoformat(timespec="seconds")
+    if value.tzinfo is None:
+        return stamp + "Z"
+    return stamp
+
+
 def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[str, Any]:
     year = get_year(session, year_id)
     vintage = load_vintage(year.fiscal_vintage)
@@ -68,7 +87,7 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
         and current.rules_sha256 == vintage["sha256"]
         and current.invalidated_at is None
     ):
-        return _json(current, replayed=True)
+        return _with_current_ledger(session, year.id, _json(current, replayed=True))
     if year.status != "OPEN":
         fail("YEAR_LOCKED", "Un exercice qui n’est pas ouvert ne peut pas être recalculé.")
     if current is not None:
@@ -178,7 +197,7 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
             "Consommation FIFO des reports antérieurs (horizon 10 ans) activée pour le MVP."
         )
     session.flush()
-    return _json(row, replayed=False)
+    return _with_current_ledger(session, year.id, _json(row, replayed=False))
 
 
 def reintegration_suggestions(session: Session, year_id: int) -> list[dict[str, str]]:
@@ -216,7 +235,7 @@ def latest_fiscal(session: Session, year_id: int) -> dict[str, Any]:
     if current is None:
         fail("FISCAL_NOT_COMPUTED", "Aucun calcul fiscal n’est enregistré pour cet exercice.", 404)
     assert current is not None  # noqa: S101
-    return _json(current, replayed=True)
+    return _with_current_ledger(session, year_id, _json(current, replayed=True))
 
 
 def _current(session: Session, year_id: int) -> FiscalComputation | None:
@@ -517,6 +536,7 @@ def _json(row: FiscalComputation, *, replayed: bool) -> dict[str, Any]:
         "replayed": replayed,
         "vintage": row.vintage,
         "rules_sha256": row.rules_sha256,
+        "computed_at": _iso_utc(row.created_at),
         "ledger_sha256": row.ledger_sha256,
         "accounting_result": money(row.accounting_result),
         "fiscal_result": money(row.fiscal_result),
