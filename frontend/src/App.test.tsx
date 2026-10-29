@@ -28,6 +28,12 @@ describe("Foundation status", () => {
     expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
     expect(screen.getByText(/Aucun envoi n’est effectué/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Comptabilité/ })).toBeInTheDocument();
+    const statements = screen.getByRole("button", { name: /États comptables/ });
+    const fiscal = screen.getByRole("button", { name: /Fiscalité LMNP/ });
+    expect(statements).toHaveTextContent("Bilan, résultat, puis centralisation.");
+    expect(fiscal).toHaveTextContent("Calcul fiscal, pré-contrôle, clôture, puis sorties figées.");
+    expect(statements.compareDocumentPosition(fiscal) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByText("Centralisation, calcul fiscal, pré-contrôle, clôture, puis sorties figées.").length).toBeGreaterThan(0);
     expect(request).toHaveBeenCalledWith("/api/status", expect.objectContaining({ cache: "no-store" }));
   });
 

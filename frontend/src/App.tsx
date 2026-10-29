@@ -10,13 +10,15 @@ import ConservationPage from "./features/ConservationPage";
 type LoadState = { kind: "loading" } | { kind: "error" } | { kind: "loaded"; data: ApplicationStatus };
 type PageId = "overview" | "ledger" | "operations" | "assets" | "statements" | "fiscal" | "conservation";
 
+export const YEAR_END_ORDER = "Centralisation, calcul fiscal, pré-contrôle, clôture, puis sorties figées.";
+
 const navItems: { id: PageId; label: string; step?: string; hint: string }[] = [
   { id: "overview", label: "Vue d’ensemble", hint: "Par où commencer." },
   { id: "ledger", label: "Comptabilité", step: "1", hint: "Activité, exercice, puis écritures validées." },
   { id: "operations", label: "Opérations & banque", step: "2", hint: "Bien, banque, emprunt, loyers et charges." },
   { id: "assets", label: "Immobilisations", step: "3", hint: "Terrain, bâtiment, mobilier, puis dotations." },
-  { id: "statements", label: "États comptables", step: "4", hint: "Bilan, résultat, puis clôture." },
-  { id: "fiscal", label: "Fiscalité LMNP", step: "5", hint: "Résultat fiscal et liasse à recopier." },
+  { id: "statements", label: "États comptables", step: "4", hint: "Bilan, résultat, puis centralisation." },
+  { id: "fiscal", label: "Fiscalité LMNP", step: "5", hint: "Calcul fiscal, pré-contrôle, clôture, puis sorties figées." },
   { id: "conservation", label: "Conservation", step: "6", hint: "Justificatifs et sauvegarde." },
 ];
 
@@ -76,7 +78,7 @@ export default function App() {
         <div className="sidebar-note">
           <span className="small-dot" aria-hidden="true" />
           <strong>Dans l’ordre du menu</strong>
-          <p>Une étape à la fois. SoloLMNP n’envoie rien aux impôts.</p>
+          <p>{YEAR_END_ORDER} SoloLMNP n’envoie rien aux impôts.</p>
         </div>
         <div className="sidebar-version">SoloLMNP · {status ? `v${status.application_version}` : "Développement"}</div>
       </aside>
@@ -93,6 +95,7 @@ export default function App() {
             <section className="intro" aria-labelledby="welcome-title">
               <h1 id="welcome-title">De l’écriture à la liasse que vous recopierez.</h1>
               <p className="intro-description">LMNP au réel, location longue durée. Suivez les six étapes. SoloLMNP prépare la liasse et le FEC. Il n’envoie rien aux impôts.</p>
+              <p>{YEAR_END_ORDER}</p>
             </section>
           )}
 

@@ -18,6 +18,9 @@ test("shows provisional statements and removes stale totals on refresh failure",
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => String(input).endsWith("/setup") ? response(setup) : failed ? response({ detail: { message: "Ledger déséquilibré" } }, 409) : response(report(1)));
   render(<StatementsPage />);
   expect(await screen.findByText("Résultat comptable : -10.01 €")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Centraliser et affecter le résultat" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Clôturer l’exercice" })).not.toBeInTheDocument();
+  expect(screen.getByText(/ouvrez Fiscalité LMNP/)).toBeInTheDocument();
   expect(screen.getByText(/Brouillons exclus : 1/)).toBeInTheDocument();
   failed = true;
   fireEvent.click(screen.getByRole("button", { name: "Actualiser les états" }));

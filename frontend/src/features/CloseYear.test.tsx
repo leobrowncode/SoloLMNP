@@ -17,6 +17,41 @@ test("focuses the precheck error and names each warning", async () => {
   expect(alert).toHaveFocus();
 });
 
+test("links to the fiscal calculation when it is missing", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+    blocking: true,
+    errors: [{ code: "FISCAL_NOT_COMPUTED", message: "Aucun calcul fiscal n’est enregistré pour cet exercice." }],
+    warnings: [],
+  }));
+  render(<CloseYear year={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  const link = await screen.findByRole("link", { name: "Calculer le résultat fiscal" });
+  expect(link).toHaveAttribute("href", "#calcul-fiscal");
+});
+
+test("links to the fiscal calculation when it is stale", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+    blocking: true,
+    errors: [{ code: "FISCAL_STALE", message: "Le calcul fiscal ne correspond plus au ledger." }],
+    warnings: [],
+  }));
+  render(<CloseYear year={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  expect(await screen.findByRole("link", { name: "Calculer le résultat fiscal" })).toHaveAttribute("href", "#calcul-fiscal");
+});
+
+test("does not offer the fiscal calculation link for another error", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+    blocking: true,
+    errors: [{ code: "YEAR_DRAFTS", message: "Des brouillons sont encore ouverts." }],
+    warnings: [],
+  }));
+  render(<CloseYear year={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Des brouillons sont encore ouverts.");
+  expect(screen.queryByRole("link", { name: "Calculer le résultat fiscal" })).not.toBeInTheDocument();
+});
+
 test("exposes warning acknowledgements as named checkboxes", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
     blocking: false,

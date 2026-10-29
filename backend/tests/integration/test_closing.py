@@ -38,6 +38,44 @@ def centralize(client, result):
     assert response.status_code == 200, response.text
 
 
+def test_precheck_requires_fiscal_after_centralization_before_close(client):
+    identity = client.post("/api/ledger/activity/identity", json={"siren": "123456789"})
+    assert identity.status_code == 200, identity.text
+    book(client, "512000", "706000", "100.00")
+    book(client, "615000", "401000", "40.00")
+
+    def codes(payload, key="errors"):
+        return [item["code"] for item in payload[key]]
+
+    before = client.get("/api/filing/years/1/precheck")
+    assert before.status_code == 200, before.text
+    before_body = before.json()
+    assert before_body["blocking"] is True
+    assert "CENTRALIZATION_REQUIRED" in codes(before_body)
+    assert "FISCAL_NOT_COMPUTED" in codes(before_body)
+
+    centralize(client, "60.00")
+    after_central = client.get("/api/filing/years/1/precheck").json()
+    assert after_central["blocking"] is True
+    assert "CENTRALIZATION_REQUIRED" not in codes(after_central)
+    assert "FISCAL_NOT_COMPUTED" in codes(after_central)
+
+    fiscal = client.post("/api/fiscal/years/1", json={"adjustments": []})
+    assert fiscal.status_code == 200, fiscal.text
+    ready_body = client.get("/api/filing/years/1/precheck").json()
+    assert ready_body["blocking"] is False, ready_body
+    assert "FISCAL_NOT_COMPUTED" not in codes(ready_body)
+    assert "FISCAL_STALE" not in codes(ready_body)
+    ready = client.post(
+        "/api/filing/years/1/ready",
+        json={"acknowledged": codes(ready_body, "warnings")},
+    )
+    assert ready.status_code == 200, ready.text
+    closed = client.post("/api/filing/years/1/close", json={"confirmation": "CLOTURER"})
+    assert closed.status_code == 200, closed.text
+    assert closed.json()["status"] == "CLOSED"
+
+
 def test_close_reopen_fec_efi_and_documents(client, settings):
     identity = client.post("/api/ledger/activity/identity", json={"siren": "123456789"})
     assert identity.status_code == 200, identity.text

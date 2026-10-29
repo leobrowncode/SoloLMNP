@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { request } from "../api/ledger";
+import CloseYear from "./CloseYear";
 import LiasseSheet, { type Worksheet } from "./LiasseSheet";
 import "./ledger.css";
 
@@ -403,13 +404,9 @@ export default function FiscalPage() {
             ))}
           </select>
         </label>
-        <button type="button" disabled={!year || busy} onClick={() => { void compute(); }}>
+        <button id="calcul-fiscal" type="button" disabled={!year || busy} onClick={() => { void compute(); }}>
           {busy ? "Calcul…" : "Calculer le résultat fiscal"}
         </button>
-        <button type="button" disabled={!year || busy} onClick={() => { void loadWorksheet(); }}>
-          Liasse à recopier
-        </button>
-        <a href={year ? `/api/filing/years/${year}/fec` : undefined}>FEC (après clôture)</a>
         <a href={year ? `/api/filing/years/${year}/export.xlsx` : undefined}>Export tableur (.xlsx, Google Sheets)</a>
       </div>
 
@@ -719,6 +716,17 @@ export default function FiscalPage() {
         </div>
       )}
 
+      {year !== 0 && <CloseYear key={year} year={year} />}
+      <section aria-labelledby="frozen-outputs-title">
+        <h3 id="frozen-outputs-title">Sorties figées</h3>
+        <p>La liasse et le FEC se génèrent après le pré-contrôle et la clôture. Avant clôture, la liasse reste un calcul en cours.</p>
+        <div className="toolbar fiscal-toolbar">
+          <button type="button" disabled={!year || busy} onClick={() => { void loadWorksheet(); }}>
+            Liasse à recopier
+          </button>
+          <a href={year ? `/api/filing/years/${year}/fec` : undefined}>FEC (après clôture)</a>
+        </div>
+      </section>
       {worksheet && <LiasseSheet worksheet={worksheet} yearId={year} />}
 
       <details className="fiscal-panel">
