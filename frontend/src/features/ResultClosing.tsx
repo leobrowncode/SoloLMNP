@@ -107,7 +107,7 @@ export default function ResultClosing({ year }: { year: number }) {
   const resultAccounts = accounts.filter((account) => account.active && preview?.result_account_prefix && account.number.startsWith(preview.result_account_prefix) && !account.number.startsWith("1209"));
   return <section aria-labelledby="result-title">
     <h3 id="result-title">Centraliser et affecter le résultat</h3>
-    <p>Le serveur recalcule les montants. Confirmez le compte et la justification avant validation. Cette étape ne clôture pas l’exercice.</p>
+    <p>Le serveur recalcule les montants. Confirmez le compte et la justification avant validation. Cette étape ne clôture pas l’exercice. Ensuite, dans Fiscalité LMNP : calcul fiscal, pré-contrôle, puis clôture.</p>
     <button type="button" onClick={() => { void load(); }}>Préparer la centralisation</button>
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
     {receipt && <p role="status">{receipt}</p>}

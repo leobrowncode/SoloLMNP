@@ -17,6 +17,23 @@ test("focuses the precheck error and names each warning", async () => {
   expect(alert).toHaveFocus();
 });
 
+test("links a missing or stale fiscal computation to the calculation", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+    blocking: true,
+    errors: [
+      { code: "FISCAL_NOT_COMPUTED", message: "Aucun calcul fiscal n’est enregistré pour cet exercice." },
+      { code: "FISCAL_STALE", message: "Le calcul fiscal ne correspond plus au ledger." },
+    ],
+    warnings: [],
+  }));
+  render(<CloseYear year={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  const links = await screen.findAllByRole("link", { name: "Calculer le résultat fiscal" });
+  expect(links).toHaveLength(2);
+  for (const link of links) expect(link).toHaveAttribute("href", "#calcul-fiscal");
+  expect(screen.getByRole("button", { name: "Accuser et préparer la clôture" })).toBeDisabled();
+});
+
 test("exposes warning acknowledgements as named checkboxes", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
     blocking: false,

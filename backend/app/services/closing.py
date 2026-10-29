@@ -57,11 +57,13 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
             }
         )
     fiscal = _capture(lambda: latest_fiscal(session, year.id), errors, "FISCAL_NOT_COMPUTED")
+    fiscal_current = False
     if fiscal is not None and fiscal["ledger_sha256"] != ledger_fingerprint(session, year.id):
         errors.append(
             {"code": "FISCAL_STALE", "message": "Le calcul fiscal ne correspond plus au ledger."}
         )
     elif fiscal is not None:
+        fiscal_current = True
         warnings.append(
             {
                 "code": "FISCAL_RESEARCH",
@@ -70,7 +72,12 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
         )
     fec = render_fec(session, year.id)
     errors.extend(fec["validation"]["errors"])
-    package = _capture(lambda: compile_package(session, year.id), errors, "MAPPING")
+    # The liasse compiler reads the stored computation. Wait until that
+    # computation exists and matches the ledger, so a missing or stale
+    # calculation stays a single error instead of being repeated by the mapping.
+    package = None
+    if fiscal_current:
+        package = _capture(lambda: compile_package(session, year.id), errors, "MAPPING")
     if package is not None:
         errors.extend(package["errors"])
         warnings.extend(package["warnings"])
