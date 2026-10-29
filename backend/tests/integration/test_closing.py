@@ -43,6 +43,82 @@ def _error_codes(response):
     return [item["code"] for item in response.json()["errors"]]
 
 
+def _year_status(client, year_id: int = 1) -> str:
+    payload = client.get("/api/ledger/setup")
+    assert payload.status_code == 200, payload.text
+    return next(item["status"] for item in payload.json()["years"] if item["id"] == year_id)
+
+
+def test_successive_prechecks_require_exact_acknowledgements(client):
+    identity = client.post("/api/ledger/activity/identity", json={"siren": "123456789"})
+    assert identity.status_code == 200, identity.text
+    book(client, "512000", "706000", "100.00")
+    book(client, "615000", "401000", "40.00")
+    centralize(client, "60.00")
+
+    first = client.get("/api/filing/years/1/precheck")
+    assert first.status_code == 200, first.text
+    first_codes = [item["code"] for item in first.json()["warnings"]]
+    assert first.json()["blocking"] is True
+    refused = client.post("/api/filing/years/1/ready", json={"acknowledged": first_codes})
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "CLOSE_BLOCKED"
+    assert _year_status(client) == "OPEN"
+
+    fiscal = client.post("/api/fiscal/years/1", json={"adjustments": []})
+    assert fiscal.status_code == 200, fiscal.text
+    second = client.get("/api/filing/years/1/precheck")
+    assert second.status_code == 200, second.text
+    assert second.json()["blocking"] is False, second.text
+    second_codes = [item["code"] for item in second.json()["warnings"]]
+    assert second_codes
+    assert set(second_codes) != set(first_codes)
+    info_code = second.json()["infos"][0]["code"]
+
+    stale = client.post("/api/filing/years/1/ready", json={"acknowledged": first_codes})
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "WARNINGS_UNACKNOWLEDGED"
+    extra = client.post(
+        "/api/filing/years/1/ready",
+        json={"acknowledged": [*second_codes, "ANCIEN_ACCUSE"]},
+    )
+    assert extra.status_code == 409
+    assert extra.json()["detail"]["code"] == "WARNINGS_UNACKNOWLEDGED"
+    with_info = client.post(
+        "/api/filing/years/1/ready",
+        json={"acknowledged": [*second_codes, info_code]},
+    )
+    assert with_info.status_code == 409
+    assert with_info.json()["detail"]["code"] == "WARNINGS_UNACKNOWLEDGED"
+    partial = client.post("/api/filing/years/1/ready", json={"acknowledged": second_codes[:-1]})
+    assert partial.status_code == 409
+    assert partial.json()["detail"]["code"] == "WARNINGS_UNACKNOWLEDGED"
+    assert _year_status(client) == "OPEN"
+
+    ready = client.post("/api/filing/years/1/ready", json={"acknowledged": second_codes})
+    assert ready.status_code == 200, ready.text
+    assert ready.json()["year_status"] == "READY_TO_CLOSE"
+    assert _year_status(client) == "READY_TO_CLOSE"
+
+    bad_close = client.post("/api/filing/years/1/close", json={"confirmation": "FERMER"})
+    assert bad_close.status_code == 422
+    assert _year_status(client) == "READY_TO_CLOSE"
+    assert client.get("/api/filing/years/1/fec").status_code == 409
+
+    closed = client.post("/api/filing/years/1/close", json={"confirmation": "CLOTURER"})
+    assert closed.status_code == 200, closed.text
+    assert closed.json()["status"] == "CLOSED"
+    assert _year_status(client) == "CLOSED"
+    fec = client.get("/api/filing/years/1/fec")
+    assert fec.status_code == 200, fec.text
+    efi = client.get("/api/filing/years/1/efi")
+    assert efi.status_code == 200, efi.text
+    assert efi.json()["frozen"] is True
+    again = client.get("/api/filing/years/1/precheck")
+    assert again.status_code == 200, again.text
+    assert again.json()["year_status"] == "CLOSED"
+
+
 def test_fiscal_computation_precedes_precheck_and_close(client):
     identity = client.post("/api/ledger/activity/identity", json={"siren": "123456789"})
     assert identity.status_code == 200, identity.text
