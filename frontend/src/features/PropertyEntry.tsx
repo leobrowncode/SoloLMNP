@@ -116,7 +116,7 @@ export default function PropertyEntry({
         Faire entrer le bien en comptabilité
       </button>
       <p className="form-help">
-        À faire une fois, après avoir préparé l’amortissement : inscrit au bilan le terrain, le bâtiment,
+        À faire une fois, après avoir créé les immobilisations du logement : inscrit au bilan le terrain, le bâtiment,
         les emprunts et les frais payés avant le début de l’exercice. L’écart va au compte de l’exploitant (108).
       </p>
       {error && <p role="alert" className="ledger-error">{error}</p>}

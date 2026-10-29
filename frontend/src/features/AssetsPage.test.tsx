@@ -81,3 +81,102 @@ test("shows an error from the current calculation", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "Calculer les périodes" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Calcul refusé");
 });
+
+const dwellingPlan = {
+  property_id: 1,
+  depreciable_base: "80000.00",
+  acquisition_costs_included: "0.00",
+  labels: ["Terrain — Bien fictif", "Construction — Bien fictif", "Gros œuvre"],
+  preview_token: "ab".repeat(32),
+  created: false,
+  items: [
+    { kind: "LAND", label: "Terrain — Bien fictif", amount: "20000.00", asset_account: "211000", depreciation_account: null, useful_life_months: null, service_start_date: "2025-01-01" },
+    { kind: "BUILDING", label: "Construction — Bien fictif", amount: "80000.00", asset_account: "213000", depreciation_account: "281300", useful_life_months: 480, service_start_date: "2025-01-01" },
+    { kind: "COMPONENT", label: "Gros œuvre", amount: "32000.00", asset_account: "213000", depreciation_account: "281300", useful_life_months: 480, service_start_date: "2025-01-01" },
+  ],
+};
+
+test("previews a dwelling plan, cancels it, then confirms without duplicating", async () => {
+  const calls: { method: string; url: string; body?: unknown }[] = [];
+  const stored = [{
+    id: 1, property_id: 1, category: "LAND", label: "Terrain — Bien fictif",
+    acquisition_value: "20000.00", depreciable_value: "0.00", non_depreciable_value: "20000.00",
+    residual_value: "0.00", useful_life_months: null, method: "NONE", asset_account: "211000",
+    depreciation_account: null, components: [],
+  }];
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    const body = init?.body ? JSON.parse(String(init.body)) as unknown : undefined;
+    calls.push({ method, url, body });
+    if (url === "/api/ledger/setup") return response({ activity: { id: 1 }, years: [{ id: 1, year: 2025, status: "OPEN" }] });
+    if (url === "/api/ledger/accounts") return response([]);
+    if (url === "/api/operations/properties") return response([{ id: 1, name: "Bien fictif" }]);
+    if (url === "/api/assets/years/1/periods") return response([]);
+    if (url === "/api/assets/properties/1/plan" && method === "GET") return response(dwellingPlan);
+    if (url === "/api/assets/properties/1/plan" && method === "POST") {
+      const posts = calls.filter((call) => call.url.endsWith("/plan") && call.method === "POST").length;
+      return response({ ...dwellingPlan, created: posts === 1 }, posts === 1 ? 201 : 200);
+    }
+    if (url === "/api/assets") {
+      const posts = calls.filter((call) => call.url.endsWith("/plan") && call.method === "POST").length;
+      return response(posts > 0 ? stored : []);
+    }
+    throw new Error(`Unexpected ${method} ${url}`);
+  });
+  render(<AssetsPage />);
+  const preview = await screen.findByRole("button", { name: "Prévisualiser l’amortissement du logement" });
+  expect(screen.queryByRole("button", { name: "Créer les immobilisations affichées" })).not.toBeInTheDocument();
+  fireEvent.click(preview);
+  expect(await screen.findByText("Non amortissable")).toBeInTheDocument();
+  expect(screen.getByText("Terrain — Bien fictif")).toBeInTheDocument();
+  expect(screen.getByText("Construction — Bien fictif")).toBeInTheDocument();
+  expect(screen.getByText("Gros œuvre")).toBeInTheDocument();
+  expect(screen.getByText("20000.00 €")).toBeInTheDocument();
+  expect(screen.getByText("211000")).toBeInTheDocument();
+  expect(screen.getAllByText("281300")).toHaveLength(2);
+  expect(screen.getAllByText("213000")).toHaveLength(2);
+  expect(screen.getAllByText("480 mois")).toHaveLength(2);
+  expect(screen.getAllByText("2025-01-01").length).toBeGreaterThanOrEqual(3);
+  fireEvent.click(screen.getByRole("button", { name: "Annuler l’aperçu" }));
+  expect(screen.queryByText("Gros œuvre")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Créer les immobilisations affichées" })).not.toBeInTheDocument();
+  expect(calls.some((call) => call.method === "POST")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Prévisualiser l’amortissement du logement" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Créer les immobilisations affichées" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("Immobilisations créées : Terrain — Bien fictif, Construction — Bien fictif, Gros œuvre.");
+  expect(await screen.findByText("Terrain protégé : aucun plan d’amortissement")).toBeInTheDocument();
+  expect(screen.getAllByText("Terrain — Bien fictif")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Prévisualiser l’amortissement du logement" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Créer les immobilisations affichées" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("Ces immobilisations existent déjà. Aucun doublon n’a été créé.");
+  expect(screen.getAllByText("Terrain — Bien fictif")).toHaveLength(1);
+  const posts = calls.filter((call) => call.url === "/api/assets/properties/1/plan" && call.method === "POST");
+  expect(posts).toHaveLength(2);
+  expect(posts.every((call) => JSON.stringify(call.body) === JSON.stringify({ confirm: true, preview_token: dwellingPlan.preview_token }))).toBe(true);
+  expect(calls.filter((call) => call.url.endsWith("/plan") && call.method === "GET")).toHaveLength(3);
+  expect(calls.filter((call) => call.method === "POST").every((call) => call.url.endsWith("/plan"))).toBe(true);
+});
+
+test("drops a dwelling preview started for another property", async () => {
+  const first = deferred();
+  const calls: string[] = [];
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    calls.push(`${method} ${url}`);
+    if (url === "/api/ledger/setup") return response({ activity: { id: 1 }, years: [{ id: 1, year: 2025, status: "OPEN" }] });
+    if (url === "/api/ledger/accounts") return response([]);
+    if (url === "/api/operations/properties") return response([{ id: 1, name: "Bien fictif" }, { id: 2, name: "Autre bien" }]);
+    if (url === "/api/assets" || url.endsWith("/periods")) return response([]);
+    if (url === "/api/assets/properties/1/plan") return first.promise;
+    throw new Error(`Unexpected ${method} ${url}`);
+  });
+  render(<AssetsPage />);
+  fireEvent.click(await screen.findByRole("button", { name: "Prévisualiser l’amortissement du logement" }));
+  fireEvent.change(screen.getByLabelText("Logement"), { target: { value: "2" } });
+  await act(async () => { first.resolve(response(dwellingPlan)); });
+  expect(screen.queryByText("Gros œuvre")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Créer les immobilisations affichées" })).not.toBeInTheDocument();
+  expect(calls.some((call) => call.startsWith("POST"))).toBe(false);
+});

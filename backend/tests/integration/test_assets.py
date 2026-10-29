@@ -3,10 +3,19 @@ from decimal import ROUND_HALF_UP, Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
+from app.core.database import Database
 from app.main import create_app
+from app.models import (
+    Account,
+    AccountingEntry,
+    Asset,
+    AssetComponent,
+    DepreciationPeriod,
+    DepreciationSchedule,
+)
 
 
 @pytest.fixture
@@ -233,6 +242,203 @@ def test_closed_year_and_invalid_accounts_are_rejected(client, database):
             text("UPDATE fiscal_year SET status='CLOSED', closed_at=CURRENT_TIMESTAMP WHERE id=1")
         )
     assert client.post("/api/assets/years/1/calculate").status_code == 409
+
+
+def register_snapshot(database: Database) -> dict[str, list[tuple[object, ...]]]:
+    """Rows a dwelling preview or confirmation must not touch, plus the asset register."""
+    with database.engine.connect() as connection:
+        accounts = connection.execute(
+            select(Account.number, Account.label, Account.account_type, Account.active).order_by(
+                Account.number
+            )
+        ).all()
+        assets = connection.execute(
+            select(
+                Asset.id,
+                Asset.category,
+                Asset.label,
+                Asset.acquisition_value,
+                Asset.asset_account,
+                Asset.depreciation_account,
+                Asset.useful_life_months,
+                Asset.service_start_date,
+            ).order_by(Asset.id)
+        ).all()
+        components = connection.execute(
+            select(
+                AssetComponent.id,
+                AssetComponent.asset_id,
+                AssetComponent.category,
+                AssetComponent.label,
+                AssetComponent.value,
+                AssetComponent.asset_account,
+                AssetComponent.depreciation_account,
+                AssetComponent.useful_life_months,
+                AssetComponent.service_start_date,
+            ).order_by(AssetComponent.id)
+        ).all()
+        schedules = connection.execute(
+            select(DepreciationSchedule.id).order_by(DepreciationSchedule.id)
+        ).all()
+        periods = connection.execute(
+            select(DepreciationPeriod.id).order_by(DepreciationPeriod.id)
+        ).all()
+        entries = connection.execute(select(AccountingEntry.id).order_by(AccountingEntry.id)).all()
+    return {
+        "accounts": [tuple(row) for row in accounts],
+        "assets": [tuple(row) for row in assets],
+        "components": [tuple(row) for row in components],
+        "schedules": [tuple(row) for row in schedules],
+        "periods": [tuple(row) for row in periods],
+        "entries": [tuple(row) for row in entries],
+    }
+
+
+def test_dwelling_plan_preview_writes_nothing_until_explicit_confirmation(client, database):
+    before = register_snapshot(database)
+    assert before["assets"] == []
+    preview = client.get("/api/assets/properties/1/plan")
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["created"] is False
+    assert body["depreciable_base"] == "80000.00"
+    assert body["land"] == "20000.00"
+    assert body["acquisition_costs_included"] == "0.00"
+    assert len(body["preview_token"]) == 64
+    land, building, *parts = body["items"]
+    assert land == {
+        "kind": "LAND",
+        "label": "Terrain — Bien fictif",
+        "amount": "20000.00",
+        "asset_account": "211000",
+        "depreciation_account": None,
+        "useful_life_months": None,
+        "service_start_date": "2025-01-01",
+    }
+    assert building == {
+        "kind": "BUILDING",
+        "label": "Construction — Bien fictif",
+        "amount": "80000.00",
+        "asset_account": "213000",
+        "depreciation_account": "281300",
+        "useful_life_months": 480,
+        "service_start_date": "2025-01-01",
+    }
+    assert [
+        (
+            part["label"],
+            part["amount"],
+            part["asset_account"],
+            part["depreciation_account"],
+            part["useful_life_months"],
+        )
+        for part in parts
+    ] == [
+        ("Gros œuvre", "32000.00", "213000", "281300", 480),
+        ("Toiture et étanchéité", "8000.00", "213500", "281350", 300),
+        ("Façade et menuiseries", "8000.00", "213500", "281350", 240),
+        ("Installations électriques", "8000.00", "213500", "281350", 240),
+        ("Plomberie et sanitaires", "8000.00", "213500", "281350", 240),
+        ("Agencements intérieurs", "16000.00", "213500", "281350", 180),
+    ]
+    assert sum(Decimal(part["amount"]) for part in parts) == Decimal("80000.00")
+    assert all(part["service_start_date"] == "2025-01-01" for part in parts)
+    # A second preview, a missing confirmation and a forged token leave the register untouched.
+    assert (
+        client.get("/api/assets/properties/1/plan").json()["preview_token"] == body["preview_token"]
+    )
+    assert client.post("/api/assets/properties/1/plan").status_code == 422
+    assert client.post("/api/assets/properties/1/plan", json={"confirm": False}).status_code == 422
+    assert (
+        client.post(
+            "/api/assets/properties/1/plan",
+            json={"confirm": True, "preview_token": "ab" * 32},
+        ).status_code
+        == 409
+    )
+    assert register_snapshot(database) == before
+    created = client.post(
+        "/api/assets/properties/1/plan",
+        json={"confirm": True, "preview_token": body["preview_token"]},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["created"] is True
+    assert created.json()["items"] == body["items"]
+    assets = client.get("/api/assets").json()
+    assert [row["label"] for row in assets] == [
+        "Terrain — Bien fictif",
+        "Construction — Bien fictif",
+    ]
+    assert assets[0]["depreciation_account"] is None
+    assert assets[0]["useful_life_months"] is None
+    assert [part["label"] for part in assets[1]["components"]] == [part["label"] for part in parts]
+    identifiers = [(row["id"], [part["id"] for part in row["components"]]) for row in assets]
+    persisted = register_snapshot(database)
+    assert persisted["accounts"] == before["accounts"]
+    assert persisted["schedules"] == before["schedules"]
+    assert persisted["periods"] == before["periods"]
+    assert persisted["entries"] == before["entries"]
+    assert len(persisted["assets"]) == 2
+    assert len(persisted["components"]) == 6
+    again = client.post(
+        "/api/assets/properties/1/plan",
+        json={"confirm": True, "preview_token": body["preview_token"]},
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["created"] is False
+    assert again.json()["items"] == body["items"]
+    repeated = client.get("/api/assets").json()
+    assert [
+        (row["id"], [part["id"] for part in row["components"]]) for row in repeated
+    ] == identifiers
+    assert register_snapshot(database) == persisted
+
+
+def test_dwelling_plan_confirmation_refuses_a_different_register(client, database):
+    before = register_snapshot(database)
+    assert client.post("/api/assets", json=furniture()).status_code == 201
+    preview = client.get("/api/assets/properties/1/plan")
+    assert preview.status_code == 200, preview.text
+    with_furniture = register_snapshot(database)
+    assert [row[2] for row in with_furniture["assets"]] == ["Mobilier fictif"]
+    assert with_furniture["accounts"] == before["accounts"]
+    refused = client.post(
+        "/api/assets/properties/1/plan",
+        json={"confirm": True, "preview_token": preview.json()["preview_token"]},
+    )
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "PLAN_EXISTS"
+    assert register_snapshot(database) == with_furniture
+
+
+def test_dwelling_plan_preview_stays_empty_when_refused(client, database):
+    before = register_snapshot(database)
+    assert client.get("/api/assets/properties/99/plan").status_code == 404
+    assert (
+        client.post(
+            "/api/assets/properties/99/plan",
+            json={"confirm": True, "preview_token": "ab" * 32},
+        ).status_code
+        == 404
+    )
+    with database.sessions.begin() as session:
+        session.execute(text("UPDATE property SET building_value = 0 WHERE id = 1"))
+    refused = client.get("/api/assets/properties/1/plan")
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "BUILDING_REQUIRED"
+    with database.sessions.begin() as session:
+        session.execute(text("UPDATE property SET building_value = 9000000 WHERE id = 1"))
+    stale_source = client.get("/api/assets/properties/1/plan")
+    assert stale_source.status_code == 200, stale_source.text
+    with database.sessions.begin() as session:
+        session.execute(text("UPDATE property SET building_value = 8000000 WHERE id = 1"))
+    stale = client.post(
+        "/api/assets/properties/1/plan",
+        json={"confirm": True, "preview_token": stale_source.json()["preview_token"]},
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "PLAN_PREVIEW_STALE"
+    assert register_snapshot(database) == before
 
 
 def test_raw_sql_cannot_fabricate_posted_period(client, database):
