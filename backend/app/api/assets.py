@@ -7,7 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.asset_schemas import (
+    AssetCorrectionInput,
     AssetInput,
+    ComponentCorrectionInput,
     ComponentInput,
     DepreciationPostInput,
     DwellingPlanConfirm,
@@ -17,6 +19,7 @@ from app.api.sessions import dependencies
 from app.core.database import Database
 from app.models import Asset, AssetComponent, DepreciationPeriod, DepreciationSchedule
 from app.services import assets as service
+from app.services import structuring
 from app.services.ledger import entry_json, fail
 
 
@@ -28,27 +31,10 @@ def build_assets_router(database: Database) -> APIRouter:
 
     @router.get("")
     def assets(session: Read) -> list[dict[str, Any]]:
-        rows = []
-        for asset in session.scalars(select(Asset).order_by(Asset.id)):
-            components = session.scalars(
-                select(AssetComponent)
-                .where(AssetComponent.asset_id == asset.id)
-                .order_by(AssetComponent.id)
-            )
-            rows.append(
-                {
-                    **service.row_json(asset),
-                    "account_warning": service.asset_account_warning(asset),
-                    "components": [
-                        {
-                            **service.row_json(row),
-                            "account_warning": service.component_account_warning(row),
-                        }
-                        for row in components
-                    ],
-                }
-            )
-        return rows
+        return [
+            structuring.present_asset(session, asset)
+            for asset in session.scalars(select(Asset).order_by(Asset.id))
+        ]
 
     @router.get("/properties/{property_id}/plan")
     def preview_dwelling_plan(property_id: int, session: Read) -> dict[str, Any]:
@@ -83,6 +69,16 @@ def build_assets_router(database: Database) -> APIRouter:
     @router.post("/{asset_id}/components", status_code=201)
     def component(asset_id: int, data: ComponentInput, session: Write) -> dict[str, Any]:
         return service.row_json(service.create_component(session, asset_id, data))
+
+    @router.patch("/{asset_id}")
+    def correct_asset(asset_id: int, data: AssetCorrectionInput, session: Write) -> dict[str, Any]:
+        return structuring.correct_asset(session, asset_id, data)
+
+    @router.patch("/{asset_id}/components/{component_id}")
+    def correct_component(
+        asset_id: int, component_id: int, data: ComponentCorrectionInput, session: Write
+    ) -> dict[str, Any]:
+        return structuring.correct_component(session, asset_id, component_id, data)
 
     @router.post("/years/{year_id}/calculate")
     def calculate(year_id: int, session: Write) -> list[dict[str, Any]]:

@@ -9,7 +9,7 @@ from sqlalchemy.pool import ConnectionPoolEntry
 
 from app.core.config import Settings
 
-SCHEMA_REVISION = "0008_dwelling"
+SCHEMA_REVISION = "0009_structuring"
 
 
 def create_database_engine(settings: Settings) -> Engine:

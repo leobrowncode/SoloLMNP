@@ -10,19 +10,23 @@ from sqlalchemy.orm import Session
 
 from app.api.ledger_schemas import ReversalInput
 from app.api.operation_schemas import (
+    BankCorrectionInput,
     BankInput,
     CSVInput,
     FundingInput,
+    LoanCorrectionInput,
     LoanInput,
     LoanPaymentInput,
     LoanPaymentsCSVInput,
     MatchInput,
     OperationInput,
     OperationsCSVInput,
+    PropertyCorrectionInput,
     PropertyInput,
     ReasonInput,
     RentScheduleInput,
     SettlementInput,
+    TenantCorrectionInput,
     TenantInput,
 )
 from app.api.sessions import dependencies
@@ -38,6 +42,7 @@ from app.models.operations import (
     Tenant,
 )
 from app.services import operations as service
+from app.services import structuring
 from app.services.ledger import entry_json, event, fail, money
 
 
@@ -60,7 +65,10 @@ def build_operations_router(database: Database) -> APIRouter:
 
     @router.get("/properties")
     def properties(session: Read) -> list[dict[str, Any]]:
-        return [record(row) for row in session.scalars(select(Property).order_by(Property.id))]
+        return [
+            structuring.present_property(session, row)
+            for row in session.scalars(select(Property).order_by(Property.id))
+        ]
 
     @router.post("/properties", status_code=201)
     def property_create(data: PropertyInput, session: Write) -> dict[str, Any]:
@@ -71,10 +79,16 @@ def build_operations_router(database: Database) -> APIRouter:
         event(session, "PROPERTY_CREATED", None, data.model_dump(mode="json"))
         return record(row)
 
+    @router.patch("/properties/{property_id}")
+    def property_correct(
+        property_id: int, data: PropertyCorrectionInput, session: Write
+    ) -> dict[str, Any]:
+        return structuring.correct_property(session, property_id, data)
+
     @router.get("/properties/{property_id}/tenants")
     def tenants(property_id: int, session: Read) -> list[dict[str, Any]]:
         return [
-            record(row)
+            structuring.present_tenant(session, row)
             for row in session.scalars(
                 select(Tenant).where(Tenant.property_id == property_id).order_by(Tenant.id)
             )
@@ -84,6 +98,12 @@ def build_operations_router(database: Database) -> APIRouter:
     def tenant_create(property_id: int, data: TenantInput, session: Write) -> dict[str, Any]:
         return record(service.add_tenant(session, property_id, data))
 
+    @router.patch("/properties/{property_id}/tenants/{tenant_id}")
+    def tenant_correct(
+        property_id: int, tenant_id: int, data: TenantCorrectionInput, session: Write
+    ) -> dict[str, Any]:
+        return structuring.correct_tenant(session, property_id, tenant_id, data)
+
     @router.post("/properties/{property_id}/rents", status_code=201)
     def rents(property_id: int, data: RentScheduleInput, session: Write) -> dict[str, int]:
         return service.schedule_rents(session, property_id, data)
@@ -91,7 +111,8 @@ def build_operations_router(database: Database) -> APIRouter:
     @router.get("/banks")
     def banks(session: Read) -> list[dict[str, Any]]:
         return [
-            record(row) for row in session.scalars(select(BankAccount).order_by(BankAccount.id))
+            structuring.present_bank(session, row)
+            for row in session.scalars(select(BankAccount).order_by(BankAccount.id))
         ]
 
     @router.post("/banks", status_code=201)
@@ -101,6 +122,10 @@ def build_operations_router(database: Database) -> APIRouter:
         session.add(row)
         event(session, "BANK_CREATED", None, data.model_dump())
         return record(row)
+
+    @router.patch("/banks/{bank_id}")
+    def bank_correct(bank_id: int, data: BankCorrectionInput, session: Write) -> dict[str, Any]:
+        return structuring.correct_bank(session, bank_id, data)
 
     @router.get("")
     def operations(
@@ -134,7 +159,7 @@ def build_operations_router(database: Database) -> APIRouter:
     @router.get("/loans")
     def loans(session: Read) -> list[dict[str, Any]]:
         return [
-            {**record(row), "remaining_principal": money(service.principal_balance(session, row))}
+            structuring.present_loan(session, row)
             for row in session.scalars(select(Loan).order_by(Loan.id))
         ]
 
@@ -159,6 +184,10 @@ def build_operations_router(database: Database) -> APIRouter:
             {**data.model_dump(mode="json"), "principal_account": principal_account},
         )
         return {**record(row), "remaining_principal": money(balance)}
+
+    @router.patch("/loans/{loan_id}")
+    def loan_correct(loan_id: int, data: LoanCorrectionInput, session: Write) -> dict[str, Any]:
+        return structuring.correct_loan(session, loan_id, data)
 
     @router.post("/loans/{loan_id}/fund", status_code=201)
     def fund(loan_id: int, data: FundingInput, session: Write) -> dict[str, Any]:

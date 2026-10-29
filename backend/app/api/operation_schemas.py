@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from app.api.ledger_schemas import AccountNumber, Input, Label, MoneyInput
+from app.api.ledger_schemas import AccountNumber, Input, Label, MoneyInput, OptionalMoney
 from app.core.money import to_cents
 
 PositiveMoney = Annotated[MoneyInput, Field(gt=0)]
@@ -162,3 +162,47 @@ class MatchInput(Input):
 
 class ReasonInput(Input):
     reason: Annotated[str, Field(min_length=5, max_length=300)]
+
+
+CorrectionReason = Annotated[str, Field(min_length=5, max_length=2000)]
+OptionalPositiveMoney = Annotated[OptionalMoney, Field(gt=0)]
+OptionalPercentage = Annotated[OptionalMoney, Field(le=100)]
+
+
+class PropertyCorrectionInput(Input):
+    reason: CorrectionReason
+    name: Label | None = None
+    address: Annotated[str, Field(min_length=1, max_length=1000)] | None = None
+    acquisition_date: Date | None = None
+    rental_start_date: Date | None = None
+    acquisition_price: OptionalMoney = None
+    acquisition_costs: OptionalMoney = None
+    land_value: OptionalMoney = None
+    building_value: OptionalMoney = None
+    notes: Annotated[str, Field(max_length=2000)] | None = None
+
+
+class TenantCorrectionInput(Input):
+    reason: CorrectionReason
+    name: Label | None = None
+    monthly_rent: OptionalPositiveMoney = None
+    entry_date: Date | None = None
+    exit_date: Date | None = None
+
+
+class BankCorrectionInput(Input):
+    reason: CorrectionReason
+    name: Label | None = None
+    account_number: AccountNumber | None = None
+
+
+class LoanCorrectionInput(Input):
+    reason: CorrectionReason
+    lender: Label | None = None
+    start_date: Date | None = None
+    initial_principal: OptionalPositiveMoney = None
+    interest_rate: OptionalPercentage = None
+    duration_months: int | None = Field(default=None, ge=1, le=1200)
+    monthly_payment: OptionalMoney = None
+    monthly_insurance: OptionalMoney = None
+    notes: Annotated[str, Field(max_length=2000)] | None = None

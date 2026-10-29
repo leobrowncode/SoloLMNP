@@ -187,4 +187,70 @@ describe("OperationsPage", () => {
     await userEvent.type(screen.getByLabelText("Locataire / client"), "Dupont");
     expect(screen.getByRole("textbox", { name: /Référence justificative/ })).toHaveValue("LOY-2026-03-Dupont");
   });
+
+  it("explains a locked property, loan and bank without offering the frozen fields", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const url = String(input);
+      if (url === "/api/ledger/setup") return response({
+        activity: { activity_name: "Fictif" },
+        years: [{ id: 1, year: 2025, start_date: "2025-01-01", end_date: "2025-12-31", status: "OPEN" }],
+      });
+      if (url === "/api/ledger/accounts") return response([
+        { number: "512000", label: "Banque", account_type: "ASSET", active: true },
+      ]);
+      if (url === "/api/operations/properties") return response([{
+        id: 1, name: "Bien fictif", address: "Adresse fictive", acquisition_date: "2025-01-01",
+        acquisition_price: "100000.00", acquisition_costs: "0.00", land_value: "20000.00",
+        building_value: "80000.00", notes: "",
+        correction: {
+          locks: [{
+            code: "PROPERTY_HAS_ASSETS", fields: ["financial"],
+            message: "Des immobilisations existent déjà.",
+          }],
+          calculated_periods: 0,
+        },
+      }]);
+      if (url === "/api/operations/properties/1/tenants") return response([]);
+      if (url === "/api/operations/banks") return response([{
+        id: 1, name: "Compte courant", account_number: "512000",
+        correction: {
+          locks: [{
+            code: "BANK_HAS_MOVEMENTS", fields: ["account_number"],
+            message: "Des mouvements existent déjà sur ce compte.",
+          }],
+          calculated_periods: 0,
+        },
+      }]);
+      if (url === "/api/operations/loans") return response([{
+        id: 1, lender: "Crédit fictif", property_id: 1, initial_principal: "15000.00",
+        remaining_principal: "15000.00", monthly_payment: "62.58", monthly_insurance: "4.53",
+        principal_account: "164000", interest_rate: "1.50", interest_rate_basis_points: 150,
+        start_date: "2025-01-01", duration_months: 240,
+        correction: {
+          locks: [{
+            code: "LOAN_ACCOUNT_FIXED", fields: ["principal_account"],
+            message: "Le compte 164 identifie l’emprunt et n’est pas modifiable.",
+          }],
+          calculated_periods: 0,
+        },
+      }]);
+      if (url.startsWith("/api/operations?")) return response([]);
+      if (url.startsWith("/api/operations/bank/transactions")) return response([]);
+      return response({});
+    }));
+    render(<OperationsPage />);
+    expect(await screen.findByText("Des immobilisations existent déjà.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Modifier Bien fictif" }));
+    expect(screen.getByLabelText("Nom du bien")).toHaveValue("Bien fictif");
+    expect(screen.queryByLabelText("Prix d’acquisition (€)")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Annuler" }));
+    await userEvent.click(screen.getByRole("button", { name: /Banque/ }));
+    expect(screen.getByText("Des mouvements existent déjà sur ce compte.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Modifier Compte courant" }));
+    expect(screen.getByLabelText("Nom du compte bancaire")).toHaveValue("Compte courant");
+    expect(screen.queryByLabelText("Compte comptable dédié")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Annuler" }));
+    await userEvent.click(screen.getByRole("button", { name: /Emprunts/ }));
+    expect(screen.getByText("Le compte 164 identifie l’emprunt et n’est pas modifiable.")).toBeInTheDocument();
+  });
 });
