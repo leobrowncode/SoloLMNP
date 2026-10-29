@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { request } from "../api/ledger";
+import CloseYear from "./CloseYear";
 import LiasseSheet, { type Worksheet } from "./LiasseSheet";
 import "./ledger.css";
 
@@ -403,7 +404,7 @@ export default function FiscalPage() {
             ))}
           </select>
         </label>
-        <button type="button" disabled={!year || busy} onClick={() => { void compute(); }}>
+        <button id="calcul-fiscal" type="button" disabled={!year || busy} onClick={() => { void compute(); }}>
           {busy ? "Calcul…" : "Calculer le résultat fiscal"}
         </button>
         <button type="button" disabled={!year || busy} onClick={() => { void loadWorksheet(); }}>
@@ -719,6 +720,7 @@ export default function FiscalPage() {
         </div>
       )}
 
+      {year !== 0 && <CloseYear key={year} year={year} />}
       {worksheet && <LiasseSheet worksheet={worksheet} yearId={year} />}
 
       <details className="fiscal-panel">

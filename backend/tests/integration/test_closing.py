@@ -38,6 +38,49 @@ def centralize(client, result):
     assert response.status_code == 200, response.text
 
 
+def test_fiscal_computation_precedes_close(client):
+    identity = client.post("/api/ledger/activity/identity", json={"siren": "123456789"})
+    assert identity.status_code == 200, identity.text
+    book(client, "512000", "706000", "100.00")
+    book(client, "615000", "401000", "40.00")
+    centralize(client, "60.00")
+
+    missing = client.get("/api/filing/years/1/precheck")
+    assert missing.status_code == 200, missing.text
+    missing_body = missing.json()
+    assert missing_body["blocking"] is True
+    assert [item["code"] for item in missing_body["errors"]].count("FISCAL_NOT_COMPUTED") == 1
+    assert client.post("/api/filing/years/1/ready", json={"acknowledged": []}).status_code == 409
+    assert (
+        client.post("/api/filing/years/1/close", json={"confirmation": "CLOTURER"}).status_code
+        == 409
+    )
+
+    fiscal = client.post("/api/fiscal/years/1", json={"adjustments": []})
+    assert fiscal.status_code == 200, fiscal.text
+    fresh = client.get("/api/filing/years/1/precheck").json()
+    fresh_codes = [item["code"] for item in fresh["errors"]]
+    assert "FISCAL_NOT_COMPUTED" not in fresh_codes
+    assert "FISCAL_STALE" not in fresh_codes
+
+    book(client, "512000", "108000", "10.00")
+    stale = client.get("/api/filing/years/1/precheck").json()
+    assert stale["blocking"] is True
+    assert any(item["code"] == "FISCAL_STALE" for item in stale["errors"])
+    assert all(item["code"] != "FISCAL_NOT_COMPUTED" for item in stale["errors"])
+
+    recomputed = client.post("/api/fiscal/years/1", json={"adjustments": []})
+    assert recomputed.status_code == 200, recomputed.text
+    ready_check = client.get("/api/filing/years/1/precheck").json()
+    assert ready_check["blocking"] is False, ready_check
+    codes = [item["code"] for item in ready_check["warnings"]]
+    prepared = client.post("/api/filing/years/1/ready", json={"acknowledged": codes})
+    assert prepared.status_code == 200, prepared.text
+    closed = client.post("/api/filing/years/1/close", json={"confirmation": "CLOTURER"})
+    assert closed.status_code == 200, closed.text
+    assert closed.json()["status"] == "CLOSED"
+
+
 def test_close_reopen_fec_efi_and_documents(client, settings):
     identity = client.post("/api/ledger/activity/identity", json={"siren": "123456789"})
     assert identity.status_code == 200, identity.text

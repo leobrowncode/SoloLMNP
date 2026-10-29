@@ -22,7 +22,7 @@ effectués pendant cette vérification documentaire.
 
 ## Workflow cible
 
-1. Clôturer l'exercice et calculer un package immuable.
+1. Centraliser, calculer le résultat fiscal, passer le pré-contrôle, puis clôturer. La clôture fige le package.
 2. Contrôler les écritures, calculs et formulaires.
 3. Exporter le rapport et la feuille de saisie EFI.
 4. L'utilisateur ouvre lui-même son espace professionnel impots.gouv.fr.

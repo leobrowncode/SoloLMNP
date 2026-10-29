@@ -19,6 +19,8 @@ test("shows provisional statements and removes stale totals on refresh failure",
   render(<StatementsPage />);
   expect(await screen.findByText("Résultat comptable : -10.01 €")).toBeInTheDocument();
   expect(screen.getByText(/Brouillons exclus : 1/)).toBeInTheDocument();
+  expect(screen.getByText(/Fiscalité LMNP/)).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Clôturer l’exercice" })).not.toBeInTheDocument();
   failed = true;
   fireEvent.click(screen.getByRole("button", { name: "Actualiser les états" }));
   const alert = await screen.findByRole("alert");

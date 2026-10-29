@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { request, type Setup } from "../api/ledger";
 import OpeningPreview from "./OpeningPreview";
-import CloseYear from "./CloseYear";
 import ResultClosing from "./ResultClosing";
 import "./ledger.css";
 
@@ -50,18 +49,16 @@ export default function StatementsPage() {
   }
   return <section className="ledger-page" aria-labelledby="statements-title">
     <h2 id="statements-title">États comptables</h2>
-    <p>Calculés sur les écritures validées. Le FEC, pour un contrôle, se télécharge une fois l’exercice clôturé.</p>
+    <p>Calculés sur les écritures validées. Centralisez le résultat ici. Le calcul fiscal, le pré-contrôle et la clôture sont dans Fiscalité LMNP.</p>
     {setup && setup.years.length === 0 && <p>Créez un exercice dans Comptabilité pour consulter ses états.</p>}
     {setup && setup.years.length > 0 && <div className="toolbar">
       <label>Exercice <select value={year} onChange={(event) => refresh(Number(event.target.value))}>{setup.years.map((item) => <option key={item.id} value={item.id}>{item.year}</option>)}</select></label>
       <button type="button" onClick={() => refresh()}>Actualiser les états</button>
       {setup.years.find((item) => item.id === year)?.status === "CLOSED"
-        ? <a href={`/api/filing/years/${year}/fec`}>Télécharger le FEC</a>
-        : <p>Le FEC sera disponible après la clôture.</p>}
+        && <a href={`/api/filing/years/${year}/fec`}>Télécharger le FEC</a>}
     </div>}
     {year !== 0 && <OpeningPreview key={`${year}-${attempt}`} year={year} />}
     {year !== 0 && <ResultClosing key={`result-${year}-${attempt}`} year={year} />}
-    {year !== 0 && <CloseYear key={`close-${year}-${attempt}`} year={year} />}
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
     {!error && (!setup || (year !== 0 && !data)) && <p role="status">Chargement des états…</p>}
     {data && <div aria-live="polite">

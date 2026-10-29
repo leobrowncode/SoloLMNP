@@ -111,30 +111,32 @@ Retour **Comptabilité** :
 
 ---
 
-## 5. États comptables — fin d’exercice
+## 5. États comptables — centraliser
 
 Menu **États comptables** :
 
 1. Consulter bilan et résultat provisoires.
 2. **Préparer la centralisation** → vérifier → confirmer.
 3. Puis **affectation** du résultat (120/129 → capitaux) si proposé.
-4. **Lancer le pré-contrôle** → cocher les avertissements → **Accuser et préparer** → **Confirmer la clôture**.
 
-Après clôture, l’exercice est figé. Une réouverture exige un motif et invalide les exports.
+La clôture n’est pas sur cet écran. Passez ensuite à Fiscalité LMNP.
 
 ---
 
-## 6. Aperçu fiscal et feuille EFI
+## 6. Fiscalité, pré-contrôle et clôture
 
-Menu **Fiscalité LMNP** :
+Menu **Fiscalité LMNP**, dans cet ordre :
 
 1. Sélectionner l’exercice → **Calculer le résultat fiscal** (après la centralisation, sur le ledger final).
-2. **Liasse à recopier** : statut, points bloquants, consignes de saisie, puis les cases par formulaire (2031, 2031-bis, 2033-A, B, C, E), l’état de suivi des amortissements non déduits et les cases de la 2042-C-PRO. Télécharger le PDF.
-3. À tout moment : **Export tableur (.xlsx, Google Sheets)** — opérations, journal, balance, amortissements, liasse. À déposer dans Google Drive puis « Ouvrir avec Google Sheets ».
-4. Après clôture : **FEC** et **Dossier de contrôle** (zip : FEC, sa description réglementaire, liasse PDF/JSON, empreintes SHA-256). À garder en cas de contrôle.
-5. Recopier **soi-même** dans l’espace professionnel impots.gouv.fr (mode EFI, « Déclarer résultat »). SoloLMNP n’envoie rien.
-6. Sur la déclaration de revenus du foyer (2042-C-PRO) : résultat en **5NA** (bénéfice ou 0) ou **5NY** (déficit), déficits LMNP antérieurs en **5GA à 5GJ**.
-7. Archiver l’accusé de dépôt avec le dossier de contrôle.
+2. **Lancer le pré-contrôle**. S’il manque le calcul ou s’il ne correspond plus au ledger, le message lie vers **Calculer le résultat fiscal**.
+3. Cocher les avertissements → **Accuser et préparer** → **Confirmer la clôture**.
+4. Après clôture, l’exercice est figé. Une réouverture exige un motif et invalide les exports.
+5. **Liasse à recopier** : statut, points bloquants, consignes de saisie, puis les cases par formulaire (2031, 2031-bis, 2033-A, B, C, E), l’état de suivi des amortissements non déduits et les cases de la 2042-C-PRO. Télécharger le PDF.
+6. À tout moment : **Export tableur (.xlsx, Google Sheets)** — opérations, journal, balance, amortissements, liasse. À déposer dans Google Drive puis « Ouvrir avec Google Sheets ».
+7. Après clôture : **FEC** et **Dossier de contrôle** (zip : FEC, sa description réglementaire, liasse PDF/JSON, empreintes SHA-256). À garder en cas de contrôle.
+8. Recopier **soi-même** dans l’espace professionnel impots.gouv.fr (mode EFI, « Déclarer résultat »). SoloLMNP n’envoie rien.
+9. Sur la déclaration de revenus du foyer (2042-C-PRO) : résultat en **5NA** (bénéfice ou 0) ou **5NY** (déficit), déficits LMNP antérieurs en **5GA à 5GJ**.
+10. Archiver l’accusé de dépôt avec le dossier de contrôle.
 
 Voir aussi [FILING.md](FILING.md).
 

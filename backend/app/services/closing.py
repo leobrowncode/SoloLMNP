@@ -70,7 +70,11 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
         )
     fec = render_fec(session, year.id)
     errors.extend(fec["validation"]["errors"])
-    package = _capture(lambda: compile_package(session, year.id), errors, "MAPPING")
+    package = (
+        _capture(lambda: compile_package(session, year.id), errors, "MAPPING")
+        if fiscal is not None
+        else None
+    )
     if package is not None:
         errors.extend(package["errors"])
         warnings.extend(package["warnings"])

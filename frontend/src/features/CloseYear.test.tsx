@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import CloseYear from "./CloseYear";
 
@@ -27,4 +27,24 @@ test("exposes warning acknowledgements as named checkboxes", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
   expect(await screen.findByRole("checkbox", { name: "Le calcul fiscal reste en recherche." })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Accuser et préparer la clôture" })).toBeEnabled();
+});
+
+test("links a missing or stale fiscal computation to the calculation", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+    blocking: true,
+    errors: [
+      { code: "FISCAL_NOT_COMPUTED", message: "Aucun calcul fiscal n’est enregistré pour cet exercice." },
+      { code: "FISCAL_STALE", message: "Le calcul fiscal ne correspond plus au ledger." },
+      { code: "YEAR_DRAFTS", message: "Des brouillons sont encore ouverts." },
+    ],
+    warnings: [],
+  }));
+  render(<CloseYear year={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  const alerts = await screen.findAllByRole("alert");
+  expect(alerts).toHaveLength(3);
+  for (const alert of alerts.slice(0, 2)) {
+    expect(within(alert).getByRole("link", { name: "Calculer le résultat fiscal" })).toHaveAttribute("href", "#calcul-fiscal");
+  }
+  expect(within(alerts[2] as HTMLElement).queryByRole("link")).not.toBeInTheDocument();
 });

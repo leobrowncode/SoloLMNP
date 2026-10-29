@@ -8,6 +8,10 @@ interface Check {
   infos?: { code: string; message: string }[];
 }
 
+function needsFiscalCalculation(code: string): boolean {
+  return code === "FISCAL_NOT_COMPUTED" || code === "FISCAL_STALE";
+}
+
 export default function CloseYear({ year }: { year: number }) {
   const [check, setCheck] = useState<Check | null>(null);
   const [error, setError] = useState("");
@@ -46,7 +50,12 @@ export default function CloseYear({ year }: { year: number }) {
     {receipt && <p role="status">{receipt}</p>}
     {check && <div>
       {(check.infos ?? []).map((item) => <p key={item.code}>{item.message}</p>)}
-      {check.errors.map((item) => <p key={item.code} role="alert">{item.message}</p>)}
+      {check.errors.map((item, index) => (
+        <p key={`${item.code}-${index}`} role="alert">
+          {item.message}
+          {needsFiscalCalculation(item.code) && <> <a href="#calcul-fiscal">Calculer le résultat fiscal</a></>}
+        </p>
+      ))}
       {check.warnings.map((item) => <label key={item.code}><input type="checkbox" checked={acks.includes(item.code)} onChange={(event) => setAcks((current) => event.target.checked ? [...current, item.code] : current.filter((code) => code !== item.code))} />{item.message}</label>)}
       <button type="button" disabled={check.blocking} onClick={() => { void ready(); }}>Accuser et préparer la clôture</button>
       <button type="button" disabled={!prepared || check.blocking} onClick={() => { void closeYear(); }}>Confirmer la clôture</button>

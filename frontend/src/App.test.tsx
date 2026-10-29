@@ -100,6 +100,31 @@ describe("Foundation status", () => {
     expect(screen.queryByText(/Base prête/)).not.toBeInTheDocument();
   });
 
+  it("shows centralization, then fiscal calculation, precheck and closing", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply()));
+    render(<App />);
+    expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
+    const steps = screen.getAllByRole("listitem").map((item) => item.textContent ?? "");
+    expect(steps).toHaveLength(6);
+    const statements = steps[3] ?? "";
+    const fiscal = steps[4] ?? "";
+    expect(statements).toMatch(/États comptables/);
+    expect(statements).toMatch(/centralisation/);
+    expect(statements).not.toMatch(/clôture/);
+    expect(fiscal).toMatch(/Fiscalité LMNP/);
+    const fiscalStart = fiscal.indexOf("Calcul fiscal");
+    const closeStart = fiscal.indexOf("clôture");
+    expect(fiscalStart).toBeGreaterThanOrEqual(0);
+    expect(closeStart).toBeGreaterThan(fiscalStart);
+    expect(fiscal.indexOf("pré-contrôle")).toBeGreaterThan(fiscalStart);
+    expect(fiscal.indexOf("pré-contrôle")).toBeLessThan(closeStart);
+    const nav = screen.getAllByRole("link").map((item) => item.textContent ?? "");
+    const statementsIndex = nav.findIndex((label) => label.includes("États comptables"));
+    const fiscalIndex = nav.findIndex((label) => label.includes("Fiscalité LMNP"));
+    expect(statementsIndex).toBeGreaterThanOrEqual(0);
+    expect(fiscalIndex).toBeGreaterThan(statementsIndex);
+  });
+
   it("aborts the pending request on unmount", async () => {
     const request = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
       expect(init.signal?.aborted).toBe(false);

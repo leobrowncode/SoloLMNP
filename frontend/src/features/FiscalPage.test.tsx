@@ -139,4 +139,11 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
     "/api/filing/years/1/efi.pdf",
   );
   expect(screen.queryByRole("link", { name: /Dossier de contrôle/ })).not.toBeInTheDocument();
+
+  const compute = screen.getByRole("button", { name: "Calculer le résultat fiscal" });
+  const closeHeading = screen.getByRole("heading", { name: "Clôturer l’exercice" });
+  const liasse = screen.getByText("2033-B — compte de résultat et résultat fiscal");
+  expect(compute).toHaveAttribute("id", "calcul-fiscal");
+  expect(compute.compareDocumentPosition(closeHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(closeHeading.compareDocumentPosition(liasse) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
