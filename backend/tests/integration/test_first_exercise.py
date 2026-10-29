@@ -115,8 +115,9 @@ def loan_payment(client, loan_id, day, principal, interest):
 
 
 def test_first_exercise_from_purchase_to_liasse_and_fec(client):
-    plan = client.post("/api/assets/properties/1/plan")
+    plan = client.post("/api/assets/properties/1/plan", json={"confirm": True})
     assert plan.status_code == 201, plan.text
+    assert plan.json()["created"] is True
     assert plan.json()["depreciable_base"] == "134262.00"
 
     entry = {

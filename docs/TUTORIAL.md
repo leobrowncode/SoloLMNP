@@ -94,7 +94,7 @@ puis **Enregistrer un règlement** plus tard.
 
 Menu **Immobilisations** :
 
-1. **Préparer l’amortissement du logement** : terrain à part, frais de notaire ajoutés au bâtiment, six composants proposés (durées à confirmer). Ou saisie manuelle : terrain, puis construction et tous ses composants.
+1. **Prévisualiser l’amortissement du logement**, puis **Créer les immobilisations affichées**. L’aperçu liste le terrain, la construction et six composants (montants, comptes, durées) sans rien enregistrer. Annuler laisse la base inchangée. Répéter la confirmation ne crée pas de doublon. Les frais de notaire et d’agence sont ajoutés au bâtiment ; les durées proposées sont à confirmer, ce n’est pas un barème légal. Ou saisie manuelle : terrain, puis construction et tous ses composants.
 2. **Faire entrer le bien en comptabilité** (une seule fois, premier exercice) : indiquez le capital restant dû de chaque prêt au début de l’exercice, le solde bancaire à cette date et les frais payés avant (intérêts, assurance emprunteur, frais de dossier). **Prévisualiser**, puis **Comptabiliser**. L’écart va au compte de l’exploitant (108). Les prêts repris ainsi n’ont pas de « déblocage » à saisir : enregistrez seulement les échéances payées pendant l’exercice. Une erreur se corrige en extournant l’écriture depuis le journal.
 3. Mobilier : **Nouvelle immobilisation** avec justification de valeur et de durée.
 4. Choisir l’exercice 2026 → **Calculer les périodes** → **Comptabiliser** chaque dotation (possible à partir du 31/12, date de la dotation).

@@ -235,6 +235,83 @@ def test_closed_year_and_invalid_accounts_are_rejected(client, database):
     assert client.post("/api/assets/years/1/calculate").status_code == 409
 
 
+def test_dwelling_plan_preview_is_not_persisted_until_explicit_confirmation(client):
+    assert client.get("/api/assets").json() == []
+    preview = client.get("/api/assets/properties/1/plan")
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["created"] is False
+    assert body["depreciable_base"] == "80000.00"
+    assert body["land"] == "20000.00"
+    assert body["acquisition_costs_included"] == "0.00"
+    land, building, *parts = body["items"]
+    assert land == {
+        "kind": "LAND",
+        "label": "Terrain — Bien fictif",
+        "amount": "20000.00",
+        "asset_account": "211000",
+        "depreciation_account": None,
+        "useful_life_months": None,
+    }
+    assert building["kind"] == "BUILDING"
+    assert building["label"] == "Construction — Bien fictif"
+    assert building["amount"] == "80000.00"
+    assert building["asset_account"] == "213000"
+    assert building["depreciation_account"] == "281300"
+    assert building["useful_life_months"] == 480
+    assert [part["label"] for part in parts] == [
+        "Gros œuvre",
+        "Toiture et étanchéité",
+        "Façade et menuiseries",
+        "Installations électriques",
+        "Plomberie et sanitaires",
+        "Agencements intérieurs",
+    ]
+    assert parts[0]["amount"] == "32000.00"
+    assert parts[0]["asset_account"] == "213000"
+    assert parts[0]["depreciation_account"] == "281300"
+    assert parts[0]["useful_life_months"] == 480
+    assert parts[1]["asset_account"] == "213500"
+    assert parts[1]["depreciation_account"] == "281350"
+    assert parts[1]["useful_life_months"] == 300
+    assert parts[-1]["amount"] == "16000.00"
+    assert parts[-1]["useful_life_months"] == 180
+    assert sum(Decimal(part["amount"]) for part in parts) == Decimal("80000.00")
+    # Preview, a missing confirmation and an explicit refusal leave the register empty.
+    assert client.get("/api/assets").json() == []
+    assert client.post("/api/assets/properties/1/plan").status_code == 422
+    assert client.post("/api/assets/properties/1/plan", json={"confirm": False}).status_code == 422
+    assert client.get("/api/assets").json() == []
+    created = client.post("/api/assets/properties/1/plan", json={"confirm": True})
+    assert created.status_code == 201, created.text
+    assert created.json()["created"] is True
+    assert created.json()["items"] == body["items"]
+    assets = client.get("/api/assets").json()
+    assert [row["label"] for row in assets] == [
+        "Terrain — Bien fictif",
+        "Construction — Bien fictif",
+    ]
+    assert [part["label"] for part in assets[1]["components"]] == [part["label"] for part in parts]
+    identifiers = [(row["id"], [part["id"] for part in row["components"]]) for row in assets]
+    again = client.post("/api/assets/properties/1/plan", json={"confirm": True})
+    assert again.status_code == 200, again.text
+    assert again.json()["created"] is False
+    assert again.json()["items"] == body["items"]
+    repeated = client.get("/api/assets").json()
+    assert [
+        (row["id"], [part["id"] for part in row["components"]]) for row in repeated
+    ] == identifiers
+
+
+def test_dwelling_plan_confirmation_refuses_a_different_register(client):
+    assert client.post("/api/assets", json=furniture()).status_code == 201
+    assert client.get("/api/assets/properties/1/plan").status_code == 200
+    refused = client.post("/api/assets/properties/1/plan", json={"confirm": True})
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "PLAN_EXISTS"
+    assert [row["label"] for row in client.get("/api/assets").json()] == ["Mobilier fictif"]
+
+
 def test_raw_sql_cannot_fabricate_posted_period(client, database):
     assert client.post("/api/assets", json=furniture()).status_code == 201
     row = client.post("/api/assets/years/1/calculate").json()[0]

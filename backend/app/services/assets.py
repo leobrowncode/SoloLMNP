@@ -358,7 +358,7 @@ def property_entry(session: Session, property_id: int, data: PropertyEntryInput)
         fail(
             "NO_ASSET_TO_BOOK",
             "Aucune immobilisation de ce bien acquise avant le début de l’exercice. "
-            "Préparez d’abord l’amortissement du logement.",
+            "Créez d’abord les immobilisations du logement depuis l’aperçu.",
             422,
         )
     for item in data.loans:
@@ -450,17 +450,25 @@ DURATION_REASON = (
 )
 
 
-def install_dwelling_plan(session: Session, property_id: int) -> dict[str, Any]:
-    """Propose a confirmed component split for a long-term furnished dwelling."""
+def _component_shares(base: int) -> list[int]:
+    shares = [base * ratio // 10000 for _label, ratio, _life, _asset, _depr in DWELLING_PARTS]
+    shares[-1] += base - sum(shares)
+    for index, part in enumerate(shares):
+        if part <= 0:
+            shares[0] += part
+            shares[index] = 0
+    return shares
+
+
+def _plan_property(session: Session, property_id: int) -> Property:
     prop = session.get(Property, property_id)
     if prop is None:
         fail("PROPERTY_NOT_FOUND", "Bien introuvable.", 404)
-    if session.scalar(select(Asset.id).where(Asset.property_id == prop.id)) is not None:
-        fail(
-            "PLAN_EXISTS",
-            "Ce bien a déjà des immobilisations. Complétez le registre à la main.",
-            422,
-        )
+    return prop
+
+
+def _dwelling_proposal(prop: Property) -> dict[str, Any]:
+    """Describe the dwelling split. This function does not write."""
     base = to_cents(prop.building_value) + to_cents(prop.acquisition_costs)
     if base <= 0:
         fail(
@@ -469,90 +477,230 @@ def install_dwelling_plan(session: Session, property_id: int) -> dict[str, Any]:
             422,
         )
     start = prop.rental_start_date or prop.acquisition_date
-    labels: list[str] = []
+    items: list[dict[str, Any]] = []
     if to_cents(prop.land_value) > 0:
         land_amount = money(to_cents(prop.land_value))
-        land = create_asset(
-            session,
-            AssetInput(
-                property_id=prop.id,
-                category="LAND",
-                label=f"Terrain — {prop.name}"[:200],
-                acquisition_date=prop.acquisition_date,
-                service_start_date=start,
-                acquisition_value=land_amount,
-                depreciable_value="0.00",
-                non_depreciable_value=land_amount,
-                method="NONE",
-                asset_account="211000",
-                basis_reason=(
-                    "Valeur de terrain saisie sur le bien. Le terrain n’est pas amortissable."
-                ),
-                duration_reason="Terrain non amortissable",
-            ),
+        items.append(
+            {
+                "kind": "LAND",
+                "label": f"Terrain — {prop.name}"[:200],
+                "amount": land_amount,
+                "asset_account": "211000",
+                "depreciation_account": None,
+                "useful_life_months": None,
+                "service_start_date": start,
+            }
         )
-        labels.append(land.label)
-    shares = [base * ratio // 10000 for _label, ratio, _life, _asset, _depr in DWELLING_PARTS]
-    shares[-1] += base - sum(shares)
-    for index, part in enumerate(shares):
-        if part <= 0:
-            shares[0] += part
-            shares[index] = 0
     building_amount = money(base)
-    building = create_asset(
-        session,
-        AssetInput(
-            property_id=prop.id,
-            category="BUILDING",
-            label=f"Construction — {prop.name}"[:200],
-            acquisition_date=prop.acquisition_date,
-            service_start_date=start,
-            acquisition_value=building_amount,
-            depreciable_value=building_amount,
-            non_depreciable_value="0.00",
-            method="LINEAR",
-            useful_life_months=480,
-            asset_account="213000",
-            depreciation_account="281300",
-            basis_reason=(
-                "Valeur du bâtiment augmentée des frais de notaire et d’agence. "
-                "Le terrain reste hors base amortissable."
-            ),
-            duration_reason=DURATION_REASON,
-        ),
+    items.append(
+        {
+            "kind": "BUILDING",
+            "label": f"Construction — {prop.name}"[:200],
+            "amount": building_amount,
+            "asset_account": "213000",
+            "depreciation_account": "281300",
+            "useful_life_months": 480,
+            "service_start_date": start,
+        }
     )
-    labels.append(building.label)
     for (label, _ratio, life, asset_account, depreciation_account), part in zip(
-        DWELLING_PARTS, shares, strict=True
+        DWELLING_PARTS, _component_shares(base), strict=True
     ):
         if part <= 0:
             continue
-        create_component(
-            session,
-            building.id,
-            ComponentInput(
-                category="STRUCTURE" if asset_account == "213000" else "INSTALLATION",
-                label=label,
-                value=money(part),
-                useful_life_months=life,
-                service_start_date=start,
-                asset_account=asset_account,
-                depreciation_account=depreciation_account,
-                basis_reason=(
-                    "Quote-part proposée pour un logement en location longue durée. "
-                    "À confirmer selon l’état réel du bien."
+        items.append(
+            {
+                "kind": "COMPONENT",
+                "label": label,
+                "amount": money(part),
+                "asset_account": asset_account,
+                "depreciation_account": depreciation_account,
+                "useful_life_months": life,
+                "service_start_date": start,
+                "component_category": (
+                    "STRUCTURE" if asset_account == "213000" else "INSTALLATION"
                 ),
-                duration_reason=DURATION_REASON,
-            ),
+            }
         )
-        labels.append(label)
     return {
         "property_id": prop.id,
         "depreciable_base": building_amount,
         "land": money(to_cents(prop.land_value)),
         "acquisition_costs_included": money(to_cents(prop.acquisition_costs)),
-        "labels": labels,
+        "labels": [str(item["label"]) for item in items],
+        "items": items,
     }
+
+
+def _public_plan(proposal: dict[str, Any], *, created: bool) -> dict[str, Any]:
+    shown = (
+        "kind",
+        "label",
+        "amount",
+        "asset_account",
+        "depreciation_account",
+        "useful_life_months",
+    )
+    return {
+        "property_id": proposal["property_id"],
+        "depreciable_base": proposal["depreciable_base"],
+        "land": proposal["land"],
+        "acquisition_costs_included": proposal["acquisition_costs_included"],
+        "labels": proposal["labels"],
+        "items": [{key: item[key] for key in shown} for item in proposal["items"]],
+        "created": created,
+    }
+
+
+def _plan_fingerprint(items: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
+    return [
+        (
+            item["kind"],
+            item["label"],
+            item["amount"],
+            item["asset_account"],
+            item["depreciation_account"],
+            item["useful_life_months"],
+        )
+        for item in items
+    ]
+
+
+def _recorded_plan_items(session: Session, property_id: int) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    assets = session.scalars(
+        select(Asset).where(Asset.property_id == property_id).order_by(Asset.id)
+    ).all()
+    for asset in assets:
+        if asset.category == "LAND":
+            kind = "LAND"
+        elif asset.category == "BUILDING":
+            kind = "BUILDING"
+        else:
+            kind = asset.category
+        items.append(
+            {
+                "kind": kind,
+                "label": asset.label,
+                "amount": money(to_cents(asset.acquisition_value)),
+                "asset_account": asset.asset_account,
+                "depreciation_account": asset.depreciation_account,
+                "useful_life_months": asset.useful_life_months,
+            }
+        )
+        components = session.scalars(
+            select(AssetComponent)
+            .where(AssetComponent.asset_id == asset.id)
+            .order_by(AssetComponent.id)
+        ).all()
+        for component in components:
+            items.append(
+                {
+                    "kind": "COMPONENT",
+                    "label": component.label,
+                    "amount": money(to_cents(component.value)),
+                    "asset_account": component.asset_account,
+                    "depreciation_account": component.depreciation_account,
+                    "useful_life_months": component.useful_life_months,
+                }
+            )
+    return items
+
+
+def preview_dwelling_plan(session: Session, property_id: int) -> dict[str, Any]:
+    """Return the dwelling split without creating any asset."""
+    return _public_plan(_dwelling_proposal(_plan_property(session, property_id)), created=False)
+
+
+def _persist_dwelling_plan(session: Session, prop: Property, items: list[dict[str, Any]]) -> None:
+    building_id: int | None = None
+    for item in items:
+        start = item["service_start_date"]
+        if item["kind"] == "LAND":
+            create_asset(
+                session,
+                AssetInput(
+                    property_id=prop.id,
+                    category="LAND",
+                    label=item["label"],
+                    acquisition_date=prop.acquisition_date,
+                    service_start_date=start,
+                    acquisition_value=item["amount"],
+                    depreciable_value="0.00",
+                    non_depreciable_value=item["amount"],
+                    method="NONE",
+                    asset_account=item["asset_account"],
+                    basis_reason=(
+                        "Valeur de terrain saisie sur le bien. Le terrain n’est pas amortissable."
+                    ),
+                    duration_reason="Terrain non amortissable",
+                ),
+            )
+        elif item["kind"] == "BUILDING":
+            building = create_asset(
+                session,
+                AssetInput(
+                    property_id=prop.id,
+                    category="BUILDING",
+                    label=item["label"],
+                    acquisition_date=prop.acquisition_date,
+                    service_start_date=start,
+                    acquisition_value=item["amount"],
+                    depreciable_value=item["amount"],
+                    non_depreciable_value="0.00",
+                    method="LINEAR",
+                    useful_life_months=item["useful_life_months"],
+                    asset_account=item["asset_account"],
+                    depreciation_account=item["depreciation_account"],
+                    basis_reason=(
+                        "Valeur du bâtiment augmentée des frais de notaire et d’agence. "
+                        "Le terrain reste hors base amortissable."
+                    ),
+                    duration_reason=DURATION_REASON,
+                ),
+            )
+            building_id = building.id
+        else:
+            if building_id is None:
+                fail("PLAN_INVALID", "La construction manque dans le plan proposé.", 500)
+            create_component(
+                session,
+                building_id,
+                ComponentInput(
+                    category=item["component_category"],
+                    label=item["label"],
+                    value=item["amount"],
+                    useful_life_months=item["useful_life_months"],
+                    service_start_date=start,
+                    asset_account=item["asset_account"],
+                    depreciation_account=item["depreciation_account"],
+                    basis_reason=(
+                        "Quote-part proposée pour un logement en location longue durée. "
+                        "À confirmer selon l’état réel du bien."
+                    ),
+                    duration_reason=DURATION_REASON,
+                ),
+            )
+
+
+def install_dwelling_plan(session: Session, property_id: int, *, confirm: bool) -> dict[str, Any]:
+    """Create the previewed dwelling split once. A repeated confirmation is a no-op."""
+    if not confirm:
+        return preview_dwelling_plan(session, property_id)
+    prop = _plan_property(session, property_id)
+    proposal = _dwelling_proposal(prop)
+    public = _public_plan(proposal, created=False)
+    recorded = _recorded_plan_items(session, prop.id)
+    if recorded:
+        if _plan_fingerprint(recorded) == _plan_fingerprint(public["items"]):
+            return public
+        fail(
+            "PLAN_EXISTS",
+            "Ce bien a déjà des immobilisations. Complétez le registre à la main.",
+            422,
+        )
+    _persist_dwelling_plan(session, prop, proposal["items"])
+    return _public_plan(proposal, created=True)
 
 
 def row_json(

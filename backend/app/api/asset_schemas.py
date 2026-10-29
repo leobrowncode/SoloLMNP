@@ -137,3 +137,9 @@ class PropertyEntryInput(Input):
 class DepreciationPostInput(Input):
     request_id: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{8,64}$")]
     piece_reference: Label
+
+
+class DwellingPlanConfirm(Input):
+    """Explicit creation of the proposed dwelling depreciation split."""
+
+    confirm: Literal[True]
