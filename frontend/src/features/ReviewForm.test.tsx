@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { RequestError } from "../api/ledger";
 import ReviewForm from "./ReviewForm";
 
 describe("ReviewForm", () => {
@@ -147,5 +148,21 @@ describe("ReviewForm", () => {
     await userEvent.selectOptions(screen.getByLabelText("Catégorie"), "FURNITURE");
     expect(screen.getByLabelText("Compte")).toHaveValue("218400");
     expect(screen.queryByRole("option", { name: "211000 · Terrains" })).not.toBeInTheDocument();
+  });
+
+  it("shows a field validation message under the control", async () => {
+    const save = vi.fn().mockRejectedValue(new RequestError({
+      code: "VALIDATION_ERROR",
+      message: "Les données envoyées sont invalides.",
+      issues: [{ code: "missing", message: "Le libellé est requis.", field: "label" }],
+    }, 422));
+    render(<ReviewForm title="Test" fields={[
+      { name: "label", label: "Libellé" },
+    ]} onSave={save} onCancel={() => undefined} />);
+    await userEvent.type(screen.getByLabelText("Libellé"), "Test");
+    await userEvent.click(screen.getByRole("button", { name: "Vérifier avant enregistrement" }));
+    await userEvent.click(screen.getByRole("button", { name: "Confirmer l’enregistrement" }));
+    expect(await screen.findByText("Le libellé est requis.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Libellé")).toHaveAttribute("aria-describedby", expect.stringContaining("-error"));
   });
 });

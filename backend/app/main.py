@@ -17,6 +17,7 @@ from app.api.filing import build_filing_router
 from app.api.fiscal import build_fiscal_router
 from app.api.ledger import build_ledger_router
 from app.api.operations import build_operations_router
+from app.core.api_errors import register_exception_handlers
 from app.core.config import Settings, get_settings
 from app.core.database import SCHEMA_REVISION, Database
 from app.core.version import APPLICATION_VERSION
@@ -73,6 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.add_middleware(
         TrustedHostMiddleware, allowed_hosts=list(configuration.allowed_hosts)
     )
+    register_exception_handlers(application)
 
     @application.middleware("http")
     async def protect_writes(

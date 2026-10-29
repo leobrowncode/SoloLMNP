@@ -1,4 +1,12 @@
 export interface Year { id: number; year: number; start_date: string; end_date: string; status: string }
+import {
+  errorSummary,
+  parseApiErrorDetail,
+  type ApiErrorAction,
+  type ApiErrorDetail,
+  type ApiErrorIssue,
+} from "./errors";
+
 export interface Setup {
   activity: { activity_name: string; siren?: string | null; siret?: string | null } | null;
   years: Year[];
@@ -19,15 +27,20 @@ export interface Entry extends Omit<EntryInput, "lines"> {
 export interface BalanceRow { account_number: string; label: string; total_debit: string; total_credit: string; debit_balance: string; credit_balance: string }
 export interface Balance { balance: BalanceRow[]; total_debit: string; total_credit: string; balanced: boolean }
 export interface LedgerLine { entry_id: number; entry_number: string; date: string; label: string; debit: string; credit: string; balance: string }
+
+export type { ApiErrorAction, ApiErrorDetail, ApiErrorIssue };
+
 export class RequestError extends Error {
   readonly status: number;
   readonly code: string;
+  readonly detail: ApiErrorDetail;
 
-  constructor(message: string, status: number, code = "") {
-    super(message);
+  constructor(detail: ApiErrorDetail, status: number) {
+    super(errorSummary(detail));
     this.name = "RequestError";
     this.status = status;
-    this.code = code;
+    this.code = detail.code;
+    this.detail = detail;
   }
 }
 
@@ -37,24 +50,9 @@ export async function request<T>(path: string, method = "GET", body?: unknown, p
     headers: { "Content-Type": "application/json", "X-SoloLMNP-Request": "1" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  const data = await response.json() as {
-    detail?: { message?: string; code?: string } | string | Array<{ msg?: string; type?: string } | string>;
-  };
+  const data = await response.json() as { detail?: unknown };
   if (!response.ok) {
-    const detail = data.detail;
-    let message = "Opération refusée. Vérifiez les champs, les dates et les montants au centime.";
-    let code = "";
-    if (typeof detail === "string" && detail.trim()) message = detail;
-    else if (detail && !Array.isArray(detail) && typeof detail === "object") {
-      if (detail.message) message = detail.message;
-      if (detail.code) code = detail.code;
-    } else if (Array.isArray(detail)) {
-      const messages = detail
-        .map((item) => (typeof item === "string" ? item : item.msg))
-        .filter((item): item is string => Boolean(item && item.trim()));
-      if (messages.length) message = messages.join(" ");
-    }
-    throw new RequestError(message, response.status, code);
+    throw new RequestError(parseApiErrorDetail(data.detail as Parameters<typeof parseApiErrorDetail>[0]), response.status);
   }
   return data as T;
 }

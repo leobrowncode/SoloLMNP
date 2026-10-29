@@ -1,0 +1,25 @@
+# Contrat d’erreur API
+
+Les réponses d’échec JSON exposent un objet `detail` structuré, identique pour le backend FastAPI et le client React.
+
+## Forme
+
+| Clé | Rôle |
+| --- | --- |
+| `code` | Identifiant stable (`VALIDATION_ERROR`, `CSV_AMOUNT`, `ACTIVITY_REQUIRED`, …) |
+| `message` | Texte lisible pour l’utilisateur |
+| `field` | Chemin de champ (validation ou refus métier ciblé) |
+| `location` | `body`, `query` ou `import` |
+| `line` | Numéro de ligne CSV / tableau (imports) |
+| `action` | `{ "label", "href" }` lien interne de résolution |
+| `issues` | Liste d’erreurs de validation (champ + message) |
+
+Les erreurs Pydantic (`422`) sont normalisées en `VALIDATION_ERROR` avec `issues`. Les refus métier (`fail()`) renvoient `code`, `message` et, le cas échéant, `field`, `line` ou `action`.
+
+## Interface
+
+- **Champ** : message sous le contrôle, relié par `aria-describedby`.
+- **Métier** : bandeau avec message et lien `action` (ex. ouvrir Comptabilité).
+- **Import** : liste « Ligne n : … » lorsque `line` est présent.
+
+Voir `frontend/src/api/errors.ts` et `backend/app/core/api_errors.py`.

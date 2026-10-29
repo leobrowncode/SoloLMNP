@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { amount, cents, request, type Account, type Setup, type Entry } from "../api/ledger";
+import { amount, cents, request, type Account, type Setup, type Entry, RequestError } from "../api/ledger";
+import ApiErrorAlert from "./ApiErrorAlert";
 import { operationsRequest as api, type Property, type Bank, type Loan, type Operation, type BankTransaction, type ImportPreview, type OperationImportPreview, type LoanPaymentImportPreview, type Tenant } from "../api/operations";
 import {
   DEFAULT_OPERATIONS_TAB,
@@ -77,6 +78,7 @@ export default function OperationsPage() {
   }
 
   const [error, setError] = useState("");
+  const [apiError, setApiError] = useState<RequestError | null>(null);
   const [message, setMessage] = useState("");
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -240,8 +242,16 @@ export default function OperationsPage() {
   }
 
   async function action(fn: () => Promise<unknown>) {
-    setBusy(true); setError(""); setMessage("");
-    try { await fn(); } catch (e) { setError(e instanceof Error ? e.message : "Service indisponible."); }
+    setBusy(true); setError(""); setApiError(null); setMessage("");
+    try { await fn(); } catch (e) {
+      if (e instanceof RequestError) {
+        setApiError(e);
+        setError("");
+      } else {
+        setApiError(null);
+        setError(e instanceof Error ? e.message : "Service indisponible.");
+      }
+    }
     finally { setBusy(false); }
   }
 
@@ -380,7 +390,8 @@ export default function OperationsPage() {
     <section id="operations" className="ledger-page" aria-labelledby="operations-title">
     <h2 id="operations-title">Opérations et banque</h2>
     <p>Suivez l’ordre des onglets : bien, banque, emprunts, puis recettes et dépenses.</p>
-    {error && <p role="alert" className="ledger-error">{error}</p>}
+    {apiError && <ApiErrorAlert detail={apiError.detail} />}
+    {error && !apiError && <p role="alert" className="ledger-error">{error}</p>}
     {message && <p role="status">{message}</p>}
     {!setup ? <p>Chargement…</p> : !setup.activity ? (
       <p>Initialisez votre activité et votre exercice dans <strong>Comptabilité</strong> avant de saisir vos opérations.</p>
