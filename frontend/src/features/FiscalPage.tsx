@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { request } from "../api/ledger";
 import CloseYear from "./CloseYear";
 import LiasseSheet, { type Worksheet } from "./LiasseSheet";
@@ -240,6 +240,7 @@ export default function FiscalPage() {
   const [vintages, setVintages] = useState<Vintage[]>([]);
   const [year, setYear] = useState(0);
   const [years, setYears] = useState<YearRow[]>([]);
+  const refreshToken = useRef(0);
   const [result, setResult] = useState<Computation | null>(null);
   const [statements, setStatements] = useState<Statements | null>(null);
   const [worksheet, setWorksheet] = useState<Worksheet | null>(null);
@@ -315,6 +316,59 @@ export default function FiscalPage() {
     }
   }
 
+  function chooseYear(next: number) {
+    refreshToken.current += 1;
+    setYear(next);
+    setAdjustments([]);
+    setStatements(null);
+    setResult(null);
+    setWorksheet(null);
+  }
+
+  async function refreshExercise() {
+    const token = refreshToken.current;
+    const selected = year;
+    const hadWorksheet = worksheet !== null;
+    const hadResult = result !== null;
+    const current = () => refreshToken.current === token;
+    const failures: string[] = [];
+    const setupTask = request<{ years: YearRow[] }>("/setup").then((setup) => {
+      if (!current()) return;
+      setYears(setup.years);
+      setYear((currentId) => (
+        currentId && setup.years.some((item) => item.id === currentId)
+          ? currentId
+          : setup.years.find((item) => item.status === "OPEN")?.id ?? setup.years[0]?.id ?? 0
+      ));
+    }, (reason: Error) => { failures.push(reason.message); });
+    const statementTask = selected
+      ? request<Statements>(`/years/${selected}/statements`).then((value) => {
+        if (current()) setStatements(value);
+      }, (reason: Error) => { failures.push(reason.message); })
+      : Promise.resolve();
+    const worksheetTask = selected && hadWorksheet
+      ? request<Worksheet>(`/years/${selected}/efi`, "GET", undefined, "/api/filing").then((value) => {
+        if (current()) setWorksheet(value);
+      }, (reason: Error) => {
+        if (current()) setWorksheet(null);
+        failures.push(reason.message);
+      })
+      : Promise.resolve();
+    const resultTask = selected && hadResult
+      ? request<Computation>(`/years/${selected}`, "GET", undefined, "/api/fiscal").then((value) => {
+        if (current()) setResult(value);
+      }, (reason: Error) => {
+        if (current()) setResult(null);
+        failures.push(reason.message);
+      })
+      : Promise.resolve();
+    await Promise.all([setupTask, statementTask, worksheetTask, resultTask]);
+    if (!current()) return;
+    const message = failures[0];
+    if (message) setError(message);
+    else setError("");
+  }
+
   async function loadSuggestions() {
     setError("");
     setBusy(true);
@@ -366,6 +420,7 @@ export default function FiscalPage() {
     setDraft({ account_number: "", amount: "", justification: "" });
   }
 
+  const selectedYear = years.find((item) => item.id === year);
   const details = result?.details;
   const depUses = details?.prior_carry_forward_use?.depreciation ?? [];
   const lossUses = details?.prior_carry_forward_use?.tax_loss ?? [];
@@ -390,13 +445,7 @@ export default function FiscalPage() {
           </HelpTip>
           <select
             value={year}
-            onChange={(event) => {
-              setYear(Number(event.target.value));
-              setAdjustments([]);
-              setStatements(null);
-              setResult(null);
-              setWorksheet(null);
-            }}
+            onChange={(event) => { chooseYear(Number(event.target.value)); }}
           >
             {years.map((item) => (
               <option key={item.id} value={item.id}>
@@ -719,7 +768,12 @@ export default function FiscalPage() {
 
       {year !== 0 && (
         <div className="fiscal-panel">
-          <CloseYear key={year} year={year} />
+          <CloseYear
+            key={year}
+            year={year}
+            {...(selectedYear?.status !== undefined ? { yearStatus: selectedYear.status } : {})}
+            onExerciseTransition={() => { void refreshExercise(); }}
+          />
         </div>
       )}
 
@@ -732,7 +786,9 @@ export default function FiscalPage() {
           <button type="button" disabled={!year || busy} onClick={() => { void loadWorksheet(); }}>
             Liasse à recopier
           </button>
-          <a href={year ? `/api/filing/years/${year}/fec` : undefined}>FEC (après clôture)</a>
+          {selectedYear?.status === "CLOSED"
+            ? <a href={`/api/filing/years/${year}/fec`}>Télécharger le FEC</a>
+            : <p>Le FEC sera disponible après la clôture.</p>}
         </div>
       </div>
       {worksheet && <LiasseSheet worksheet={worksheet} yearId={year} />}

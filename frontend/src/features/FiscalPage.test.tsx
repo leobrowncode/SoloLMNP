@@ -146,3 +146,142 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
   );
   expect(screen.queryByRole("link", { name: /Dossier de contrôle/ })).not.toBeInTheDocument();
 });
+
+test("closing reloads the exercise status, the dashboard and the frozen exports", async () => {
+  let phase: "open" | "ready" | "closed" = "open";
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    if (url.endsWith("/vintages")) {
+      return response({ vintages: [{ vintage: "2025", status: "research_only", blocked: [], executable: [] }] });
+    }
+    if (url.endsWith("/setup")) {
+      const status = phase === "closed" ? "CLOSED" : phase === "ready" ? "READY_TO_CLOSE" : "OPEN";
+      return response({ years: [{ id: 1, year: 2025, status }] });
+    }
+    if (url.endsWith("/statements")) {
+      return response({
+        income_statement: {
+          income: [],
+          expenses: [],
+          total_income: "1000.00",
+          total_expenses: "1200.00",
+          result: phase === "closed" ? "60.00" : "-200.00",
+        },
+      });
+    }
+    if (url.endsWith("/precheck")) {
+      return response({
+        blocking: false,
+        year_status: phase === "closed" ? "CLOSED" : "OPEN",
+        errors: [],
+        warnings: [{ code: "FISCAL_RESEARCH", message: "Le calcul fiscal reste en recherche." }],
+      });
+    }
+    if (url.endsWith("/ready") && method === "POST") {
+      phase = "ready";
+      return response({
+        blocking: false,
+        year_status: "READY_TO_CLOSE",
+        errors: [],
+        warnings: [{ code: "FISCAL_RESEARCH", message: "Le calcul fiscal reste en recherche." }],
+      });
+    }
+    if (url.endsWith("/close") && method === "POST") {
+      phase = "closed";
+      return response({ fiscal_year_id: 1, status: "CLOSED", generation: 1 });
+    }
+    if (url.endsWith("/efi")) {
+      return response({
+        transmission: false,
+        declarable: false,
+        frozen: phase === "closed",
+        disclaimer: "Aucun envoi n’est effectué.",
+        exercise: { start: "2025-01-01", end: "2025-12-31" },
+        declarant: { name: "Test", siren: "123456789", siret: null },
+        blocking: [],
+        instructions: [],
+        liasse: { form: "2033-B", vintage: "2025", fields: [] },
+        personal_return: { form: "2042-C-PRO", status: "verified_by_cross_reference", lines: [] },
+      });
+    }
+    throw new Error(`unexpected ${method} ${url}`);
+  });
+
+  render(<FiscalPage />);
+  expect(await screen.findByRole("option", { name: "2025 · ouvert" })).toBeInTheDocument();
+  expect(await screen.findByText("-200.00 €")).toBeInTheDocument();
+  expect(screen.getByText("Le FEC sera disponible après la clôture.")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Le calcul fiscal reste en recherche." }));
+  fireEvent.click(screen.getByRole("button", { name: "Accuser et préparer la clôture" }));
+  expect(await screen.findByRole("option", { name: "2025 · prêt à clôturer" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Liasse à recopier" }));
+  expect(await screen.findByText(/calcul en cours/)).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /Dossier de contrôle/ })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Confirmer la clôture" }));
+  expect(await screen.findByRole("option", { name: "2025 · clôturé" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Télécharger le FEC" })).toHaveAttribute(
+    "href",
+    "/api/filing/years/1/fec",
+  );
+  expect(screen.queryByText("Le FEC sera disponible après la clôture.")).not.toBeInTheDocument();
+  expect(await screen.findByText(/montants figés à la clôture/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /Dossier de contrôle/ })).toBeInTheDocument();
+  expect(screen.getByText("60.00 €")).toBeInTheDocument();
+  expect(screen.queryByText("-200.00 €")).not.toBeInTheDocument();
+  expect(screen.getByText(/Exercice clôturé/)).toBeInTheDocument();
+});
+
+test("a refused close keeps the ready exercise and explains the failure", async () => {
+  let phase: "open" | "ready" = "open";
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    if (url.endsWith("/vintages")) {
+      return response({ vintages: [] });
+    }
+    if (url.endsWith("/setup")) {
+      return response({
+        years: [{ id: 1, year: 2025, status: phase === "ready" ? "READY_TO_CLOSE" : "OPEN" }],
+      });
+    }
+    if (url.endsWith("/statements")) {
+      return response({
+        income_statement: {
+          income: [], expenses: [], total_income: "0.00", total_expenses: "0.00", result: "0.00",
+        },
+      });
+    }
+    if (url.endsWith("/precheck") || (url.endsWith("/ready") && method === "POST")) {
+      if (url.endsWith("/ready")) phase = "ready";
+      return response({
+        blocking: false,
+        year_status: phase === "ready" ? "READY_TO_CLOSE" : "OPEN",
+        errors: [],
+        warnings: [{ code: "FISCAL_RESEARCH", message: "Le calcul fiscal reste en recherche." }],
+      });
+    }
+    if (url.endsWith("/close")) {
+      return response({ detail: { message: "La clôture a été refusée." } }, 409);
+    }
+    throw new Error(`unexpected ${method} ${url}`);
+  });
+
+  render(<FiscalPage />);
+  expect(await screen.findByRole("option", { name: "2025 · ouvert" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Le calcul fiscal reste en recherche." }));
+  fireEvent.click(screen.getByRole("button", { name: "Accuser et préparer la clôture" }));
+  expect(await screen.findByRole("option", { name: "2025 · prêt à clôturer" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Confirmer la clôture" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("La clôture a été refusée.");
+  expect(screen.getByRole("option", { name: "2025 · prêt à clôturer" })).toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: "2025 · clôturé" })).not.toBeInTheDocument();
+  expect(screen.getByText("Le FEC sera disponible après la clôture.")).toBeInTheDocument();
+  expect(screen.queryByText(/Exercice clôturé/)).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Confirmer la clôture" })).toBeEnabled();
+});

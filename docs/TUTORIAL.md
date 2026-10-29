@@ -128,8 +128,8 @@ Cette étape ne clôture pas l’exercice. La suite est dans **Fiscalité LMNP**
 Menu **Fiscalité LMNP**, dans cet ordre :
 
 1. Sélectionner l’exercice → **Calculer le résultat fiscal** (après la centralisation, sur le ledger final).
-2. **Lancer le pré-contrôle**. S’il manque le calcul, ou s’il ne correspond plus au ledger, le lien **Calculer le résultat fiscal** ramène au calcul. Cocher les avertissements → **Accuser et préparer** → **Confirmer la clôture**.
-3. Après clôture, l’exercice est figé. Une réouverture exige un motif et invalide les exports.
+2. **Lancer le pré-contrôle**. S’il manque le calcul, ou s’il ne correspond plus au ledger, le lien **Calculer le résultat fiscal** ramène au calcul. Cocher chaque avertissement affiché : un nouveau pré-contrôle décoche tout, et **Accuser et préparer** reste inactif tant qu’il en manque un. Puis **Confirmer la clôture**. Le statut de l’exercice, le tableau de bord et les sorties (liasse, FEC) se rechargent.
+3. Après clôture, l’exercice est figé. Une réouverture exige un motif et invalide les exports. Elle n’est pas encore proposée dans l’écran.
 4. **Liasse à recopier** : statut, points bloquants, consignes de saisie, puis les cases par formulaire (2031, 2031-bis, 2033-A, B, C, E), l’état de suivi des amortissements non déduits et les cases de la 2042-C-PRO. Télécharger le PDF. Avant la clôture, la liasse reste un calcul en cours.
 5. À tout moment : **Export tableur (.xlsx, Google Sheets)** — opérations, journal, balance, amortissements, liasse. À déposer dans Google Drive puis « Ouvrir avec Google Sheets ».
 6. Après clôture : **FEC** et **Dossier de contrôle** (zip : FEC, sa description réglementaire, liasse PDF/JSON, empreintes SHA-256). À garder en cas de contrôle.
