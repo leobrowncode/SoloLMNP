@@ -47,6 +47,8 @@ class AssetInput(Input):
         if self.disposed_at is not None and self.disposed_at < self.service_start_date:
             raise ValueError("La sortie ne peut pas précéder la mise en service.")
         if self.category == "LAND":
+            if self.depreciation_account is not None:
+                raise ValueError("Un terrain n’a pas de compte d’amortissement.")
             if any(
                 (
                     self.method != "NONE",
@@ -54,7 +56,6 @@ class AssetInput(Input):
                     non_depreciable != acquisition,
                     residual != 0,
                     self.useful_life_months is not None,
-                    self.depreciation_account is not None,
                 )
             ):
                 raise ValueError("Le terrain doit être intégralement non amortissable.")

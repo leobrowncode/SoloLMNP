@@ -94,9 +94,9 @@ puis **Enregistrer un règlement** plus tard.
 
 Menu **Immobilisations** :
 
-1. **Prévisualiser l’amortissement du logement**, puis **Créer les immobilisations affichées**. L’aperçu liste le terrain, la construction et six composants (montants, comptes, durées, mise en service) sans rien enregistrer : ni immobilisation, ni compte. Annuler laisse la base inchangée. Répéter la confirmation ne crée pas de doublon. Les frais de notaire et d’agence sont ajoutés au bâtiment ; les durées proposées sont à confirmer, ce n’est pas un barème légal. Ou saisie manuelle : terrain, puis construction et tous ses composants.
+1. **Prévisualiser l’amortissement du logement**, puis **Créer les immobilisations affichées**. L’aperçu liste le terrain, la construction et six composants (montants, comptes, durées, mise en service) sans rien enregistrer : ni immobilisation, ni compte. Annuler laisse la base inchangée. Répéter la confirmation ne crée pas de doublon. Les frais de notaire et d’agence sont ajoutés au bâtiment ; les durées proposées sont à confirmer, ce n’est pas un barème légal. Ou saisie manuelle : terrain (compte 211, sans amortissement), puis construction (213000 / 281300) et tous ses composants. Le formulaire ne propose que les comptes de la catégorie, jamais un compte 28 comme compte d’immobilisation.
 2. **Faire entrer le bien en comptabilité** (une seule fois, premier exercice) : indiquez le capital restant dû de chaque prêt au début de l’exercice, le solde bancaire à cette date et les frais payés avant (intérêts, assurance emprunteur, frais de dossier). **Prévisualiser**, puis **Comptabiliser**. L’écart va au compte de l’exploitant (108). Les prêts repris ainsi n’ont pas de « déblocage » à saisir : enregistrez seulement les échéances payées pendant l’exercice. Une erreur se corrige en extournant l’écriture depuis le journal.
-3. Mobilier : **Nouvelle immobilisation** avec justification de valeur et de durée.
+3. Mobilier : **Nouvelle immobilisation**, comptes 218400 et 281840, avec justification de valeur et de durée. Un couple déjà enregistré qui ne correspond pas à sa catégorie est signalé sur la fiche. Le registre et le journal ne sont pas réécrits.
 4. Choisir l’exercice 2026 → **Calculer les périodes** → **Comptabiliser** chaque dotation (possible à partir du 31/12, date de la dotation).
 
 ---

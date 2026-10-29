@@ -38,7 +38,14 @@ def build_assets_router(database: Database) -> APIRouter:
             rows.append(
                 {
                     **service.row_json(asset),
-                    "components": [service.row_json(row) for row in components],
+                    "account_warning": service.asset_account_warning(asset),
+                    "components": [
+                        {
+                            **service.row_json(row),
+                            "account_warning": service.component_account_warning(row),
+                        }
+                        for row in components
+                    ],
                 }
             )
         return rows

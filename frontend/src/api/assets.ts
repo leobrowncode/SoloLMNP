@@ -6,12 +6,15 @@ export const assetsRequest = <T>(path: string, method = "GET", body?: unknown) =
 export interface Component {
   id: number; asset_id: number; category: string; label: string; value: string;
   useful_life_months: number; service_start_date: string;
+  asset_account?: string; depreciation_account?: string;
+  account_warning?: string | null;
 }
 export interface Asset {
   id: number; property_id: number; category: string; label: string;
   acquisition_value: string; depreciable_value: string; non_depreciable_value: string;
   residual_value: string; useful_life_months: number | null; method: string;
   asset_account: string; depreciation_account: string | null; components: Component[];
+  account_warning?: string | null;
 }
 export interface DepreciationPeriod {
   id: number; target_type: string; target_id: number; target_label: string; base: string;

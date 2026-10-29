@@ -51,3 +51,26 @@ La durée est une estimation documentée de l'utilisation par l'activité. Le lo
 fournit pas de barème automatique. Si une construction est décomposée, les composants
 doivent couvrir exactement sa base afin d'éviter un double amortissement ou une omission.
 Détails et sources : [PHASE4_REPORT.md](PHASE4_REPORT.md).
+
+Le formulaire manuel ne propose que les comptes actifs de la catégorie. Le serveur
+refuse tout autre couple, y compris sur un appel direct à l’API. Le compte
+d’amortissement est le miroir de même longueur : on insère 8 après le chiffre de
+classe et on retire le dernier chiffre (`213000` → `281300`, `213500` → `281350`,
+`218400` → `281840`).
+
+| Catégorie | Comptes d’immobilisation | Exemple |
+|---|---|---|
+| Terrain | 211, sans compte 28 | 211000 |
+| Construction | 212, 213 hors 2135, 214 | 213000 / 281300 |
+| Travaux immobilisés | 2135, 2181 | 213500 / 281350 |
+| Équipement | 215, 2182, 2183 | 218300 / 281830 |
+| Mobilier | 2184 | 218400 / 281840 |
+| Autre | 218 hors 2181 à 2184 | sous-compte à ouvrir, avec son miroir 28 |
+
+Un composant de construction n’utilise que les comptes construction ou agencement
+(212, 213, 214, 2135, 2181) et leur miroir. Les comptes 28 et 29 ne sont jamais des
+comptes d’immobilisation.
+
+Un couple déjà enregistré qui ne respecte pas cette règle est signalé sur la fiche.
+Le registre est immuable : ni la ligne, ni le composant, ni le journal ne sont
+réécrits. La correction reste un acte explicite.

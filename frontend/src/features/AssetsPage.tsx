@@ -2,11 +2,18 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { assetsRequest as api, type Asset, type DepreciationPeriod } from "../api/assets";
 import { request, type Account, type Setup } from "../api/ledger";
 import { operationsRequest, type Property } from "../api/operations";
+import {
+  alignAssetDraft, assetAccountChoices, componentAssetChoices, DEFAULT_ASSET,
+  depreciationAccountChoices, mirrorDepreciation, preferredAccount,
+} from "./assetAccounts";
 import PropertyEntry from "./PropertyEntry";
 import ReviewForm, { type Field } from "./ReviewForm";
 import "./ledger.css";
 
-interface Editor { title: string; path: string; fields: Field[]; retry?: boolean; }
+interface Editor {
+  title: string; path: string; fields: Field[]; retry?: boolean;
+  derive?: ((draft: Record<string, string>, changed: string) => Partial<Record<string, string>>) | undefined;
+}
 const categories: [string, string][] = [
   ["BUILDING", "Construction"], ["FURNITURE", "Mobilier"], ["EQUIPMENT", "Équipement"],
   ["IMPROVEMENT", "Travaux immobilisés"], ["OTHER", "Autre immobilisation"],
@@ -80,12 +87,15 @@ export default function AssetsPage() {
     return () => { active = false; ++requests.current; };
   }, [yearId, revision]);
 
-  const account = (name: string, label: string, prefix: string, value?: string): Field => ({
-    name, label, value, choices: accounts.filter((row) => row.active && row.number.startsWith(prefix)).map((row) => [row.number, `${row.number} · ${row.label}`]),
-  });
   const property: Field = { name: "property_id", label: "Bien", choices: properties.map((row) => [String(row.id), row.name]) };
   function openAsset(land: boolean) {
-    setEditor({ title: land ? "Inscrire un terrain non amortissable" : "Inscrire une immobilisation", path: "", fields: [
+    const category = land ? "LAND" : "BUILDING";
+    const assetAccount = preferredAccount(assetAccountChoices(accounts, category), DEFAULT_ASSET[category]);
+    const depreciationAccount = preferredAccount(
+      depreciationAccountChoices(accounts, assetAccount),
+      mirrorDepreciation(assetAccount),
+    );
+    const fields: Field[] = [
       property,
       { name: "category", label: "Catégorie", choices: land ? [["LAND", "Terrain — jamais amorti"]] : categories },
       { name: "label", label: "Libellé" },
@@ -97,20 +107,50 @@ export default function AssetsPage() {
       { name: "residual_value", label: "Valeur résiduelle (€)", money: true, value: "0.00" },
       { name: "method", label: "Méthode", choices: land ? [["NONE", "Aucune — terrain"]] : [["LINEAR", "Linéaire"]] },
       { name: "useful_life_months", label: "Durée d’utilisation en mois", type: "number", optional: land },
-      account("asset_account", "Compte d’immobilisation", "2", land ? "211000" : undefined),
-      { ...account("depreciation_account", "Compte d’amortissement", "28"), optional: land },
+      {
+        name: "asset_account", label: "Compte d’immobilisation", value: assetAccount,
+        choicesFor: (draft) => assetAccountChoices(accounts, land ? "LAND" : draft.category ?? ""),
+        hint: land
+          ? "Compte 211 uniquement. Le terrain n’a pas de compte d’amortissement."
+          : "Uniquement les comptes de la catégorie. Les comptes 28 n’y figurent pas.",
+      },
+    ];
+    if (!land) fields.push({
+      name: "depreciation_account", label: "Compte d’amortissement", value: depreciationAccount,
+      choicesFor: (draft) => depreciationAccountChoices(accounts, draft.asset_account ?? ""),
+      hint: "Compte 28 miroir du compte d’immobilisation, par exemple 213000 et 281300.",
+    });
+    fields.push(
       { name: "basis_reason", label: "Justification de la valeur (au moins 5 caractères)" },
       { name: "duration_reason", label: "Justification de la durée (au moins 5 caractères)", value: land ? "Terrain non amortissable" : undefined },
-    ] });
+    );
+    setEditor({
+      title: land ? "Inscrire un terrain non amortissable" : "Inscrire une immobilisation",
+      path: "", fields,
+      derive: (draft, changed) => alignAssetDraft(accounts, draft, changed, land ? "land" : "asset"),
+    });
   }
   function openComponent(asset: Asset) {
-    setEditor({ title: `Ajouter un composant à ${asset.label}`, path: `/${asset.id}/components`, fields: [
+    const assetAccount = preferredAccount(componentAssetChoices(accounts), asset.asset_account);
+    const depreciationAccount = preferredAccount(
+      depreciationAccountChoices(accounts, assetAccount),
+      asset.depreciation_account,
+    );
+    setEditor({ title: `Ajouter un composant à ${asset.label}`, path: `/${asset.id}/components`, derive: (draft, changed) => alignAssetDraft(accounts, draft, changed, "component"), fields: [
       { name: "category", label: "Catégorie technique" }, { name: "label", label: "Libellé" },
       { name: "value", label: "Valeur du composant (€)", money: true },
       { name: "useful_life_months", label: "Durée d’utilisation en mois", type: "number" },
       { name: "service_start_date", label: "Date de mise en service", type: "date" },
-      account("asset_account", "Compte d’immobilisation", "2", asset.asset_account),
-      account("depreciation_account", "Compte d’amortissement", "28", asset.depreciation_account ?? undefined),
+      {
+        name: "asset_account", label: "Compte d’immobilisation", value: assetAccount,
+        choicesFor: () => componentAssetChoices(accounts),
+        hint: "Construction ou agencement (213 ou 2135), jamais 211 ni 28.",
+      },
+      {
+        name: "depreciation_account", label: "Compte d’amortissement", value: depreciationAccount,
+        choicesFor: (draft) => depreciationAccountChoices(accounts, draft.asset_account ?? ""),
+        hint: "Compte 28 miroir : 213000 avec 281300, 213500 avec 281350.",
+      },
       { name: "basis_reason", label: "Justification de la ventilation" },
       { name: "duration_reason", label: "Justification de la durée" },
     ] });
@@ -204,7 +244,7 @@ export default function AssetsPage() {
 
   return <section id="assets" className="ledger-page" aria-labelledby="assets-title">
     <h2 id="assets-title">Immobilisations</h2>
-    <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations.</p>
+    <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations. Le formulaire ne propose que les comptes de la catégorie. Un couple déjà enregistré et incohérent est signalé ; il n’est pas réécrit.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}{message && <p role="status">{message}</p>}
     {!setup?.activity ? <p>Initialisez d’abord l’activité, l’exercice et le bien.</p> : <>
       <button disabled={!properties.length} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
@@ -254,12 +294,16 @@ export default function AssetsPage() {
         years={setup.years.filter((year) => year.status === "OPEN")}
         onDone={(text) => { setError(""); setMessage(text); setRevision((value) => value + 1); }}
       />
-      {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} />}
+      {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} derive={editor.derive} />}
       {assets.map((row) => <article className="entry-card" key={row.id}><h3>{row.label}</h3>
         <p>{row.category} · Valeur {row.acquisition_value} € · Base {row.depreciable_value} € · Non amortissable {row.non_depreciable_value} €</p>
         <p>{row.category === "LAND" ? "Terrain protégé : aucun plan d’amortissement" : `Linéaire sur ${row.useful_life_months} mois · ${row.asset_account} / ${row.depreciation_account}`}</p>
+        {row.account_warning && <p role="alert" className="ledger-error">{row.account_warning}</p>}
         {row.category === "BUILDING" && <><p>Ajoutez tous les composants avant le premier calcul ; leur total doit couvrir exactement la base.</p><button onClick={() => openComponent(row)}>Ajouter un composant</button></>}
-        {row.components.map((part) => <p key={part.id}>↳ {part.label} · {part.value} € · {part.useful_life_months} mois</p>)}
+        {row.components.map((part) => <div key={part.id}>
+          <p>↳ {part.label} · {part.value} € · {part.useful_life_months} mois</p>
+          {part.account_warning && <p role="alert" className="ledger-error">{part.account_warning}</p>}
+        </div>)}
       </article>)}
       <div className="section-heading"><div><h3>Dotations comptables</h3><p>Le calcul en jours calendaires ne modifie jamais la couche fiscale.</p></div>
         <label>Exercice<select value={yearId} onChange={(event) => {

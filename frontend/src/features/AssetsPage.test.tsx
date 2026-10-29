@@ -180,3 +180,99 @@ test("drops a dwelling preview started for another property", async () => {
   expect(screen.queryByRole("button", { name: "Créer les immobilisations affichées" })).not.toBeInTheDocument();
   expect(calls.some((call) => call.startsWith("POST"))).toBe(false);
 });
+
+const chart = [
+  ["211000", "Terrains"], ["211100", "Autre terrain"], ["213000", "Constructions"],
+  ["213100", "Construction inactive"], ["213500", "Installations"], ["218300", "Matériel"],
+  ["218400", "Mobilier"], ["218500", "Autre corporel"], ["281300", "Amort. constructions"],
+  ["281350", "Amort. installations"], ["281830", "Amort. matériel"], ["281840", "Amort. mobilier"],
+  ["281850", "Amort. autre"], ["512000", "Banques"],
+].map(([number, label], index) => ({ number, label, account_type: "ASSET", active: index !== 3 }));
+
+function optionValues(label: string): string[] {
+  return [...(screen.getByLabelText(label) as HTMLSelectElement).options].map((option) => option.value);
+}
+
+test("proposes only the accounts of the selected category", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url === "/api/ledger/setup") return response({ activity: { id: 1 }, years: [{ id: 1, year: 2025, status: "OPEN" }] });
+    if (url === "/api/ledger/accounts") return response(chart);
+    if (url === "/api/operations/properties") return response([{ id: 1, name: "Bien fictif" }]);
+    if (url === "/api/assets") return response([{
+      id: 2, property_id: 1, category: "BUILDING", label: "Construction fictive",
+      acquisition_value: "80000.00", depreciable_value: "80000.00", non_depreciable_value: "0.00",
+      residual_value: "0.00", useful_life_months: 360, method: "LINEAR",
+      asset_account: "213000", depreciation_account: "281300", components: [],
+    }]);
+    if (url.endsWith("/periods")) return response([]);
+    throw new Error(`Unexpected ${url}`);
+  });
+  render(<AssetsPage />);
+  fireEvent.click(await screen.findByRole("button", { name: "Nouvelle immobilisation" }));
+  expect(screen.getByLabelText("Catégorie")).toHaveValue("BUILDING");
+  expect(screen.getByLabelText("Compte d’immobilisation")).toHaveValue("213000");
+  expect(screen.getByLabelText("Compte d’amortissement")).toHaveValue("281300");
+  expect(optionValues("Compte d’immobilisation")).toEqual(["213000"]);
+  expect(optionValues("Compte d’amortissement")).toEqual(["281300"]);
+  for (const category of ["FURNITURE", "EQUIPMENT", "IMPROVEMENT", "OTHER"] as const) {
+    fireEvent.change(screen.getByLabelText("Catégorie"), { target: { value: category } });
+  }
+  expect(screen.getByLabelText("Compte d’immobilisation")).toHaveValue("218500");
+  expect(screen.getByLabelText("Compte d’amortissement")).toHaveValue("281850");
+  expect(optionValues("Compte d’immobilisation")).toEqual(["218500"]);
+  expect(optionValues("Compte d’amortissement")).not.toContain("281300");
+  fireEvent.change(screen.getByLabelText("Catégorie"), { target: { value: "FURNITURE" } });
+  expect(screen.getByLabelText("Compte d’immobilisation")).toHaveValue("218400");
+  expect(optionValues("Compte d’immobilisation")).toEqual(["218400"]);
+  expect(optionValues("Compte d’amortissement")).toEqual(["281840"]);
+  fireEvent.change(screen.getByLabelText("Catégorie"), { target: { value: "EQUIPMENT" } });
+  expect(optionValues("Compte d’immobilisation")).toEqual(["218300"]);
+  expect(optionValues("Compte d’amortissement")).toEqual(["281830"]);
+  fireEvent.change(screen.getByLabelText("Catégorie"), { target: { value: "IMPROVEMENT" } });
+  expect(optionValues("Compte d’immobilisation")).toEqual(["213500"]);
+  expect(optionValues("Compte d’amortissement")).toEqual(["281350"]);
+  fireEvent.change(screen.getByLabelText("Catégorie"), { target: { value: "BUILDING" } });
+  expect(optionValues("Compte d’immobilisation")).toEqual(["213000"]);
+  expect(optionValues("Compte d’immobilisation")).not.toEqual(expect.arrayContaining(["211000", "281300", "512000"]));
+  fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+  fireEvent.click(screen.getByRole("button", { name: "Inscrire un terrain" }));
+  expect(screen.getByLabelText("Compte d’immobilisation")).toHaveValue("211000");
+  expect(optionValues("Compte d’immobilisation")).toEqual(["211000", "211100"]);
+  expect(screen.queryByLabelText("Compte d’amortissement")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ajouter un composant" }));
+  expect(optionValues("Compte d’immobilisation")).toEqual(["213000", "213500"]);
+  expect(optionValues("Compte d’amortissement")).toEqual(["281300"]);
+  fireEvent.change(screen.getByLabelText("Compte d’immobilisation"), { target: { value: "213500" } });
+  expect(screen.getByLabelText("Compte d’amortissement")).toHaveValue("281350");
+  expect(optionValues("Compte d’amortissement")).toEqual(["281350"]);
+});
+
+test("shows an inconsistent stored pair without offering to rewrite it", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url === "/api/ledger/setup") return response({ activity: { id: 1 }, years: [{ id: 1, year: 2025, status: "OPEN" }] });
+    if (url === "/api/ledger/accounts") return response([]);
+    if (url === "/api/operations/properties") return response([{ id: 1, name: "Bien fictif" }]);
+    if (url.endsWith("/periods")) return response([]);
+    if (url === "/api/assets") return response([{
+      id: 3, property_id: 1, category: "BUILDING", label: "Construction incohérente",
+      acquisition_value: "80000.00", depreciable_value: "80000.00", non_depreciable_value: "0.00",
+      residual_value: "0.00", useful_life_months: 360, method: "LINEAR",
+      asset_account: "211000", depreciation_account: "281300",
+      account_warning: "Le compte 211000 correspond à Terrain. Le registre et les écritures ne sont pas réécrits.",
+      components: [{
+        id: 9, asset_id: 3, category: "STRUCTURE", label: "Mauvais composant", value: "1000.00",
+        useful_life_months: 120, service_start_date: "2025-01-01",
+        account_warning: "Le compte 218400 n’est pas autorisé. Le registre et les écritures ne sont pas réécrits.",
+      }],
+    }]);
+    throw new Error(`Unexpected ${url}`);
+  });
+  render(<AssetsPage />);
+  expect(await screen.findByText(/Le compte 211000 correspond à Terrain/)).toBeInTheDocument();
+  expect(screen.getByText(/Le compte 218400 n’est pas autorisé/)).toBeInTheDocument();
+  expect(screen.getByText(/211000 \/ 281300/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Corriger" })).not.toBeInTheDocument();
+});

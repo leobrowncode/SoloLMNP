@@ -120,4 +120,32 @@ describe("ReviewForm", () => {
     }));
     expect(save.mock.calls[0]?.[0]).not.toHaveProperty("operation_type");
   });
+
+  it("refreshes dependent choices when another field changes", async () => {
+    render(<ReviewForm
+      title="Comptes"
+      fields={[
+        {
+          name: "category", label: "Catégorie",
+          choices: [["BUILDING", "Construction"], ["FURNITURE", "Mobilier"]],
+        },
+        {
+          name: "asset_account", label: "Compte", value: "213000",
+          choicesFor: (draft) => draft.category === "FURNITURE"
+            ? [["218400", "218400 · Mobilier"]]
+            : [["213000", "213000 · Constructions"], ["211000", "211000 · Terrains"]],
+        },
+      ]}
+      derive={(draft, changed) => (
+        changed === "category" && draft.category === "FURNITURE" ? { asset_account: "218400" } : {}
+      )}
+      onSave={vi.fn()}
+      onCancel={() => undefined}
+    />);
+    expect(screen.getByLabelText("Compte")).toHaveValue("213000");
+    expect(screen.getByRole("option", { name: "211000 · Terrains" })).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Catégorie"), "FURNITURE");
+    expect(screen.getByLabelText("Compte")).toHaveValue("218400");
+    expect(screen.queryByRole("option", { name: "211000 · Terrains" })).not.toBeInTheDocument();
+  });
 });

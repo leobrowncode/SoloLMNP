@@ -8,6 +8,8 @@ export interface Field {
   money?: boolean;
   value?: string | undefined;
   choices?: [string, string][];
+  /** Options that depend on the current draft (category, asset account, …). */
+  choicesFor?: ((draft: Record<string, string>) => [string, string][]) | undefined;
   optional?: boolean;
   /** UI-only field excluded from the save payload (backend forbids extras). */
   local?: boolean;
@@ -21,9 +23,13 @@ function readField(field: Field, raw: string): unknown {
   return raw || (field.optional ? null : "");
 }
 
-function labelOf(field: Field, value: unknown): string {
+function choicesOf(field: Field, draft: Record<string, string>): [string, string][] | undefined {
+  return field.choicesFor?.(draft) ?? field.choices;
+}
+
+function labelOf(field: Field, value: unknown, draft: Record<string, string>): string {
   const key = String(value ?? "");
-  return field.choices?.find(([choice]) => choice === key)?.[1] ?? (key || "—");
+  return choicesOf(field, draft)?.find(([choice]) => choice === key)?.[1] ?? (key || "—");
 }
 
 export default function ReviewForm({
@@ -164,12 +170,13 @@ export default function ReviewForm({
             {groupFields.map((field) => {
               const controlId = `${formUid}-${field.name}`;
               const hintId = field.hint ? `${controlId}-hint` : undefined;
+              const choices = choicesOf(field, draft);
               return (
                 <div key={field.name} className={field.money ? "form-field field-money" : "form-field"}>
                   <label htmlFor={controlId}>
                     {field.label}{field.optional ? " (facultatif)" : ""}
                   </label>
-                  {field.choices ? (
+                  {choices ? (
                     <select
                       id={controlId}
                       name={field.name}
@@ -180,10 +187,10 @@ export default function ReviewForm({
                     >
                       {field.optional && (
                         <option value="">
-                          {field.choices.find(([value]) => value === "")?.[1] ?? "—"}
+                          {choices.find(([value]) => value === "")?.[1] ?? "—"}
                         </option>
                       )}
-                      {field.choices.filter(([value]) => value !== "").map(([value, label]) => (
+                      {choices.filter(([value]) => value !== "").map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
@@ -221,7 +228,7 @@ export default function ReviewForm({
             {fields.filter((field) => !field.local).map((field) => (
               <div key={field.name}>
                 <dt>{field.label}</dt>
-                <dd>{labelOf(field, review[field.name])}</dd>
+                <dd>{labelOf(field, review[field.name], draft)}</dd>
               </div>
             ))}
             {sumInto && (
