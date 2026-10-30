@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import FiscalPage from "./FiscalPage";
 
@@ -600,4 +601,92 @@ test("a failed export read can be retried and a later failure keeps the posture 
   fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
   expect(await screen.findByText(/exigent un exercice clôturé/)).toBeInTheDocument();
   expect(screen.queryByText(/peuvent être périmées/)).not.toBeInTheDocument();
+});
+
+test("wires every fiscal help control as an accessible popover", async () => {
+  const user = userEvent.setup();
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    if (url.endsWith("/vintages")) {
+      return response({ vintages: [{ vintage: "2025", status: "research_only", blocked: [], executable: [] }] });
+    }
+    if (url.endsWith("/setup")) return response({ years: [{ id: 1, year: 2025, status: "OPEN" }] });
+    if (url.endsWith("/statements")) {
+      return response({
+        income_statement: {
+          income: [],
+          expenses: [{ account_number: "615000", label: "Entretien", amount: "400.00" }],
+          total_income: "1000.00",
+          total_expenses: "1200.00",
+          result: "-200.00",
+        },
+      });
+    }
+    if (isFiscalRead(url, method)) return notComputed();
+    if (url.includes("/api/fiscal/years/1") && method === "POST") {
+      return response({
+        status: "research_only",
+        declarable: false,
+        accounting_result: "-200.00",
+        fiscal_result: "0.00",
+        deductible_depreciation: "600.00",
+        unused_depreciation: "200.00",
+        tax_loss: "0.00",
+        non_deductible: "0.00",
+        details: {
+          operating_income: "1000.00",
+          other_charges: "400.00",
+          accounting_depreciation: "800.00",
+          capacity: "600.00",
+          current_deductible_depreciation: "600.00",
+          prior_depreciation_used: "0.00",
+          prior_tax_loss_used: "0.00",
+          goal_hint: "Résultat fiscal à 0 €.",
+          prior_carry_forward_use: { status: "enabled", depreciation: [], tax_loss: [] },
+        },
+      });
+    }
+    if (url.endsWith("/exports")) return response(exportBody(false, "bloquee"));
+    return response({});
+  });
+
+  render(<FiscalPage />);
+  expect(await screen.findByRole("heading", { name: /Loyers & charges comptabilisés/ })).toBeInTheDocument();
+  const triggers = screen.getAllByRole("button", { name: /^Aide :/ });
+  expect(triggers.length).toBeGreaterThanOrEqual(12);
+  const ids = new Set<string>();
+  for (const trigger of triggers) {
+    expect(trigger).toHaveAccessibleName();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    const controls = trigger.getAttribute("aria-controls");
+    expect(controls).toBeTruthy();
+    expect(trigger).toHaveAttribute("aria-describedby", controls);
+    expect(ids.has(controls ?? "")).toBe(false);
+    ids.add(controls ?? "");
+    const panel = document.getElementById(controls ?? "");
+    expect(panel).toHaveAttribute("role", "tooltip");
+    expect(panel).toHaveAttribute("hidden");
+  }
+  expect(document.querySelectorAll(".help-tip").length).toBe(triggers.length);
+
+  const beforeCompute = triggers.length;
+  await user.click(screen.getByRole("button", { name: "Calculer le résultat fiscal" }));
+  expect(await screen.findByText(/Résultat fiscal à 0 €/)).toBeInTheDocument();
+  const after = screen.getAllByRole("button", { name: /^Aide :/ });
+  expect(after.length).toBeGreaterThan(beforeCompute);
+  for (const trigger of after) {
+    const controls = trigger.getAttribute("aria-controls");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveAttribute("aria-describedby", controls);
+    expect(document.getElementById(controls ?? "")).toHaveAttribute("role", "tooltip");
+  }
+
+  const plafond = screen.getByRole("button", { name: "Aide : Plafond" });
+  await user.click(plafond);
+  expect(plafond).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("tooltip")).toHaveTextContent(/ne peut pas dépasser/);
+  await user.keyboard("{Escape}");
+  expect(plafond).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 });

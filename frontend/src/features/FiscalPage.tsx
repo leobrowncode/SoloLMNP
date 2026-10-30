@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RequestError, request } from "../api/ledger";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import { describedBy, fiscalActionCauses } from "./actionCauses";
 import CloseYear from "./CloseYear";
+import HelpTip from "./HelpTip";
 import PrerequisiteList from "./PrerequisiteList";
 import ExportDownloads from "./ExportDownloads";
 import { asExportStatus, type ExportStatus } from "./exportStatus";
@@ -96,15 +97,6 @@ interface AdjustmentDraft {
   account_number: string;
   amount: string;
   justification: string;
-}
-
-function HelpTip({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <span className="help-tip">
-      <button type="button" className="help-tip-btn" aria-label={`Aide : ${label}`}>?</button>
-      <span role="tooltip" className="help-tip-panel">{children}</span>
-    </span>
-  );
 }
 
 function Metric({
