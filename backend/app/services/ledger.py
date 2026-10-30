@@ -271,12 +271,24 @@ def reverse_entry(
     return entry
 
 
-def projection(session: Session, year_id: int, account: str | None = None) -> dict[str, Any]:
+def projection(
+    session: Session,
+    year_id: int,
+    account: str | None = None,
+    *,
+    include_ledger: bool = True,
+) -> dict[str, Any]:
     get_year(session, year_id)
+    conditions = [
+        AccountingEntry.fiscal_year_id == year_id,
+        AccountingEntry.status == "VALIDATED",
+    ]
+    if account is not None:
+        conditions.append(AccountingEntryLine.account_number == account)
     rows = session.execute(
         select(AccountingEntryLine, AccountingEntry)
         .join(AccountingEntry, AccountingEntry.id == AccountingEntryLine.accounting_entry_id)
-        .where(AccountingEntry.fiscal_year_id == year_id, AccountingEntry.status == "VALIDATED")
+        .where(*conditions)
         .order_by(
             AccountingEntry.accounting_date, AccountingEntry.sequence, AccountingEntryLine.position
         )
@@ -299,7 +311,7 @@ def projection(session: Session, year_id: int, account: str | None = None) -> di
         )
         cell["debit_cents"] += debit
         cell["credit_cents"] += credit
-        if account is None or account == line.account_number:
+        if include_ledger and (account is None or account == line.account_number):
             ledger.append(
                 {
                     "account_number": line.account_number,

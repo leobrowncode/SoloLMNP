@@ -48,6 +48,24 @@ def test_validation_issues_map_pydantic_locations() -> None:
     assert issues[0]["code"] == "missing"
 
 
+def test_validation_issues_drop_the_pydantic_english_prefix() -> None:
+    issues = validation_issues(
+        [
+            {
+                "type": "value_error",
+                "loc": ("body", "end_date"),
+                "msg": (
+                    "Value error, La date de fin doit être postérieure ou égale à la date de début."
+                ),
+            }
+        ]
+    )
+    assert issues[0]["message"] == (
+        "La date de fin doit être postérieure ou égale à la date de début."
+    )
+    assert issues[0]["field"] == "end_date"
+
+
 def test_fail_can_override_field() -> None:
     with pytest.raises(HTTPException) as exc:
         fail("BANK_REQUIRED", "Banque requise.", 422, field="bank_account_id")

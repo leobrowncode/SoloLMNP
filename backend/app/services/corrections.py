@@ -101,6 +101,11 @@ def write_audit(
 
 def closed_cap_blocks(session: Session, label: str) -> bool:
     """True when a closed exercise stored this label in its depreciation cap."""
+    from app.services.asset_read_cache import cached_cap_label
+
+    cached = cached_cap_label(session, label)
+    if cached is not None:
+        return cached
     details_rows = session.scalars(
         select(FiscalComputation.details)
         .join(FiscalYear, FiscalYear.id == FiscalComputation.fiscal_year_id)
@@ -137,6 +142,11 @@ def calculated_periods(session: Session, schedule_id: int) -> list[DepreciationP
 def count_periods(session: Session, schedule_ids: list[int], status: str) -> int:
     if not schedule_ids:
         return 0
+    from app.services.asset_read_cache import cached_period_count
+
+    cached = cached_period_count(session, schedule_ids, status)
+    if cached is not None:
+        return cached
     return len(
         session.scalars(
             select(DepreciationPeriod.id).where(
@@ -276,6 +286,11 @@ def touches(changed: dict[str, object], groups: dict[str, str], names: set[str])
 def period_in_closed_year(session: Session, schedule_ids: list[int]) -> bool:
     if not schedule_ids:
         return False
+    from app.services.asset_read_cache import cached_closed_period
+
+    cached = cached_closed_period(session, schedule_ids)
+    if cached is not None:
+        return cached
     rows = session.execute(
         select(DepreciationPeriod.fiscal_year_id)
         .where(

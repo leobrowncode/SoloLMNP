@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import stat
 import zipfile
 from uuid import uuid4
 
@@ -262,6 +263,25 @@ def test_close_reopen_fec_efi_and_documents(client, settings):
     )
     assert rejected.status_code == 422
     assert rejected.json()["detail"]["code"] == "DOCUMENT_SIGNATURE"
+
+
+def test_backup_rejects_zip_slip_members(client, settings):
+    root = settings.database_path.parent / "backups"
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / "sololmnp-slip.zip"
+    info = zipfile.ZipInfo("documents/..\\secret.txt")
+    info.external_attr = stat.S_IFLNK << 16
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(info, b"nope")
+        archive.writestr("manifest.json", json.dumps({"files": []}))
+        archive.writestr("database.sqlite3", b"not a database")
+    rejected = client.post(
+        "/api/filing/backup/restore",
+        json={"filename": path.name, "confirmation": "RESTAURER"},
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["detail"]["code"] == "BACKUP_REJECTED"
+    assert not (settings.documents_dir / "secret.txt").exists()
 
 
 def test_backup_round_trip_rejects_escape(client, settings):

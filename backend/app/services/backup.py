@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import sqlite3
+import stat
 import tempfile
 import time
 import zipfile
@@ -105,6 +106,8 @@ def verify_backup(settings: Settings, filename: str) -> dict[str, Any]:
             database = Path(folder) / "database.sqlite3"
             with zipfile.ZipFile(path) as archive:
                 archive.extract("database.sqlite3", folder)
+            if not _inside(database, Path(folder)):
+                fail("BACKUP_REJECTED", "Chemin d’archive refusé.", 422)
             _check_database(database)
     except HTTPException as exc:
         _record_check(path, ok=False, message=_error_message(exc))
@@ -212,6 +215,8 @@ def _inspect(path: Path) -> tuple[dict[str, Any], dict[str, int]]:
         with zipfile.ZipFile(path) as archive:
             manifest = json.loads(archive.read("manifest.json"))
             archive.extract("database.sqlite3", folder)
+        if not _inside(database, Path(folder)):
+            fail("BACKUP_REJECTED", "Chemin d’archive refusé.", 422)
         _check_database(database)
         try:
             counts = population(database)
@@ -255,6 +260,8 @@ def _replace_live_database(settings: Settings, database: Database, archive_path:
         extracted = Path(folder) / "database.sqlite3"
         with zipfile.ZipFile(archive_path) as archive:
             archive.extract("database.sqlite3", folder)
+        if not _inside(extracted, Path(folder)):
+            fail("BACKUP_REJECTED", "Chemin d’archive refusé.", 422)
         _check_database(extracted)
         incoming = destination.with_name(f"{destination.name}.incoming")
         try:
@@ -300,7 +307,10 @@ def _replace_documents(root: Path, files: list[tuple[str, bytes]]) -> None:
         for name, content in files:
             if not _single_segment(name):
                 fail("BACKUP_REJECTED", "Chemin de document refusé.", 422)
-            (staging / name).write_bytes(content)
+            target = staging / name
+            if not _inside(target, staging):
+                fail("BACKUP_REJECTED", "Chemin de document refusé.", 422)
+            target.write_bytes(content)
         if root.exists():
             previous = root.parent / f".documents-previous-{uuid4().hex}"
             os.replace(root, previous)
@@ -318,7 +328,40 @@ def _replace_documents(root: Path, files: list[tuple[str, bytes]]) -> None:
 
 
 def _single_segment(name: str) -> bool:
-    return bool(name) and name == Path(name).name and ".." not in name and not name.startswith(".")
+    return (
+        bool(name)
+        and name == Path(name).name
+        and ".." not in name
+        and "\\" not in name
+        and "\x00" not in name
+        and not name.startswith(".")
+    )
+
+
+def _unsafe_member(member: str) -> bool:
+    if (
+        not member
+        or member.endswith("/")
+        or "\\" in member
+        or "\x00" in member
+        or member.startswith("/")
+        or (len(member) >= 2 and member[1] == ":")
+    ):
+        return True
+    parts = member.split("/")
+    return any(part in {"", ".", ".."} for part in parts)
+
+
+def _is_symlink(info: zipfile.ZipInfo) -> bool:
+    return stat.S_ISLNK(info.external_attr >> 16)
+
+
+def _inside(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    return not path.is_symlink()
 
 
 def _file_record(path: Path, name: str) -> dict[str, object]:
@@ -343,12 +386,16 @@ def _validate_archive(path: Path) -> None:
             for item in manifest["files"]
             if isinstance(item, dict) and isinstance(item.get("name"), str)
         }
+        total = 0
         for info in archive.infolist():
             member = info.filename
-            if member.endswith("/") or member.startswith("/") or ".." in member.split("/"):
+            if _unsafe_member(member) or _is_symlink(info):
                 fail("BACKUP_REJECTED", "Chemin d’archive refusé.", 422)
             if info.file_size > MAX_MEMBER:
                 fail("BACKUP_REJECTED", "Membre d’archive trop volumineux.", 422)
+            total += info.file_size
+            if total > MAX_ARCHIVE:
+                fail("BACKUP_REJECTED", "Archive trop volumineuse ou lien refusé.", 422)
             if member == "manifest.json":
                 continue
             record = listed.get(member)

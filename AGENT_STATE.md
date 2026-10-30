@@ -7,7 +7,7 @@
 
 - Completed through: liasse LMNP IR conforme à la notice 2033, entrée du bien au premier exercice, dossier de contrôle FEC
 - Current phase: exercice 2026 (premier exercice réel : achat 09/01/2026, location et exercice depuis le 06/04/2026)
-- Current objective: saisie des données réelles 2026 par l’utilisateur, clôture début 2027, recopie EFI
+- Current objective: saisie des données réelles 2026 par l’utilisateur, clôture début 2027, recopie EFI. Les millésimes 2025 et 2026 restent en recherche.
 
 ## Completed
 
@@ -21,9 +21,9 @@
 
 ## Active work
 
-- Issue: résidus #7 (cession/TVA/PV), #12 restauration manuelle, #13 authentification
-- Branch: main (local)
-- Status: produit utilisable pour la déclaration 2027 (exercice 2026), sous réserve de vérifier les cases sur le formulaire 2027
+- Issue: résidus #7 (cession/TVA/PV). #13 : parcours navigateur, sécurité, axe, volume. Pas d’authentification tant que l’écoute reste locale.
+- Branch: cursor/p12-e2e-security-a11y-perf-2aa3
+- Status: produit utilisable pour préparer l’exercice 2026. Les montants fiscaux restent en recherche, pas une base de déclaration.
 
 ## Important decisions
 

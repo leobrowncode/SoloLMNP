@@ -110,3 +110,7 @@ constaté. L’invalidation de ce calcul sort le mouvement du solde. Le registre
 `depreciation_carry_forward` ou `tax_loss_carry_forward` conserve le montant
 créé par exercice d’origine. Un amortissement non déduit n’a pas de mouvement
 `expired`. Un recalcul du même exercice remplace ses mouvements.
+
+## Index de lecture du journal
+
+La migration `0011_entry_year_status` ajoute `ix_accounting_entry_year_status_date` sur `accounting_entry` (`fiscal_year_id`, `status`, `accounting_date`, `sequence`). Le journal, la balance, les états et le FEC filtrent les écritures validées d’un exercice puis les trient par date. L’index évite de parcourir toutes les écritures du fichier quand plusieurs exercices sont stockés.

@@ -15,6 +15,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, Literal, cast
 
+from app.core.csv_text import safe_cell
 from app.core.money import to_cents
 
 Profile = Literal["bank", "operations", "loan_payments"]
@@ -227,14 +228,6 @@ def make_issue(
         "location": "import",
         "help": help_id or CODE_HELP.get(code, "import-csv"),
     }
-
-
-def safe_cell(value: str) -> str:
-    if value.startswith(("=", "+", "@")):
-        return "'" + value
-    if value.startswith("-") and not re.fullmatch(r"-[\d\s\u00a0\u202f.,]+", value):
-        return "'" + value
-    return value
 
 
 def rejection_text(issue: dict[str, Any]) -> str:

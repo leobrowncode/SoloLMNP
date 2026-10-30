@@ -46,12 +46,12 @@ composants et une période comptabilisée sans écriture OD conforme. La durée 
 
 ## Contrôles P5 à P12, relus le 2 octobre 2026
 
-La clôture verrouille les écritures, l’audit est append-only et la réouverture exige un motif. Le FEC ne lit que des lignes validées. Le compilateur de formulaires n’utilise pas `eval`. Les dépôts refusent un chemin utilisateur. La restauration refuse `..`, les liens, les doublons, une empreinte fausse et un schéma différent, puis écrit une copie de contrôle sans remplacer la base ouverte.
+La clôture verrouille les écritures, l’audit est append-only et la réouverture exige un motif. Le FEC ne lit que des lignes validées. Le compilateur de formulaires n’utilise pas `eval`. Les dépôts refusent un chemin utilisateur. La restauration refuse un chemin qui sort de l’archive, un lien, un doublon, une empreinte fausse et un schéma différent. Elle prend une sauvegarde préalable, puis remplace le fichier SQLite ouvert. Le détail de la relecture du 30 octobre 2026 est dans [SECURITY.md](SECURITY.md).
 
 Risques qui restent :
 
 - Aucune authentification. L’instance doit rester sur une machine ou un réseau privé.
 - Le propriétaire du fichier SQLite peut le modifier. L’audit n’est pas une piste inviolable.
 - Le statut fiscal `research_only` est volontaire. Un export ou une feuille EFI ne constitue pas une déclaration.
-- La restauration ne bascule pas la base en service. Le remplacement se fait après arrêt, par l’opérateur, à partir de `restore-check.sqlite3`.
+- La restauration remplace la base en service après une sauvegarde préalable. Un échec de contrôle laisse l’ancienne base en place.
 - Les lockfiles Python ne contiennent pas les empreintes de distribution. Les tags d’images restent mutables.

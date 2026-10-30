@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import PROJECT_ROOT
+from app.core.csv_text import safe_cell
 from app.core.money import to_cents
 from app.domain.fiscal.engine import DEPRECIATION_RULE_ID, TAX_LOSS_RULE_ID
 from app.domain.fiscal.loader import load_vintage, public_rule
@@ -272,13 +273,13 @@ def archival_csv(worksheet: dict[str, Any]) -> tuple[bytes, str]:
     for row in document["rows"]:
         writer.writerow(
             [
-                row["form"],
-                row["case"] or "",
-                row["case_status"],
-                row["label"],
-                row["amount"],
-                " ".join(row["rules"]),
-                row["source_url"] or "",
+                safe_cell(str(row["form"])),
+                safe_cell(str(row["case"] or "")),
+                safe_cell(str(row["case_status"])),
+                safe_cell(str(row["label"])),
+                safe_cell(str(row["amount"])),
+                safe_cell(" ".join(row["rules"])),
+                safe_cell(str(row["source_url"] or "")),
             ]
         )
     raw = buffer.getvalue().encode()

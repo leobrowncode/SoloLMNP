@@ -66,6 +66,13 @@ class AccountingEntry(Base):
             unique=True,
             sqlite_where=text("source_type = 'OPENING'"),
         ),
+        Index(
+            "ix_accounting_entry_year_status_date",
+            "fiscal_year_id",
+            "status",
+            "accounting_date",
+            "sequence",
+        ),
         UniqueConstraint("fiscal_year_id", "sequence", name="uq_entry_year_sequence"),
         UniqueConstraint("fiscal_year_id", "entry_number", name="uq_entry_year_number"),
         CheckConstraint("status IN ('DRAFT','VALIDATED')", name="status"),

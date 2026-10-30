@@ -346,7 +346,7 @@ def build_ledger_router(database: Database) -> APIRouter:
 
     @router.get("/years/{year_id}/balance")
     def balance(year_id: int, session: Read) -> dict[str, Any]:
-        result = projection(session, year_id)
+        result = projection(session, year_id, include_ledger=False)
         del result["ledger"]
         return result
 

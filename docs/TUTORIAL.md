@@ -2,7 +2,9 @@
 
 Guide d’utilisation pour un LMNP au réel, location longue durée, y compris une colocation.
 SoloLMNP prépare la liasse à recopier et le FEC. Il n’envoie rien
-sur [impots.gouv.fr](https://www.impots.gouv.fr).
+sur [impots.gouv.fr](https://www.impots.gouv.fr). Le cycle d’un exercice est
+décrit dans [ANNUAL_CYCLE.md](ANNUAL_CYCLE.md). Les millésimes chargés restent
+en recherche : un montant affiché n’est pas une base de déclaration.
 
 ## Démarrer l’application
 

@@ -33,6 +33,7 @@ export function frenchValidityMessage(field: HTMLInputElement | HTMLSelectElemen
     if (field instanceof HTMLInputElement && field.type === "file") return "Choisissez un fichier.";
     return "Ce champ est obligatoire.";
   }
+  if (validity.customError) return field.validationMessage || "Corrigez ce champ.";
   if (field instanceof HTMLInputElement && field.type === "date" && (validity.badInput || validity.typeMismatch)) {
     return "Indiquez une date au format JJ/MM/AAAA.";
   }

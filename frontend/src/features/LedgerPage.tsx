@@ -14,8 +14,9 @@ import {
   type LedgerTab,
 } from "../routing/paths";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
-import { DATE_HINT, enumChoices, enumLabel, formatAmount, formatCents, formatIsoDate } from "../lib/format";
+import { DATE_HINT, YEAR_END_BEFORE_START, enumChoices, enumLabel, formatAmount, formatCents, formatIsoDate } from "../lib/format";
 import FrenchForm from "../lib/FrenchForm";
+import { showFrenchValidation } from "../lib/validation";
 import "./ledger.css";
 import { BrowsableList } from "./BrowsableList";
 import ChartOfAccounts from "./ChartOfAccounts";
@@ -283,7 +284,24 @@ export default function LedgerPage() {
     </FrenchForm>}
     {setup?.activity && <details id="ajouter-exercice" tabIndex={-1} open={!setup.years.length || hash === "#ajouter-exercice"}>
       <summary>{setup.activity.activity_name} · Ajouter un exercice</summary>
-      <FrenchForm onSubmit={(e) => {
+      <FrenchForm onInput={(event) => {
+        const form = event.currentTarget;
+        const start = form.elements.namedItem("start");
+        const end = form.elements.namedItem("end");
+        if (start instanceof HTMLInputElement && end instanceof HTMLInputElement) {
+          end.setCustomValidity(start.value && end.value && start.value > end.value ? YEAR_END_BEFORE_START : "");
+        }
+      }} onSubmit={(e) => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        const start = form.elements.namedItem("start");
+        const endInput = form.elements.namedItem("end");
+        if (start instanceof HTMLInputElement && endInput instanceof HTMLInputElement && start.value && endInput.value && start.value > endInput.value) {
+          endInput.setCustomValidity(YEAR_END_BEFORE_START);
+          showFrenchValidation(form);
+          return;
+        }
+        if (endInput instanceof HTMLInputElement) endInput.setCustomValidity("");
         const data = formData(e);
         const end = String(data.get("end") ?? "");
         const vintage = String(data.get("vintage") ?? "");

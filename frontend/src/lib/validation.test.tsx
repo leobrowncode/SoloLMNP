@@ -57,6 +57,28 @@ describe("French validation", () => {
     expect(input).not.toHaveAttribute("value", "Choose File");
   });
 
+  it("shows a custom date message instead of a generic correction", async () => {
+    render(
+      <FrenchForm onSubmit={(event) => event.preventDefault()}>
+        <label>
+          Fin de l’exercice
+          <input
+            name="end"
+            type="date"
+            required
+            defaultValue="2025-01-01"
+            ref={(node) => node?.setCustomValidity("La date de fin doit être postérieure ou égale à la date de début.")}
+          />
+        </label>
+        <button type="submit">Enregistrer</button>
+      </FrenchForm>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "La date de fin doit être postérieure ou égale à la date de début.",
+    );
+  });
+
   it("keeps an explicit French hint on a date input", () => {
     render(
       <label>

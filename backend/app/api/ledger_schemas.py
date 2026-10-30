@@ -5,7 +5,15 @@ from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from app.core.money import to_cents
 
@@ -86,11 +94,16 @@ class YearInput(Input):
     end_date: date
     fiscal_vintage: Annotated[str, Field(pattern=r"^[0-9]{4}$")]
 
-    @model_validator(mode="after")
-    def dates(self) -> "YearInput":
-        if self.start_date > self.end_date or self.end_date.year != self.year:
-            raise ValueError("Dates d’exercice incohérentes avec l’année de clôture.")
-        return self
+    @field_validator("end_date")
+    @classmethod
+    def dates(cls, end_date: date, info: ValidationInfo) -> date:
+        start = info.data.get("start_date")
+        year = info.data.get("year")
+        if isinstance(start, date) and start > end_date:
+            raise ValueError("La date de fin doit être postérieure ou égale à la date de début.")
+        if isinstance(year, int) and end_date.year != year:
+            raise ValueError("L’année de clôture doit être celle de la date de fin.")
+        return end_date
 
 
 class AccountInput(Input):

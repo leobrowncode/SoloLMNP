@@ -1,10 +1,11 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ledgerPath } from "../routing/paths";
 import { renderWithRouter } from "../routing/testPage";
 import LedgerPage from "./LedgerPage";
 import { cents, amount } from "../api/ledger";
+import { YEAR_END_BEFORE_START } from "../lib/format";
 
 const accounts = [
   { number: "512000", label: "Banque", active: true, account_type: "ASSET" },
@@ -201,5 +202,29 @@ describe("ledger", () => {
     expect(reverse).toBeDisabled();
     expect(document.getElementById("entry-8-reversal")).toHaveTextContent("déjà une extourne");
     expect(document.querySelector('a[href="/comptabilite/journal"]')).toHaveTextContent("Consulter le journal");
+  });
+
+  it("explains an exercise whose end date is before its start", async () => {
+    const fetcher = mockApi();
+    fetcher.mockImplementation(async (url: string) => {
+      const path = String(url).replace("/api/ledger", "");
+      if (path === "/setup") {
+        return new Response(JSON.stringify({
+          activity: { activity_name: "Fictif" },
+          years: [],
+        }), { status: 200 });
+      }
+      if (path === "/accounts") return new Response(JSON.stringify(accounts), { status: 200 });
+      if (path === "/journals") return new Response(JSON.stringify([{ code: "OD", label: "Opérations", active: true }]), { status: 200 });
+      return new Response("{}", { status: 200 });
+    });
+    renderLedger();
+    expect(await screen.findByRole("button", { name: "Créer l’exercice" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Début de l’exercice/), { target: { value: "2025-12-31" } });
+    fireEvent.change(screen.getByLabelText(/Fin de l’exercice/), { target: { value: "2025-01-01" } });
+    fireEvent.change(screen.getByLabelText("Millésime fiscal"), { target: { value: "2025" } });
+    fireEvent.click(screen.getByRole("button", { name: "Créer l’exercice" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(YEAR_END_BEFORE_START);
+    expect(fetcher.mock.calls.some(([url, init]) => String(url).endsWith("/years") && (init as RequestInit | undefined)?.method === "POST")).toBe(false);
   });
 });

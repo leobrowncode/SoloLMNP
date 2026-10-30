@@ -9,8 +9,8 @@
 - P8 : export FEC déterministe des écritures validées d’un exercice clôturé, hors centralisation. Voir [le rapport](docs/PHASE8_REPORT.md).
 - P9 : compilateur de mappings en liste blanche et snapshots immuables. Structure de travail, pas une liasse certifiée. Voir [le rapport](docs/PHASE9_REPORT.md).
 - P10 : feuille de recopie EFI (2031 / 2033) et 2042-C-PRO, document de travail. Revenus 2025 : cases lues sur les PDF archivés ; exercice 2026 : cases bloquées, formulaires 2027 non publiés. Saisie manuelle uniquement. Voir [le rapport](docs/PHASE10_REPORT.md).
-- P11 : dépôt de justificatifs, sauvegarde cohérente et restauration contrôlée vers une copie de vérification. Voir [le rapport](docs/PHASE11_REPORT.md).
-- P12 : scénarios A–J, accessibilité des formulaires de clôture, d’inventaire et d’états, budgets de requêtes. Voir [le rapport](docs/PHASE12_REPORT.md).
+- P11 : dépôt de justificatifs, sauvegarde cohérente et restauration contrôlée. L’archive remplace la base vivante après une sauvegarde préalable. Voir [le rapport](docs/PHASE11_REPORT.md).
+- P12 : scénarios A–J sur l’API, parcours navigateur, relecture de sécurité, axe et vues étroites, volume de lecture. Les millésimes restent en recherche. Voir [le rapport](docs/PHASE12_REPORT.md).
 
 Les issues #6 à #13 restent ouvertes sur leurs résidus. L’outil vise une activité déclarée LMNP ; le LMP est hors périmètre. Les contrôles de cases de la liasse BIC peuvent être satisfaits sans rendre la sortie déclarable. Le statut affiché est Recherche, Provisoire ou Déclarable ; les millésimes 2025 et 2026 restent en Recherche. La cession, la TVA, les plus-values et la ventilation automatique du terrain restent désactivées. Le calcul fiscal stocké reste `research_only`. La 2042-C-PRO des revenus 2025 est numérotée (5NA / 5NY, 5GA à 5GJ) d’après le CERFA 11222*28 ; l’exercice 2026 ne publie pas ces cases. Aucune télétransmission.
 
