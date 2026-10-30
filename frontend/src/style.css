@@ -97,6 +97,9 @@ section{
   display:grid;
   gap:9px
 }
+.nav-links[hidden]{
+  display:none !important
+}
 .nav-toggle{
   display:none
 }
