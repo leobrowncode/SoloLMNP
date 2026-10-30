@@ -9,6 +9,8 @@ from app.main import create_app
 from tests.integration.test_closing import centralize
 from tests.integration.test_closing import client as closing_client  # noqa: F401
 from tests.integration.test_ledger import client as seeded_client  # noqa: F401
+from tests.integration.test_opening import next_year
+from tests.integration.test_opening_posting import close, generate, request
 from tests.integration.test_statements import book
 
 
@@ -30,10 +32,19 @@ def _board(client: TestClient) -> dict[str, Any]:
         "closing",
         "filing",
     ]
+    progress = body["progression"]
+    assert progress["label"] == f"{progress['done']}/{progress['total']}"
+    assert progress["total"] == len(body["steps"])
+    assert progress["current_step"] == body["continue"]["step"]
+    assert progress["done"] == sum(step["status"] == "fait" for step in body["steps"])
     for step in body["steps"]:
         amount = step["amount_cents"]
         assert amount is None or isinstance(amount, int)
         assert isinstance(amount, bool) is False
+        assert step["summary"]
+        assert step["status_label"] in {"À faire", "En cours", "Bloqué", "Prête", "Terminé"}
+        if step["status"] == "bloque":
+            assert step["prerequisites"][0]["action"]["href"].startswith("/")
     return body
 
 
@@ -118,3 +129,86 @@ def test_ready_to_close_continues_to_the_precheck(closing_client) -> None:  # no
     assert filing["status"] == "pret"
     assert "Bloquée" in filing["summary"] or "Provisoire" in filing["summary"]
     assert "recherche" in filing["summary"].lower()
+
+
+def test_first_exercise_progression_follows_persisted_writes(settings, database) -> None:
+    with TestClient(create_app(settings), headers={"X-SoloLMNP-Request": "1"}) as client:
+        empty = _board(client)
+        assert empty["progression"]["label"] == "0/6"
+        assert empty["progression"]["current_status_label"] == "À faire"
+        assert empty["continue"]["href"] == "/comptabilite/brouillons#creer-activite"
+        created = client.post(
+            "/api/ledger/activity",
+            json={"activity_name": "LMNP fictif", "activity_start_date": "2026-01-01"},
+        )
+        assert created.status_code == 201, created.text
+        started = _board(client)
+        assert _step(started, "structure")["status_label"] == "En cours"
+        assert started["continue"]["href"] == "/comptabilite/brouillons#ajouter-exercice"
+        assert started["progression"]["done"] == 0
+        year = client.post(
+            "/api/ledger/years",
+            json={
+                "year": 2026,
+                "start_date": "2026-01-01",
+                "end_date": "2026-12-31",
+                "fiscal_vintage": "2026",
+            },
+        )
+        assert year.status_code == 201, year.text
+        opened = _board(client)
+        assert opened["dossier"]["year"] == 2026
+        assert _step(opened, "opening")["status_label"] == "Terminé"
+        assert "Premier exercice" in _step(opened, "opening")["summary"]
+        assert opened["progression"]["done"] >= 1
+        assert opened["continue"]["href"] == "/comptabilite/brouillons#identite-liasse"
+        assert _board(client)["progression"] == opened["progression"]
+        assert opened["dossier"]["vintage_status"] == "research_only"
+
+
+def test_following_year_opening_survives_a_reload(seeded_client, database) -> None:  # noqa: F811
+    identity = seeded_client.post("/api/ledger/activity/identity", json={"siren": "123456789"})
+    assert identity.status_code == 200, identity.text
+    first = _board(seeded_client)
+    assert first["dossier"]["year"] == 2025
+    assert _step(first, "opening")["status_label"] == "Terminé"
+    assert "Premier exercice" in _step(first, "opening")["summary"]
+    assert _board(seeded_client)["progression"] == first["progression"]
+
+    book(seeded_client, "512000", "706000", "100.00")
+    next_year(seeded_client)
+    blocked = _board(seeded_client)
+    assert blocked["dossier"]["year"] == 2026
+    opening = _step(blocked, "opening")
+    assert opening["status_label"] == "Bloqué"
+    assert opening["prerequisites"][0]["action"]["href"] == "/fiscalite#close-title"
+    assert blocked["continue"]["href"] == "/fiscalite#close-title"
+    assert blocked["progression"]["current_step"] == "opening"
+    assert _board(seeded_client)["progression"] == blocked["progression"]
+
+    for number in ("120000", "129000"):
+        created = seeded_client.post(
+            "/api/ledger/accounts",
+            json={"number": number, "label": "Résultat", "account_type": "EQUITY"},
+        )
+        assert created.status_code == 201, created.text
+    close(database)
+    waiting = _board(seeded_client)
+    opening = _step(waiting, "opening")
+    assert opening["status_label"] == "En cours"
+    assert opening["prerequisites"][0]["code"] == "OPENING_MISSING"
+    assert opening["prerequisites"][0]["action"]["href"] == "/etats-comptables#opening-title"
+    assert waiting["continue"]["step"] == "operations"
+    assert waiting["continue"]["href"] == "/operations/biens#ajouter-bien"
+
+    generated = generate(seeded_client, request(seeded_client))
+    assert generated.status_code == 200, generated.text
+    posted = _board(seeded_client)
+    opening = _step(posted, "opening")
+    assert opening["status_label"] == "Terminé"
+    assert isinstance(opening["amount_cents"], int)
+    assert isinstance(opening["amount_cents"], bool) is False
+    assert opening["amount_cents"] > 0
+    assert posted["progression"]["done"] == waiting["progression"]["done"] + 1
+    assert posted["dossier"]["vintage_status"] == "research_only"
+    assert _board(seeded_client)["progression"] == posted["progression"]

@@ -23,9 +23,9 @@ STATUS_FAIT = "fait"
 STATUS_LABELS = {
     STATUS_A_FAIRE: "À faire",
     STATUS_EN_COURS: "En cours",
-    STATUS_BLOQUE: "Bloquée",
+    STATUS_BLOQUE: "Bloqué",
     STATUS_PRET: "Prête",
-    STATUS_FAIT: "Faite",
+    STATUS_FAIT: "Terminé",
 }
 
 _POSTURE_LABELS = {"provisoire": "Provisoire", "bloquee": "Bloquée", "finale": "Finale"}
@@ -132,10 +132,12 @@ def build_dashboard(facts: DashboardFacts) -> dict[str, Any]:
         _closing(facts),
         _filing(facts),
     ]
+    action = _continue(facts, steps)
     payload = {
         "dossier": dict(facts.dossier),
-        "continue": _continue(facts, steps),
+        "continue": action,
         "steps": steps,
+        "progression": _progression(steps, action),
     }
     return _guard(payload)
 
@@ -460,23 +462,43 @@ def _step(
 
 
 def _continue(facts: DashboardFacts, steps: list[dict[str, Any]]) -> dict[str, Any]:
+    """Next action from the first real blocker, then the first unfinished step."""
     blocked = next((step for step in steps if step["status"] == STATUS_BLOQUE), None)
     if blocked is not None and blocked["prerequisites"]:
         return _from_prerequisite(blocked)
     if facts.year_status == "CLOSED":
         return _direct("filing", "/fiscalite#sorties-figees", "voir les sorties")
-    closing = next(step for step in steps if step["id"] == "closing")
-    if closing["status"] == STATUS_PRET:
-        if facts.year_status == "READY_TO_CLOSE":
+    if facts.year_status == "READY_TO_CLOSE":
+        closing = next(step for step in steps if step["id"] == "closing")
+        if closing["status"] != STATUS_BLOQUE:
             return _direct("closing", "/fiscalite#close-title", "confirmer la clôture")
-        return _direct("closing", "/fiscalite#close-title", "voir le pré-contrôle")
     pending = next((step for step in steps if step["status"] != STATUS_FAIT), None)
     if pending is None:
         return _direct("filing", "/fiscalite#sorties-figees", "voir les sorties")
+    if pending["id"] == "closing" and pending["status"] == STATUS_PRET:
+        if facts.year_status == "READY_TO_CLOSE":
+            return _direct("closing", "/fiscalite#close-title", "confirmer la clôture")
+        return _direct("closing", "/fiscalite#close-title", "voir le pré-contrôle")
     if pending["prerequisites"]:
         return _from_prerequisite(pending)
     label, href = _FALLBACK[str(pending["id"])]
     return _direct(str(pending["id"]), href, label)
+
+
+def _progression(steps: list[dict[str, Any]], action: Mapping[str, Any]) -> dict[str, Any]:
+    done = sum(1 for step in steps if step["status"] == STATUS_FAIT)
+    total = len(steps)
+    current = next(step for step in steps if step["id"] == action["step"])
+    return {
+        "done": done,
+        "total": total,
+        "label": f"{done}/{total}",
+        "current_step": current["id"],
+        "current_label": current["label"],
+        "current_status": current["status"],
+        "current_status_label": current["status_label"],
+        "summary": current["summary"],
+    }
 
 
 def _from_prerequisite(step: Mapping[str, Any]) -> dict[str, Any]:
@@ -576,4 +598,23 @@ def _guard(payload: dict[str, Any]) -> dict[str, Any]:
     encoded = json.dumps(payload, ensure_ascii=False).lower()
     if "declarable" in encoded or "déclarable" in encoded:
         raise ValueError("Le tableau de bord ne présente pas un dossier déclarable.")
+    progress = payload["progression"]
+    done = sum(1 for step in payload["steps"] if step["status"] == STATUS_FAIT)
+    if progress["done"] != done or progress["total"] != len(payload["steps"]):
+        raise ValueError("La progression ne correspond pas aux étapes.")
+    if progress["label"] != f"{done}/{progress['total']}":
+        raise ValueError("Le libellé de progression ne correspond pas au décompte.")
+    if progress["current_step"] != payload["continue"]["step"]:
+        raise ValueError("La progression ne correspond pas à la prochaine action.")
+    for step in payload["steps"]:
+        summary = step["summary"]
+        if not isinstance(summary, str) or not summary.strip():
+            raise ValueError("Chaque étape a une justification.")
+        if step["status"] != STATUS_BLOQUE:
+            continue
+        hrefs = [item["action"]["href"] for item in step["prerequisites"]]
+        if not hrefs or any(
+            not isinstance(href, str) or not href.startswith("/") for href in hrefs
+        ):
+            raise ValueError("Chaque blocage a un lien correctif.")
     return payload

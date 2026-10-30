@@ -42,11 +42,13 @@ Si un écran affiche une erreur de chargement, **Réessayer** relance la lecture
 
 Le bandeau affiche le **statut dossier** : Incomplet, Bloqué, Prêt à vérifier ou Clôturé. Il est calculé sur l’exercice en cours (ou le dernier exercice s’ils sont tous clôturés) à partir de la clôture, du statut fiscal et de la posture des exports. Il ne dit jamais que le dossier est déclarable : les millésimes restent en recherche. **Stockage opérationnel** n’apparaît que dans **Diagnostic technique**, sur la vue d’ensemble. « Aucun envoi » est à côté des sorties fiscales (liasse, PDF, FEC), pas dans le bandeau.
 
-La vue d’ensemble est le tableau de bord du dossier, pas une copie du menu. Le menu reste la navigation. Chaque étape (structure et SIREN, opérations, immobilisations et amortissements, à-nouveaux, clôture, fiscalité et exports) affiche son état, les prérequis manquants — les mêmes explications et liens que sur une action désactivée — et le dernier événement utile. **Continuer** ouvre la prochaine action. Ces états viennent du serveur (`GET /api/dashboard`), pas d’une liste locale. Rien n’y est présenté comme déclarable : les millésimes restent en recherche. Les montants affichés sont des centimes convertis en euros.
+La vue d’ensemble est le tableau de bord du dossier, pas une copie du menu. Le menu reste la navigation. Chaque étape (structure et SIREN, opérations, immobilisations et amortissements, à-nouveaux, clôture, fiscalité et exports) affiche **Terminé**, **À faire**, **En cours** ou **Bloqué**, avec une justification. Une clôture prête à confirmer affiche **Prête**. Les prérequis manquants reprennent les mêmes explications et liens que sur une action désactivée, et chaque blocage propose le lien qui le corrige. Le dernier événement utile est indiqué. **Continuer** ouvre la prochaine action, celle du premier prérequis réel : un à-nouveaux bloqué par l’exercice précédent passe avant le pré-contrôle.
+
+Le bandeau reprend cette progression à côté du statut dossier, sur toutes les pages : le décompte des étapes terminées et **Continuer**. Le statut dossier reste affiché. Ces états viennent du serveur (`GET /api/dashboard`), pas d’une liste enregistrée dans le navigateur. Recharger la page ou ouvrir un autre navigateur donne le même résultat. Rien n’y est présenté comme déclarable : les millésimes restent en recherche. Les montants affichés sont des centimes convertis en euros.
 
 Alternative Docker : voir [DEPLOYMENT.md](DEPLOYMENT.md).
 
-Vérifier, sur la vue d’ensemble, que le statut dossier s’affiche, que le tableau de bord indique la prochaine action avec **Continuer**, et que **Diagnostic technique** dit **Stockage opérationnel**. Ce libellé n’est pas repris sur les autres pages.
+Vérifier, sur la vue d’ensemble, que le statut dossier s’affiche, que la progression du bandeau indique le décompte et **Continuer**, et que le tableau de bord détaille chaque étape. Ouvrir une autre page du menu : le statut dossier et la progression restent, **Diagnostic technique** non. **Stockage opérationnel** n’est que dans ce diagnostic.
 
 ---
 

@@ -16,9 +16,9 @@ export type DashboardStepId = (typeof DASHBOARD_STEPS)[number];
 export const DASHBOARD_STATUS_LABELS = {
   a_faire: "À faire",
   en_cours: "En cours",
-  bloque: "Bloquée",
+  bloque: "Bloqué",
   pret: "Prête",
-  fait: "Faite",
+  fait: "Terminé",
 } as const;
 
 export type DashboardStepStatus = keyof typeof DASHBOARD_STATUS_LABELS;
@@ -57,10 +57,22 @@ export interface DashboardContinue {
   step: DashboardStepId;
 }
 
+export interface DashboardProgression {
+  done: number;
+  total: number;
+  label: string;
+  current_step: DashboardStepId;
+  current_label: string;
+  current_status: DashboardStepStatus;
+  current_status_label: (typeof DASHBOARD_STATUS_LABELS)[DashboardStepStatus];
+  summary: string;
+}
+
 export interface DashboardPayload {
   dossier: DossierStatus;
   continue: DashboardContinue;
   steps: DashboardStep[];
+  progression: DashboardProgression;
 }
 
 const FORBIDDEN = /declarable|déclarable/i;
@@ -116,13 +128,44 @@ function isContinue(value: unknown): value is DashboardContinue {
   return DASHBOARD_STEPS.some((id) => id === value.step);
 }
 
+function isCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isProgression(
+  value: unknown,
+  steps: DashboardStep[],
+  next: DashboardContinue,
+): value is DashboardProgression {
+  if (!record(value) || !isCount(value.done) || !isCount(value.total)) return false;
+  if (value.done > value.total || value.label !== `${value.done}/${value.total}`) return false;
+  if (!DASHBOARD_STEPS.some((id) => id === value.current_step) || value.current_step !== next.step) return false;
+  if (typeof value.current_label !== "string" || typeof value.summary !== "string") return false;
+  if (FORBIDDEN.test(value.current_label) || FORBIDDEN.test(value.summary) || FORBIDDEN.test(String(value.label))) {
+    return false;
+  }
+  const status = value.current_status;
+  if (typeof status !== "string" || !(status in DASHBOARD_STATUS_LABELS)) return false;
+  const code = status as DashboardStepStatus;
+  if (value.current_status_label !== DASHBOARD_STATUS_LABELS[code]) return false;
+  if (steps.length === 0) return true;
+  if (value.total !== steps.length || value.done !== steps.filter((step) => step.status === "fait").length) return false;
+  const current = steps.find((step) => step.id === value.current_step);
+  if (!current) return false;
+  return current.label === value.current_label
+    && current.status === code
+    && current.status_label === value.current_status_label
+    && current.summary === value.summary;
+}
+
 export function isDashboard(value: unknown): value is DashboardPayload {
   if (!record(value) || !isDossierStatus(value.dossier) || !isContinue(value.continue)) return false;
   const steps = value.steps;
   if (!Array.isArray(steps)) return false;
-  if (steps.length === 0) return true;
+  if (steps.length === 0) return isProgression(value.progression, [], value.continue);
   if (steps.length !== DASHBOARD_STEPS.length) return false;
-  return DASHBOARD_STEPS.every((id, index) => isStep(steps[index], id));
+  if (!DASHBOARD_STEPS.every((id, index) => isStep(steps[index], id))) return false;
+  return isProgression(value.progression, steps as DashboardStep[], value.continue);
 }
 
 export async function fetchDashboard(signal: AbortSignal): Promise<DashboardPayload> {

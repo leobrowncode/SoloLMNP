@@ -1,4 +1,4 @@
-import type { DashboardPayload, DashboardStep, DashboardStepId, DashboardStepStatus } from "../api/dashboard";
+import type { DashboardContinue, DashboardPayload, DashboardProgression, DashboardStep, DashboardStepId, DashboardStepStatus } from "../api/dashboard";
 import { DASHBOARD_STATUS_LABELS } from "../api/dashboard";
 import type { DossierStatus } from "../api/status";
 
@@ -52,9 +52,46 @@ const siren = {
   action: { label: "Renseigner le SIREN", href: "/comptabilite/brouillons#identite-liasse" },
 };
 
-export function dashboardFixture(kind: "empty" | "partial" | "blocked" | "ready" | "blank"): DashboardPayload {
+function attach(
+  payload: Omit<DashboardPayload, "progression">,
+): DashboardPayload {
+  const steps = payload.steps;
+  const next: DashboardContinue = payload.continue;
+  let progression: DashboardProgression;
+  if (steps.length === 0) {
+    progression = {
+      done: 0,
+      total: 0,
+      label: "0/0",
+      current_step: next.step,
+      current_label: LABELS[next.step],
+      current_status: "a_faire",
+      current_status_label: "À faire",
+      summary: "Aucun dossier à afficher.",
+    };
+  } else {
+    const done = steps.filter((item) => item.status === "fait").length;
+    const current = steps.find((item) => item.id === next.step) ?? steps[0];
+    if (!current) throw new Error("Étape de progression absente.");
+    progression = {
+      done,
+      total: steps.length,
+      label: `${done}/${steps.length}`,
+      current_step: current.id,
+      current_label: current.label,
+      current_status: current.status,
+      current_status_label: current.status_label,
+      summary: current.summary,
+    };
+  }
+  return { ...payload, progression };
+}
+
+export function dashboardFixture(
+  kind: "empty" | "partial" | "blocked" | "ready" | "blank" | "followingBlocked" | "followingOpen" | "followingPosted",
+): DashboardPayload {
   if (kind === "blank") {
-    return {
+    return attach({
       dossier: dossier("incomplet", "Incomplet", null, null),
       continue: {
         label: "Continuer",
@@ -63,10 +100,10 @@ export function dashboardFixture(kind: "empty" | "partial" | "blocked" | "ready"
         step: "structure",
       },
       steps: [],
-    };
+    });
   }
   if (kind === "empty") {
-    return {
+    return attach({
       dossier: dossier("incomplet", "Incomplet", null, null),
       continue: {
         label: "Continuer",
@@ -82,10 +119,10 @@ export function dashboardFixture(kind: "empty" | "partial" | "blocked" | "ready"
           ? { prerequisites: [{ code: "NO_ACTIVITY", message: "L’activité n’est pas créée.", action: { label: "Créer l’activité", href: "/comptabilite/brouillons#creer-activite" } }] }
           : {},
       )),
-    };
+    });
   }
   if (kind === "partial") {
-    return {
+    return attach({
       dossier: dossier("incomplet", "Incomplet", "OPEN", 2026),
       continue: {
         label: "Continuer",
@@ -116,10 +153,10 @@ export function dashboardFixture(kind: "empty" | "partial" | "blocked" | "ready"
         }),
         step("filing", "en_cours", "Calculez le résultat fiscal avant de télécharger la liasse ou le PDF."),
       ],
-    };
+    });
   }
   if (kind === "blocked") {
-    return {
+    return attach({
       dossier: dossier("bloque", "Bloqué", "OPEN", 2026),
       continue: {
         label: "Continuer",
@@ -142,9 +179,69 @@ export function dashboardFixture(kind: "empty" | "partial" | "blocked" | "ready"
           }],
         }),
       ],
-    };
+    });
   }
-  return {
+  if (kind === "followingBlocked" || kind === "followingOpen" || kind === "followingPosted") {
+    const opening = kind === "followingPosted"
+      ? step("opening", "fait", "Les à-nouveaux sont comptabilisés.", { amount_cents: 250050 })
+      : kind === "followingBlocked"
+        ? step("opening", "bloque", "L’exercice précédent n’est pas clôturé : ces soldes peuvent changer.", {
+          prerequisites: [{
+            code: "SOURCE_NOT_CLOSED",
+            message: "L’exercice précédent n’est pas clôturé : ces soldes peuvent changer.",
+            action: { label: "Clôturer l’exercice précédent", href: "/fiscalite#close-title" },
+          }],
+        })
+        : step("opening", "en_cours", "Les à-nouveaux ne sont pas comptabilisés.", {
+          prerequisites: [{
+            code: "OPENING_MISSING",
+            message: "Les à-nouveaux ne sont pas comptabilisés.",
+            action: { label: "Prévisualiser les à-nouveaux", href: "/etats-comptables#opening-title" },
+          }],
+        });
+    const closingReady = kind === "followingOpen";
+    const next: DashboardContinue = kind === "followingBlocked"
+      ? {
+        label: "Continuer",
+        href: "/fiscalite#close-title",
+        detail: "Prochaine action : Clôturer l’exercice précédent.",
+        step: "opening",
+      }
+      : kind === "followingOpen"
+        ? {
+          label: "Continuer",
+          href: "/etats-comptables#opening-title",
+          detail: "Prochaine action : Prévisualiser les à-nouveaux.",
+          step: "opening",
+        }
+        : {
+          label: "Continuer",
+          href: "/fiscalite#calcul-fiscal",
+          detail: "Prochaine action : Calculer le résultat fiscal.",
+          step: "closing",
+        };
+    return attach({
+      dossier: dossier("incomplet", "Incomplet", "OPEN", 2026),
+      continue: next,
+      steps: [
+        step("structure", "fait", "Activité, exercice 2026 et SIREN sont en place."),
+        step("operations", "fait", "Des opérations sont enregistrées.", { amount_cents: 5000 }),
+        step("assets", "fait", "Les dotations de l’exercice sont comptabilisées.", { amount_cents: 1000 }),
+        opening,
+        closingReady
+          ? step("closing", "pret", "Le pré-contrôle ne bloque pas. Préparez la clôture.")
+          : step("closing", "en_cours", "Aucun calcul fiscal n’est enregistré pour cet exercice.", {
+            prerequisites: [{
+              code: "FISCAL_NOT_COMPUTED",
+              message: "Aucun calcul fiscal n’est enregistré pour cet exercice.",
+              action: { label: "Calculer le résultat fiscal", href: "/fiscalite#calcul-fiscal" },
+            }],
+          }),
+        step("filing", "en_cours", "Aucun calcul fiscal n’est enregistré pour cet exercice. Millésime en recherche."),
+      ],
+    });
+  }
+  return attach({
     dossier: dossier("pret_a_verifier", "Prêt à vérifier", "READY_TO_CLOSE", 2026),
     continue: {
       label: "Continuer",
@@ -169,5 +266,5 @@ export function dashboardFixture(kind: "empty" | "partial" | "blocked" | "ready"
         }],
       }),
     ],
-  };
+  });
 }

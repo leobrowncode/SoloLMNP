@@ -79,12 +79,14 @@ describe("overview dashboard", () => {
     expect(screen.getByText(/Exercice 2026 créé/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Renseigner le SIREN" })).toBeInTheDocument();
     expect(screen.getAllByText("En cours").length).toBeGreaterThan(0);
+    expect(screen.getByText("Terminé")).toBeInTheDocument();
+    expect(screen.getByText(/Premier exercice/)).toBeInTheDocument();
   });
 
   it("shows a blocked dossier in cents and keeps the research vintage", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(dashboardFixture("blocked"))));
     renderBoard();
-    expect((await screen.findAllByText("Bloquée")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Bloqué")).length).toBeGreaterThan(0);
     expect(screen.getByText(/Montant des opérations/)).toBeInTheDocument();
     expect(screen.getByText("123.45 €")).toBeInTheDocument();
     expect(screen.getByText("25.00 €")).toBeInTheDocument();
@@ -111,6 +113,42 @@ describe("overview dashboard", () => {
     expect(screen.queryByText(/déclarable/i)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Aide : Clôture" }));
     expect(screen.getByRole("tooltip")).toHaveTextContent("Gel de l’exercice");
+  });
+
+  it("moves a following year from a blocked opening to the posted balances", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce(reply(dashboardFixture("followingBlocked")))
+      .mockResolvedValueOnce(reply(dashboardFixture("followingOpen")))
+      .mockResolvedValueOnce(reply(dashboardFixture("followingPosted")));
+    vi.stubGlobal("fetch", request);
+    const view = renderBoard();
+    expect(await screen.findByText("Bloqué")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Clôturer l’exercice précédent" })).toHaveAttribute(
+      "href",
+      "/fiscalite#close-title",
+    );
+    expect(screen.getByRole("link", { name: "Continuer" })).toHaveAttribute("href", "/fiscalite#close-title");
+    expect(screen.getAllByText("Terminé").length).toBeGreaterThan(0);
+    view.unmount();
+
+    const open = renderBoard();
+    expect((await screen.findAllByText("Les à-nouveaux ne sont pas comptabilisés.")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "Prévisualiser les à-nouveaux" })).toHaveAttribute(
+      "href",
+      "/etats-comptables#opening-title",
+    );
+    expect(screen.getByRole("link", { name: "Continuer" })).toHaveAttribute(
+      "href",
+      "/etats-comptables#opening-title",
+    );
+    expect(screen.getByText("Prête")).toBeInTheDocument();
+    open.unmount();
+
+    renderBoard();
+    expect(await screen.findByText("Les à-nouveaux sont comptabilisés.")).toBeInTheDocument();
+    expect(screen.getByText("2500.50 €")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continuer" })).toHaveAttribute("href", "/fiscalite#calcul-fiscal");
+    expect(screen.queryByText(/déclarable/i)).not.toBeInTheDocument();
   });
 
   it("rejects a payload that calls the dossier declarable", () => {

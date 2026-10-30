@@ -171,6 +171,13 @@ main{
   letter-spacing:-.3px;
   color:#254536
 }
+.topbar-meta{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:flex-start;
+  gap:8px 28px;
+  width:100%
+}
 .dossier-status{
   margin:0;
   max-width:42rem
@@ -195,6 +202,27 @@ main{
   color:#6d7f72;
   font-size:12px;
   line-height:1.45
+}
+.dossier-progress{
+  margin:0;
+  max-width:34rem
+}
+.dossier-progress p{
+  margin:0
+}
+.dossier-progress a,
+.dossier-progress button{
+  color:#254536;
+  font-weight:650;
+  font-size:13px
+}
+.dossier-progress button{
+  margin-top:4px;
+  padding:0;
+  border:0;
+  background:transparent;
+  cursor:pointer;
+  text-decoration:underline
 }
 .dashboard-board{
   margin-top:36px
@@ -597,6 +625,9 @@ footer{
     min-height:56px;
     padding:12px 6%;
     font-size:13px
+  }
+  .dossier-progress{
+    max-width:none
   }
   .content{
     padding:31px 6% 22px
