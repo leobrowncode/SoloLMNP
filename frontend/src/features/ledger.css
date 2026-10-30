@@ -127,6 +127,35 @@
 .cap-cats li span:last-child { color: #355245; white-space: nowrap; }
 .report-list li { margin: .25rem 0; }
 .liasse-links a { font-weight: 600; }
+.export-board { display: grid; gap: .75rem; margin-top: .75rem; min-width: 0; }
+.export-board-list { display: grid; gap: .75rem; }
+.export-card {
+  display: grid;
+  gap: .4rem;
+  min-width: 0;
+  padding: .85rem 1rem;
+  border: 1px solid #d8e0d8;
+  border-radius: 10px;
+  background: #fff;
+}
+.export-card header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .75rem;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.export-card h4 { margin: 0; }
+.export-card p, .export-card li { overflow-wrap: anywhere; margin: 0; }
+.export-card ul { margin: 0; padding-left: 1.15rem; }
+.export-card button { justify-self: start; min-height: 2.75rem; }
+.export-posture { font-weight: 700; }
+.export-card-provisoire { background: #fff9ef; border-color: #e0c08a; }
+.export-card-bloquee { background: #fbf6f6; border-color: #e3c1c1; }
+.export-card-finale { background: #e7f6e8; border-color: #9cbc9a; }
+@media (max-width: 40rem) {
+  .export-card button { justify-self: stretch; }
+}
 .liasse-sheet .ledger-error ul { margin: .35rem 0 0; padding-left: 1.2rem; }
 .property-entry { margin: 1rem 0; }
 .fiscal-panel {

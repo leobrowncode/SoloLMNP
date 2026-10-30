@@ -138,7 +138,7 @@ export default function LedgerPage() {
         siret: String(data.get("siret") ?? ""),
       }), "Identité enregistrée. Elle apparaîtra en tête de la liasse.");
     }}>
-      <h3>Identité pour la liasse</h3>
+      <h3 id="identite-liasse">Identité pour la liasse</h3>
       <p>Le SIRET figure sur la 2031. Laissez vide si vous ne l’avez pas encore.</p>
       <label>SIREN<input name="siren" inputMode="numeric" maxLength={9} defaultValue={setup.activity.siren ?? ""} /></label>
       <label>SIRET<input name="siret" inputMode="numeric" maxLength={14} defaultValue={setup.activity.siret ?? ""} /></label>

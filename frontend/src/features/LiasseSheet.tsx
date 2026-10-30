@@ -83,7 +83,7 @@ function frDate(value?: string): string {
   return `${d}/${m}/${y}`;
 }
 
-export default function LiasseSheet({ worksheet, yearId }: { worksheet: Worksheet; yearId: number }) {
+export default function LiasseSheet({ worksheet }: { worksheet: Worksheet }) {
   const fields = worksheet.liasse?.fields ?? [];
   const blocking = worksheet.blocking ?? [];
   const warnings = worksheet.warnings ?? [];
@@ -133,15 +133,12 @@ export default function LiasseSheet({ worksheet, yearId }: { worksheet: Workshee
       )}
 
       <p className="liasse-links">
-        <a href={`/api/filing/years/${yearId}/efi.pdf`}>PDF de recopie</a>
-        {worksheet.frozen && <>
-          {" · "}<a href={`/api/filing/years/${yearId}/fec`}>FEC</a>
-          {" · "}<a href={`/api/filing/years/${yearId}/archive`}>Dossier de contrôle (FEC + description + liasse)</a>
-        </>}
-        {" · "}
         <a href={worksheet.portal ?? "https://www.impots.gouv.fr/professionnel/teleprocedures-efi-ou-edi"} target="_blank" rel="noreferrer">
           impots.gouv.fr — déclarer en mode EFI
         </a>
+      </p>
+      <p className="field-hint">
+        Le PDF, le FEC et le dossier de contrôle sont au-dessus. Chacun est marqué Provisoire, Bloquée ou Finale. Un téléchargement refusé reste sur cette page.
       </p>
 
       {(worksheet.instructions ?? []).length > 0 && (

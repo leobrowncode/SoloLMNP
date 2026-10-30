@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { RequestError, request } from "../api/ledger";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import CloseYear from "./CloseYear";
+import ExportDownloads from "./ExportDownloads";
+import { asExportStatus, type ExportStatus } from "./exportStatus";
 import LiasseSheet, { type Worksheet } from "./LiasseSheet";
 import { calculationNotice, outputLabel, outputTrust } from "./outputStatus";
 import "./ledger.css";
@@ -296,6 +298,9 @@ export default function FiscalPage() {
   const [result, setResult] = useState<Computation | null>(null);
   const [statements, setStatements] = useState<Statements | null>(null);
   const [worksheet, setWorksheet] = useState<Worksheet | null>(null);
+  const [exportStatus, setExportStatus] = useState<ExportStatus | null>(null);
+  const [exportFailed, setExportFailed] = useState(false);
+  const [exportTick, setExportTick] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [adjustments, setAdjustments] = useState<AdjustmentDraft[]>([]);
@@ -330,6 +335,22 @@ export default function FiscalPage() {
     }, (reason: Error) => { if (current) setError(reason.message); });
     return () => { current = false; };
   }, [year]);
+
+  useEffect(() => {
+    if (!year) return;
+    let current = true;
+    void request<unknown>(`/years/${year}/exports`, "GET", undefined, "/api/filing").then((value) => {
+      if (!current) return;
+      const parsed = asExportStatus(value);
+      setExportStatus(parsed);
+      setExportFailed(parsed === null);
+    }, () => {
+      if (!current) return;
+      setExportStatus(null);
+      setExportFailed(true);
+    });
+    return () => { current = false; };
+  }, [year, exportTick]);
 
   useEffect(() => {
     if (!year) return;
@@ -372,6 +393,7 @@ export default function FiscalPage() {
       };
       const next = await request<Computation>(`/years/${year}`, "POST", payload, "/api/fiscal");
       if (resultEpoch.current === epoch) setResult(next);
+      setExportTick((tick) => tick + 1);
     } catch (reason) {
       if (resultEpoch.current !== epoch) return;
       setResult(null);
@@ -405,6 +427,7 @@ export default function FiscalPage() {
   }
 
   async function refreshExercise() {
+    setExportTick((tick) => tick + 1);
     const token = refreshToken.current;
     const epoch = resultEpoch.current;
     const selected = year;
@@ -539,7 +562,6 @@ export default function FiscalPage() {
         <button id="calcul-fiscal" type="button" disabled={!year || busy} onClick={() => { void compute(); }}>
           {busy ? "Calcul…" : "Calculer le résultat fiscal"}
         </button>
-        <a href={year ? `/api/filing/years/${year}/export.xlsx` : undefined}>Export tableur (.xlsx, Google Sheets)</a>
       </div>
 
       <ul className="fiscal-rules-strip" aria-label="Règles LMNP utiles">
@@ -862,18 +884,21 @@ export default function FiscalPage() {
       <div className="fiscal-panel" id="sorties-figees">
         <h3>Sorties figées</h3>
         <p className="field-hint">
-          Liasse et FEC après la clôture. Avant la clôture, la liasse reste un calcul en cours.
+          Chaque sortie indique Provisoire, Bloquée ou Finale. Une sortie bloquée liste ses prérequis
+          et ne se télécharge pas. Le refus reste sur cette page.
         </p>
         <div className="toolbar">
           <button type="button" disabled={!year || busy} onClick={() => { void loadWorksheet(); }}>
             Liasse à recopier
           </button>
-          {selectedYear?.status === "CLOSED"
-            ? <a href={`/api/filing/years/${year}/fec`}>Télécharger le FEC</a>
-            : <p>Le FEC sera disponible après la clôture.</p>}
         </div>
+        {year !== 0 && exportStatus && <ExportDownloads yearId={year} status={exportStatus} />}
+        {year !== 0 && !exportStatus && exportFailed && (
+          <p>Les sorties n’ont pas pu être lues. Rechargez la page.</p>
+        )}
+        {year !== 0 && !exportStatus && !exportFailed && <p role="status">Chargement des sorties…</p>}
       </div>
-      {worksheet && <LiasseSheet worksheet={worksheet} yearId={year} />}
+      {worksheet && <LiasseSheet worksheet={worksheet} />}
 
       <details className="fiscal-panel">
         <summary>Millésimes chargés (technique)</summary>

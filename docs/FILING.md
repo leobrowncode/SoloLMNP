@@ -26,7 +26,7 @@ effectués pendant cette vérification documentaire.
 2. Calculer le résultat fiscal sur le ledger final. L’écran recharge le dernier calcul, avec sa date et l’empreinte du ledger. Une empreinte de ledger différente, ou une correction des hypothèses de calcul (bien, immobilisation, composant, emprunt), marque ce résultat obsolète. Un recalcul refusé ne le laisse pas affiché comme calcul en cours.
 3. Lancer le pré-contrôle, accuser les avertissements, puis clôturer. La clôture fige le package.
 4. Contrôler les écritures, calculs et formulaires figés.
-5. Exporter le rapport et la feuille de saisie EFI.
+5. Exporter le rapport et la feuille de saisie EFI. Chaque sortie affiche Provisoire, Bloquée ou Finale ; une sortie Bloquée ne se télécharge pas et indique le prérequis manquant.
 6. L'utilisateur ouvre lui-même son espace professionnel impots.gouv.fr.
 7. Il recopie les valeurs, contrôle puis valide lui-même la déclaration.
 8. Il archive l'accusé fourni par le portail.

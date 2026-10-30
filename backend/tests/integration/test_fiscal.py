@@ -311,9 +311,13 @@ def test_validated_record_distinguishes_provisional_and_declarable(client, monke
     assert blocked["declarable"] is False
     assert blocked["exports"]["liasse"]["posture"] == "bloquee"
     assert "prête à recopier" not in blocked["output_headline"].casefold()
-    blocked_pdf = client.get("/api/filing/years/1/efi.pdf").content.lower()
-    assert b"provisoire" in blocked_pdf
-    assert b"pr\xeate \xe0 recopier" not in blocked_pdf
+    blocked_pdf = client.get("/api/filing/years/1/efi.pdf")
+    assert blocked_pdf.status_code == 409
+    detail = blocked_pdf.json()["detail"]
+    assert detail["code"] in {"SIREN_MANQUANT", "EXPORT_BLOCKED"}
+    assert detail["action"]["href"].endswith("#identite-liasse")
+    blob = detail["message"] + " ".join(item["message"] for item in detail.get("issues") or [])
+    assert "SIREN" in blob
     precheck = client.get("/api/filing/years/1/precheck").json()
     assert precheck["output_status"] == "provisoire"
     codes = {item["code"] for item in precheck["warnings"]}

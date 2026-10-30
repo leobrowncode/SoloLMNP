@@ -13,6 +13,7 @@ from app.domain.filing.mappings import compile_package
 from app.domain.fiscal.output_status import (
     OUTPUT_PROVISOIRE,
     OUTPUT_RECHERCHE,
+    align_controlled_exports,
     classify,
     load_validation,
 )
@@ -73,6 +74,7 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
     fec = render_fec(session, year.id)
     fec_errors = list(fec["validation"]["errors"])
     errors.extend(fec_errors)
+    fec_blocked = bool(fec_errors) or not fec["siren"]
     # The liasse compiler reads the stored computation. Wait until that
     # computation exists and matches the ledger, so a missing or stale
     # calculation stays a single error instead of being repeated by the mapping.
@@ -91,14 +93,16 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
             copy_complete=False,
             year_closed=year.status == "CLOSED",
             produced=False,
-            fec_blocked=bool(fec_errors),
+            fec_blocked=fec_blocked,
         )
         output_status = str(summary["output_status"])
         output_label = str(summary["output_label"])
         exports = summary["exports"]
-    if fec_errors or year.status != "CLOSED":
-        blocked = {"posture": "bloquee", "label": "Bloquée"}
-        exports = {**exports, "fec": blocked, "archive": blocked}
+    exports = align_controlled_exports(
+        exports,
+        year_closed=year.status == "CLOSED",
+        fec_blocked=fec_blocked,
+    )
     if fiscal_current and output_status == OUTPUT_RECHERCHE:
         warnings.append(
             {

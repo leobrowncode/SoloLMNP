@@ -8,8 +8,9 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.domain.filing.fec import render_fec
 from app.domain.filing.mappings import BLOCKING_WARNINGS, compile_package
-from app.domain.fiscal.output_status import apply_output_status
+from app.domain.fiscal.output_status import align_controlled_exports, apply_output_status
 from app.models.filing import TaxReturnSnapshot
 from app.services.ledger import get_year
 
@@ -49,7 +50,7 @@ def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
         *package.get("errors", []),
         *[item for item in package.get("warnings", []) if item["code"] in BLOCKING_WARNINGS],
     ]
-    return {
+    body = {
         "fiscal_year_id": year.id,
         "year": year.year,
         "declarable": declarable,
@@ -113,6 +114,17 @@ def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
             "note": "",
         },
     }
+    rendered = render_fec(session, year.id)
+    body["exports"] = align_controlled_exports(
+        body.get("exports") or {},
+        year_closed=year.status == "CLOSED",
+        fec_blocked=bool(rendered["validation"]["errors"]) or not rendered["siren"],
+    )
+    pdf_slot = body["exports"].get("pdf")
+    if isinstance(pdf_slot, dict):
+        body["export_posture"] = pdf_slot.get("posture", body.get("export_posture"))
+        body["export_posture_label"] = pdf_slot.get("label", body.get("export_posture_label"))
+    return body
 
 
 def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
@@ -140,6 +152,9 @@ def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
         text(f"Statut : {status}. Aucune transmission : à recopier soi-même en mode EFI.")
     else:
         text(f"Statut : {status}. Aucune transmission. Ne pas recopier comme déclaration.")
+    posture_label = worksheet.get("export_posture_label")
+    if isinstance(posture_label, str) and posture_label:
+        text(f"Posture d’export : {posture_label}.")
     text(
         f"Déclarant : {declarant.get('name') or '—'} · SIREN {declarant.get('siren') or 'manquant'}"
         f" · SIRET {declarant.get('siret') or '—'}"

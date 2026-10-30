@@ -17,6 +17,7 @@ from app.services.backup import create_backup, restore_backup
 from app.services.closing import close_year, mark_ready, precheck, reopen_year
 from app.services.documents import store_document
 from app.services.efi import efi_worksheet, worksheet_pdf
+from app.services.export_gate import export_status, require_export
 from app.services.spreadsheet import year_workbook
 
 
@@ -42,16 +43,20 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
     def reopen(year_id: int, data: ReopenInput, session: Write) -> dict[str, Any]:
         return reopen_year(session, year_id, data.confirmation, data.reason)
 
+    @router.get("/years/{year_id}/exports")
+    def exports(year_id: int, session: Read) -> dict[str, Any]:
+        return export_status(session, year_id)
+
     @router.get("/years/{year_id}/fec")
     def fec(year_id: int, session: Read) -> Response:
+        status = require_export(session, year_id, "fec")
         rendered = export_fec(session, year_id)
-        return Response(
-            content=rendered["content"],
-            media_type="text/plain; charset=utf-8",
-            headers={
-                "Content-Disposition": f'attachment; filename="{rendered["filename"]}"',
-                "X-Content-SHA256": rendered["sha256"],
-            },
+        return _download(
+            rendered["content"],
+            "text/plain; charset=utf-8",
+            rendered["filename"],
+            _posture(status, "fec"),
+            sha256=rendered["sha256"],
         )
 
     @router.get("/years/{year_id}/package")
@@ -64,13 +69,13 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
 
     @router.get("/years/{year_id}/efi.pdf")
     def efi_pdf(year_id: int, session: Read) -> Response:
+        status = require_export(session, year_id, "pdf")
         worksheet = efi_worksheet(session, year_id)
-        return Response(
-            content=worksheet_pdf(worksheet),
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f'attachment; filename="liasse-{worksheet["year"]}.pdf"'
-            },
+        return _download(
+            worksheet_pdf(worksheet),
+            "application/pdf",
+            f"liasse-{worksheet['year']}.pdf",
+            _posture(status, "pdf"),
         )
 
     @router.get("/years/{year_id}/export.xlsx")
@@ -84,14 +89,14 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
 
     @router.get("/years/{year_id}/archive")
     def archive(year_id: int, session: Read) -> Response:
+        status = require_export(session, year_id, "archive")
         bundle = control_archive(session, year_id)
-        return Response(
-            content=bundle["content"],
-            media_type="application/zip",
-            headers={
-                "Content-Disposition": f'attachment; filename="{bundle["filename"]}"',
-                "X-Content-SHA256": bundle["sha256"],
-            },
+        return _download(
+            bundle["content"],
+            "application/zip",
+            bundle["filename"],
+            _posture(status, "archive"),
+            sha256=bundle["sha256"],
         )
 
     @router.post("/documents", status_code=201)
@@ -116,3 +121,27 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
         return restore_backup(settings, data.filename, destination)
 
     return router
+
+
+def _posture(status: dict[str, Any], kind: str) -> str:
+    slot = status["exports"].get(kind)
+    if isinstance(slot, dict) and isinstance(slot.get("posture"), str):
+        return str(slot["posture"])
+    return "bloquee"
+
+
+def _download(
+    content: bytes,
+    media_type: str,
+    filename: str,
+    posture: str,
+    *,
+    sha256: str | None = None,
+) -> Response:
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "X-Export-Posture": posture,
+    }
+    if sha256 is not None:
+        headers["X-Content-SHA256"] = sha256
+    return Response(content=content, media_type=media_type, headers=headers)

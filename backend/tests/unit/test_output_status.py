@@ -8,11 +8,14 @@ from typing import Any
 import pytest
 
 from app.domain.fiscal.output_status import (
+    align_controlled_exports,
     allows_ready_phrase,
     artifact_posture,
     calculation_status,
     classify,
     contains_ready_phrase,
+    download_refusal,
+    export_slot,
     is_validated,
     load_validation,
     presentation,
@@ -157,6 +160,7 @@ def test_validated_aligned_and_complete_is_declarable() -> None:
         produced=True,
     )
     assert closed["exports"]["liasse"]["posture"] == "finale"
+    assert closed["exports"]["liasse"]["download"] is True
     assert closed["exports"]["pdf"]["posture"] == "finale"
     assert closed["exports"]["archive"]["label"] == "Finale"
     assert closed["validation"]["effective"] is True
@@ -184,6 +188,7 @@ def test_research_copy_is_never_final_and_never_ready_to_copy() -> None:
         produced=True,
     )
     assert blocked["exports"]["liasse"]["posture"] == "bloquee"
+    assert blocked["exports"]["liasse"]["download"] is False
     assert resolve_trust(record_valid=False, rules_aligned=True, copy_complete=True) == "recherche"
     assert artifact_posture(produced=False, blocked=False, final=True) == "bloquee"
 
@@ -197,3 +202,52 @@ def test_only_the_declarable_headline_uses_the_ready_phrase() -> None:
     ready = presentation("declarable", copy_complete=True)
     assert ready["output_headline"] == "Déclarable — Prête à recopier"
     assert contains_ready_phrase(ready["disclaimer"])
+
+
+def test_download_follows_the_posture_without_recomputing_gates() -> None:
+    assert export_slot("finale") == {"posture": "finale", "label": "Finale", "download": True}
+    assert export_slot("provisoire")["download"] is True
+    assert export_slot("inconnu") == {"posture": "bloquee", "label": "Bloquée", "download": False}
+    aligned = align_controlled_exports(
+        {
+            "liasse": export_slot("provisoire"),
+            "pdf": export_slot("provisoire"),
+            "fec": export_slot("finale"),
+            "archive": export_slot("finale"),
+        },
+        year_closed=True,
+        fec_blocked=True,
+    )
+    assert aligned["pdf"]["download"] is True
+    assert aligned["fec"]["download"] is False
+    assert aligned["archive"]["label"] == "Bloquée"
+    status = {
+        "exports": aligned,
+        "prerequisites": [
+            {
+                "code": "FEC_INVALID",
+                "message": "En-tête FEC absent.",
+                "export": "fec",
+                "action": {"label": "Voir le pré-contrôle", "href": "/fiscalite#close-title"},
+            }
+        ],
+    }
+    refusal = download_refusal("archive", status)
+    assert refusal is not None
+    assert refusal["code"] == "FEC_INVALID"
+    assert refusal["action"]["href"] == "/fiscalite#close-title"
+    assert download_refusal("pdf", status) is None
+    blocked = download_refusal(
+        "pdf",
+        {
+            "exports": {"pdf": export_slot("bloquee")},
+            "prerequisites": [
+                {"code": "SIREN_MANQUANT", "message": "Indiquez le SIREN.", "export": "liasse"},
+                {"code": "CASE_NON_VERIFIEE", "message": "Case absente.", "export": "liasse"},
+            ],
+        },
+    )
+    assert blocked is not None
+    assert blocked["code"] == "EXPORT_BLOCKED"
+    assert blocked["message"] == "La liasse indique des prérequis manquants."
+    assert len(blocked["issues"]) == 2
