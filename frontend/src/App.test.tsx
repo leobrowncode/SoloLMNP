@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { RouterProvider } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { isApplicationStatus } from "./api/status";
+import { dashboardFixture } from "./features/dashboardFixture";
 import { ledgerPath, operationsPath, ROUTES } from "./routing/paths";
 import { createTestRouter } from "./routing/router";
 import { renderAt } from "./routing/renderTestApp";
@@ -20,8 +21,17 @@ const ready = {
     vintage_status: "research_only",
   },
 };
+const sampleBoard = dashboardFixture("ready");
+
 function reply(body: unknown = ready, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+function api(statusBody: unknown = ready, statusCode = 200) {
+  return vi.fn((url: string) => {
+    if (url === "/api/dashboard") return Promise.resolve(reply(sampleBoard));
+    return Promise.resolve(reply(statusBody, statusCode));
+  });
 }
 
 function renderApp(path = ROUTES.home) {
@@ -37,22 +47,25 @@ describe("Foundation status", () => {
   });
 
   it("shows centralization before the fiscal calculation, precheck and closing", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply()));
+    vi.stubGlobal("fetch", api());
     renderApp();
     await screen.findByText("Prêt à vérifier");
     const nav = screen.getByRole("navigation", { name: "Navigation principale" });
     const links = within(nav).getAllByRole("link");
     const statements = links.find((link) => /États comptables/.test(link.textContent ?? ""))!;
     const fiscal = links.find((link) => /Fiscalité LMNP/.test(link.textContent ?? ""))!;
-    const statementsStep = within(screen.getByRole("list")).getByRole("link", { name: /États comptables/ });
-    const fiscalStep = within(screen.getByRole("list")).getByRole("link", { name: /Fiscalité LMNP/ });
-    expect(statementsStep).toHaveTextContent("Bilan, résultat, puis centralisation.");
-    expect(fiscalStep).toHaveTextContent("Calcul fiscal, pré-contrôle, clôture, puis sorties figées.");
     expect(links.indexOf(statements)).toBeLessThan(links.indexOf(fiscal));
+    const steps = await screen.findByRole("list", { name: "Étapes du dossier" });
+    expect(within(steps).queryByRole("link", { name: /États comptables/ })).not.toBeInTheDocument();
+    expect(within(steps).queryByRole("link", { name: /Fiscalité LMNP/ })).not.toBeInTheDocument();
+    expect(within(steps).getByRole("heading", { name: "Clôture" })).toBeInTheDocument();
+    expect(within(steps).getByRole("heading", { name: "Fiscalité et exports" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continuer" })).toHaveAttribute("href", "/fiscalite#close-title");
+    expect(screen.queryByText("Bilan, résultat, puis centralisation.")).not.toBeInTheDocument();
   });
 
   it("displays the dossier status without a permanent storage banner", async () => {
-    const request = vi.fn().mockResolvedValue(reply());
+    const request = api();
     vi.stubGlobal("fetch", request);
     renderApp();
     expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
@@ -69,9 +82,9 @@ describe("Foundation status", () => {
   });
 
   it("shows an unmigrated database as not ready on HTTP 503", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply({
+    vi.stubGlobal("fetch", api({
       ...ready, database: { ...ready.database, status: "not_ready", schema_revision: null },
-    }, 503)));
+    }, 503));
     renderApp();
     expect(await screen.findByText("Le stockage nécessite une vérification")).toBeInTheDocument();
     expect(screen.queryByText(/Base prête/)).not.toBeInTheDocument();
@@ -80,10 +93,13 @@ describe("Foundation status", () => {
   });
 
   it("invalidates the status indicator when a later check fails", async () => {
-    const request = vi.fn()
-      .mockResolvedValueOnce(reply())
-      .mockRejectedValueOnce(new Error("offline"))
-      .mockResolvedValueOnce(reply());
+    let statusCalls = 0;
+    const request = vi.fn((url: string) => {
+      if (url === "/api/dashboard") return Promise.resolve(reply(sampleBoard));
+      statusCalls += 1;
+      if (statusCalls === 2) return Promise.reject(new Error("offline"));
+      return Promise.resolve(reply());
+    });
     vi.stubGlobal("fetch", request);
     renderApp();
     expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
@@ -103,7 +119,13 @@ describe("Foundation status", () => {
   });
 
   it("allows retry after a network failure", async () => {
-    const request = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(reply());
+    let statusCalls = 0;
+    const request = vi.fn((url: string) => {
+      if (url === "/api/dashboard") return Promise.resolve(reply(sampleBoard));
+      statusCalls += 1;
+      if (statusCalls === 1) return Promise.reject(new Error("offline"));
+      return Promise.resolve(reply());
+    });
     vi.stubGlobal("fetch", request);
     renderApp();
     expect(await screen.findByRole("alert")).toHaveTextContent("Connexion au service indisponible");
@@ -132,6 +154,7 @@ describe("Foundation status", () => {
   it("keeps the OneDrive alert visible on a ready database and after navigation", async () => {
     const warning = "La base est dans un dossier synchronisé (OneDrive). Copiez le projet hors de ce dossier : la synchro peut corrompre SQLite.";
     vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url === "/api/dashboard") return Promise.resolve(reply(sampleBoard));
       if (url === "/api/status") return Promise.resolve(reply({ ...ready, storage_warning: warning }));
       if (url.endsWith("/setup")) return Promise.resolve(reply({ activity: null, years: [] }));
       if (url.endsWith("/accounts") || url.endsWith("/journals")) return Promise.resolve(reply([]));
@@ -156,7 +179,7 @@ describe("Foundation status", () => {
   });
 
   it("does not show a storage alert when a ready database has no warning", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply({ ...ready, storage_warning: null })));
+    vi.stubGlobal("fetch", api({ ...ready, storage_warning: null }));
     renderApp();
     expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
     expect(screen.getByText("Stockage opérationnel")).toBeInTheDocument();
@@ -166,11 +189,11 @@ describe("Foundation status", () => {
 
   it("shows the OneDrive alert when the database is not ready", async () => {
     const warning = "La base est dans un dossier synchronisé (OneDrive). Copiez le projet hors de ce dossier : la synchro peut corrompre SQLite.";
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply({
+    vi.stubGlobal("fetch", api({
       ...ready,
       storage_warning: warning,
       database: { ...ready.database, status: "not_ready", schema_revision: null },
-    }, 503)));
+    }, 503));
     renderApp();
     expect(await screen.findByRole("alert")).toHaveTextContent("Stockage non sûr");
     expect(screen.getByRole("alert")).toHaveTextContent(warning);
@@ -213,6 +236,7 @@ describe("Application routing", () => {
 
   it("restores the previous screen with the browser history", async () => {
     vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url === "/api/dashboard") return Promise.resolve(reply(sampleBoard));
       if (url === "/api/status") return Promise.resolve(reply());
       if (url.endsWith("/setup")) {
         return Promise.resolve(reply({ activity: { activity_name: "Test" }, years: [{ id: 1, year: 2026, start_date: "2026-01-01", end_date: "2026-12-31", status: "OPEN" }] }));
@@ -239,6 +263,7 @@ describe("Application routing", () => {
 
   it("asks before leaving a modified ledger draft", async () => {
     vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url === "/api/dashboard") return Promise.resolve(reply(sampleBoard));
       if (url === "/api/status") return Promise.resolve(reply());
       if (url.endsWith("/setup")) {
         return Promise.resolve(reply({ activity: { activity_name: "Test" }, years: [{ id: 1, year: 2026, start_date: "2026-01-01", end_date: "2026-12-31", status: "OPEN" }] }));

@@ -196,39 +196,66 @@ main{
   font-size:12px;
   line-height:1.45
 }
-.path-list{
-  list-style:none;
-  margin:28px 0 0;
-  padding:0
+.dashboard-board{
+  margin-top:36px
 }
-.path-list li{
-  border-bottom:1px solid #e6eadf
-}
-.path-list button,
-.path-list .path-link{
-  width:100%;
+.dashboard-next{
   display:flex;
+  flex-wrap:wrap;
   align-items:center;
-  gap:16px;
-  text-align:left;
-  background:transparent;
-  border:0;
-  padding:16px 0;
-  cursor:pointer;
-  color:inherit;
-  font:inherit;
-  text-decoration:none
+  gap:12px 18px;
+  margin-bottom:8px
 }
-.path-list strong{
-  display:block;
-  font-size:15px;
+.dashboard-next p{
+  margin:0;
+  color:#5d7364;
+  font-size:14px;
+  line-height:1.45
+}
+.dashboard-continue{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:44px;
+  padding:10px 18px;
+  border-radius:8px;
+  background:#254536;
+  color:#fff;
+  text-decoration:none;
+  font-weight:650
+}
+.dashboard-steps{
+  list-style:none;
+  margin:20px 0 0;
+  padding:0;
+  display:grid;
+  gap:14px
+}
+.dashboard-step{
+  border:1px solid #e6eadf;
+  border-radius:10px;
+  padding:16px 16px 12px
+}
+.dashboard-step h3{
+  font-size:16px;
   color:#254536
 }
-.path-list .stage-description span{
-  display:block;
+.dashboard-state{
+  margin:0 0 8px
+}
+.dashboard-state strong{
+  font-weight:650
+}
+.dashboard-step-a_faire .dashboard-state strong{color:#5d7364}
+.dashboard-step-en_cours .dashboard-state strong{color:#3d4f73}
+.dashboard-step-bloque .dashboard-state strong{color:#8a4b32}
+.dashboard-step-pret .dashboard-state strong{color:#3d4f73}
+.dashboard-step-fait .dashboard-state strong{color:#254536}
+.dashboard-amount,
+.dashboard-event{
+  color:#5d7364;
   font-size:13px;
-  color:#6d7f72;
-  margin-top:2px
+  line-height:1.45
 }
 .install-details{
   margin-top:28px;
@@ -579,6 +606,12 @@ footer{
   }
   .intro-description{
     font-size:13px
+  }
+  .dashboard-next{
+    align-items:stretch
+  }
+  .dashboard-continue{
+    width:100%
   }
   .eyebrow{
     font-size:8px;

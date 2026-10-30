@@ -42,9 +42,11 @@ Si un écran affiche une erreur de chargement, **Réessayer** relance la lecture
 
 Le bandeau affiche le **statut dossier** : Incomplet, Bloqué, Prêt à vérifier ou Clôturé. Il est calculé sur l’exercice en cours (ou le dernier exercice s’ils sont tous clôturés) à partir de la clôture, du statut fiscal et de la posture des exports. Il ne dit jamais que le dossier est déclarable : les millésimes restent en recherche. **Stockage opérationnel** n’apparaît que dans **Diagnostic technique**, sur la vue d’ensemble. « Aucun envoi » est à côté des sorties fiscales (liasse, PDF, FEC), pas dans le bandeau.
 
+La vue d’ensemble est le tableau de bord du dossier, pas une copie du menu. Le menu reste la navigation. Chaque étape (structure et SIREN, opérations, immobilisations et amortissements, à-nouveaux, clôture, fiscalité et exports) affiche son état, les prérequis manquants — les mêmes explications et liens que sur une action désactivée — et le dernier événement utile. **Continuer** ouvre la prochaine action. Ces états viennent du serveur (`GET /api/dashboard`), pas d’une liste locale. Rien n’y est présenté comme déclarable : les millésimes restent en recherche. Les montants affichés sont des centimes convertis en euros.
+
 Alternative Docker : voir [DEPLOYMENT.md](DEPLOYMENT.md).
 
-Vérifier, sur la vue d’ensemble, que le statut dossier s’affiche et que **Diagnostic technique** dit **Stockage opérationnel**. Ce libellé n’est pas repris sur les autres pages.
+Vérifier, sur la vue d’ensemble, que le statut dossier s’affiche, que le tableau de bord indique la prochaine action avec **Continuer**, et que **Diagnostic technique** dit **Stockage opérationnel**. Ce libellé n’est pas repris sur les autres pages.
 
 ---
 
