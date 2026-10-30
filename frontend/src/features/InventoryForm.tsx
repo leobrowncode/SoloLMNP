@@ -153,7 +153,7 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
       <button type="button" disabled={draft.lines.length >= 100} onClick={() => setDraft({ ...draft, lines: [...draft.lines, blankLine()] })}>Ajouter une ligne</button>
     </fieldset>}
     {review && <>
-      <h4>Vérifier avant validation définitive</h4>
+      <h3>Vérifier avant validation définitive</h3>
       <p>{review.journal_code} · {formatIsoDate(review.accounting_date)} · {review.label}</p>
       <p>Pièce {review.piece_reference} du {formatIsoDate(review.piece_date)}</p><p>{review.justification}</p>
       <table><caption>Lignes à comptabiliser</caption><thead><tr><th>Compte</th><th>Libellé</th><th>Débit €</th><th>Crédit €</th></tr></thead><tbody>{review.lines.map((line, i) => <tr key={i}><td>{line.account_number}</td><td>{line.label}</td><td>{formatAmount(line.debit)}</td><td>{formatAmount(line.credit)}</td></tr>)}</tbody></table>

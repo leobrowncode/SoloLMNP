@@ -81,7 +81,7 @@ export default function ReopenYear({
     <div className="reopen-year" id="reouvrir-exercice" aria-labelledby="reopen-title">
       <SaveNoticeHost place="reouvrir-exercice" notice={notice} onDismiss={dismiss} />
       <div className="heading-with-help">
-        <h4 id="reopen-title" tabIndex={-1}>Réouvrir l’exercice</h4>
+        <h3 id="reopen-title" tabIndex={-1}>Réouvrir l’exercice</h3>
         <GlossaryTip id="reouverture" />
       </div>
       <p>Réservé à une correction justifiée. L’action est tracée dans l’audit.</p>

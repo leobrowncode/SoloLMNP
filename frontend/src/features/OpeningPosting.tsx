@@ -76,7 +76,7 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
   }
   return <section id="ouverture-comptabilisation" aria-labelledby="opening-posting-title">
     <SaveNoticeHost place="ouverture-comptabilisation" notice={notice} onDismiss={dismiss} />
-    <h4 id="opening-posting-title" tabIndex={-1}>Comptabiliser et contrôler les à-nouveaux</h4>
+    <h3 id="opening-posting-title" tabIndex={-1}>Comptabiliser et contrôler les à-nouveaux</h3>
     <p>La génération valide une écriture à la date d’ouverture. Elle exige un exercice précédent clôturé sans brouillon et un exercice destinataire ouvert et vide.</p>
     {preview && !posted && <FrenchForm onSubmit={(event) => { void post(event); }}>
       <fieldset disabled={blocked || busy}>

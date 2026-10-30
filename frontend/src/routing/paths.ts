@@ -87,6 +87,10 @@ export const navItems: {
   { id: "conservation", label: "Conservation", step: "6", hint: "Justificatifs et sauvegarde.", path: ROUTES.conservation },
 ];
 
+export function viewDocumentTitle(label: string): string {
+  return `${label} — SoloLMNP`;
+}
+
 export function pageIdFromPathname(pathname: string): PageId {
   if (pathname === ROUTES.home) return "overview";
   if (pathname.startsWith(ROUTES.ledger)) return "ledger";
