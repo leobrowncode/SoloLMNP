@@ -1,7 +1,15 @@
 import { useEffect, type Ref } from "react";
 import { Link } from "react-router-dom";
-import type { ApiErrorDetail } from "../api/errors";
-import { importIssueLines } from "../api/errors";
+import type { ApiErrorDetail, ApiErrorIssue } from "../api/errors";
+import { helpForError, importIssueLines, knownHelp } from "../api/errors";
+import GlossaryTip from "./GlossaryTip";
+import type { GlossaryId } from "./glossary";
+
+function issueHelp(issue: ApiErrorIssue, banner: GlossaryId | null): GlossaryId | null {
+  const help = knownHelp(issue.help);
+  if (!help || help === banner) return null;
+  return help;
+}
 
 export default function ApiErrorAlert({
   detail,
@@ -22,23 +30,37 @@ export default function ApiErrorAlert({
   }, [alertRef, detail, focus]);
   const importLines = importIssueLines(detail);
   const otherIssues = (detail.issues ?? []).filter((issue) => issue.line === undefined);
+  const bannerHelp = helpForError(detail);
   return (
     <div role="alert" className={className} tabIndex={-1} ref={alertRef}>
-      <p>{detail.message}</p>
+      <p>
+        {detail.message}
+        {bannerHelp && <GlossaryTip id={bannerHelp} />}
+      </p>
       {otherIssues.length > 1 && (
         <ul>
-          {otherIssues.map((issue) => (
-            <li key={`${issue.code}-${issue.message}`}>{issue.message}</li>
-          ))}
+          {otherIssues.map((issue) => {
+            const help = issueHelp(issue, bannerHelp);
+            return (
+              <li key={`${issue.code}-${issue.message}`}>
+                {issue.message}
+                {help && <GlossaryTip id={help} />}
+              </li>
+            );
+          })}
         </ul>
       )}
       {importLines.length > 0 && (
         <ul className="import-error-lines">
-          {importLines.map((issue) => (
-            <li key={`${issue.code}-${issue.line}-${issue.message}`}>
-              Ligne {issue.line} : {issue.message}
-            </li>
-          ))}
+          {importLines.map((issue) => {
+            const help = issueHelp(issue, bannerHelp);
+            return (
+              <li key={`${issue.code}-${issue.line}-${issue.message}`}>
+                Ligne {issue.line} : {issue.message}
+                {help && <GlossaryTip id={help} />}
+              </li>
+            );
+          })}
         </ul>
       )}
       {(detail.action || onRetry) && (

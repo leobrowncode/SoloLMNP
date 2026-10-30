@@ -5,6 +5,7 @@ import { focusRouteTarget } from "./routing/focusTarget";
 import { navItems, pageIdFromPathname, ROUTES, type PageId } from "./routing/paths";
 import { UnsavedChangesProvider } from "./routing/unsaved";
 import DossierStatus from "./features/DossierStatus";
+import GlossaryTip from "./features/GlossaryTip";
 import { showsDossierIndicator, showsOperationalStorage } from "./features/dossierStatus";
 import ScreenStatus from "./features/ScreenStatus";
 import { showsLoading } from "./features/screenState";
@@ -121,6 +122,11 @@ export default function AppShell() {
               <section className="intro" aria-labelledby="welcome-title">
                 <h1 id="welcome-title">De l’écriture à la liasse que vous recopierez.</h1>
                 <p className="intro-description">LMNP au réel, location longue durée. Suivez les six étapes. SoloLMNP prépare la liasse et le FEC. Il n’envoie rien aux impôts.</p>
+                <div className="heading-with-help">
+                  <GlossaryTip id="lmnp-reel" />
+                  <GlossaryTip id="liasse" />
+                  <GlossaryTip id="fec" />
+                </div>
               </section>
             )}
 

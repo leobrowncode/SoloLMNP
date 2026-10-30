@@ -2,6 +2,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.core.api_errors import (
+    HELP_IDS,
     RESOLUTION_ACTIONS,
     _detail,
     fail,
@@ -13,6 +14,14 @@ from app.core.api_errors import (
 def test_detail_adds_resolution_action_when_known() -> None:
     payload = _detail("ACTIVITY_REQUIRED", "Créez l’activité.")
     assert payload["action"] == RESOLUTION_ACTIONS["ACTIVITY_REQUIRED"]
+    assert "help" not in payload
+
+
+def test_detail_points_known_codes_at_a_glossary_entry() -> None:
+    payload = _detail("FEC_INVALID", "Le FEC contient des erreurs.")
+    assert payload["help"] == HELP_IDS["FEC_INVALID"] == "fec"
+    opening = _detail("UNBALANCED_OPENING", "À-nouveaux déséquilibrés.")
+    assert opening["help"] == "a-nouveaux"
 
 
 def test_import_line_fail_sets_location_and_line() -> None:

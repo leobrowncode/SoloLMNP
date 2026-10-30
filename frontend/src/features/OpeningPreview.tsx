@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
 import OpeningPosting from "./OpeningPosting";
+import GlossaryTip from "./GlossaryTip";
 import ScreenStatus from "./ScreenStatus";
 import {
   beginLoad, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
@@ -34,7 +35,10 @@ export default function OpeningPreview({ year }: { year: number }) {
     }
   }
   return <section aria-labelledby="opening-title" data-screen-phase={view.phase}>
-    <h3 id="opening-title" tabIndex={-1}>Préparer les à-nouveaux de cet exercice</h3>
+    <div className="heading-with-help">
+      <h3 id="opening-title" tabIndex={-1}>Préparer les à-nouveaux de cet exercice</h3>
+      <GlossaryTip id="a-nouveaux" />
+    </div>
     <p>La prévisualisation depuis l’exercice précédent ne crée aucune écriture. Vérifiez les soldes avant de demander leur comptabilisation.</p>
     <button
       type="button"

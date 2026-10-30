@@ -3,6 +3,8 @@ import { RequestError, request } from "../api/ledger";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import { describedBy, fiscalActionCauses } from "./actionCauses";
 import CloseYear from "./CloseYear";
+import GlossaryTip from "./GlossaryTip";
+import type { GlossaryId } from "./glossary";
 import HelpTip from "./HelpTip";
 import PrerequisiteList from "./PrerequisiteList";
 import ExportDownloads from "./ExportDownloads";
@@ -100,15 +102,15 @@ interface AdjustmentDraft {
 }
 
 function Metric({
-  label, value, tip, accent,
+  label, value, help, accent,
 }: {
-  label: string; value: string; tip: string; accent?: "good" | "warn" | "neutral";
+  label: string; value: string; help: GlossaryId; accent?: "good" | "warn" | "neutral";
 }) {
   return (
     <div className={`fiscal-metric fiscal-metric-${accent ?? "neutral"}`}>
       <dt>
         {label}
-        <HelpTip label={label}>{tip}</HelpTip>
+        <GlossaryTip id={help} label={label} />
       </dt>
       <dd>{value} €</dd>
     </div>
@@ -615,6 +617,12 @@ export default function FiscalPage() {
         La comptabilité ne change pas. Cession, TVA et plus-values restent hors de cet écran.
         Ordre de fin d’exercice : calcul fiscal, pré-contrôle, clôture, puis liasse et FEC figés.
       </p>
+      <div className="heading-with-help">
+        <GlossaryTip id="cession" />
+        <GlossaryTip id="liasse" />
+        <GlossaryTip id="fec" />
+        <GlossaryTip id="efi" />
+      </div>
 
       {error && <p className="ledger-error" role="alert">{error}</p>}
       <ScreenStatus
@@ -636,10 +644,7 @@ export default function FiscalPage() {
       <div className="toolbar fiscal-toolbar">
         <label>
           Exercice
-          <HelpTip label="Exercice">
-            Choisissez l’année ouverte à analyser. Les reports ne sont repris que depuis
-            des exercices déjà clôturés.
-          </HelpTip>
+          <GlossaryTip id="exercice" />
           <select
             value={year}
             onChange={(event) => { chooseYear(Number(event.target.value)); }}
@@ -660,24 +665,15 @@ export default function FiscalPage() {
       <ul className="fiscal-rules-strip" aria-label="Règles LMNP utiles">
         <li>
           <strong>Plafond amortissement</strong>
-          <HelpTip label="Plafond">
-            L’amortissement déductible ne peut pas dépasser : loyers − autres charges
-            déductibles. L’excédent est reporté, pas perdu.
-          </HelpTip>
+          <GlossaryTip id="plafond" />
         </li>
         <li>
           <strong>Pas d’imputation revenu global</strong>
-          <HelpTip label="Déficit">
-            Un déficit LMNP se reporte sur les revenus LMNP des 10 années suivantes.
-            Il ne diminue pas vos salaires ou autres revenus.
-          </HelpTip>
+          <GlossaryTip id="deficit" />
         </li>
         <li>
           <strong>Terrain non amortissable</strong>
-          <HelpTip label="Terrain">
-            La part terrain doit être ventilée manuellement à l’achat. SoloLMNP refuse
-            toute base amortissable sur un terrain.
-          </HelpTip>
+          <GlossaryTip id="terrain" />
         </li>
       </ul>
 
@@ -685,26 +681,23 @@ export default function FiscalPage() {
         <div className="fiscal-panel">
           <h3>
             1. Loyers & charges comptabilisés
-            <HelpTip label="Loyers et charges">
-              Issus du ledger validé (hors centralisation). Ce sont les montants
-              comptables, avant retraitement fiscal.
-            </HelpTip>
+            <GlossaryTip id="loyers-charges" />
           </h3>
           <dl className="fiscal-metrics">
             <Metric
               label="Loyers / produits"
               value={statements.income_statement.total_income}
-              tip="Total des comptes de produits (classe 7) de l’exercice."
+              help="produits"
             />
             <Metric
               label="Charges totales"
               value={statements.income_statement.total_expenses}
-              tip="Toutes les charges comptables, y compris la dotation 681."
+              help="charges"
             />
             <Metric
               label="Résultat comptable"
               value={statements.income_statement.result}
-              tip="Produits − charges au ledger. Différent du résultat fiscal LMNP."
+              help="resultat-comptable"
             />
           </dl>
           <div className="ledger-table">
@@ -743,11 +736,7 @@ export default function FiscalPage() {
       <div className="fiscal-panel">
         <h3>
           2. Quote-part de charge non déductible
-          <HelpTip label="Réintégration">
-            Si une charge n’est que partiellement déductible (ex. usage privé), indiquez
-            ici la part à réintégrer. L’écriture comptable reste entière ; seule la
-            fiscalité change. Les comptes 681 (amortissements) ne se gèrent pas ici.
-          </HelpTip>
+          <GlossaryTip id="reintegration" />
         </h3>
         <p className="field-hint">
           Optionnel. Chaque réintégration augmente la capacité d’amortissement déductible
@@ -832,11 +821,7 @@ export default function FiscalPage() {
           />
           <h3>
             3. Capacité & amortissements
-            <HelpTip label="Capacité">
-              Capacité = loyers − charges déductibles (hors dotation). On déduit d’abord
-              l’amortissement de l’année dans cette limite, puis les reports antérieurs
-              (FIFO) sur le reste de capacité.
-            </HelpTip>
+            <GlossaryTip id="capacite" />
           </h3>
           <ol className="fiscal-waterfall">
             <li>
@@ -854,15 +839,12 @@ export default function FiscalPage() {
             <li className="fiscal-waterfall-key">
               <span>
                 = Capacité d’amortissement
-                <HelpTip label="Capacité calculée">
-                  Maximum d’amortissement fiscalement déductible cette année. Au-delà,
-                  le surplus est reporté.
-                </HelpTip>
+                <GlossaryTip id="capacite" label="Capacité calculée" />
               </span>
               <strong>{details.capacity ?? "—"} €</strong>
             </li>
             <li>
-              <span>Dotation comptable 681</span>
+              <span><span>Dotation comptable 681</span> <GlossaryTip id="compte-681" /></span>
               <strong>{details.accounting_depreciation ?? "—"} €</strong>
             </li>
             <li>
@@ -874,7 +856,7 @@ export default function FiscalPage() {
               <strong>{details.prior_depreciation_used ?? "0.00"} €</strong>
             </li>
             <li>
-              <span>Amortissement non déduit (report N)</span>
+              <span><span>Amortissement non déduit (report N)</span> <GlossaryTip id="report-amortissement" /></span>
               <strong>{result.unused_depreciation} €</strong>
             </li>
             <li>
@@ -883,11 +865,8 @@ export default function FiscalPage() {
             </li>
             <li className={`fiscal-waterfall-result fiscal-waterfall-${goalTone}`}>
               <span>
-                Résultat fiscal
-                <HelpTip label="Résultat fiscal">
-                  Montant BIC de l’activité après plafond et reports. Cible usuelle : 0 €
-                  (pas d’impôt BIC supplémentaire via cette activité).
-                </HelpTip>
+                <span>Résultat fiscal</span>
+                <GlossaryTip id="resultat-fiscal" />
               </span>
               <strong>{result.fiscal_result} €</strong>
             </li>
@@ -902,23 +881,23 @@ export default function FiscalPage() {
             <Metric
               label="Résultat comptable"
               value={result.accounting_result}
-              tip="Reste au ledger. Le fiscal ne le réécrit jamais."
+              help="resultat-comptable"
             />
             <Metric
               label="Amortissement déductible total"
               value={result.deductible_depreciation}
-              tip="Dotation de l’année dans la capacité + reprises de reports."
+              help="amortissement"
               accent="good"
             />
             <Metric
               label="Stock amortissement reporté"
               value={result.unused_depreciation}
-              tip="Excédent de l’année, utilisable plus tard si capacité."
+              help="report-amortissement"
             />
             <Metric
               label="Déficit LMNP de l’exercice"
               value={result.tax_loss}
-              tip="Si résultat fiscal négatif. Report 10 ans, hors revenu global."
+              help="deficit"
             />
           </dl>
 
@@ -998,6 +977,9 @@ export default function FiscalPage() {
       </div>
       {worksheet && <LiasseSheet worksheet={worksheet} />}
 
+      <div className="heading-with-help">
+        <GlossaryTip id="millesime" />
+      </div>
       <details className="fiscal-panel">
         <summary>Millésimes chargés (technique)</summary>
         <ul>

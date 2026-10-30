@@ -156,7 +156,7 @@ export default function HelpTip({ label, children }: { label: string; children: 
           hidden={!open}
           className="help-tip-panel"
         >
-          {children}
+          {open ? children : null}
         </span>,
         document.body,
       )}

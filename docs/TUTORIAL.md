@@ -29,6 +29,8 @@ Chaque étape du menu possède une adresse stable (`/comptabilite/brouillons`,
 utiliser Précédent/Suivant du navigateur ou enregistrer un favori sans perdre
 votre écran. Une saisie non enregistrée demande confirmation avant de quitter.
 
+Les pastilles **?** à côté d’un terme comptable ouvrent le glossaire : ce que c’est, pourquoi c’est demandé, un exemple et l’erreur fréquente. Clic, Entrée ou Espace ouvrent l’aide ; un second clic, Échap ou un clic à l’extérieur la ferment. Le texte reste dans l’écran, y compris sur un téléphone (320 px et plus). Une erreur peut proposer la même entrée. Le glossaire ne dit pas qu’une sortie est déclarable : les millésimes restent en recherche. SoloLMNP n’envoie rien aux impôts.
+
 Une action métier désactivée (nouvelle recette, nouvelle dépense, immobilisation,
 à-nouveaux, emprunt, règlement, dotation, clôture, etc.) nomme chaque prérequis
 manquant et propose un lien vers l’écran qui le corrige. S’il y a plusieurs
@@ -141,7 +143,7 @@ Cette étape ne clôture pas l’exercice. La suite est dans **Fiscalité LMNP**
 
 Menu **Fiscalité LMNP**, dans cet ordre :
 
-Les pastilles **?** à côté des libellés ouvrent une aide au clic, ou avec Entrée ou Espace. Un second clic, la touche Échap ou un clic à l’extérieur ferment l’aide. Le texte reste dans la largeur de l’écran, y compris sur un téléphone (320 px et plus).
+Les pastilles **?** de cet écran reprennent le glossaire (plafond, déficit, amortissement, liasse, FEC, EFI). Le geste est le même que sur les autres écrans.
 
 1. Sélectionner l’exercice. Le dernier calcul se recharge avec sa date et l’empreinte du ledger. Si cette empreinte n’est plus celle du ledger, ou si une correction de bien, d’immobilisation, de composant ou d’emprunt a changé un montant, une durée, une date ou un compte du calcul, le résultat est marqué **Obsolète** immédiatement. Il n’est plus le calcul en cours : le pré-contrôle le traite comme absent. Un libellé, un locataire ou une banque ne le rend pas obsolète. **Calculer le résultat fiscal** (après la centralisation, sur le ledger final) enregistre un nouveau calcul. Un recalcul refusé retire l’ancien résultat de l’écran : il n’est pas laissé comme calcul en cours.
 2. **Lancer le pré-contrôle**. S’il manque le calcul, ou s’il ne correspond plus au ledger, le lien **Calculer le résultat fiscal** ramène au calcul. Cocher chaque avertissement affiché : un nouveau pré-contrôle décoche tout, et **Accuser et préparer** reste inactif tant qu’il en manque un. Puis **Confirmer la clôture**. Le statut de l’exercice, le tableau de bord et les sorties (liasse, FEC) se rechargent.

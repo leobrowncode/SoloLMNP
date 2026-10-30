@@ -4,6 +4,7 @@ import { RequestError } from "../api/ledger";
 import ApiErrorAlert from "./ApiErrorAlert";
 import PrerequisiteList from "./PrerequisiteList";
 import type { ExportSlot, ExportStatus } from "./exportStatus";
+import GlossaryTip from "./GlossaryTip";
 
 const OUTPUTS: {
   kind: "liasse" | "pdf" | "fec" | "archive";
@@ -97,7 +98,13 @@ export default function ExportDownloads({ yearId, status }: { yearId: number; st
               data-posture={slot.posture}
             >
               <header>
-                <h4>{output.title}</h4>
+                <div className="heading-with-help">
+                  <h4>{output.title}</h4>
+                  {output.kind === "liasse" && <GlossaryTip id="liasse" />}
+                  {output.kind === "pdf" && <GlossaryTip id="efi" />}
+                  {output.kind === "fec" && <GlossaryTip id="fec" />}
+                  {output.kind === "archive" && <GlossaryTip id="dossier-controle" />}
+                </div>
                 <p className="export-posture">{slot.label}</p>
               </header>
               <div id={hintId}>

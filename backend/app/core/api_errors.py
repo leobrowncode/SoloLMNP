@@ -8,6 +8,48 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+# Glossary ids from frontend/src/features/glossary.ts. Keep in sync with ERROR_HELP.
+HELP_IDS: dict[str, str] = {
+    "ALREADY_MATCHED": "rapprochement",
+    "ALREADY_REVERSED": "extourne",
+    "BANK_MATCH_EXISTS": "rapprochement",
+    "BUSINESS_REVERSAL_REQUIRED": "extourne",
+    "CLOSE_BLOCKED": "cloture",
+    "DEPRECIATION_TARGET_NOT_FOUND": "amortissement",
+    "EMPTY_OPENING": "a-nouveaux",
+    "EXPORT_BLOCKED": "liasse",
+    "FEC_INVALID": "fec",
+    "FISCAL_NOT_COMPUTED": "resultat-fiscal",
+    "LOAN_ACCOUNT_EXHAUSTED": "compte-164",
+    "LOAN_NOT_FUNDED": "compte-164",
+    "LOAN_OPENING_BALANCE": "emprunt",
+    "MAPPING_MISSING": "millesime",
+    "MAPPING_UNUSABLE": "millesime",
+    "MATCH_INCONSISTENT": "rapprochement",
+    "NOT_MATCHED": "rapprochement",
+    "NOT_VALIDATED": "extourne",
+    "OPENING_ALREADY_EXISTS": "a-nouveaux",
+    "OPENING_AUDIT_MISSING": "a-nouveaux",
+    "OPENING_JOURNAL_REQUIRED": "a-nouveaux",
+    "OPENING_TOO_LARGE": "a-nouveaux",
+    "PREVIOUS_YEAR_REQUIRED": "a-nouveaux",
+    "PRINCIPAL_EXCEEDED": "compte-164",
+    "RESULT_ACCOUNT_REQUIRED": "compte-120-129",
+    "REVERSAL_CHAIN": "extourne",
+    "REVERSAL_DATE": "extourne",
+    "SCHEDULE_NOT_FOUND": "amortissement",
+    "SETTLEMENTS_EXIST": "extourne",
+    "SIREN_MANQUANT": "siren",
+    "SIREN_REQUIRED": "siren",
+    "SOURCE_NOT_CLOSED": "a-nouveaux",
+    "TARGET_HAS_ENTRIES": "a-nouveaux",
+    "UNBALANCED_OPENING": "a-nouveaux",
+    "UNKNOWN_VINTAGE": "millesime",
+    "VINTAGE_NOT_USABLE": "millesime",
+    "WARNINGS_UNACKNOWLEDGED": "pre-controle",
+    "YEAR_NOT_CLOSED": "cloture",
+}
+
 RESOLUTION_ACTIONS: dict[str, dict[str, str]] = {
     "ACTIVITY_REQUIRED": {"label": "Ouvrir Comptabilité", "href": "/comptabilite"},
     "ACTIVITY_EXISTS": {"label": "Ouvrir Comptabilité", "href": "/comptabilite"},
@@ -54,6 +96,9 @@ def _detail(
     resolved = action or RESOLUTION_ACTIONS.get(code)
     if resolved:
         payload["action"] = resolved
+    help_id = HELP_IDS.get(code)
+    if help_id:
+        payload["help"] = help_id
     if issues:
         payload["issues"] = issues
     return payload
@@ -124,10 +169,15 @@ def register_exception_handlers(application: FastAPI) -> None:
     async def handle_http(request: Request, exc: HTTPException) -> JSONResponse:
         if isinstance(exc.detail, dict) and "code" in exc.detail and "message" in exc.detail:
             detail = dict(exc.detail)
-            if "action" not in detail and isinstance(detail.get("code"), str):
-                action = RESOLUTION_ACTIONS.get(detail["code"])
-                if action:
-                    detail = {**detail, "action": action}
+            if isinstance(detail.get("code"), str):
+                if "action" not in detail:
+                    action = RESOLUTION_ACTIONS.get(detail["code"])
+                    if action:
+                        detail = {**detail, "action": action}
+                if "help" not in detail:
+                    help_id = HELP_IDS.get(detail["code"])
+                    if help_id:
+                        detail = {**detail, "help": help_id}
             return JSONResponse(status_code=exc.status_code, content={"detail": detail})
         if isinstance(exc.detail, str):
             return JSONResponse(
