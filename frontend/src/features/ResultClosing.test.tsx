@@ -146,7 +146,10 @@ test("an unusable result account blocks confirmation without writing", async () 
   render(<ResultClosing year={1} />);
   fireEvent.click(screen.getByRole("button", { name: "Préparer la centralisation" }));
   expect(await screen.findByText(/Aucun compte actif 120/)).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Vérifier la centralisation" })).toBeDisabled();
+  const verify = screen.getByRole("button", { name: "Vérifier la centralisation" });
+  expect(verify).toBeDisabled();
+  expect(verify).toHaveAttribute("aria-describedby", "centralization-causes");
+  expect(document.querySelector('a[href="/comptabilite/plan-comptable"]')).toHaveTextContent("Ouvrir le plan comptable");
   expect(calls.every((call) => call.method === "GET")).toBe(true);
 });
 

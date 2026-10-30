@@ -48,3 +48,31 @@ test("previews then posts the property entry with loans and pre-start costs", as
   await vi.waitFor(() => expect(done).toHaveBeenCalledWith("Bien entré en comptabilité (écriture 2026-000001)."));
   expect(bodies[1]).toMatchObject({ confirm: true });
 });
+
+test("explains a disabled property entry and the missing preview", () => {
+  render(<PropertyEntry properties={[]} years={[]} onDone={vi.fn()} />);
+  const start = screen.getByRole("button", { name: "Faire entrer le bien en comptabilité" });
+  expect(start).toBeDisabled();
+  expect(start).toHaveAttribute("aria-describedby", "property-entry-causes");
+  const causes = document.getElementById("property-entry-causes");
+  expect(causes).toHaveTextContent("Aucun bien n’est enregistré.");
+  expect(causes).toHaveTextContent("Aucun exercice n’est créé.");
+  expect(causes?.querySelector('a[href="/operations/biens#ajouter-bien"]')).toBeTruthy();
+  expect(causes?.querySelector('a[href="/comptabilite/brouillons#ajouter-exercice"]')).toBeTruthy();
+});
+
+test("explains that posting waits for a preview", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url === "/api/operations/loans") return response([]);
+    if (url === "/api/operations/banks") return response([]);
+    throw new Error(url);
+  });
+  render(<PropertyEntry properties={[{ id: 1, name: "Bien", acquisition_price: "1.00", land_value: "0.00", building_value: "1.00" }]} years={[{ id: 4, year: 2026 }]} onDone={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Faire entrer le bien en comptabilité" }));
+  const post = await screen.findByRole("button", { name: "Comptabiliser" });
+  expect(post).toBeDisabled();
+  expect(post).toHaveAttribute("aria-describedby", "property-entry-post-causes");
+  expect(document.getElementById("property-entry-post-causes")).toHaveTextContent("Prévisualisez l’écriture");
+  expect(screen.getByRole("button", { name: "Prévisualiser l’écriture" })).toBeEnabled();
+});

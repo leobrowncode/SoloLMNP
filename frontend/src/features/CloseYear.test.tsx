@@ -29,8 +29,13 @@ test("links a missing or stale fiscal computation to the calculation", async () 
   render(<CloseYear year={1} />);
   fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
   const links = await screen.findAllByRole("link", { name: "Calculer le résultat fiscal" });
-  expect(links).toHaveLength(2);
-  for (const link of links) expect(link).toHaveAttribute("href", "#calcul-fiscal");
+  expect(links.length).toBeGreaterThanOrEqual(2);
+  for (const link of links) expect(link).toHaveAttribute("href", "/fiscalite#calcul-fiscal");
+  const prepare = screen.getByRole("button", { name: "Accuser et préparer la clôture" });
+  expect(prepare).toHaveAttribute("aria-describedby", "close-prepare-causes");
+  const causes = document.getElementById("close-prepare-causes");
+  expect(causes).toHaveTextContent("Aucun calcul fiscal n’est enregistré pour cet exercice.");
+  expect(causes).toHaveTextContent("Le calcul fiscal ne correspond plus au ledger.");
   expect(screen.getByRole("button", { name: "Accuser et préparer la clôture" })).toBeDisabled();
 });
 

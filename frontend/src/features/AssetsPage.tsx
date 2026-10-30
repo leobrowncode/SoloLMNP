@@ -13,6 +13,10 @@ import {
 import {
   PLAN_HELP, correctionMessage, editTitle, locked, readInvalidation, type CorrectionState,
 } from "./correction";
+import {
+  activityCause, assetCreateCauses, depreciationCalculateCauses, describedBy, listed, postDepreciationCauses,
+} from "./actionCauses";
+import PrerequisiteList from "./PrerequisiteList";
 import PropertyEntry from "./PropertyEntry";
 import ReviewForm, { type Field } from "./ReviewForm";
 import "./ledger.css";
@@ -396,6 +400,16 @@ export default function AssetsPage() {
   }
 
   const bootReady = boot.phase === "loaded" || showsData(boot);
+  const assetCauses = assetCreateCauses(properties.length);
+  const assetCauseId = "asset-create-causes";
+  const planCauses = assetCreateCauses(properties.length);
+  const planCauseId = "asset-plan-causes";
+  const periodCauses = depreciationCalculateCauses(yearId, setup?.years ?? []);
+  const periodCauseId = "asset-period-causes";
+  const periodsSettled = periodsView.phase === "loaded" || periodsView.phase === "empty";
+  const postCauses = yearId && periodsSettled ? postDepreciationCauses(periods) : [];
+  const postCauseId = "asset-post-causes";
+  const postDescribed = yearId ? describedBy(postCauseId, postCauses) : describedBy(periodCauseId, periodCauses);
   return <section id="assets" className="ledger-page" aria-labelledby="assets-title" data-screen-phase={boot.phase}>
     <h2 id="assets-title">Immobilisations</h2>
     <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations. Le formulaire ne propose que les comptes de la catégorie. Un couple déjà enregistré et incohérent est signalé ; il n’est pas réécrit. Modifier une fiche demande un motif : tant qu’aucune dotation n’est comptabilisée, la valeur, la durée et les comptes peuvent être corrigés.</p>
@@ -405,10 +419,13 @@ export default function AssetsPage() {
       onRetry={() => setRevision((value) => value + 1)}
       loading={<p>Chargement des immobilisations…</p>}
     />
-    {boot.phase === "loaded" && !setup?.activity && <p>Initialisez d’abord l’activité, l’exercice et le bien.</p>}
+    {boot.phase === "loaded" && !setup?.activity && (
+      <PrerequisiteList id="assets-activity" causes={listed(activityCause(false))} intro="Les immobilisations restent indisponibles :" />
+    )}
     {bootReady && setup?.activity && <>
-      <button disabled={!properties.length} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
-      <button disabled={!properties.length} onClick={() => openAsset(true)}>Inscrire un terrain</button>
+      <button id="nouvelle-immobilisation" disabled={assetCauses.length > 0} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
+      <button disabled={assetCauses.length > 0} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(true)}>Inscrire un terrain</button>
+      <PrerequisiteList id={assetCauseId} causes={assetCauses} />
       <div className="toolbar">
         <label>Logement
           <select value={selectedProperty} disabled={confirming} onChange={(event) => {
@@ -421,7 +438,8 @@ export default function AssetsPage() {
             {properties.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
           </select>
         </label>
-        <button type="button" disabled={!properties.length || planBusy} onClick={() => { void previewPlan(); }}>Prévisualiser l’amortissement du logement</button>
+        <button id="preview-amortissement" type="button" disabled={planCauses.length > 0 || planBusy} aria-describedby={describedBy(planCauseId, planCauses)} onClick={() => { void previewPlan(); }}>Prévisualiser l’amortissement du logement</button>
+        <PrerequisiteList id={planCauseId} causes={planCauses} />
       </div>
       <p className="form-help">La prévisualisation n’enregistre ni immobilisation ni compte. Après vérification, « Créer les immobilisations affichées » inscrit le terrain à part, ajoute les frais de notaire et d’agence à la base du bâtiment, puis crée six composants (gros œuvre, toiture, façade, électricité, plomberie, agencements). Les durées sont à confirmer : ce n’est pas un barème légal. Annuler laisse la base inchangée. Répéter la confirmation ne crée pas de doublon. Le mobilier reste à saisir à part.</p>
       {visiblePlan && <>
@@ -451,7 +469,7 @@ export default function AssetsPage() {
       </>}
       <PropertyEntry
         properties={properties}
-        years={setup.years.filter((year) => year.status === "OPEN")}
+        years={setup.years}
         onDone={(text) => { setError(""); setMessage(text); setRevision((value) => value + 1); }}
       />
       {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} help={editor.help} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} derive={editor.derive} />}
@@ -477,15 +495,17 @@ export default function AssetsPage() {
           </div>
         </div>)}
       </article>)}
-      <div className="section-heading"><div><h3>Dotations comptables</h3><p>Le calcul en jours calendaires ne modifie jamais la couche fiscale.</p></div>
+      <div className="section-heading" id="dotations" tabIndex={-1}><div><h3>Dotations comptables</h3><p>Le calcul en jours calendaires ne modifie jamais la couche fiscale.</p></div>
         <label>Exercice<select value={yearId} onChange={(event) => {
           ++periodRequest.current;
           setPeriods([]); setError(""); setMessage(""); setEditor(null);
           setYearId(Number(event.target.value));
         }}>{setup.years.filter((year) => year.status === "OPEN").map((year) => <option key={year.id} value={year.id}>{year.year}</option>)}</select></label>
       </div>
-      <button disabled={!yearId} onClick={() => { void calculate(); }}>Calculer les périodes</button>
-      <button type="button" disabled={!periods.some((row) => row.status !== "POSTED")} onClick={() => { void postAll(); }}>Comptabiliser toutes les dotations</button>
+      <button id="calculer-periodes" disabled={periodCauses.length > 0} aria-describedby={describedBy(periodCauseId, periodCauses)} onClick={() => { void calculate(); }}>Calculer les périodes</button>
+      <PrerequisiteList id={periodCauseId} causes={periodCauses} />
+      <button type="button" disabled={yearId ? postCauses.length > 0 || !periodsSettled : periodCauses.length > 0} aria-describedby={postDescribed} onClick={() => { void postAll(); }}>Comptabiliser toutes les dotations</button>
+      <PrerequisiteList id={postCauseId} causes={postCauses} />
       <ScreenStatus
         state={periodsView}
         onRetry={() => setPeriodsAttempt((value) => value + 1)}

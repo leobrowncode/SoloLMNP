@@ -34,13 +34,18 @@ export default function OpeningPreview({ year }: { year: number }) {
     }
   }
   return <section aria-labelledby="opening-title" data-screen-phase={view.phase}>
-    <h3 id="opening-title">Préparer les à-nouveaux de cet exercice</h3>
+    <h3 id="opening-title" tabIndex={-1}>Préparer les à-nouveaux de cet exercice</h3>
     <p>La prévisualisation depuis l’exercice précédent ne crée aucune écriture. Vérifiez les soldes avant de demander leur comptabilisation.</p>
-    <button type="button" onClick={() => { void load(); }} disabled={view.phase === "loading"}>Prévisualiser les à-nouveaux</button>
+    <button
+      type="button"
+      onClick={() => { void load(); }}
+      disabled={view.phase === "loading"}
+      aria-describedby={view.phase === "loading" ? "opening-loading" : undefined}
+    >Prévisualiser les à-nouveaux</button>
     <ScreenStatus
       state={view}
       onRetry={() => { void load(); }}
-      loading={<p role="status">Chargement des soldes à reprendre…</p>}
+      loading={<p id="opening-loading" role="status">Chargement des soldes à reprendre…</p>}
       empty={<p>Aucun solde à reprendre.</p>}
     />
     {data && <div aria-live="polite">

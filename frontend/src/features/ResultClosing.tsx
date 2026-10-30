@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { request, type Account, type Entry, type Journal } from "../api/ledger";
+import { centralizationCauses, describedBy } from "./actionCauses";
+import PrerequisiteList from "./PrerequisiteList";
 
 interface PreviewLine { account_number: string; label: string; debit: string; credit: string }
 interface ProposedAccount { number: string; label: string; account_type: string }
@@ -134,8 +136,12 @@ export default function ResultClosing({ year }: { year: number }) {
       : line
   ));
   const missingResultAccount = !!prefix && resultChoices.length === 0;
+  const centralCauses = preview
+    ? centralizationCauses(preview.year_status, missingResultAccount, prefix ?? null)
+    : [];
+  const centralCauseId = "centralization-causes";
   return <section aria-labelledby="result-title">
-    <h3 id="result-title">Centraliser et affecter le résultat</h3>
+    <h3 id="result-title" tabIndex={-1}>Centraliser et affecter le résultat</h3>
     <p>Le serveur recalcule les montants. Confirmez le compte et la justification avant validation. Préparer, corriger ou quitter ne modifie pas le plan comptable. Cette étape ne clôture pas l’exercice. Ensuite, dans Fiscalité LMNP : calcul fiscal, pré-contrôle, puis clôture.</p>
     <button type="button" onClick={() => { void load(); }}>Préparer la centralisation</button>
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
@@ -154,12 +160,12 @@ export default function ResultClosing({ year }: { year: number }) {
         <label>Journal<select name="journal" required>{general.map((journal) => <option key={journal.code} value={journal.code}>{journal.code}</option>)}</select></label>
         <label>Référence de pièce<input name="piece" required maxLength={200} /></label>
         {!!resultChoices.length && <label>Compte de résultat<select name="result" required defaultValue={saved?.result_account ?? resultChoices[0]?.number}>{resultChoices.map((account) => <option key={account.number} value={account.number}>{account.number} · {account.label}{account.create ? " (sera créé)" : ""}</option>)}</select></label>}
-        {missingResultAccount && <p className="field-hint">Aucun compte actif {prefix} (hors 1209). Réactivez-le ou créez-en un dans le plan de comptes, puis préparez à nouveau.</p>}
         <label>Justification<textarea name="justification" required minLength={10} maxLength={3000} /></label>
       </>}
       {review && saved && <p>Demande {saved.request_id} conservée dans cet onglet. Réessayez la même demande si la réponse a été perdue.</p>}
       {review && !!saved?.create_accounts?.length && <p>La confirmation crée {saved.create_accounts.map((account) => `${account.number} · ${account.label}`).join(", ")} dans la même opération que la centralisation.</p>}
-      <button type="submit" disabled={busy || preview.year_status !== "OPEN" || missingResultAccount}>{review ? "Confirmer la centralisation" : "Vérifier la centralisation"}</button>
+      <button type="submit" disabled={busy || centralCauses.length > 0} aria-describedby={describedBy(centralCauseId, centralCauses)}>{review ? "Confirmer la centralisation" : "Vérifier la centralisation"}</button>
+      <PrerequisiteList id={centralCauseId} causes={centralCauses} />
       {review && <button type="button" onClick={() => setReview(false)}>Corriger</button>}
     </form>}
     {preview?.already_posted && appropriation && !appropriation.already_posted && <form onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(event.currentTarget); }}>

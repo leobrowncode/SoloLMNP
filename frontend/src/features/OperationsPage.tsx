@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { amount, cents, request, type Account, type Setup, type Entry, RequestError } from "../api/ledger";
+import {
+  activityCause, bankCause, csvPreviewCauses, describedBy, duplicatePostCauses, listed,
+  loanPostCauses, openYearCauses, operationEntryCauses, propertyCause, rentCauses,
+} from "./actionCauses";
 import ApiErrorAlert from "./ApiErrorAlert";
+import PrerequisiteList from "./PrerequisiteList";
 import ScreenStatus from "./ScreenStatus";
 import {
   beginLoad, defer, failLoad, finishLoad, idleView, showsData, showsLoading, toApiError, type ScreenView,
@@ -306,7 +311,45 @@ export default function OperationsPage() {
     setLoanMappingConfirmed(false);
   }
 
-  const openYears = setup?.years.filter((year) => year.status === "OPEN") ?? [];
+  const years = setup?.years ?? [];
+  const openYears = years.filter((year) => year.status === "OPEN");
+  const entryCauses = operationEntryCauses(properties.length, years);
+  const entryCauseId = "operation-entry-causes";
+  const bankCauses = listed(bankCause(banks.length));
+  const bankCauseId = "operation-bank-causes";
+  const loanCauses = listed(propertyCause(properties.length));
+  const loanCauseId = "loan-create-causes";
+  const activityCauses = listed(activityCause(Boolean(setup?.activity)));
+  const bankPreviewCauses = csvPreviewCauses({
+    hasContent: csv.trim() !== "",
+    anchor: "/operations/banque#import-releve",
+    missingProperty: false,
+    missingYear: false,
+    missingBank: !bankId,
+    missingLoan: false,
+  });
+  const operationPreviewCauses = csvPreviewCauses({
+    hasContent: opCsv.trim() !== "",
+    anchor: "/operations/transactions#import-operations",
+    missingProperty: !opPropertyId,
+    missingYear: !opYearId,
+    missingBank: false,
+    missingLoan: false,
+  });
+  const loanPreviewCauses = csvPreviewCauses({
+    hasContent: loanCsv.trim() !== "",
+    anchor: "/operations/emprunts#import-echeances",
+    missingProperty: false,
+    missingYear: !opYearId,
+    missingBank: !bankId,
+    missingLoan: !loanImportId,
+  });
+  const operationPostCauses = opPreview
+    ? duplicatePostCauses(opPreview.rows.every((row) => row.duplicate), "/operations/transactions#import-operations")
+    : [];
+  const loanImportPostCauses = loanPreview?.result
+    ? loanPostCauses(loanMappingConfirmed, loanPreview.result.rows.some((row) => !row.duplicate))
+    : [];
   const loanPreviewData = loanPreview?.result ?? null;
   const previewLoan = loans.find((loan) => loan.id === loanPreview?.loanId);
   function occupants(id: number) {
@@ -422,7 +465,7 @@ export default function OperationsPage() {
       loading={!setup ? <p>Chargement…</p> : null}
     />
     {bundleView.phase === "loaded" && setup && !setup.activity && (
-      <p>Initialisez votre activité et votre exercice dans <strong>Comptabilité</strong> avant de saisir vos opérations.</p>
+      <PrerequisiteList id="operations-activity" causes={activityCauses} intro="Initialisez votre activité avant de saisir des opérations :" />
     )}
     {showsData(bundleView) && setup?.activity && <>
       <nav className="step-tabs" aria-label="Étapes des opérations">
@@ -454,7 +497,7 @@ export default function OperationsPage() {
 
       {tab === "Biens" && <>
         <p className="form-help">Ajoutez le logement avant les loyers. Terrain et bâtiment doivent égaler le prix. Les frais de notaire viennent en plus.</p>
-        <button type="button" onClick={() => setEditor({
+        <button id="ajouter-bien" type="button" onClick={() => setEditor({
           title: "Ajouter un bien", path: "/properties",
           help: "Le terrain et le bâtiment doivent totaliser exactement le prix d’acquisition. Les frais restent à part.",
           derive: (draft, changed) => {
@@ -493,7 +536,7 @@ export default function OperationsPage() {
             <div className="entry-actions">
               <button type="button" onClick={() => openProperty(p)}>Modifier {p.name}</button>
             </div>
-            <h4>Colocataires</h4>
+            <h4 id={`colocataires-${p.id}`} tabIndex={-1}>Colocataires</h4>
             <ul>
               {occupants(p.id).map((tenant) => (
                 <li key={tenant.id}>
@@ -520,20 +563,21 @@ export default function OperationsPage() {
                 { name: "exit_date", label: "Sortie, si elle est connue", type: "date", optional: true },
               ],
             })}>Ajouter un colocataire</button>
-            <button type="button" disabled={!opYearId || !occupants(p.id).length} onClick={() => {
+            <button type="button" disabled={rentCauses(p.id, occupants(p.id).length, years).length > 0} aria-describedby={describedBy(`rents-${p.id}`, rentCauses(p.id, occupants(p.id).length, years))} onClick={() => {
               void action(async () => {
                 const result = await api<{ created: number; already: number }>("/properties/" + p.id + "/rents", "POST", { fiscal_year_id: opYearId });
                 setMessage(result.created + " quittance(s) préparée(s), " + result.already + " déjà présentes. Elles restent à régler.");
                 setRevision((value) => value + 1);
               });
             }}>Préparer les loyers de l’exercice</button>
+            <PrerequisiteList id={`rents-${p.id}`} causes={rentCauses(p.id, occupants(p.id).length, years)} />
           </article>
         ))}
       </>}
 
       {tab === "Banque" && <>
         <p className="form-help">Créez d’abord le compte bancaire, puis importez éventuellement un relevé CSV pour rapprocher.</p>
-        <button type="button" onClick={() => setEditor({
+        <button id="ajouter-banque" type="button" onClick={() => setEditor({
           title: "Ajouter un compte bancaire", path: "/banks",
           fields: [
             { name: "name", label: "Nom du compte bancaire", group: "Banque" },
@@ -568,10 +612,11 @@ export default function OperationsPage() {
                 setCsv(await file.text());
               });
             }} /></label>
-            <label>Contenu CSV<textarea rows={6} value={csv} onChange={(e) => { setCsv(e.target.value); setPreview(null); }} /></label>
-            <button type="button" disabled={busy || !csv} onClick={() => {
+            <label>Contenu CSV<textarea id="import-releve" rows={6} value={csv} onChange={(e) => { setCsv(e.target.value); setPreview(null); }} /></label>
+            <button type="button" disabled={busy || bankPreviewCauses.length > 0} aria-describedby={describedBy("bank-preview-causes", bankPreviewCauses)} onClick={() => {
               void action(async () => setPreview(await api<ImportPreview>("/bank/preview", "POST", { bank_account_id: bankId, content: csv })));
             }}>Prévisualiser l’import</button>
+            <PrerequisiteList id="bank-preview-causes" causes={bankPreviewCauses} />
             {preview && <>
               <p>{preview.count} mouvement(s) · {preview.rows.filter((r) => r.duplicate).length} déjà importé(s)</p>
               <div className="ledger-table"><table>
@@ -598,13 +643,14 @@ export default function OperationsPage() {
             loading={<p>Chargement du relevé…</p>}
             empty={<p>Aucun mouvement sur ce compte.</p>}
           />
+          {entryCauses.length > 0 && <PrerequisiteList id={entryCauseId} causes={entryCauses} />}
           {showsData(bankView) && transactions.map((t) => (
             <article key={t.id} className="entry-card">
               <h3>{t.label} · {t.amount} €</h3>
               <p>{t.date} · {t.external_reference} · {t.matched_entry_id ? "Rapproché avec l’écriture #" + t.matched_entry_id : "À rapprocher"}</p>
               {!t.matched_entry_id ? <>
                 <button type="button" disabled={busy} onClick={() => { void action(() => findCandidates(t)); }}>Rapprocher une écriture existante</button>
-                <button type="button" disabled={!properties.length} onClick={() => newOperation(t.amount.startsWith("-") ? "EXPENSE" : "REVENUE", t)}>Créer une opération liée</button>
+                <button type="button" disabled={entryCauses.length > 0} aria-describedby={describedBy(entryCauseId, entryCauses)} onClick={() => newOperation(t.amount.startsWith("-") ? "EXPENSE" : "REVENUE", t)}>Créer une opération liée</button>
               </> : (
                 <button type="button" onClick={() => setEditor({
                   title: "Annuler le rapprochement", path: "/bank/transactions/" + t.id + "/unmatch",
@@ -641,7 +687,7 @@ export default function OperationsPage() {
 
       {tab === "Emprunts" && <>
         <p className="form-help">Chaque ligne de crédit = un emprunt SoloLMNP avec son propre compte 164. Exemple : 15&nbsp;000 € et 195&nbsp;000 € → deux emprunts. Un compte 164 libre est attribué automatiquement si besoin.</p>
-        <button type="button" disabled={!properties.length} onClick={() => {
+        <button id="ajouter-emprunt" type="button" disabled={loanCauses.length > 0} aria-describedby={describedBy(loanCauseId, loanCauses)} onClick={() => {
           const used = new Set(loans.map((loan) => loan.principal_account));
           const free164 = accounts
             .filter((a) => a.active && a.number.startsWith("164") && !used.has(a.number))
@@ -672,8 +718,8 @@ export default function OperationsPage() {
           ],
         });
         }}>Ajouter un emprunt</button>
-        {!properties.length && <p>Ajoutez d’abord un bien.</p>}
-        {!banks.length && <p>Ajoutez un compte bancaire avant déblocage ou échéance.</p>}
+        <PrerequisiteList id={loanCauseId} causes={loanCauses} />
+        <PrerequisiteList id={bankCauseId} causes={bankCauses} intro="Déblocage et échéance indisponibles :" />
         {loans.map((l) => (
           <article className="entry-card" key={l.id}>
             <h3>{l.lender}</h3>
@@ -682,7 +728,7 @@ export default function OperationsPage() {
             <div className="entry-actions">
               <button type="button" onClick={() => openLoan(l)}>Modifier {l.lender}</button>
             </div>
-            <button type="button" disabled={!banks.length} onClick={() => setEditor({
+            <button type="button" disabled={bankCauses.length > 0} aria-describedby={describedBy(bankCauseId, bankCauses)} onClick={() => setEditor({
               title: "Déblocage initial : " + l.lender,
               path: "/loans/" + l.id + "/fund",
               retry: true,
@@ -692,7 +738,7 @@ export default function OperationsPage() {
                 { name: "amount", label: "Montant débloqué (€)", money: true, value: l.initial_principal, group: "Montant" },
               ],
             })}>Enregistrer le déblocage</button>
-            <button type="button" disabled={!banks.length} onClick={() => {
+            <button type="button" disabled={bankCauses.length > 0} aria-describedby={describedBy(bankCauseId, bankCauses)} onClick={() => {
               const rate = BigInt(l.interest_rate_basis_points ?? 0);
               const remaining = cents(l.remaining_principal);
               const interest = remaining * rate / 120000n;
@@ -721,6 +767,9 @@ export default function OperationsPage() {
             }}>Saisir une échéance</button>
           </article>
         ))}
+        {!!loans.length && !!banks.length && !openYears.length && (
+          <PrerequisiteList id="loan-import-year" causes={openYearCauses(years)} intro="L’import des échéances est indisponible :" />
+        )}
         {!!loans.length && !!banks.length && !!openYears.length && <details>
           <summary>Importer les échéances depuis Google Sheets ou un CSV</summary>
           <p>Collez l’en-tête et les lignes d’un seul prêt. Colonnes reconnues : <code>Prêt;Rang;Date;Capital (€);Intérêts (€);Assurance banque (€);Assurance externe à compléter (€);Total banque (€)</code>. La colonne facultative <code>Date débit</code> permet d’utiliser la date réelle du relevé bancaire. Seules les échéances de l’exercice déjà arrivées à leur date seront proposées.</p>
@@ -761,10 +810,10 @@ export default function OperationsPage() {
               setLoanCsv(await file.text());
             });
           }} /></label>
-          <label>Lignes du tableau d’amortissement<textarea rows={8} value={loanCsv} onChange={(e) => {
+          <label>Lignes du tableau d’amortissement<textarea id="import-echeances" rows={8} value={loanCsv} onChange={(e) => {
             setLoanCsv(e.target.value); clearLoanPaymentPreview();
           }} /></label>
-          <button type="button" disabled={busy || !loanCsv || !loanImportId || !opYearId || !bankId} onClick={() => {
+          <button type="button" disabled={busy || loanPreviewCauses.length > 0} aria-describedby={describedBy("loan-preview-causes", loanPreviewCauses)} onClick={() => {
             const requestId = ++loanPreviewRequest.current;
             const context = {
               loanId: loanImportId, yearId: opYearId, bankId, content: loanCsv,
@@ -784,6 +833,7 @@ export default function OperationsPage() {
               setLoanMappingConfirmed(false);
             });
           }}>Prévisualiser les échéances</button>
+          <PrerequisiteList id="loan-preview-causes" causes={loanPreviewCauses} />
           {loanPreviewData && loanPreview && <>
             <p>
               {loanPreviewData.count} échéance(s) retenue(s) sur {loanPreviewData.source_count}
@@ -803,7 +853,7 @@ export default function OperationsPage() {
                 </tr>
               ))}</tbody>
             </table></div> : <p>Aucune échéance arrivée à sa date pour cet exercice.</p>}
-            {loanPreviewData.rows.some((row) => !row.duplicate) && <label>
+            {loanPreviewData.rows.some((row) => !row.duplicate) && <label id="confirmer-pret" tabIndex={-1}>
               <input
                 type="checkbox"
                 checked={loanMappingConfirmed}
@@ -812,7 +862,7 @@ export default function OperationsPage() {
               Je confirme que le prêt source {loanPreviewData.loan_reference} correspond à
               {" "}{previewLoan?.lender} · {previewLoan?.initial_principal} € · {previewLoan?.principal_account}.
             </label>}
-            <button type="button" disabled={busy || !loanMappingConfirmed || !loanPreviewData.rows.some((row) => !row.duplicate)} onClick={() => {
+            <button type="button" disabled={busy || loanImportPostCauses.length > 0} aria-describedby={describedBy("loan-post-causes", loanImportPostCauses)} onClick={() => {
               void action(async () => {
                 const result = await api<LoanPaymentImportPreview>(
                   "/loans/" + loanPreview.loanId + "/payments/import",
@@ -829,6 +879,7 @@ export default function OperationsPage() {
                 clearLoanPaymentPreview(); setRevision((value) => value + 1);
               });
             }}>Comptabiliser les échéances</button>
+            <PrerequisiteList id="loan-post-causes" causes={loanImportPostCauses} />
           </>}
         </details>}
       </>}
@@ -864,12 +915,13 @@ export default function OperationsPage() {
               setOpCsv(await file.text());
             });
           }} /></label>
-          <label>Lignes collées ou contenu CSV<textarea rows={6} value={opCsv} onChange={(e) => { setOpCsv(e.target.value); setOpPreview(null); }} /></label>
-          <button type="button" disabled={busy || !opCsv || !opPropertyId || !opYearId} onClick={() => {
+          <label>Lignes collées ou contenu CSV<textarea id="import-operations" rows={6} value={opCsv} onChange={(e) => { setOpCsv(e.target.value); setOpPreview(null); }} /></label>
+          <button type="button" disabled={busy || operationPreviewCauses.length > 0} aria-describedby={describedBy("operation-preview-causes", operationPreviewCauses)} onClick={() => {
             void action(async () => setOpPreview(await api<OperationImportPreview>("/import/preview", "POST", {
               property_id: opPropertyId, fiscal_year_id: opYearId, content: opCsv, bank_account_id: bankId || null,
             })));
           }}>Prévisualiser les justificatifs</button>
+          <PrerequisiteList id="operation-preview-causes" causes={operationPreviewCauses} />
           {opPreview && <>
             <p>{opPreview.count} opération(s) · {opPreview.rows.filter((row) => row.duplicate).length} déjà importée(s)</p>
             <div className="ledger-table"><table>
@@ -887,7 +939,7 @@ export default function OperationsPage() {
                 </tr>
               ))}</tbody>
             </table></div>
-            <button type="button" disabled={busy || opPreview.rows.every((row) => row.duplicate)} onClick={() => {
+            <button type="button" disabled={busy || operationPostCauses.length > 0} aria-describedby={describedBy("operation-post-causes", operationPostCauses)} onClick={() => {
               void action(async () => {
                 const result = await api<OperationImportPreview>("/import", "POST", {
                   property_id: opPropertyId, fiscal_year_id: opYearId, content: opCsv, bank_account_id: bankId || null,
@@ -896,13 +948,15 @@ export default function OperationsPage() {
                 setOpPreview(null); setRevision((value) => value + 1);
               });
             }}>Comptabiliser les justificatifs</button>
+            <PrerequisiteList id="operation-post-causes" causes={operationPostCauses} />
           </>}
         </details>
         <div className="form-actions">
-          <button type="button" disabled={!properties.length || !setup.years.some((y) => y.status === "OPEN")} onClick={() => newOperation("REVENUE")}>Nouvelle recette</button>
-          <button type="button" disabled={!properties.length || !setup.years.some((y) => y.status === "OPEN")} onClick={() => newOperation("EXPENSE")}>Nouvelle dépense</button>
+          <button type="button" disabled={entryCauses.length > 0} aria-describedby={describedBy(entryCauseId, entryCauses)} onClick={() => newOperation("REVENUE")}>Nouvelle recette</button>
+          <button type="button" disabled={entryCauses.length > 0} aria-describedby={describedBy(entryCauseId, entryCauses)} onClick={() => newOperation("EXPENSE")}>Nouvelle dépense</button>
         </div>
-        {!properties.length && <p>Ajoutez d’abord un bien dans l’onglet Biens.</p>}
+        <PrerequisiteList id={entryCauseId} causes={entryCauses} />
+        <PrerequisiteList id={bankCauseId} causes={bankCauses} intro="Le règlement reste indisponible :" />
         {showsLoading(bundleView) && <p>Chargement des opérations…</p>}
         {bundleView.phase === "loaded" && operations.length === 0 && <p>Aucune opération enregistrée.</p>}
         {showsData(bundleView) && operations.map((row) => (
@@ -914,7 +968,7 @@ export default function OperationsPage() {
             )}
             <button type="button" onClick={() => { void action(async () => setDetails(await request<Entry>("/entries/" + row.accounting_entry_id))); }}>Voir l’écriture</button>
             {row.status !== "REVERSED" && row.remaining_to_settle && row.remaining_to_settle !== "0.00" && (
-              <button type="button" disabled={!banks.length} onClick={() => setEditor({
+              <button type="button" disabled={bankCauses.length > 0} aria-describedby={describedBy(bankCauseId, bankCauses)} onClick={() => setEditor({
                 title: "Régler : " + row.description,
                 path: "/" + row.id + "/settle",
                 retry: true,

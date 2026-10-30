@@ -29,6 +29,11 @@ Chaque étape du menu possède une adresse stable (`/comptabilite/brouillons`,
 utiliser Précédent/Suivant du navigateur ou enregistrer un favori sans perdre
 votre écran. Une saisie non enregistrée demande confirmation avant de quitter.
 
+Une action métier désactivée (nouvelle recette, nouvelle dépense, immobilisation,
+à-nouveaux, emprunt, règlement, dotation, clôture, etc.) nomme chaque prérequis
+manquant et propose un lien vers l’écran qui le corrige. S’il y a plusieurs
+causes, elles sont toutes listées. L’ordre du parcours ne change pas.
+
 Si l’alerte « Stockage non sûr » apparaît, la base est dans OneDrive. Elle reste visible sur toutes les vues, même quand la base est prête. Copiez le projet hors de ce dossier synchronisé avant de saisir : la synchronisation peut corrompre SQLite.
 
 Si un écran affiche une erreur de chargement, **Réessayer** relance la lecture. Ce n’est pas un dossier vide. Quand c’est sans risque, les informations déjà affichées restent, marquées comme pouvant être périmées. Les totaux des états comptables disparaissent plutôt que de montrer un chiffre incertain. Le **statut dossier** et **Stockage opérationnel** disparaissent aussi : une lecture ratée ne laisse pas l’indicateur précédent.

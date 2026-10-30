@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { request } from "../api/ledger";
+import { describedBy, openingGenerationCauses } from "./actionCauses";
+import PrerequisiteList from "./PrerequisiteList";
 import type { Opening } from "./OpeningPreview";
 
 interface Continuity {
@@ -16,8 +18,9 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
   const pending = useRef(false);
   const generation = useRef(0);
   useEffect(() => () => { generation.current += 1; }, []);
-  const blocked = !preview || !preview.preview_token || preview.total_debit === "0.00" || preview.warnings.some((warning) =>
-    ["SOURCE_NOT_CLOSED", "SOURCE_DRAFTS", "TARGET_NOT_OPEN", "TARGET_HAS_ENTRIES", "INACTIVE_ACCOUNTS"].includes(warning.code));
+  const causes = openingGenerationCauses(preview);
+  const blocked = causes.length > 0;
+  const causeId = "opening-generation-causes";
 
   async function post(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,7 +54,7 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
     }
   }
   return <section aria-labelledby="opening-posting-title">
-    <h4 id="opening-posting-title">Comptabiliser et contrôler les à-nouveaux</h4>
+    <h4 id="opening-posting-title" tabIndex={-1}>Comptabiliser et contrôler les à-nouveaux</h4>
     <p>La génération valide une écriture à la date d’ouverture. Elle exige un exercice précédent clôturé sans brouillon et un exercice destinataire ouvert et vide.</p>
     {preview && !receipt && <form onSubmit={(event) => { void post(event); }}>
       <fieldset disabled={blocked || busy}>
@@ -61,8 +64,9 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
         {preview.result_line && <label>Compte de reprise du résultat<input name="result" required pattern="[1-7][0-9]{2,9}" maxLength={10} />
           <span>Compte actif de capitaux propres {preview.result_line.credit !== "0.00" ? "120 (hors 1209)" : "129"}, à créer dans le plan de comptes si absent. Aucune affectation automatique.</span>
         </label>}
-        <button type="submit">Générer et valider les à-nouveaux</button>
       </fieldset>
+      <button type="submit" disabled={blocked || busy} aria-describedby={describedBy(causeId, causes)}>Générer et valider les à-nouveaux</button>
+      <PrerequisiteList id={causeId} causes={causes} />
     </form>}
     {receipt && <p role="status">{receipt}</p>}
     <button type="button" disabled={busy} onClick={() => { void check(); }}>Contrôler la continuité des à-nouveaux</button>

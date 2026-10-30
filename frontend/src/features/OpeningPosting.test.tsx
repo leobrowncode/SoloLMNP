@@ -34,9 +34,46 @@ test("posts explicit account and preview token once, shows persisted receipt", a
   expect(screen.queryByRole("button", { name: "Générer et valider les à-nouveaux" })).not.toBeInTheDocument();
 });
 
-test.each(["SOURCE_NOT_CLOSED", "SOURCE_DRAFTS", "TARGET_NOT_OPEN", "TARGET_HAS_ENTRIES", "INACTIVE_ACCOUNTS"])("blocks generation for %s", (code) => {
+test.each([
+  ["SOURCE_NOT_CLOSED", "/fiscalite#close-title", "Clôturer l’exercice précédent"],
+  ["SOURCE_DRAFTS", "/comptabilite/brouillons#nouvelle-ecriture", "Valider les brouillons"],
+  ["TARGET_NOT_OPEN", "/fiscalite#close-title", "Voir la clôture de l’exercice"],
+  ["TARGET_HAS_ENTRIES", "/comptabilite/journal", "Consulter le journal"],
+  ["INACTIVE_ACCOUNTS", "/comptabilite/plan-comptable", "Réactiver les comptes"],
+])("blocks generation for %s and links to the fix", (code, href, label) => {
   render(<OpeningPosting year={2} preview={{ ...preview, warnings: [{ code, message: "Blocage" }] }} />);
-  expect(screen.getByRole("button", { name: "Générer et valider les à-nouveaux" })).toBeDisabled();
+  const button = screen.getByRole("button", { name: "Générer et valider les à-nouveaux" });
+  expect(button).toBeDisabled();
+  expect(button).toHaveAttribute("aria-describedby", "opening-generation-causes");
+  const causes = document.getElementById("opening-generation-causes");
+  expect(causes).toHaveTextContent("Blocage");
+  expect(causes?.querySelector("a")).toHaveAttribute("href", href);
+  expect(causes?.querySelector("a")).toHaveTextContent(label);
+});
+
+test("lists every opening blocker together, including an empty balance and a missing token", () => {
+  const { preview_token: _token, ...withoutToken } = preview;
+  void _token;
+  render(<OpeningPosting year={2} preview={{
+    ...withoutToken,
+    total_debit: "0.00",
+    warnings: [
+      { code: "SOURCE_NOT_CLOSED", message: "Pas clôturé" },
+      { code: "SOURCE_DRAFTS", message: "Brouillons exclus" },
+      { code: "PREVIEW_ONLY", message: "Prévisualisation" },
+      { code: "RESULT_ACCOUNT_REQUIRED", message: "Compte à choisir" },
+    ],
+  }} />);
+  const button = screen.getByRole("button", { name: "Générer et valider les à-nouveaux" });
+  expect(button).toBeDisabled();
+  const causes = document.getElementById("opening-generation-causes");
+  expect(causes).toHaveTextContent("ne peut pas être comptabilisée");
+  expect(causes).toHaveTextContent("Aucun solde à reprendre");
+  expect(causes).toHaveTextContent("Pas clôturé");
+  expect(causes).toHaveTextContent("Brouillons exclus");
+  expect(causes).not.toHaveTextContent("Prévisualisation");
+  expect(causes).not.toHaveTextContent("Compte à choisir");
+  expect(causes?.querySelectorAll("a")).toHaveLength(4);
 });
 
 test("failed generation shows error and permits an idempotent retry", async () => {

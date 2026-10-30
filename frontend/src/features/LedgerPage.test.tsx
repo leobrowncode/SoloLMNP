@@ -117,4 +117,51 @@ describe("ledger", () => {
     expect(screen.queryByText(/Chargement…/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Aucune écriture pour cette vue/)).not.toBeInTheDocument();
   });
+
+  it("explains a closed exercise on a new entry and an unbalanced draft", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const path = String(url);
+      if (path.endsWith("/setup")) {
+        return new Response(JSON.stringify({
+          activity: { activity_name: "Fictif" },
+          years: [{ id: 1, year: 2025, start_date: "2025-01-01", end_date: "2025-12-31", status: "CLOSED" }],
+        }), { status: 200 });
+      }
+      if (path.endsWith("/accounts")) return new Response(JSON.stringify(accounts), { status: 200 });
+      if (path.endsWith("/journals")) return new Response(JSON.stringify([{ code: "OD", label: "Opérations", active: true }]), { status: 200 });
+      if (path.includes("/entries?")) {
+        return new Response(JSON.stringify({
+          entries: [{
+            id: 7, version: 1, status: "DRAFT", entry_number: null, journal_code: "OD",
+            accounting_date: "2025-01-02", piece_date: "2025-01-02", piece_reference: "B",
+            label: "Déséquilibrée", fiscal_year_id: 1, balanced: false, reversal_of_id: null,
+            total_debit: "1.00", total_credit: "0.00",
+            lines: [{ account_number: "512000", label: "Banque", debit: "1.00", credit: "0.00" }],
+          }, {
+            id: 8, version: 1, status: "VALIDATED", entry_number: "2025-1", journal_code: "OD",
+            accounting_date: "2025-01-03", piece_date: "2025-01-03", piece_reference: "E",
+            label: "Extourne", fiscal_year_id: 1, balanced: true, reversal_of_id: 4,
+            total_debit: "1.00", total_credit: "1.00", lines: [],
+          }],
+          count: 2,
+        }), { status: 200 });
+      }
+      return new Response("{}", { status: 200 });
+    }));
+    renderLedger();
+    const create = await screen.findByRole("button", { name: "Nouvelle écriture" });
+    expect(create).toBeDisabled();
+    expect(create).toHaveAttribute("aria-describedby", "ledger-year-causes");
+    expect(document.getElementById("ledger-year-causes")).toHaveTextContent("clôturé");
+    expect(document.querySelector('a[href="/fiscalite#reopen-title"]')).toHaveTextContent("Réouvrir l’exercice");
+    const validate = await screen.findByRole("button", { name: "Valider" });
+    expect(validate).toBeDisabled();
+    expect(validate).toHaveAttribute("aria-describedby", expect.stringContaining("entry-7-balance"));
+    expect(document.getElementById("entry-7-balance")).toHaveTextContent("n’est pas équilibrée");
+    await userEvent.click(screen.getByRole("button", { name: "Journal" }));
+    const reverse = await screen.findByRole("button", { name: "Extourner" });
+    expect(reverse).toBeDisabled();
+    expect(document.getElementById("entry-8-reversal")).toHaveTextContent("déjà une extourne");
+    expect(document.querySelector('a[href="/comptabilite/journal"]')).toHaveTextContent("Consulter le journal");
+  });
 });

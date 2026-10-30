@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { downloadFiling } from "../api/download";
 import { RequestError } from "../api/ledger";
 import ApiErrorAlert from "./ApiErrorAlert";
+import PrerequisiteList from "./PrerequisiteList";
 import type { ExportSlot, ExportStatus } from "./exportStatus";
 
 const OUTPUTS: {
@@ -104,38 +105,14 @@ export default function ExportDownloads({ yearId, status }: { yearId: number; st
                   <p>Document provisoire : ce n’est pas une sortie finale.</p>
                 )}
                 {slot.posture === "finale" && output.kind !== "liasse" && <p>Sortie finale.</p>}
-                {slot.posture === "bloquee" && output.kind === "liasse" && prerequisites.length > 0 && (
-                  <ul>
-                    {prerequisites.map((item) => (
-                      <li key={`${item.code}-${item.message}`}>
-                        <span>{item.message}</span>
-                        {item.action && (
-                          <>
-                            {" "}
-                            <a href={item.action.href}>{item.action.label}</a>
-                          </>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                {slot.posture === "bloquee" && output.kind === "liasse" && (
+                  <PrerequisiteList causes={prerequisites} intro="" />
                 )}
                 {slot.posture === "bloquee" && output.kind === "pdf" && (
                   <p>Le PDF reste bloqué tant que la liasse l’est. Les prérequis sont indiqués au-dessus.</p>
                 )}
-                {slot.posture === "bloquee" && output.kind === "fec" && prerequisites.length > 0 && (
-                  <ul>
-                    {prerequisites.map((item) => (
-                      <li key={`${item.code}-${item.message}`}>
-                        <span>{item.message}</span>
-                        {item.action && (
-                          <>
-                            {" "}
-                            <a href={item.action.href}>{item.action.label}</a>
-                          </>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                {slot.posture === "bloquee" && output.kind === "fec" && (
+                  <PrerequisiteList causes={prerequisites} intro="" />
                 )}
                 {slot.posture === "bloquee" && output.kind === "archive" && (
                   <p>Le dossier de contrôle suit le FEC. Les prérequis sont indiqués sur la carte FEC.</p>

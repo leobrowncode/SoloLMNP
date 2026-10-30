@@ -155,6 +155,19 @@
 .export-card-provisoire { background: #fff9ef; border-color: #e0c08a; }
 .export-card-bloquee { background: #fbf6f6; border-color: #e3c1c1; }
 .export-card-finale { background: #e7f6e8; border-color: #9cbc9a; }
+.action-prerequisites {
+  margin: .35rem 0 .9rem;
+  max-width: 68ch;
+  padding: .75rem .9rem;
+  border: 1px solid #e3c1c1;
+  border-radius: 10px;
+  background: #fbf6f6;
+  color: #173c2e;
+}
+.action-prerequisites p { margin: 0 0 .35rem; }
+.action-prerequisites ul { margin: 0; padding-left: 1.15rem; }
+.action-prerequisites li { margin: .35rem 0; line-height: 1.45; }
+.action-prerequisites a { font-weight: 650; text-underline-offset: .15em; display: inline-block; padding: .15rem 0; }
 @media (max-width: 40rem) {
   .export-card button { justify-self: stretch; }
 }

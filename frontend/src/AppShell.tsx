@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { fetchStatus } from "./api/status";
+import { focusRouteTarget } from "./routing/focusTarget";
 import { navItems, pageIdFromPathname, ROUTES, type PageId } from "./routing/paths";
 import { UnsavedChangesProvider } from "./routing/unsaved";
 import DossierStatus from "./features/DossierStatus";
@@ -18,6 +19,22 @@ function focusMain() {
   document.getElementById("main")?.focus();
 }
 
+function focusCurrentRoute(hash: string) {
+  let stopped = false;
+  const started = performance.now();
+  function tick() {
+    if (stopped) return;
+    if (focusRouteTarget(hash)) return;
+    if (performance.now() - started > 4000) {
+      focusMain();
+      return;
+    }
+    window.setTimeout(tick, 50);
+  }
+  tick();
+  return () => { stopped = true; };
+}
+
 export default function AppShell() {
   const { state, retry } = useScreenQuery(fetchStatus, "status", {
     keepPrevious: true,
@@ -26,9 +43,7 @@ export default function AppShell() {
   const location = useLocation();
   const page: PageId = pageIdFromPathname(location.pathname);
 
-  useEffect(() => {
-    focusMain();
-  }, [location.pathname]);
+  useEffect(() => focusCurrentRoute(location.hash), [location.pathname, location.hash]);
 
   const status = state.data;
   const serviceReady = status?.database.status === "ready";

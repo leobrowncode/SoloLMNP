@@ -19,7 +19,7 @@ test("loads on demand, shows loss and warnings, clears totals on failure", async
   expect(fetch).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Prévisualiser les à-nouveaux" }));
   expect(await screen.findByRole("table")).toHaveTextContent("À déterminer");
-  expect(screen.getByText("L’exercice précédent n’est pas clôturé.")).toBeInTheDocument();
+  expect(screen.getAllByText("L’exercice précédent n’est pas clôturé.")).toHaveLength(2);
   expect(fetch.mock.calls[0]?.[0]).toBe("/api/ledger/years/2/opening-preview");
   fetch.mockResolvedValue(response({ detail: { message: "Exercice précédent absent" } }, 409));
   fireEvent.click(screen.getByRole("button", { name: "Prévisualiser les à-nouveaux" }));
