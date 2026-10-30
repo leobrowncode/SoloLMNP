@@ -383,6 +383,8 @@
   line-height: 1.4;
   box-shadow: 0 8px 24px rgba(23, 60, 46, .18);
   overflow-wrap: anywhere;
+  overflow-y: auto;
+  max-height: calc(100vh - 1.5rem);
   pointer-events: auto;
 }
 .help-tip-panel[hidden] {

@@ -33,24 +33,46 @@ function clampHelpPanel(box: {
 }
 
 function placePanel(button: HTMLButtonElement, panel: HTMLElement) {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
   const trigger = button.getBoundingClientRect();
-  const measured = panel.getBoundingClientRect();
-  const next = clampHelpPanel({
+  const maxHeight = Math.max(0, viewportHeight - PANEL_MARGIN * 2);
+  panel.style.maxHeight = `${maxHeight}px`;
+  panel.style.overflowY = "auto";
+  panel.style.right = "auto";
+  panel.style.transform = "none";
+  const width = clampHelpPanel({
     triggerLeft: trigger.left,
     triggerTop: trigger.top,
     triggerWidth: trigger.width,
     triggerBottom: trigger.bottom,
-    panelHeight: measured.height,
-    viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight,
-  });
-  panel.style.left = `${next.left}px`;
-  panel.style.right = "auto";
-  panel.style.top = `${next.top}px`;
-  panel.style.bottom = "auto";
-  panel.style.width = `${next.width}px`;
-  panel.style.maxWidth = `${next.width}px`;
-  panel.style.transform = "none";
+    panelHeight: 0,
+    viewportWidth,
+    viewportHeight,
+  }).width;
+  panel.style.width = `${width}px`;
+  panel.style.maxWidth = `${width}px`;
+  const apply = (panelHeight: number) => {
+    const next = clampHelpPanel({
+      triggerLeft: trigger.left,
+      triggerTop: trigger.top,
+      triggerWidth: trigger.width,
+      triggerBottom: trigger.bottom,
+      panelHeight,
+      viewportWidth,
+      viewportHeight,
+    });
+    panel.style.left = `${next.left}px`;
+    panel.style.top = `${next.top}px`;
+    panel.style.bottom = "auto";
+    panel.style.width = `${next.width}px`;
+    return next;
+  };
+  const measuredHeight = panel.getBoundingClientRect().height || panel.scrollHeight;
+  apply(measuredHeight);
+  const placed = panel.getBoundingClientRect();
+  const overflow = placed.top < PANEL_MARGIN || placed.bottom > viewportHeight - PANEL_MARGIN;
+  if (placed.height > 0 && overflow) apply(placed.height);
 }
 
 export default function HelpTip({ label, children }: { label: string; children: ReactNode }) {
@@ -65,11 +87,22 @@ export default function HelpTip({ label, children }: { label: string; children: 
     const button = buttonRef.current;
     const panel = panelRef.current;
     if (!button || !panel) return;
-    const place = () => placePanel(button, panel);
+    let stopped = false;
+    const place = () => {
+      if (stopped || !button.isConnected || !panel.isConnected) return;
+      placePanel(button, panel);
+    };
     place();
+    const frame = window.requestAnimationFrame(place);
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(() => place()) : null;
+    observer?.observe(panel);
+    void document.fonts?.ready.then(() => place());
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     return () => {
+      stopped = true;
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
     };

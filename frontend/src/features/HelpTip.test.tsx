@@ -147,4 +147,31 @@ describe("mobile viewport", () => {
     const after = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
     expect(after).toBeLessThanOrEqual(Math.max(before, width));
   });
+
+  test("keeps the popover inside the viewport when the trigger is on the bottom edge", async () => {
+    const width = 320;
+    const height = 640;
+    mockViewport(width, height);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains("help-tip-btn")) {
+        return domRect({ left: width - 52, top: height - 70, width: 44, height: 44 });
+      }
+      if (this.classList.contains("help-tip-panel")) {
+        const left = this.style.left ? Number.parseFloat(this.style.left) : 12;
+        const top = this.style.top ? Number.parseFloat(this.style.top) : 12;
+        const panelWidth = this.style.width ? Number.parseFloat(this.style.width) : 288;
+        return domRect({ left, top, width: panelWidth, height: 160 });
+      }
+      return domRect({ left: 0, top: 0, width: 0, height: 0 });
+    });
+    const user = userEvent.setup();
+    render(<HelpTip label="Résultat fiscal">Montant BIC après plafond et reports.</HelpTip>);
+    await user.click(screen.getByRole("button", { name: "Aide : Résultat fiscal" }));
+    const panel = screen.getByRole("tooltip");
+    const rect = panel.getBoundingClientRect();
+    expect(rect.left).toBeGreaterThanOrEqual(0);
+    expect(rect.right).toBeLessThanOrEqual(width);
+    expect(rect.top).toBeGreaterThanOrEqual(0);
+    expect(rect.bottom).toBeLessThanOrEqual(height);
+  });
 });
