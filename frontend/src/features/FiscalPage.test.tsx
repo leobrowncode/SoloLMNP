@@ -183,7 +183,12 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
   expect(within(resultRow as HTMLElement).getByText("0.00 €")).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Liasse à recopier" }));
-  expect(await screen.findByText(/Aucun envoi n’est effectué/)).toBeInTheDocument();
+  const sheet = await screen.findByText((_, node) => (
+    node?.classList.contains("fiscal-goal") === true
+    && (node.textContent ?? "").includes("Aucun envoi n’est effectué")
+  ));
+  expect(sheet).toBeInTheDocument();
+  expect(document.getElementById("sorties-figees")).toHaveTextContent("Aucun envoi n’est effectué");
   expect(screen.getAllByText("Recherche").length).toBeGreaterThan(0);
   expect(screen.queryByText(/Prête à recopier/)).not.toBeInTheDocument();
   expect(screen.queryByText("Pas encore prête")).not.toBeInTheDocument();

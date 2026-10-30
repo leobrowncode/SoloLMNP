@@ -980,8 +980,8 @@ export default function FiscalPage() {
       <div className="fiscal-panel" id="sorties-figees">
         <h3>Sorties figées</h3>
         <p className="field-hint">
-          Chaque sortie indique Provisoire, Bloquée ou Finale. Une sortie bloquée liste ses prérequis
-          et ne se télécharge pas. Le refus reste sur cette page.
+          Aucun envoi n’est effectué. Chaque sortie indique Provisoire, Bloquée ou Finale.
+          Une sortie bloquée liste ses prérequis et ne se télécharge pas. Le refus reste sur cette page.
         </p>
         <div className="toolbar">
           <button type="button" disabled={!year || busy} onClick={() => { void loadWorksheet(); }}>

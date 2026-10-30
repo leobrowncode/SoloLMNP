@@ -171,6 +171,31 @@ main{
   letter-spacing:-.3px;
   color:#254536
 }
+.dossier-status{
+  margin:0;
+  max-width:42rem
+}
+.dossier-status p{
+  margin:0
+}
+.dossier-kicker{
+  color:#728875;
+  font-size:11px;
+  letter-spacing:.04em;
+  text-transform:uppercase
+}
+.dossier-status strong{
+  font-weight:650
+}
+.dossier-status-incomplet strong{color:#5d7364}
+.dossier-status-bloque strong{color:#8a4b32}
+.dossier-status-pret_a_verifier strong{color:#3d4f73}
+.dossier-status-cloture strong{color:#254536}
+.dossier-hint{
+  color:#6d7f72;
+  font-size:12px;
+  line-height:1.45
+}
 .path-list{
   list-style:none;
   margin:28px 0 0;

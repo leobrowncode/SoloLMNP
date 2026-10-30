@@ -11,6 +11,14 @@ const ready = {
   application_version: "0.2.0", phase: "foundation",
   database: { status: "ready", schema_revision: "0001_foundation", expected_revision: "0001_foundation" },
   fiscal: { status: "research_only", available_vintages: [] },
+  dossier: {
+    status: "pret_a_verifier",
+    label: "Prêt à vérifier",
+    fiscal_year_id: 1,
+    year: 2026,
+    year_status: "OPEN",
+    vintage_status: "research_only",
+  },
 };
 function reply(body: unknown = ready, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -31,7 +39,7 @@ describe("Foundation status", () => {
   it("shows centralization before the fiscal calculation, precheck and closing", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply()));
     renderApp();
-    await screen.findByText(/Base prête/);
+    await screen.findByText("Prêt à vérifier");
     const nav = screen.getByRole("navigation", { name: "Navigation principale" });
     const links = within(nav).getAllByRole("link");
     const statements = links.find((link) => /États comptables/.test(link.textContent ?? ""))!;
@@ -43,12 +51,19 @@ describe("Foundation status", () => {
     expect(links.indexOf(statements)).toBeLessThan(links.indexOf(fiscal));
   });
 
-  it("displays live readiness without claiming tax readiness", async () => {
+  it("displays the dossier status without a permanent storage banner", async () => {
     const request = vi.fn().mockResolvedValue(reply());
     vi.stubGlobal("fetch", request);
     renderApp();
-    expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
-    expect(screen.getByText(/Aucun envoi n’est effectué/)).toBeInTheDocument();
+    expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
+    expect(screen.getByText("Statut dossier")).toBeInTheDocument();
+    const diagnostic = screen.getByText("Stockage opérationnel").closest("details");
+    expect(diagnostic).toHaveAttribute("data-diagnostic", "storage");
+    expect(document.querySelector(".topbar")).not.toHaveTextContent("Stockage opérationnel");
+    expect(document.querySelector(".topbar")).not.toHaveTextContent("Base prête");
+    expect(document.querySelector(".topbar")).not.toHaveTextContent("Aucun envoi");
+    expect(screen.queryByText(/Aucun envoi/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Déclarable|déclarable/)).not.toBeInTheDocument();
     expect(within(screen.getByRole("navigation", { name: "Navigation principale" })).getByRole("link", { name: /Comptabilité/ })).toBeInTheDocument();
     expect(request).toHaveBeenCalledWith("/api/status", expect.objectContaining({ cache: "no-store" }));
   });
@@ -60,23 +75,30 @@ describe("Foundation status", () => {
     renderApp();
     expect(await screen.findByText("Le stockage nécessite une vérification")).toBeInTheDocument();
     expect(screen.queryByText(/Base prête/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Stockage opérationnel")).not.toBeInTheDocument();
+    expect(screen.queryByText("Prêt à vérifier")).not.toBeInTheDocument();
   });
 
-  it("keeps the last ready screen when a later status check fails", async () => {
+  it("invalidates the status indicator when a later check fails", async () => {
     const request = vi.fn()
       .mockResolvedValueOnce(reply())
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce(reply());
     vi.stubGlobal("fetch", request);
     renderApp();
-    expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
+    expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
+    expect(screen.getByText("Stockage opérationnel")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Actualiser" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Connexion au service indisponible");
     expect(screen.getByText(/peuvent être périmées/)).toBeInTheDocument();
-    expect(screen.getByText(/Base prête/)).toBeInTheDocument();
+    expect(screen.queryByText("Stockage opérationnel")).not.toBeInTheDocument();
+    expect(screen.queryByText("Prêt à vérifier")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Base prête/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Connexion au service et vérification/)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /De l’écriture à la liasse/ })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Réessayer" }));
-    expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
+    expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
+    expect(screen.getByText("Stockage opérationnel")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -86,7 +108,8 @@ describe("Foundation status", () => {
     renderApp();
     expect(await screen.findByRole("alert")).toHaveTextContent("Connexion au service indisponible");
     await userEvent.click(screen.getByRole("button", { name: /Actualiser/ }));
-    expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
+    expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
+    expect(screen.getByText("Stockage opérationnel")).toBeInTheDocument();
     expect(request.mock.calls.filter(([url]) => url === "/api/status")).toHaveLength(2);
   });
 
@@ -95,6 +118,15 @@ describe("Foundation status", () => {
     renderApp();
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(isApplicationStatus(null)).toBe(false);
+    expect(isApplicationStatus({
+      ...ready,
+      dossier: {
+        ...ready.dossier,
+        status: "declarable",
+        label: "Déclarable",
+        vintage_status: "declarable",
+      },
+    })).toBe(false);
   });
 
   it("keeps the OneDrive alert visible on a ready database and after navigation", async () => {
@@ -111,17 +143,23 @@ describe("Foundation status", () => {
     expect(alert).toHaveTextContent("peut corrompre SQLite");
     expect(alert).toHaveTextContent("Copiez le projet hors de ce dossier");
     expect(alert).not.toHaveTextContent("Base prête");
-    expect(screen.getByText(/Base prête/)).toBeInTheDocument();
+    expect(alert).not.toHaveTextContent("Stockage opérationnel");
+    expect(screen.getByText("Stockage opérationnel")).toBeInTheDocument();
+    expect(document.querySelector(".topbar")).not.toHaveTextContent("Stockage opérationnel");
     await userEvent.click(screen.getByRole("link", { name: "Comptabilité" }));
     expect(screen.getByRole("link", { name: "Comptabilité" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("alert")).toHaveTextContent(warning);
+    expect(screen.queryByText("Stockage opérationnel")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Base prête/)).not.toBeInTheDocument();
+    expect(screen.getByText("Prêt à vérifier")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Votre comptabilité" })).toBeInTheDocument();
   });
 
   it("does not show a storage alert when a ready database has no warning", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply({ ...ready, storage_warning: null })));
     renderApp();
-    expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
+    expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
+    expect(screen.getByText("Stockage opérationnel")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByText(/OneDrive|Stockage non sûr/)).not.toBeInTheDocument();
   });
@@ -138,6 +176,7 @@ describe("Foundation status", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(warning);
     expect(screen.getByText("Le stockage nécessite une vérification")).toBeInTheDocument();
     expect(screen.queryByText(/Base prête/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Stockage opérationnel")).not.toBeInTheDocument();
   });
 
   it("aborts the pending request on unmount", async () => {
