@@ -98,6 +98,7 @@
 .fiscal-rules-strip li {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: .4rem;
   padding: .85rem 1rem;
   background: #eef5ef;
@@ -196,6 +197,7 @@
 .fiscal-metric dt {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: .35rem;
   font-size: .8rem;
   color: #5b7466;
@@ -231,7 +233,9 @@
 .fiscal-waterfall span {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: .35rem;
+  max-width: 100%;
   color: #355245;
 }
 .fiscal-waterfall-key,
@@ -335,10 +339,18 @@
   position: relative;
   display: inline-flex;
   vertical-align: middle;
+  max-width: 100%;
 }
 .help-tip-btn {
-  width: 1.35rem;
-  height: 1.35rem;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: 0 0 44px;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
   margin: 0 !important;
   padding: 0 !important;
   border-radius: 999px !important;
@@ -348,14 +360,20 @@
   font-size: .75rem !important;
   font-weight: 700;
   line-height: 1;
-  cursor: help;
+  cursor: pointer;
 }
 .help-tip-panel {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + .45rem);
-  transform: translateX(-50%);
-  width: min(18rem, 70vw);
+  position: fixed;
+  z-index: 30;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  top: auto;
+  width: auto;
+  max-width: calc(100vw - 1.5rem);
+  box-sizing: border-box;
+  transform: none;
+  margin: 0;
   padding: .7rem .8rem;
   border-radius: 8px;
   background: #173c2e;
@@ -364,36 +382,16 @@
   font-weight: 400;
   line-height: 1.4;
   box-shadow: 0 8px 24px rgba(23, 60, 46, .18);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .12s ease;
-  z-index: 5;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+  max-height: calc(100vh - 1.5rem);
+  pointer-events: auto;
 }
-.help-tip-panel::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  margin-left: -5px;
-  border: 5px solid transparent;
-  border-top-color: #173c2e;
-}
-.help-tip:hover .help-tip-panel,
-.help-tip:focus-within .help-tip-panel {
-  opacity: 1;
+.help-tip-panel[hidden] {
+  display: none !important;
 }
 @media (max-width: 700px) {
   .fiscal-waterfall li { flex-direction: column; align-items: flex-start; gap: .25rem; }
   .fiscal-dashboard .ledger-table table { table-layout: fixed; width: 100%; }
   .fiscal-dashboard td, .fiscal-dashboard th { overflow-wrap: anywhere; }
-  .help-tip-panel {
-    position: fixed;
-    left: .75rem;
-    right: .75rem;
-    bottom: .75rem;
-    top: auto;
-    width: auto;
-    transform: none;
-  }
-  .help-tip-panel::after { display: none; }
 }
