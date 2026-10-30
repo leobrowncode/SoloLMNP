@@ -96,6 +96,8 @@ Pour chaque opération : date, bien, exercice, montant, compte 6xx/7xx.
 Si le règlement a lieu le même jour → lier la banque ; sinon choisir « Non réglé »,
 puis **Enregistrer un règlement** plus tard.
 
+Sur l’onglet **Transactions**, **Voir l’écriture** affiche le détail (numéro, libellé et lignes) sous la liste. **Fermer** retire ce détail sans changer d’onglet ; la touche Échap fait la même chose. Le focus revient au bouton qui a ouvert le détail. Ouvrir une autre écriture remplace le détail affiché.
+
 **Import CSV** (Banque, Emprunts, Transactions) :
 
 - **Télécharger le modèle CSV** : en-têtes en français, deux lignes d’exemple, UTF-8 avec BOM, séparateur `;`, montants avec virgule (`800,00`), dates `JJ/MM/AAAA`.

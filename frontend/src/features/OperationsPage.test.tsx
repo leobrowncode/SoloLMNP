@@ -22,6 +22,8 @@ function mockApi(options: {
   properties?: unknown[];
   years?: unknown[];
   banks?: unknown[] | null;
+  operations?: unknown[];
+  entries?: Record<string, unknown>;
 } = {}) {
   const properties = options.properties ?? [{
     id: 1, name: "Bien fictif", acquisition_price: "100000.00",
@@ -51,7 +53,7 @@ function mockApi(options: {
     if (url === "/api/operations/imports/loan_payments/commit") {
       return response({ ...((options.loanPreview ?? {}) as object), imported: 1 });
     }
-    if (url.startsWith("/api/operations?")) return response([{
+    if (url.startsWith("/api/operations?")) return response(options.operations ?? [{
       id: 1, kind: "EXPENSE", property_id: 1, fiscal_year_id: 1,
       date: "2025-02-01", amount: "100.00", description: "Assurance",
       counterparty: "Fournisseur", accounting_entry_id: 5,
@@ -60,6 +62,10 @@ function mockApi(options: {
       principal: "0.00", interest: "0.00", insurance: "0.00", other_costs: "0.00",
     }]);
     if (url.startsWith("/api/operations/bank/transactions")) return response([]);
+    if (url.startsWith("/api/ledger/entries/")) {
+      const id = url.slice(url.lastIndexOf("/") + 1);
+      return response(options.entries?.[id] ?? {});
+    }
     return response({});
   });
   vi.stubGlobal("fetch", fetcher);
@@ -377,4 +383,139 @@ describe("OperationsPage", () => {
     expect(document.getElementById("operation-bank-causes")).toHaveTextContent("Aucun compte bancaire");
     expect(document.querySelector('a[href="/operations/banque#ajouter-banque"]')).toHaveTextContent("Ajouter un compte bancaire");
   });
+
+  it("opens, replaces and closes an entry detail from the keyboard", async () => {
+    const user = userEvent.setup();
+    mockApi({
+      operations: [
+        {
+          id: 1, kind: "EXPENSE", property_id: 1, fiscal_year_id: 1,
+          date: "2025-02-01", amount: "100.00", description: "Assurance",
+          counterparty: "Fournisseur", accounting_entry_id: 5,
+          remaining_to_settle: "40.00", status: "POSTED",
+          deductible_percentage: "80.00", fiscal_treatment: "PARTIAL",
+          principal: "0.00", interest: "0.00", insurance: "0.00", other_costs: "0.00",
+        },
+        {
+          id: 2, kind: "REVENUE", property_id: 1, fiscal_year_id: 1,
+          date: "2025-03-01", amount: "800.00", description: "Loyer",
+          counterparty: "Dupont", accounting_entry_id: 6,
+          remaining_to_settle: "0.00", status: "SETTLED",
+          deductible_percentage: "100.00", fiscal_treatment: "NONE",
+          principal: "0.00", interest: "0.00", insurance: "0.00", other_costs: "0.00",
+        },
+      ],
+      entries: {
+        "5": entryFixture(5, "2025-000005", "Prime d’assurance"),
+        "6": entryFixture(6, "2025-000006", "Loyer mars"),
+      },
+    });
+    renderOperations("Transactions");
+    const openers = await screen.findAllByRole("button", { name: "Voir l’écriture" });
+    const first = openers[0];
+    const second = openers[1];
+    if (!first || !second) throw new Error("Deux boutons Voir l’écriture sont attendus.");
+    const transactions = screen.getByRole("button", { name: /Transactions/ });
+    expect(transactions).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+
+    first.focus();
+    await user.keyboard("{Enter}");
+    const firstDetail = await screen.findByRole("heading", { name: "2025-000005 · Prime d’assurance" });
+    expect(firstDetail.tagName).toBe("H3");
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "616000" })).toBeInTheDocument();
+    expect(transactions).toHaveAttribute("aria-pressed", "true");
+
+    const close = screen.getByRole("button", { name: "Fermer le détail de l’écriture" });
+    expect(close).toHaveTextContent("Fermer");
+    close.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.queryByRole("heading", { name: "2025-000005 · Prime d’assurance" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fermer le détail de l’écriture" })).not.toBeInTheDocument();
+    expect(first).toHaveFocus();
+    expect(transactions).toHaveAttribute("aria-pressed", "true");
+
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { name: "2025-000005 · Prime d’assurance" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("heading", { name: "2025-000005 · Prime d’assurance" })).not.toBeInTheDocument();
+    expect(first).toHaveFocus();
+    expect(transactions).toHaveAttribute("aria-pressed", "true");
+
+    second.focus();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { name: "2025-000006 · Loyer mars" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "2025-000005 · Prime d’assurance" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Fermer le détail de l’écriture" })).toHaveLength(1);
+    expect(screen.getByRole("cell", { name: "706000" })).toBeInTheDocument();
+    expect(transactions).toHaveAttribute("aria-pressed", "true");
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("heading", { name: "2025-000006 · Loyer mars" })).not.toBeInTheDocument();
+    expect(second).toHaveFocus();
+    expect(transactions).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+  });
+
+  it("keeps the entry detail and its close button on a narrow screen", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: /max-width:\s*(?:768|430)px/.test(query),
+      media: query,
+      onchange: null,
+      addEventListener() { return undefined; },
+      removeEventListener() { return undefined; },
+      dispatchEvent() { return false; },
+    }));
+    mockApi({
+      operations: [{
+        id: 1, kind: "EXPENSE", property_id: 1, fiscal_year_id: 1,
+        date: "2025-02-01", amount: "100.00", description: "Assurance",
+        counterparty: "Fournisseur", accounting_entry_id: 5,
+        remaining_to_settle: "40.00", status: "POSTED",
+        deductible_percentage: "80.00", fiscal_treatment: "PARTIAL",
+        principal: "0.00", interest: "0.00", insurance: "0.00", other_costs: "0.00",
+      }],
+      entries: { "5": entryFixture(5, "2025-000005", "Prime d’assurance") },
+    });
+    renderOperations("Transactions");
+    await userEvent.click(await screen.findByRole("button", { name: "Voir l’écriture" }));
+    expect(await screen.findByRole("list", { name: "Lignes de l’écriture" })).toBeInTheDocument();
+    expect(document.querySelector("[data-mobile-variant='cards']")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Fermer le détail de l’écriture" })).toHaveTextContent("Fermer");
+    expect(screen.getByRole("heading", { name: "2025-000005 · Prime d’assurance" }).tagName).toBe("H3");
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Fermer le détail de l’écriture" }));
+    expect(screen.queryByRole("list", { name: "Lignes de l’écriture" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Transactions/ })).toHaveAttribute("aria-pressed", "true");
+  });
 });
+
+function entryFixture(id: number, entryNumber: string, label: string) {
+  const revenue = id === 6;
+  return {
+    id,
+    version: 1,
+    fiscal_year_id: 1,
+    journal_code: "OD",
+    accounting_date: "2025-02-01",
+    piece_reference: "P-" + id,
+    piece_date: "2025-02-01",
+    label,
+    status: "VALIDATED",
+    entry_number: entryNumber,
+    total_debit: revenue ? "800.00" : "100.00",
+    total_credit: revenue ? "800.00" : "100.00",
+    balanced: true,
+    reversal_of_id: null,
+    lines: revenue
+      ? [
+        { id: 1, position: 1, account_number: "411000", account_label: "Client", label: "Loyer", debit: "800.00", credit: "0.00" },
+        { id: 2, position: 2, account_number: "706000", account_label: "Loyers", label: "Loyer", debit: "0.00", credit: "800.00" },
+      ]
+      : [
+        { id: 1, position: 1, account_number: "616000", account_label: "Assurance", label: "Prime", debit: "100.00", credit: "0.00" },
+        { id: 2, position: 2, account_number: "401000", account_label: "Fournisseur", label: "Dette", debit: "0.00", credit: "100.00" },
+      ],
+  };
+}
