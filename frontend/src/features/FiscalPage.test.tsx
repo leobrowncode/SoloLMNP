@@ -690,3 +690,91 @@ test("wires every fiscal help control as an accessible popover", async () => {
   expect(plafond).toHaveAttribute("aria-expanded", "false");
   expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 });
+
+test("shows carry-forward balances and a blocked rule reason", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    if (url.endsWith("/vintages")) {
+      return response({
+        vintages: [{
+          vintage: "2025",
+          status: "research_only",
+          output_label: "Recherche",
+          blocked: [{
+            id: "RULE-BLOCKED-156-BIS-001",
+            blocking_reason: "Le 1° bis ne s’applique pas à la location meublée.",
+          }],
+          executable: [],
+        }],
+      });
+    }
+    if (url.endsWith("/setup")) {
+      return response({ years: [{ id: 1, year: 2025, status: "OPEN" }] });
+    }
+    if (url.endsWith("/statements")) {
+      return response({
+        income_statement: {
+          income: [],
+          expenses: [],
+          total_income: "0.00",
+          total_expenses: "0.00",
+          result: "0.00",
+        },
+      });
+    }
+    if (url.endsWith("/exports")) return response(exportBody(false, "bloquee"));
+    if (isFiscalRead(url, method)) {
+      return response({
+        status: "research_only",
+        declarable: false,
+        accounting_result: "-200.00",
+        fiscal_result: "0.00",
+        deductible_depreciation: "600.00",
+        unused_depreciation: "200.00",
+        tax_loss: "0.00",
+        non_deductible: "0.00",
+        output_label: "Recherche",
+        details: {
+          operating_income: "1000.00",
+          other_charges: "400.00",
+          accounting_depreciation: "800.00",
+          capacity: "600.00",
+          current_deductible_depreciation: "600.00",
+          prior_depreciation_used: "0.00",
+          prior_tax_loss_used: "0.00",
+          goal_hint: "Résultat fiscal à 0 €.",
+          prior_carry_forward_use: { status: "enabled", depreciation: [], tax_loss: [] },
+          carry_registers: {
+            depreciation: {
+              horizon_years: null,
+              expires: false,
+              rows: [{ origin_year: 2025, created: "200.00", used: "0.00", expired: "0.00", remaining: "200.00" }],
+              totals: { created: "200.00", used: "0.00", expired: "0.00", remaining: "200.00" },
+            },
+            tax_loss: {
+              horizon_years: 10,
+              expires: true,
+              rows: [{ origin_year: 2025, created: "0.00", used: "0.00", expired: "0.00", remaining: "0.00" }],
+              totals: { created: "0.00", used: "0.00", expired: "0.00", remaining: "0.00" },
+            },
+          },
+        },
+      });
+    }
+    return response({});
+  });
+
+  const user = userEvent.setup();
+  render(<FiscalPage />);
+  expect(await screen.findByText("Amortissements non déduits (art. 39 C, II)")).toBeInTheDocument();
+  expect(screen.getByText("Déficits LMNP (art. 156, I, 1° ter)")).toBeInTheDocument();
+  expect(screen.getByText("Pas d’échéance")).toBeInTheDocument();
+  expect(screen.getByText("Échéance : 10 ans")).toBeInTheDocument();
+  await user.click(screen.getByText("Millésimes chargés (technique)"));
+  expect(
+    screen.getByText(
+      "RULE-BLOCKED-156-BIS-001 — Le 1° bis ne s’applique pas à la location meublée.",
+    ),
+  ).toBeInTheDocument();
+});

@@ -20,6 +20,7 @@ HELP_IDS: dict[str, str] = {
     "EXPORT_BLOCKED": "liasse",
     "FEC_INVALID": "fec",
     "FISCAL_NOT_COMPUTED": "resultat-fiscal",
+    "FISCAL_RULE_BLOCKED": "cession",
     "LOAN_ACCOUNT_EXHAUSTED": "compte-164",
     "LOAN_NOT_FUNDED": "compte-164",
     "LOAN_OPENING_BALANCE": "emprunt",
@@ -102,6 +103,10 @@ RESOLUTION_ACTIONS: dict[str, dict[str, str]] = {
     "ACTIVITY_REQUIRED": {"label": "Ouvrir Comptabilité", "href": "/comptabilite"},
     "ACTIVITY_EXISTS": {"label": "Ouvrir Comptabilité", "href": "/comptabilite"},
     "FISCAL_NOT_COMPUTED": {"label": "Calculer la fiscalité", "href": "/fiscalite#calcul-fiscal"},
+    "FISCAL_RULE_BLOCKED": {
+        "label": "Voir les règles bloquées",
+        "href": "/fiscalite#regles-lmnp",
+    },
     "CLOSE_BLOCKED": {"label": "Voir le pré-contrôle", "href": "/fiscalite"},
     "WARNINGS_UNACKNOWLEDGED": {"label": "Voir le pré-contrôle", "href": "/fiscalite"},
     "YEAR_NOT_CLOSED": {"label": "Clôturer l’exercice", "href": "/fiscalite#close-title"},

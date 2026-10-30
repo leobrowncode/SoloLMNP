@@ -42,7 +42,7 @@ Toutes les tables ont clés entières/UUID, dates ISO, timestamps UTC, contraint
   assurance et frais et référencent chacune une écriture. Le capital restant est dérivé
   du compte 164, il n'est pas un second total modifiable.
 - `asset`, `asset_component`, `depreciation_schedule`, `depreciation_period`; contraintes base, cumul et terrain.
-- `tax_computation`, `fiscal_adjustment`, `depreciation_carry_forward`, `tax_loss_carry_forward` : lots et usages séparés, immuables après clôture.
+- `fiscal_computation`, `depreciation_carry_forward`, `tax_loss_carry_forward`, `carry_forward_event` : le calcul, le stock créé par exercice, et l’historique des créations, utilisations et expirations. Une ligne d’historique appartient au calcul qui l’a constatée. L’invalidation de ce calcul la sort du solde. L’amortissement non déduit n’a pas de ligne `expired`.
 - `tax_form`, `tax_form_field`, `tax_mapping`, `tax_form_field_result`, `tax_return_package`, `tax_return_snapshot`.
 - `supporting_document`, plus tables d'association typées ; stockage UUID et empreinte SHA-256 unique contrôlée.
 - `audit_event`, append-only ; `validation_result` est recalculable et rattaché à un run.
@@ -101,3 +101,12 @@ réaligne le plan sur la fiche, invalide les calculs fiscaux ouverts, repasse
 écritures validées, et donc le FEC, ne sont pas réécrites. Un calcul fiscal
 clôturé qui a mémorisé la base n’est ni invalidé ni recalculé : la valeur et la
 durée sont refusées jusqu’à réouverture.
+
+## Historique des reports
+
+La migration `0010_carry_events` ajoute `carry_forward_event`. Chaque ligne est
+un mouvement `created`, `used` ou `expired`, rattaché au calcul qui l’a
+constaté. L’invalidation de ce calcul sort le mouvement du solde. Le registre
+`depreciation_carry_forward` ou `tax_loss_carry_forward` conserve le montant
+créé par exercice d’origine. Un amortissement non déduit n’a pas de mouvement
+`expired`. Un recalcul du même exercice remplace ses mouvements.

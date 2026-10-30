@@ -1,43 +1,126 @@
 {
   "vintage": "2026",
-  "version": "research-1",
+  "version": "research-2",
   "status": "research_only",
+  "declarable": false,
+  "consulted_at": "2026-10-30",
   "immutable": false,
   "rules": [
     {
       "id": "RULE-LMNP-DEPRECIATION-LIMIT-001",
       "status": "executable",
       "effect_start": "2015-01-01",
-      "source": "CGI art. 39 C, version en vigueur au 01/01/2015, et BOI-BIC-AMT-20-40-10-20",
-      "interpretation": "La dotation comptable 681 reste au ledger. La part déductible de l'exercice est limitée à la capacité (loyers moins autres charges déductibles, après réintégrations). L'excédent constitue un report d'amortissement non déduit. Les reports antérieurs d'exercices CLOTURÉS sont consommés ensuite en FIFO (plus ancien d'abord) sur la capacité résiduelle. Les registres d'origine ne sont pas mutés : la consommation est tracée dans le calcul courant."
+      "effect_end": null,
+      "source": "CGI art. 39 C, II-2 et II-3, version en vigueur depuis le 01/01/2015 (LOI n°2014-891 du 8 août 2014, art. 20). BOI-BIC-AMT-20-40-10-20 du 01/03/2017, II § 40 : l’amortissement déductible est la différence positive entre les loyers acquis et les autres charges. L’exemple du II retient 2 500 € de loyers, 1 000 € de charges et 3 050 € d’annuité : 1 500 € déductibles, 1 550 € reportés. BOI-FORM-000038 : l’état de suivi reporte le solde sur l’exercice suivant, sans colonne d’expiration.",
+      "source_url": "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000029355753/2015-01-01",
+      "consulted_at": "2026-10-30",
+      "interpretation": "La dotation comptable 681 reste au ledger. La part déductible de l’exercice est limitée à la capacité (loyers moins autres charges, après réintégrations), sans devenir négative : l’amortissement ne crée ni n’augmente un déficit. L’excédent est un report d’amortissement non déduit, sans horizon de dix ans. Les reports d’exercices clôturés sont consommés ensuite en FIFO sur la capacité résiduelle. Ce stock n’est pas l’amortissement réputé différé aboli en 2004."
     },
     {
       "id": "RULE-LMNP-LOSS-001",
       "status": "executable",
       "effect_start": "2024-02-14",
-      "source": "BOI-BIC-CHAMP-40-20, III-A, renvoyant au CGI art. 156 I 1° ter",
-      "interpretation": "Un résultat fiscal négatif est un déficit LMNP reportable, distinct du registre d'amortissements. Il n'est pas imputé sur le revenu global. Sur un résultat fiscal positif (après plafonnement et consommation des amortissements reportés), les déficits antérieurs d'exercices CLOTURÉS sont imputés en FIFO dans la limite de dix années. Hors MVP : changement de statut LMP/LMNP, report en arrière."
+      "effect_end": null,
+      "source": "CGI art. 156, I, 1° ter, version en vigueur depuis le 01/07/2026 (LEGIARTI000053544806) : les déficits LMNP s’imputent exclusivement sur les revenus de cette activité au cours des dix années suivantes, tant qu’elle n’est pas professionnelle. BOI-BIC-DEF-20-20 du 12/09/2012, § 110-120. Notice DGFiP « Location meublée », modifiée le 23/04/2026. Le 1° bis est une autre règle et ne s’applique pas.",
+      "source_url": "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000053544806",
+      "consulted_at": "2026-10-30",
+      "interpretation": "Un résultat fiscal négatif est un déficit LMNP reportable, distinct du registre d’amortissements. Il n’est pas imputé sur le revenu global. Sur un résultat fiscal positif, après plafonnement et consommation des amortissements reportés, les déficits d’exercices clôturés sont imputés en FIFO pendant les dix années suivantes. Au-delà, le solde est expiré. Hors calcul : passage en LMP et report en arrière."
     },
     {
       "id": "RULE-LAND-NON-DEPRECIABLE-001",
       "status": "executable",
       "effect_start": "2017-03-01",
-      "source": "BOI-BIC-AMT-10-20 et BOI-BIC-CHAMP-40-20",
-      "interpretation": "Un terrain enregistré ne peut pas avoir de base amortissable. Le contrôle relit le registre, sans estimer de ventilation."
+      "effect_end": null,
+      "source": "BOI-BIC-AMT-10-20, publication du 05/08/2026, I-A § 10 et I § 230 : le prix du sol est exclu de la base amortissable. Application LMNP rappelée au BOI-BIC-CHAMP-40-20. URL relue dans la documentation du projet le 02/10/2026, non relue in extenso le 30/10/2026.",
+      "source_url": "https://bofip.impots.gouv.fr/bofip/4590-PGP.html/identifiant=BOI-BIC-AMT-10-20-20260805",
+      "consulted_at": "2026-10-02",
+      "interpretation": "Un terrain enregistré ne peut pas avoir de base amortissable. Le contrôle relit le registre. Il n’estime pas la ventilation terrain / construction."
     },
     {
       "id": "RULE-PARTIAL-CHARGE-001",
       "status": "executable",
-      "effect_start": "2025-01-01",
-      "source": "Principe de réintégration : la charge reste entière au ledger, seule la quote-part non déductible déclarée est ajoutée.",
-      "interpretation": "L'utilisateur confirme un montant non déductible, plafonné par le solde de charge du compte, hors comptes 681. Le ledger n'est pas modifié."
+      "effect_start": "2026-02-21",
+      "effect_end": null,
+      "source": "CGI art. 39, 1, al. 1, version en vigueur depuis le 21/02/2026 (LEGIARTI000044978650) : le bénéfice net est établi sous déduction de toutes charges. La quote-part sans lien avec l’activité n’est pas une charge déductible. Le montant est celui confirmé par l’utilisateur, pas une estimation.",
+      "source_url": "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000044978650",
+      "consulted_at": "2026-10-30",
+      "interpretation": "L’utilisateur confirme un montant non déductible, plafonné par le solde de charge du compte, hors comptes 681. Le ledger n’est pas modifié. La réintégration augmente la capacité d’amortissement."
     },
     {
       "id": "RULE-LMNP-BIC-001",
       "status": "scope",
       "effect_start": null,
-      "source": "Périmètre produit : activité déclarée LMNP. Le LMP (CGI art. 155 IV) n'est pas traité.",
-      "interpretation": "L'utilisateur déclare une activité LMNP. Aucun seuil de recettes ni comparaison avec les autres revenus du foyer n'est calculé. Les règles LMP ne sont pas appliquées."
+      "effect_end": null,
+      "source": "Périmètre produit : activité déclarée LMNP. L’art. 155, IV définit le loueur professionnel par les seuils du foyer. Ces seuils ne sont pas calculés. Notice DGFiP « Location meublée », modifiée le 23/04/2026.",
+      "source_url": "https://www.impots.gouv.fr/particulier/location-meublee",
+      "consulted_at": "2026-10-30",
+      "interpretation": "L’utilisateur déclare une activité LMNP. Aucun seuil de recettes ni comparaison avec les autres revenus du foyer n’est calculé. Les règles LMP ne sont pas appliquées."
+    },
+    {
+      "id": "RULE-BLOCKED-ARD-39B-001",
+      "status": "blocked",
+      "effect_start": "2004-01-01",
+      "effect_end": null,
+      "source": "CGI art. 39 B (amortissement minimal linéaire). Les amortissements réputés différés de l’ancien art. 39, 1-2° et de l’ancien second alinéa de l’art. 39 B sont supprimés pour les exercices ouverts à compter du 01/01/2004 (loi de finances pour 2004, art. 89 ; instruction 4 H-5-04). BOI-BIC-AMT-10-50 du 04/01/2017.",
+      "source_url": "https://bofip.impots.gouv.fr/bofip/4667-PGP.html/identifiant=BOI-BIC-AMT-10-50-20170104",
+      "consulted_at": "2026-10-30",
+      "blocking_reason": "Les amortissements réputés différés sont supprimés pour les exercices ouverts à compter du 1er janvier 2004. L’article 39 B n’ouvre qu’un amortissement minimal linéaire. Ce régime n’est pas appliqué. Le stock suivi est celui de l’article 39 C, II.",
+      "interpretation": "Règle non appliquée."
+    },
+    {
+      "id": "RULE-BLOCKED-156-BIS-001",
+      "status": "blocked",
+      "effect_start": null,
+      "effect_end": null,
+      "source": "CGI art. 156, I, 1° bis, même version LEGIARTI000053544806 du 01/07/2026. Le 1° bis vise les déficits BIC sans participation personnelle, continue et directe, reportables six ans. Le texte écarte ces modalités pour les déficits de location meublée de locaux d’habitation.",
+      "source_url": "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000053544806",
+      "consulted_at": "2026-10-30",
+      "blocking_reason": "L’article 156, I, 1° bis ne s’applique pas aux déficits de location meublée de locaux d’habitation. Le moteur n’impute pas un déficit LMNP sur six ans. La règle exécutée est le 1° ter, dix ans, hors revenu global.",
+      "interpretation": "Règle non appliquée."
+    },
+    {
+      "id": "RULE-BLOCKED-CESSION-001",
+      "status": "blocked",
+      "effect_start": null,
+      "effect_end": null,
+      "source": "CGI art. 39 C, II : à la cessation de la location, le stock d’amortissement non déduit suit un régime propre, et la cession touche la plus-value. Ce calcul n’est pas écrit. Un mouvement des comptes 675 ou 775, ou une immobilisation sortie, empêche de traiter l’opération comme un loyer.",
+      "source_url": "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000029355753/2015-01-01",
+      "consulted_at": "2026-10-30",
+      "blocking_reason": "La cession ou la cessation n’est pas calculée. Un mouvement validé sur un compte 675 ou 775, ou une immobilisation sortie, bloque le calcul fiscal.",
+      "interpretation": "Règle non appliquée."
+    },
+    {
+      "id": "RULE-BLOCKED-TVA-001",
+      "status": "blocked",
+      "effect_start": null,
+      "effect_end": null,
+      "source": "La TVA collectée ou déductible n’a pas de lecture LMNP dans ce moteur. Le compte 445 n’est ni un loyer ni une charge déductible.",
+      "source_url": "https://www.impots.gouv.fr/particulier/location-meublee",
+      "consulted_at": "2026-10-30",
+      "blocking_reason": "La TVA n’est pas traitée. Un mouvement validé sur un compte 445 bloque le calcul fiscal.",
+      "interpretation": "Règle non appliquée."
+    },
+    {
+      "id": "RULE-BLOCKED-PLUS-VALUE-001",
+      "status": "blocked",
+      "effect_start": null,
+      "effect_end": null,
+      "source": "Les plus-values et moins-values de cession d’immobilisation ne sont pas calculées. Les comptes 675 et 775 ne sont pas repris dans le résultat fiscal.",
+      "source_url": "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000029355753/2015-01-01",
+      "consulted_at": "2026-10-30",
+      "blocking_reason": "Les plus-values et moins-values ne sont pas calculées. Un mouvement validé sur un compte 675 ou 775, ou une immobilisation sortie, bloque le calcul fiscal.",
+      "interpretation": "Règle non appliquée."
+    },
+    {
+      "id": "RULE-BLOCKED-LAND-AUTO-001",
+      "status": "blocked",
+      "effect_start": null,
+      "effect_end": null,
+      "source": "BOI-BIC-AMT-10-20 : le sol est exclu de la base amortissable. Aucune méthode d’estimation du prix du terrain n’est retenue. La ventilation reste saisie à la main.",
+      "source_url": "https://bofip.impots.gouv.fr/bofip/4590-PGP.html/identifiant=BOI-BIC-AMT-10-20-20260805",
+      "consulted_at": "2026-10-02",
+      "blocking_reason": "La ventilation automatique du terrain et de la construction n’est pas estimée. Seule la valeur de terrain saisie est retenue. Une base amortissable positive sur un terrain est refusée.",
+      "interpretation": "Règle non appliquée."
     }
   ]
 }

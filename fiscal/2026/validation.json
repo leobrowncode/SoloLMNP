@@ -6,7 +6,7 @@
   "official_source": null,
   "validated_on": null,
   "scope": null,
-  "rules_version": "research-1",
+  "rules_version": "research-2",
   "forms_version": null,
   "notes": "Millésime non validé. Les formulaires 2027 ne sont pas archivés. Même conditions que fiscal/2025/validation.json : source officielle, date, périmètre et version, avec rules_version égal à fiscal/2026/rules.yaml. Ne pas recopier une attestation 2025."
 }

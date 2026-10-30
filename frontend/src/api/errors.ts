@@ -48,6 +48,7 @@ export const ERROR_HELP = {
   EXPORT_BLOCKED: "liasse",
   FEC_INVALID: "fec",
   FISCAL_NOT_COMPUTED: "resultat-fiscal",
+  FISCAL_RULE_BLOCKED: "cession",
   LOAN_ACCOUNT_EXHAUSTED: "compte-164",
   LOAN_NOT_FUNDED: "compte-164",
   LOAN_OPENING_BALANCE: "emprunt",

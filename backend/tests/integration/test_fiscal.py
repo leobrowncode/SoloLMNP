@@ -38,6 +38,14 @@ def test_depreciation_limit_is_separate_from_the_ledger(client):
     assert body["details"]["other_charges"] == "400.00"
     assert body["details"]["prior_depreciation_available"] == "0.00"
     assert body["details"]["depreciation_reports"] == []
+    dep = body["details"]["carry_registers"]["depreciation"]
+    assert dep["expires"] is False
+    assert dep["horizon_years"] is None
+    assert dep["rule_id"] == "RULE-LMNP-DEPRECIATION-LIMIT-001"
+    assert dep["totals"]["created"] == "200.00"
+    assert dep["totals"]["used"] == "0.00"
+    assert dep["totals"]["expired"] == "0.00"
+    assert dep["totals"]["remaining"] == "200.00"
     assert body["details"]["depreciation_categories"] == []
     assert "0 €" in body["details"]["goal_hint"]
     assert report(client)["income_statement"]["total_expenses"] == "1200.00"
@@ -55,8 +63,18 @@ def test_tax_loss_is_not_a_depreciation_carry_forward(client):
     assert body["unused_depreciation"] == "0.00"
     assert "RULE-LMNP-LOSS-001" in body["details"]["applied_rules"]
     assert body["details"]["scope_rules"] == ["RULE-LMNP-BIC-001"]
-    assert "RULE-LMNP-BIC-001" not in body["details"]["blocked_rules"]
+    blocked_ids = [rule["id"] for rule in body["details"]["blocked_rules"]]
+    assert "RULE-LMNP-BIC-001" not in blocked_ids
+    assert "RULE-BLOCKED-156-BIS-001" in blocked_ids
     assert "RULE-LMNP-BIC-001" not in body["details"]["applied_rules"]
+    loss = body["details"]["carry_registers"]["tax_loss"]
+    assert loss["horizon_years"] == 10
+    assert loss["totals"] == {
+        "created": "150.00",
+        "used": "0.00",
+        "expired": "0.00",
+        "remaining": "150.00",
+    }
 
 
 def test_partial_charge_stays_in_the_ledger(client):
@@ -135,8 +153,36 @@ def test_vintages_stay_research_only(client):
     assert payload["status"] == "research_only"
     assert {row["vintage"] for row in payload["vintages"]} == {"2025", "2026"}
     assert all(row["scope"] == ["RULE-LMNP-BIC-001"] for row in payload["vintages"])
-    assert all(row["blocked"] == [] for row in payload["vintages"])
+    for row in payload["vintages"]:
+        blocked_ids = [rule["id"] for rule in row["blocked"]]
+        assert "RULE-BLOCKED-CESSION-001" in blocked_ids
+        assert "RULE-BLOCKED-TVA-001" in blocked_ids
+        assert "RULE-BLOCKED-ARD-39B-001" in blocked_ids
+        assert all(rule["blocking_reason"] for rule in row["blocked"])
+        assert all(rule["source_url"].startswith("https://") for rule in row["rules"])
+        assert row["declarable"] is False
     assert client.get("/api/status").json()["fiscal"]["status"] == "research_only"
+
+
+def test_cession_account_blocks_the_computation(client):
+    created = client.post(
+        "/api/ledger/accounts",
+        json={
+            "number": "775000",
+            "label": "Produits des cessions d’éléments d’actif",
+            "account_type": "INCOME",
+        },
+    )
+    assert created.status_code == 201, created.text
+    book(client, "512000", "775000", "100.00")
+    refused = client.post("/api/fiscal/years/1", json={"adjustments": []})
+    assert refused.status_code == 409, refused.text
+    detail = refused.json()["detail"]
+    assert detail["code"] == "FISCAL_RULE_BLOCKED"
+    assert "RULE-BLOCKED-CESSION-001" in detail["message"]
+    assert "RULE-BLOCKED-PLUS-VALUE-001" in detail["message"]
+    assert detail["help"] == "cession"
+    assert client.get("/api/fiscal/years/1").status_code == 404
 
 
 def identify(client):
@@ -243,7 +289,7 @@ VALIDATED: dict[str, Any] = {
         "regime": "réel simplifié BIC",
         "excluded": ["cession", "TVA", "plus-values", "LMP"],
     },
-    "rules_version": "research-1",
+    "rules_version": "research-2",
 }
 
 

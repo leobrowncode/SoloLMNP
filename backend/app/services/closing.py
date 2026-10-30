@@ -215,6 +215,18 @@ def reopen_year(session: Session, year_id: int, confirmation: str, reason: str) 
         )
     ):
         row.invalidated_at = utc_now()
+    later = session.scalars(
+        select(FiscalComputation)
+        .join(FiscalYear, FiscalYear.id == FiscalComputation.fiscal_year_id)
+        .where(
+            FiscalYear.rental_activity_id == year.rental_activity_id,
+            FiscalYear.year > year.year,
+            FiscalYear.status != "CLOSED",
+            FiscalComputation.invalidated_at.is_(None),
+        )
+    )
+    for row in later:
+        row.invalidated_at = utc_now()
     _audit(session, year, "REOPENED", before, "OPEN", reason)
     session.flush()
     return {"fiscal_year_id": year.id, "status": year.status}
