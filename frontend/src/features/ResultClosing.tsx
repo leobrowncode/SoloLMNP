@@ -3,6 +3,9 @@ import { amount, cents, request, type Account, type Entry, type Journal } from "
 import { centralizationCauses, describedBy } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
+import { GLOSSARY } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice } from "./localFeedback";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 import { formatAmount, formatEuros } from "../lib/format";
@@ -39,7 +42,7 @@ export default function ResultClosing({ year }: { year: number }) {
     } catch { return null; }
   });
   const [review, setReview] = useState(!!saved);
-  const [receipt, setReceipt] = useState("");
+  const { notice, show, dismiss } = useSaveNotice();
   const [error, setError] = useState("");
   const { busy, step, run } = useMutation();
   const errorRef = useRef<HTMLParagraphElement>(null);
@@ -48,7 +51,7 @@ export default function ResultClosing({ year }: { year: number }) {
   async function load() {
     await run(async (report) => {
       report("Préparation de la centralisation…");
-      setError(""); setPreview(null); setAppropriation(null); setReceipt("");
+      setError(""); setPreview(null); setAppropriation(null); dismiss();
       try {
         const [central, accountsValue, journalsValue] = await Promise.all([
           request<CentralPreview>(`/years/${year}/centralization-preview`),
@@ -121,9 +124,21 @@ export default function ResultClosing({ year }: { year: number }) {
           target_account: requestBody.target_account, expected_amount: requestBody.expected_amount,
         };
         const response = await request<{ created: boolean; entry: Entry }>(path, "POST", body);
-        const message = `Écriture ${response.entry.entry_number} ${response.created ? "validée" : "déjà enregistrée"}. Actualisez les états.`;
+        const verb = response.created ? "validée" : "déjà enregistrée";
+        const entryNumber = response.entry.entry_number ?? "résultat";
+        const message = `Écriture ${entryNumber} ${verb}. Actualisez les états.`;
         sessionStorage.removeItem(storageKey);
-        setSaved(null); setReview(false); setReceipt(message);
+        setSaved(null); setReview(false);
+        show({
+          kind: requestBody.kind === "centralization" ? GLOSSARY.centralisation.label : GLOSSARY.affectation.label,
+          name: entryNumber,
+          action: verb,
+          targetId: "resultat-cloture",
+          detail: message,
+          next: requestBody.kind === "centralization"
+            ? { label: "Affecter le résultat", href: "#result-title" }
+            : { label: "Lancer le calcul fiscal", href: "/fiscalite#calcul-fiscal" },
+        });
         if (requestBody.kind === "centralization") {
           const central = await request<CentralPreview>(`/years/${year}/centralization-preview`);
           const accountsValue = await request<Account[]>("/accounts");
@@ -159,7 +174,8 @@ export default function ResultClosing({ year }: { year: number }) {
     ? centralizationCauses(preview.year_status, missingResultAccount, prefix ?? null)
     : [];
   const centralCauseId = "centralization-causes";
-  return <section aria-labelledby="result-title">
+  return <section id="resultat-cloture" aria-labelledby="result-title">
+    <SaveNoticeHost place="resultat-cloture" notice={notice} onDismiss={dismiss} />
     <div className="heading-with-help">
       <h3 id="result-title" tabIndex={-1}>Centraliser et affecter le résultat</h3>
       <GlossaryTip id="centralisation" />
@@ -170,7 +186,6 @@ export default function ResultClosing({ year }: { year: number }) {
     <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void load(); }}>Préparer la centralisation</button>
     <MutationStatus step={step} />
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
-    {receipt && <p role="status">{receipt}</p>}
     {preview && !preview.already_posted && <FrenchForm onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(event.currentTarget); }}>
       <p>Résultat à centraliser : {formatEuros(preview.result)}. Brouillons exclus : {preview.excluded_draft_count}.</p>
       <table><caption>Écriture de centralisation proposée</caption>

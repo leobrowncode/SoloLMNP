@@ -3,6 +3,9 @@ import { request } from "../api/ledger";
 import { closeConfirmCauses, closePrepareCauses, describedBy, precheckAction } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
+import { GLOSSARY } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice } from "./localFeedback";
 import ReopenYear from "./ReopenYear";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
@@ -30,15 +33,18 @@ function acknowledgedExactly(warnings: Notice[], acks: string[]) {
 export default function CloseYear({
   year,
   yearStatus,
+  yearLabel,
   onExerciseTransition,
 }: {
   year: number;
   yearStatus?: string;
+  yearLabel?: string;
   onExerciseTransition?: () => void;
 }) {
   const [check, setCheck] = useState<Check | null>(null);
   const [error, setError] = useState("");
-  const [receipt, setReceipt] = useState("");
+  const { notice, show, dismiss } = useSaveNotice();
+  const exerciseName = yearLabel ?? String(year);
   const [acks, setAcks] = useState<string[]>([]);
   const [prepared, setPrepared] = useState(false);
   const [closed, setClosed] = useState(false);
@@ -55,7 +61,7 @@ export default function CloseYear({
       setPrepared(false);
       setAcks([]);
       setCheck(null);
-      setReceipt("");
+      dismiss();
       setError("");
     }
   }
@@ -84,7 +90,7 @@ export default function CloseYear({
         setAcks([]);
         setPrepared(false);
         setClosed(next.year_status === "CLOSED");
-        setReceipt("");
+        dismiss();
       } catch (reason) {
         setError((reason as Error).message);
       }
@@ -96,7 +102,7 @@ export default function CloseYear({
     await run(async (report) => {
       report("Préparation de la clôture…");
       setError("");
-      setReceipt("");
+      dismiss();
       try {
         const next = await request<Check>(
           `/years/${year}/ready`, "POST", { acknowledged: acks }, "/api/filing",
@@ -114,7 +120,14 @@ export default function CloseYear({
           onExerciseTransition?.();
           return;
         }
-        setReceipt("Exercice marqué prêt à clôturer. La confirmation suivante fige les écritures.");
+        show({
+          kind: GLOSSARY.exercice.label,
+          name: exerciseName,
+          action: "préparé",
+          targetId: "confirmer-cloture",
+          detail: "Exercice marqué prêt à clôturer. La confirmation suivante fige les écritures.",
+          next: { label: "Confirmer la clôture", href: "#confirmer-cloture" },
+        });
         onExerciseTransition?.();
       } catch (reason) {
         setError((reason as Error).message);
@@ -127,11 +140,18 @@ export default function CloseYear({
     await run(async (report) => {
       report("Clôture de l’exercice…");
       setError("");
-      setReceipt("");
+      dismiss();
       try {
         await request(`/years/${year}/close`, "POST", { confirmation: "CLOTURER" }, "/api/filing");
         setClosed(true);
-        setReceipt("Exercice clôturé. Les exports déjà figés restent consultables.");
+        show({
+          kind: GLOSSARY.exercice.label,
+          name: exerciseName,
+          action: "clôturé",
+          targetId: "confirmer-cloture",
+          detail: "Exercice clôturé. Les exports déjà figés restent consultables.",
+          next: { label: "Voir les sorties figées", href: "#sorties-figees" },
+        });
         onExerciseTransition?.();
       } catch (reason) {
         setError((reason as Error).message);
@@ -157,7 +177,8 @@ export default function CloseYear({
     <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void load(); }}>Lancer le pré-contrôle</button>
     <MutationStatus step={step} />
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
-    {receipt && <p role="status">{receipt}</p>}
+    <div id="confirmer-cloture">
+    <SaveNoticeHost place="confirmer-cloture" notice={notice} onDismiss={dismiss} />
     {check && <div>
       {check.output_label && (
         <p className={`fiscal-output-status fiscal-output-${check.output_status ?? "recherche"}`}>
@@ -176,9 +197,11 @@ export default function CloseYear({
       <button type="button" disabled={!prepared || Boolean(check.blocking) || sealed || busy} aria-busy={busy || undefined} aria-describedby={describedBy(confirmCauseId, confirmCauses)} onClick={() => { void closeYear(); }}>Confirmer la clôture</button>
       <PrerequisiteList id={confirmCauseId} causes={confirmCauses} />
     </div>}
+    </div>
     {sealed && (
       <ReopenYear
         year={year}
+        yearLabel={exerciseName}
         locked={busy}
         {...(onExerciseTransition ? { onExerciseTransition } : {})}
       />

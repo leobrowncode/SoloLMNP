@@ -4,7 +4,9 @@ import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import { describedBy, fiscalActionCauses } from "./actionCauses";
 import CloseYear from "./CloseYear";
 import GlossaryTip from "./GlossaryTip";
-import type { GlossaryId } from "./glossary";
+import { GLOSSARY, type GlossaryId } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice } from "./localFeedback";
 import HelpTip from "./HelpTip";
 import PrerequisiteList from "./PrerequisiteList";
 import ExportDownloads from "./ExportDownloads";
@@ -321,6 +323,7 @@ export default function FiscalPage() {
   const [resultView, setResultView] = useState<ScreenView<Computation>>(idleView());
   const [resultAttempt, setResultAttempt] = useState(0);
   const [error, setError] = useState("");
+  const { notice, show, dismiss } = useSaveNotice();
   const { busy, step, run } = useMutation();
   const [adjustments, setAdjustments] = useState<AdjustmentDraft[]>([]);
   const [draft, setDraft] = useState<AdjustmentDraft>({
@@ -457,6 +460,7 @@ export default function FiscalPage() {
     await run(async (report) => {
       report("Calcul du résultat fiscal…");
       setError("");
+      dismiss();
       setWorksheet(null);
       setResult(null);
       setResultView((previous) => beginLoad(previous, false));
@@ -472,6 +476,15 @@ export default function FiscalPage() {
         if (resultEpoch.current === epoch) {
           setResult(next);
           setResultView(finishLoad(next));
+          const vintage = years.find((item) => item.id === year)?.year ?? year;
+          show({
+            kind: GLOSSARY["resultat-fiscal"].label,
+            name: String(vintage),
+            action: "calculé",
+            targetId: "calcul-fiscal-zone",
+            detail: "Calcul enregistré. Le millésime reste en recherche : ce n’est pas une base de déclaration.",
+            next: { label: "Lancer le pré-contrôle", href: "#close-title" },
+          });
         }
         setExportTick((tick) => tick + 1);
       } catch (reason) {
@@ -503,6 +516,7 @@ export default function FiscalPage() {
     setStatements(null);
     setResult(null);
     setWorksheet(null);
+    dismiss();
   }
 
   async function refreshExercise() {
@@ -659,7 +673,8 @@ export default function FiscalPage() {
         empty={<p>Aucun calcul fiscal n’est enregistré pour cet exercice.</p>}
       />
 
-      <div className="toolbar fiscal-toolbar">
+      <div id="calcul-fiscal-zone" className="toolbar fiscal-toolbar">
+        <SaveNoticeHost place="calcul-fiscal-zone" notice={notice} onDismiss={dismiss} />
         <label>
           Exercice
           <GlossaryTip id="exercice" />
@@ -968,6 +983,7 @@ export default function FiscalPage() {
           <CloseYear
             key={year}
             year={year}
+            {...(selectedYear ? { yearLabel: String(selectedYear.year) } : {})}
             {...(selectedYear?.status !== undefined ? { yearStatus: selectedYear.status } : {})}
             onExerciseTransition={() => { void refreshExercise(); }}
           />

@@ -21,6 +21,9 @@ import {
 import PrerequisiteList from "./PrerequisiteList";
 import PropertyEntry from "./PropertyEntry";
 import GlossaryTip from "./GlossaryTip";
+import { GLOSSARY } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice } from "./localFeedback";
 import ReviewForm, { type Field } from "./ReviewForm";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
@@ -72,7 +75,7 @@ export default function AssetsPage() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const { notice, show, dismiss } = useSaveNotice();
   const [boot, setBoot] = useState<ScreenView<{ ready: true }>>(() => beginLoad(idleView(), false));
   const [periodsView, setPeriodsView] = useState<ScreenView<{ yearId: number }>>(idleView());
   const [periodsAttempt, setPeriodsAttempt] = useState(0);
@@ -196,8 +199,36 @@ export default function AssetsPage() {
       report("Enregistrement de l’immobilisation…");
       const result = await api<Record<string, unknown>>(editor.path, editor.method ?? "POST", data);
       const invalidation = readInvalidation(result.invalidation);
+      const label = typeof data.label === "string" && data.label.trim() ? data.label.trim() : editor.title;
+      const created = (editor.method ?? "POST") === "POST";
+      const component = editor.path.includes("/components");
+      const assetMatch = editor.path.match(/^\/(\d+)/);
+      const savedId = typeof result.id === "number" ? result.id : null;
+      const cardId = savedId ?? (assetMatch ? Number(assetMatch[1]) : null);
       setEditor(null);
-      setMessage(invalidation ? correctionMessage(invalidation) : "Enregistrement effectué.");
+      if (editor.path.includes("/periods/") && editor.path.endsWith("/post")) {
+        show({
+          kind: GLOSSARY.dotation.label,
+          name: editor.title.replace(/^Comptabiliser /, "") || label,
+          action: "comptabilisée",
+          targetId: "dotations",
+          detail: "Dotation comptabilisée.",
+          next: { label: "Voir le journal", href: "/comptabilite/journal" },
+        });
+      } else {
+        const existingCard = !created && cardId ? `asset-${cardId}` : null;
+        show({
+          kind: component ? GLOSSARY.composant.label : GLOSSARY.immobilisation.label,
+          name: label,
+          action: created ? (component ? "créé" : "créée") : (component ? "modifié" : "modifiée"),
+          targetId: existingCard ?? "creer-immobilisation",
+          highlightId: created && cardId ? `asset-${cardId}` : undefined,
+          detail: invalidation ? correctionMessage(invalidation) : undefined,
+          next: invalidation?.dropped_period_ids.length
+            ? { label: "Relancer le calcul des périodes", href: "/immobilisations#calculer-periodes" }
+            : { label: "Calculer les périodes", href: "/immobilisations#calculer-periodes" },
+        });
+      }
       setRevision((value) => value + 1);
     });
   }
@@ -328,7 +359,7 @@ export default function AssetsPage() {
       const requestId = ++planRequest.current;
       const propertyId = selectedProperty;
       report("Prévisualisation du plan d’amortissement…");
-      setError(""); setMessage(""); setConfirming(false);
+      setError(""); dismiss(); setConfirming(false);
       try {
         const result = await api<DwellingPlan>(`/properties/${propertyId}/plan`);
         if (requestId === planRequest.current) setPlan({ propertyId, preview: result });
@@ -346,7 +377,7 @@ export default function AssetsPage() {
     await run(async (report) => {
       const requestId = ++planRequest.current;
       report("Création des immobilisations…");
-      setError(""); setMessage(""); setConfirming(true);
+      setError(""); dismiss(); setConfirming(true);
       try {
         const result = await api<DwellingPlan>(
           `/properties/${propertyId}/plan`,
@@ -355,9 +386,17 @@ export default function AssetsPage() {
         );
         if (requestId !== planRequest.current) return;
         setPlan(null);
-        setMessage(result.created
-          ? `Immobilisations créées : ${result.labels.join(", ")}. Calculez ensuite les périodes, puis comptabilisez-les.`
-          : "Ces immobilisations existent déjà. Aucun doublon n’a été créé.");
+        const createdLabels = result.labels.join(", ");
+        show({
+          kind: "Immobilisations",
+          name: result.labels[0] ?? "logement",
+          action: result.created ? "créées" : "déjà présentes",
+          targetId: "creer-immobilisation",
+          detail: result.created
+            ? `Immobilisations créées : ${createdLabels}. Calculez ensuite les périodes, puis comptabilisez-les.`
+            : "Ces immobilisations existent déjà. Aucun doublon n’a été créé.",
+          next: { label: "Calculer les périodes", href: "/immobilisations#calculer-periodes" },
+        });
         setRevision((value) => value + 1);
       } catch (reason) {
         if (requestId === planRequest.current) {
@@ -380,7 +419,7 @@ export default function AssetsPage() {
     await run(async (report) => {
       report(`Comptabilisation de ${pending.length} dotation(s)…`);
       setError("");
-      setMessage("");
+      dismiss();
       batchKey.current ??= crypto.randomUUID();
       const key = batchKey.current;
       try {
@@ -403,11 +442,17 @@ export default function AssetsPage() {
             `${failed.message} L’écran recharge l’état enregistré : les dotations déjà passées restent comptabilisées.`,
           );
         } else {
-          setMessage(
-            result.replayed
-              ? `${result.posted_count} dotation(s) déjà comptabilisée(s). Aucun doublon.`
-              : `${result.posted_count} dotation(s) comptabilisée(s).`,
-          );
+          const postedText = result.replayed
+            ? `${result.posted_count} dotation(s) déjà comptabilisée(s). Aucun doublon.`
+            : `${result.posted_count} dotation(s) comptabilisée(s).`;
+          show({
+            kind: GLOSSARY.dotation.label,
+            name: `${result.posted_count} écriture(s)`,
+            action: result.replayed ? "déjà comptabilisée" : "comptabilisée",
+            targetId: "dotations",
+            detail: postedText,
+            next: { label: "Voir le journal", href: "/comptabilite/journal" },
+          });
         }
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : "Comptabilisation impossible.");
@@ -420,13 +465,22 @@ export default function AssetsPage() {
     await run(async (report) => {
       const requestId = ++periodRequest.current;
       report("Calcul des périodes…");
-      setError(""); setMessage("");
+      setError(""); dismiss();
       try {
         const rows = await api<DepreciationPeriod[]>(`/years/${yearId}/calculate`, "POST");
         if (requestId === periodRequest.current) {
           setPeriods(rows);
           setPeriodsView(finishLoad({ yearId }, () => rows.length === 0));
-          setMessage(`${rows.length} période(s) calculée(s). Vérifiez-les avant comptabilisation.`);
+          show({
+            kind: rows.length > 1 ? "Dotations" : GLOSSARY.dotation.label,
+            name: `${rows.length} période(s)`,
+            action: rows.length > 1 ? "calculées" : "calculée",
+            targetId: "dotations",
+            detail: `${rows.length} période(s) calculée(s). Vérifiez-les avant comptabilisation.`,
+            next: rows.length
+              ? { label: "Comptabiliser toutes les dotations", href: "/immobilisations#comptabiliser-dotations" }
+              : undefined,
+          });
         }
       } catch (reason) {
         if (requestId === periodRequest.current) {
@@ -459,7 +513,6 @@ export default function AssetsPage() {
     <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations. Le formulaire ne propose que les comptes de la catégorie. Un couple déjà enregistré et incohérent est signalé ; il n’est pas réécrit. Modifier une fiche demande un motif : tant qu’aucune dotation n’est comptabilisée, la valeur, la durée et les comptes peuvent être corrigés.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}
     <MutationStatus step={step} />
-    {message && <p role="status">{message}</p>}
     <ScreenStatus
       state={boot}
       onRetry={() => setRevision((value) => value + 1)}
@@ -469,8 +522,11 @@ export default function AssetsPage() {
       <PrerequisiteList id="assets-activity" causes={listed(activityCause(false))} intro="Les immobilisations restent indisponibles :" />
     )}
     {bootReady && setup?.activity && <>
-      <button id="nouvelle-immobilisation" disabled={assetCauses.length > 0 || busy} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
-      <button disabled={assetCauses.length > 0 || busy} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(true)}>Inscrire un terrain</button>
+      <div id="creer-immobilisation">
+        <button id="nouvelle-immobilisation" disabled={assetCauses.length > 0 || busy} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
+        <button disabled={assetCauses.length > 0 || busy} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(true)}>Inscrire un terrain</button>
+        <SaveNoticeHost place="creer-immobilisation" notice={notice} onDismiss={dismiss} />
+      </div>
       <PrerequisiteList id={assetCauseId} causes={assetCauses} />
       <div className="toolbar">
         <label>Logement
@@ -516,10 +572,10 @@ export default function AssetsPage() {
         properties={properties}
         years={setup.years}
         locked={busy}
-        onDone={(text) => { setError(""); setMessage(text); setRevision((value) => value + 1); }}
+        onDone={() => { setError(""); setRevision((value) => value + 1); }}
       />
       {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} help={editor.help} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} derive={editor.derive} locked={busy} />}
-      {assets.map((row) => <article className="entry-card" key={row.id}><h3>{row.label}</h3>
+      {assets.map((row) => <article className="entry-card" id={`asset-${row.id}`} key={row.id}><h3>{row.label}</h3>
         <p>{enumLabel("assetCategory", row.category)} · Valeur {formatEuros(row.acquisition_value)} · Base {formatEuros(row.depreciable_value)} · Non amortissable {formatEuros(row.non_depreciable_value)}</p>
         <p>{row.category === "LAND" ? "Terrain protégé : aucun plan d’amortissement" : `${enumLabel("depreciationMethod", row.method ?? "LINEAR")} sur ${row.useful_life_months} mois · ${row.asset_account} / ${row.depreciation_account}`}</p>
         {row.account_warning && <p role="alert" className="ledger-error">{row.account_warning}</p>}
@@ -540,17 +596,19 @@ export default function AssetsPage() {
             <button type="button" disabled={busy} onClick={() => openComponentCorrection(row, part)}>{editTitle(part.label, part.correction, ["value", "life", "dates", "account"])}</button>
           </div>
         </div>)}
+        <SaveNoticeHost place={`asset-${row.id}`} notice={notice} onDismiss={dismiss} />
       </article>)}
       <div className="section-heading" id="dotations" tabIndex={-1}><div><div className="heading-with-help"><h3>Dotations comptables</h3><GlossaryTip id="dotation" /><GlossaryTip id="compte-681" /></div><p>Le calcul en jours calendaires ne modifie jamais la couche fiscale.</p></div>
         <label>Exercice<select value={yearId} onChange={(event) => {
           ++periodRequest.current;
-          setPeriods([]); setError(""); setMessage(""); setEditor(null);
+          setPeriods([]); setError(""); dismiss(); setEditor(null);
           setYearId(Number(event.target.value));
         }}>{setup.years.filter((year) => year.status === "OPEN").map((year) => <option key={year.id} value={year.id}>{year.year}</option>)}</select></label>
+        <SaveNoticeHost place="dotations" notice={notice} onDismiss={dismiss} />
       </div>
       <button id="calculer-periodes" disabled={periodCauses.length > 0 || busy} aria-busy={busy || undefined} aria-describedby={describedBy(periodCauseId, periodCauses)} onClick={() => { void calculate(); }}>Calculer les périodes</button>
       <PrerequisiteList id={periodCauseId} causes={periodCauses} />
-      <button type="button" disabled={busy || (yearId ? postCauses.length > 0 || !periodsSettled : periodCauses.length > 0)} aria-busy={busy || undefined} aria-describedby={postDescribed} onClick={() => { void postAll(); }}>Comptabiliser toutes les dotations</button>
+      <button id="comptabiliser-dotations" type="button" disabled={busy || (yearId ? postCauses.length > 0 || !periodsSettled : periodCauses.length > 0)} aria-busy={busy || undefined} aria-describedby={postDescribed} onClick={() => { void postAll(); }}>Comptabiliser toutes les dotations</button>
       <PrerequisiteList id={postCauseId} causes={postCauses} />
       <ScreenStatus
         state={periodsView}

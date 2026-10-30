@@ -3,6 +3,9 @@ import { request } from "../api/ledger";
 import { describedBy, openingGenerationCauses } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
 import type { Opening } from "./OpeningPreview";
+import { GLOSSARY } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice } from "./localFeedback";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 import { formatAmount } from "../lib/format";
@@ -16,7 +19,8 @@ interface Continuity {
 
 export default function OpeningPosting({ year, preview }: { year: number; preview: Opening | null }) {
   const [error, setError] = useState("");
-  const [receipt, setReceipt] = useState("");
+  const [posted, setPosted] = useState(false);
+  const { notice, show, dismiss } = useSaveNotice();
   const [control, setControl] = useState<Continuity | null>(null);
   const { busy, step, run } = useMutation();
   const generation = useRef(0);
@@ -34,13 +38,24 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
     await run(async (report) => {
       const id = ++generation.current;
       report("Génération des à-nouveaux…");
-      setError(""); setReceipt(""); setControl(null);
+      setError(""); dismiss(); setControl(null);
       try {
         const response = await request<{ created: boolean; entry: { entry_number: string } }>(`/years/${year}/opening`, "POST", {
           preview_token: token, journal_code: fields.get("journal"),
           piece_reference: fields.get("reference"), result_account: resultLine ? fields.get("result") : null,
         });
-        if (id === generation.current) setReceipt(`Écriture ${response.entry.entry_number} ${response.created ? "créée et validée" : "déjà enregistrée"}. Actualisez les états pour consulter les nouveaux soldes.`);
+        if (id === generation.current) {
+          const verb = response.created ? "créée et validée" : "déjà enregistrée";
+          setPosted(true);
+          show({
+            kind: GLOSSARY.ecriture.label,
+            name: response.entry.entry_number,
+            action: verb,
+            targetId: "ouverture-comptabilisation",
+            detail: `Écriture ${response.entry.entry_number} ${verb}. Actualisez les états pour consulter les nouveaux soldes.`,
+            next: { label: "Contrôler la continuité", href: "#ouverture-continuite" },
+          });
+        }
       } catch (reason) {
         if (id === generation.current) setError((reason as Error).message);
       }
@@ -59,10 +74,11 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
       }
     });
   }
-  return <section aria-labelledby="opening-posting-title">
+  return <section id="ouverture-comptabilisation" aria-labelledby="opening-posting-title">
+    <SaveNoticeHost place="ouverture-comptabilisation" notice={notice} onDismiss={dismiss} />
     <h4 id="opening-posting-title" tabIndex={-1}>Comptabiliser et contrôler les à-nouveaux</h4>
     <p>La génération valide une écriture à la date d’ouverture. Elle exige un exercice précédent clôturé sans brouillon et un exercice destinataire ouvert et vide.</p>
-    {preview && !receipt && <FrenchForm onSubmit={(event) => { void post(event); }}>
+    {preview && !posted && <FrenchForm onSubmit={(event) => { void post(event); }}>
       <fieldset disabled={blocked || busy}>
         <legend>Reprise avant affectation du résultat</legend>
         <label>Journal des à-nouveaux<input name="journal" defaultValue="AN" pattern="[A-Z0-9]{2,10}" required maxLength={10} /></label>
@@ -74,8 +90,7 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
       <button type="submit" disabled={blocked || busy} aria-busy={busy || undefined} aria-describedby={describedBy(causeId, causes)}>Générer et valider les à-nouveaux</button>
       <PrerequisiteList id={causeId} causes={causes} />
     </FrenchForm>}
-    {receipt && <p role="status">{receipt}</p>}
-    <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void check(); }}>Contrôler la continuité des à-nouveaux</button>
+    <button id="ouverture-continuite" type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void check(); }}>Contrôler la continuité des à-nouveaux</button>
     <MutationStatus step={step} />
     {error && <p role="alert">{error}</p>}
     {control && <div aria-live="polite">

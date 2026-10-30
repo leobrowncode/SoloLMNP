@@ -45,7 +45,11 @@ test("previews then posts the property entry with loans and pre-start costs", as
     prior_charges: [{ account_number: "661000", amount: "1200.00" }],
   });
   fireEvent.click(screen.getByRole("button", { name: "Comptabiliser" }));
-  await vi.waitFor(() => expect(done).toHaveBeenCalledWith("Bien entré en comptabilité (écriture 2026-000001)."));
+  await vi.waitFor(() => expect(done).toHaveBeenCalledOnce());
+  const status = screen.getByRole("status");
+  expect(status).toHaveTextContent("Bien entré en comptabilité (écriture 2026-000001).");
+  expect(status).toHaveTextContent(/Écriture “Mérignac 1” comptabilisée à \d{2}:\d{2}/);
+  expect(status).not.toHaveFocus();
   expect(bodies[1]).toMatchObject({ confirm: true });
 });
 

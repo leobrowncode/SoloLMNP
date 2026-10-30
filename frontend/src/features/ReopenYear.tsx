@@ -3,6 +3,9 @@ import { request } from "../api/ledger";
 import { describedBy, reopenCauses } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
+import { GLOSSARY } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice } from "./localFeedback";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 
@@ -14,17 +17,20 @@ const INVALIDATED = [
 
 export default function ReopenYear({
   year,
+  yearLabel,
   onExerciseTransition,
   locked = false,
 }: {
   year: number;
+  yearLabel?: string;
   onExerciseTransition?: () => void;
   locked?: boolean;
 }) {
   const [confirmation, setConfirmation] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-  const [receipt, setReceipt] = useState("");
+  const { notice, show, dismiss } = useSaveNotice();
+  const exerciseName = yearLabel ?? String(year);
   const { busy, step, run } = useMutation();
   const errorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
@@ -46,7 +52,7 @@ export default function ReopenYear({
     await run(async (report) => {
       report("Réouverture de l’exercice…");
       setError("");
-      setReceipt("");
+      dismiss();
       try {
         await request(
           `/years/${year}/reopen`,
@@ -54,7 +60,14 @@ export default function ReopenYear({
           { confirmation: "ROUVRIR", reason: trimmedReason },
           "/api/filing",
         );
-        setReceipt("Exercice rouvert. Recalculez la fiscalité avant un nouveau pré-contrôle.");
+        show({
+          kind: GLOSSARY.exercice.label,
+          name: exerciseName,
+          action: "rouvert",
+          targetId: "reouvrir-exercice",
+          detail: "Exercice rouvert. Recalculez la fiscalité avant un nouveau pré-contrôle.",
+          next: { label: "Recalculer la fiscalité", href: "#calcul-fiscal" },
+        });
         setConfirmation("");
         setReason("");
         onExerciseTransition?.();
@@ -65,7 +78,8 @@ export default function ReopenYear({
   }
 
   return (
-    <div className="reopen-year" aria-labelledby="reopen-title">
+    <div className="reopen-year" id="reouvrir-exercice" aria-labelledby="reopen-title">
+      <SaveNoticeHost place="reouvrir-exercice" notice={notice} onDismiss={dismiss} />
       <div className="heading-with-help">
         <h4 id="reopen-title" tabIndex={-1}>Réouvrir l’exercice</h4>
         <GlossaryTip id="reouverture" />
@@ -97,7 +111,6 @@ export default function ReopenYear({
       </div>
       <MutationStatus step={step} />
       {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
-      {receipt && <p role="status">{receipt}</p>}
       <button type="button" disabled={!canSubmit} aria-busy={busy || undefined} aria-describedby={describedBy(causeId, causes)} onClick={() => { void reopen(); }}>
         {busy ? "Réouverture…" : "Réouvrir l’exercice"}
       </button>

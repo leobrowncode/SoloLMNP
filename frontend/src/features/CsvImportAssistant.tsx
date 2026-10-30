@@ -16,6 +16,9 @@ import {
 } from "./actionCauses";
 import ApiErrorAlert from "./ApiErrorAlert";
 import GlossaryTip from "./GlossaryTip";
+import { GLOSSARY } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice } from "./localFeedback";
 import PrerequisiteList from "./PrerequisiteList";
 import FrenchFileInput from "../lib/FrenchFileInput";
 import { enumLabel } from "../lib/format";
@@ -70,8 +73,10 @@ export default function CsvImportAssistant({
     loan_id?: number | null;
   };
   loanLabel?: string;
-  onImported: (message: string) => void;
+  onImported: () => void;
 }) {
+  const { notice, show, dismiss } = useSaveNotice();
+  const place = `import-${textareaId}`;
   const [content, setContent] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
   const [fields, setFields] = useState<CsvField[]>([]);
@@ -132,8 +137,9 @@ export default function CsvImportAssistant({
   }
 
   return (
-    <details>
+    <details id={place}>
       <summary>{summaryTitle}</summary>
+      <SaveNoticeHost place={place} notice={notice} onDismiss={dismiss} />
       <p>
         {intro}{" "}
         <GlossaryTip id="import-csv" />
@@ -268,7 +274,15 @@ export default function CsvImportAssistant({
                   body(preview.loan_reference ?? undefined),
                 );
                 if (generation.current !== current) return;
-                onImported(importedMessage(profile, result.imported));
+                show({
+                  kind: GLOSSARY["import-csv"].label,
+                  name: IMPORT_NAMES[profile],
+                  action: "enregistré",
+                  targetId: place,
+                  detail: importedMessage(profile, result.imported),
+                  next: IMPORT_NEXT[profile],
+                });
+                onImported();
                 setPreview(null);
                 setContent("");
                 setHeaders([]);
@@ -339,6 +353,18 @@ function rowDetail(row: CsvPreview["rows"][number]): string {
   const correction = item.correction ? `Correction : ${item.correction}` : "";
   return `${item.message} ${value}${correction}`.trim();
 }
+
+const IMPORT_NAMES = {
+  bank: "relevé bancaire",
+  operations: "recettes et dépenses",
+  loan_payments: "échéancier",
+} as const;
+
+const IMPORT_NEXT = {
+  bank: { label: "Rapprocher un mouvement", href: "/operations/banque" },
+  operations: { label: "Vérifier le traitement fiscal", href: "/fiscalite#calcul-fiscal" },
+  loan_payments: { label: "Rapprocher le relevé", href: "/operations/banque" },
+} as const;
 
 function importedMessage(profile: CsvProfile, imported: number): string {
   if (profile === "bank") {

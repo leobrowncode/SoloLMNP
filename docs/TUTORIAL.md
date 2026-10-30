@@ -46,6 +46,8 @@ La vue d’ensemble est le tableau de bord du dossier, pas une copie du menu. Le
 
 Le bandeau reprend cette progression à côté du statut dossier, sur toutes les pages : le décompte des étapes terminées et **Continuer**. Le statut dossier reste affiché. Ces états viennent du serveur (`GET /api/dashboard`), pas d’une liste enregistrée dans le navigateur. Recharger la page ou ouvrir un autre navigateur donne le même résultat. Rien n’y est présenté comme déclarable : les millésimes restent en recherche. Les montants affichés sont des centimes convertis en euros, au format français (`1 234,56 €`). La saisie accepte `1 234,56` ou `1234,56`. Le calcul reste en centimes entiers. L’API reçoit toujours le décimal exact `1234.56`. Les dates affichées sont en JJ/MM/AAAA, et chaque champ date le rappelle. Les messages de validation sont en français. Le bouton de fichier dit « Choisir un fichier ».
 
+Après un enregistrement, le message reste à côté du bouton ou de la ligne créée. Il nomme l’objet, l’action et l’heure, par exemple « Immobilisation “Appartement Lyon” créée à 15:42 ». La ligne est amenée à l’écran et surlignée, sans prendre le focus. S’il y a une suite utile, un lien ou un bouton la propose. Le message se ferme tout seul, ou avec **Fermer le message**. Il ne reste pas affiché en haut de la page.
+
 Alternative Docker : voir [DEPLOYMENT.md](DEPLOYMENT.md).
 
 Vérifier, sur la vue d’ensemble, que le statut dossier s’affiche, que la progression du bandeau indique le décompte et **Continuer**, et que le tableau de bord détaille chaque étape. Ouvrir une autre page du menu : le statut dossier et la progression restent, **Diagnostic technique** non. **Stockage opérationnel** n’est que dans ce diagnostic.

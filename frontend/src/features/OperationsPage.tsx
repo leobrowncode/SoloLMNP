@@ -23,6 +23,10 @@ import {
 } from "../routing/paths";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import ReviewForm, { type Field } from "./ReviewForm";
+import { GLOSSARY } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice } from "./localFeedback";
+import { operationSaveNotice } from "./operationSave";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 import {
@@ -75,7 +79,7 @@ export default function OperationsPage() {
   const [apiError, setApiError] = useState<RequestError | null>(null);
   const [bundleView, setBundleView] = useState<ScreenView<{ key: string }>>(() => beginLoad(idleView(), false));
   const [bankView, setBankView] = useState<ScreenView<{ query: string }>>(idleView());
-  const [message, setMessage] = useState("");
+  const { notice, show, dismiss } = useSaveNotice();
   const [revision, setRevision] = useState(0);
   const { busy, step, run } = useMutation();
   const [offset, setOffset] = useState(0);
@@ -246,11 +250,20 @@ export default function OperationsPage() {
     await run(async (report) => {
       if (!editor) return;
       report("Enregistrement…");
-      setError(""); setApiError(null); setMessage("");
-      const result = await api<Record<string, unknown>>(editor.path, editor.method ?? "POST", { ...data, ...editor.fixed });
+      setError(""); setApiError(null); dismiss();
+      const savedEditor = editor;
+      const result = await api<Record<string, unknown>>(savedEditor.path, savedEditor.method ?? "POST", { ...data, ...savedEditor.fixed });
       const invalidation = readInvalidation(result.invalidation);
       setEditor(null); setDetails(null);
-      setMessage(invalidation ? correctionMessage(invalidation) : "Enregistrement effectué.");
+      show(operationSaveNotice({
+        path: savedEditor.path,
+        method: savedEditor.method,
+        title: savedEditor.title,
+        fixed: savedEditor.fixed,
+        data,
+        result,
+        detail: invalidation ? correctionMessage(invalidation) : undefined,
+      }));
       setRevision((v) => v + 1);
     });
   }
@@ -258,7 +271,7 @@ export default function OperationsPage() {
   async function action(fn: () => Promise<unknown>, label = "Opération en cours…") {
     await run(async (report) => {
       report(label);
-      setError(""); setApiError(null); setMessage("");
+      setError(""); setApiError(null); dismiss();
       try { await fn(); } catch (e) {
         if (e instanceof RequestError) {
           setApiError(e);
@@ -410,7 +423,6 @@ export default function OperationsPage() {
     <MutationStatus step={step} />
     {apiError && <ApiErrorAlert detail={apiError.detail} />}
     {error && !apiError && <p role="alert" className="ledger-error">{error}</p>}
-    {message && <p role="status">{message}</p>}
     <ScreenStatus
       state={bundleView}
       onRetry={() => setRevision((value) => value + 1)}
@@ -448,7 +460,8 @@ export default function OperationsPage() {
         />
       )}
 
-      {tab === "Biens" && <>
+      {tab === "Biens" && <div id="biens-saisie">
+        <SaveNoticeHost place="biens-saisie" notice={notice} onDismiss={dismiss} />
         <p className="form-help">Ajoutez le logement avant les loyers. Terrain et bâtiment doivent égaler le prix. Les frais de notaire viennent en plus.</p>
         <button id="ajouter-bien" type="button" onClick={() => setEditor({
           title: "Ajouter un bien", path: "/properties",
@@ -482,7 +495,7 @@ export default function OperationsPage() {
           ],
         })}>Ajouter un bien</button>
         {properties.map((p) => (
-          <article key={p.id} className="entry-card">
+          <article key={p.id} id={`bien-${p.id}`} className="entry-card">
             <h3>{p.name}</h3>
             <p>Acquisition : {formatEuros(p.acquisition_price)} · Terrain : {formatEuros(p.land_value)} · Bâtiment : {formatEuros(p.building_value)}</p>
             {p.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
@@ -519,16 +532,25 @@ export default function OperationsPage() {
             <button type="button" disabled={rentCauses(p.id, occupants(p.id).length, years).length > 0} aria-describedby={describedBy(`rents-${p.id}`, rentCauses(p.id, occupants(p.id).length, years))} onClick={() => {
               void action(async () => {
                 const result = await api<{ created: number; already: number }>("/properties/" + p.id + "/rents", "POST", { fiscal_year_id: opYearId });
-                setMessage(result.created + " quittance(s) préparée(s), " + result.already + " déjà présentes. Elles restent à régler.");
+                show({
+                  kind: "Quittance",
+                  name: p.name,
+                  action: result.created ? "préparée" : "déjà préparée",
+                  targetId: "biens-saisie",
+                  highlightId: `bien-${p.id}`,
+                  detail: result.created + " quittance(s) préparée(s), " + result.already + " déjà présentes. Elles restent à régler.",
+                  next: { label: "Enregistrer les recettes", href: operationsPath("Transactions") },
+                });
                 setRevision((value) => value + 1);
               });
             }}>Préparer les loyers de l’exercice</button>
             <PrerequisiteList id={`rents-${p.id}`} causes={rentCauses(p.id, occupants(p.id).length, years)} />
           </article>
         ))}
-      </>}
+      </div>}
 
-      {tab === "Banque" && <>
+      {tab === "Banque" && <div id="banque-saisie">
+        <SaveNoticeHost place="banque-saisie" notice={notice} onDismiss={dismiss} />
         <p className="form-help">Créez d’abord le compte bancaire, puis importez éventuellement un relevé CSV pour rapprocher.</p>
         <div className="heading-with-help">
           <GlossaryTip id="compte-512" />
@@ -542,7 +564,7 @@ export default function OperationsPage() {
           ],
         })}>Ajouter un compte bancaire</button>
         {banks.map((row) => (
-          <article key={row.id} className="entry-card">
+          <article key={row.id} id={`banque-${row.id}`} className="entry-card">
             <h3>{row.name}</h3>
             <p>Compte {row.account_number}</p>
             {row.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
@@ -575,7 +597,7 @@ export default function OperationsPage() {
             action={action}
             missingBank={!bankId}
             context={{ bank_account_id: bankId }}
-            onImported={(text) => { setMessage(text); setRevision((value) => value + 1); }}
+            onImported={() => setRevision((value) => value + 1)}
           />
           <ScreenStatus
             state={bankView}
@@ -585,7 +607,7 @@ export default function OperationsPage() {
           />
           {entryCauses.length > 0 && <PrerequisiteList id={entryCauseId} causes={entryCauses} />}
           {showsData(bankView) && transactions.map((t) => (
-            <article key={t.id} className="entry-card">
+            <article key={t.id} id={`mouvement-${t.id}`} className="entry-card">
               <h3>{t.label} · {formatEuros(t.amount)}</h3>
               <p>{formatIsoDate(t.date)} · {t.external_reference} · {t.matched_entry_id ? "Rapproché avec l’écriture #" + t.matched_entry_id : "À rapprocher"}</p>
               {!t.matched_entry_id ? <>
@@ -607,9 +629,18 @@ export default function OperationsPage() {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
             void action(async () => {
-              await api("/bank/transactions/" + matchCandidates.transaction.id + "/match", "POST", { entry_line_id: Number(data.get("line")) });
+              const movement = matchCandidates.transaction;
+              await api("/bank/transactions/" + movement.id + "/match", "POST", { entry_line_id: Number(data.get("line")) });
               setMatchCandidates(null); setRevision((v) => v + 1);
-              setMessage("Rapprochement enregistré sans nouvelle écriture.");
+              show({
+                kind: GLOSSARY.rapprochement.label,
+                name: movement.label,
+                action: "enregistré",
+                targetId: "banque-saisie",
+                highlightId: `mouvement-${movement.id}`,
+                detail: "Rapprochement enregistré sans nouvelle écriture.",
+                next: { label: "Voir le journal", href: "/comptabilite/journal" },
+              });
             });
           }}>
             <h3>Rapprocher : {matchCandidates.transaction.label}</h3>
@@ -623,9 +654,10 @@ export default function OperationsPage() {
             <button type="button" onClick={() => setMatchCandidates(null)}>Annuler</button>
           </FrenchForm>}
         </>}
-      </>}
+      </div>}
 
-      {tab === "Emprunts" && <>
+      {tab === "Emprunts" && <div id="emprunts-saisie">
+        <SaveNoticeHost place="emprunts-saisie" notice={notice} onDismiss={dismiss} />
         <p className="form-help">Chaque ligne de crédit = un emprunt SoloLMNP avec son propre compte 164. Exemple : 15&nbsp;000 € et 195&nbsp;000 € → deux emprunts. Un compte 164 libre est attribué automatiquement si besoin.</p>
         <div className="heading-with-help">
           <GlossaryTip id="emprunt" />
@@ -665,7 +697,7 @@ export default function OperationsPage() {
         <PrerequisiteList id={loanCauseId} causes={loanCauses} />
         <PrerequisiteList id={bankCauseId} causes={bankCauses} intro="Déblocage et échéance indisponibles :" />
         {loans.map((l) => (
-          <article className="entry-card" key={l.id}>
+          <article className="entry-card" id={`emprunt-${l.id}`} key={l.id}>
             <h3>{l.lender}</h3>
             <p>Capital initial : {formatEuros(l.initial_principal)} · Solde comptable : {formatEuros(l.remaining_principal)} · Mensualité : {formatEuros(l.monthly_payment)} + assurance {formatEuros(l.monthly_insurance)} · Compte {l.principal_account}</p>
             {l.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
@@ -757,12 +789,13 @@ export default function OperationsPage() {
             missingLoan={!loanImportId}
             context={{ bank_account_id: bankId, fiscal_year_id: opYearId, loan_id: loanImportId }}
             loanLabel={loanForImport ? `${loanForImport.lender} · ${formatEuros(loanForImport.initial_principal)} · ${loanForImport.principal_account}` : ""}
-            onImported={(text) => { setMessage(text); setRevision((value) => value + 1); }}
+            onImported={() => setRevision((value) => value + 1)}
           />
         </>}
-      </>}
+      </div>}
 
-      {tab === "Transactions" && <>
+      {tab === "Transactions" && <div id="transactions-saisie">
+        <SaveNoticeHost place="transactions-saisie" notice={notice} onDismiss={dismiss} />
         <p className="form-help">Enregistrez les loyers et charges. La part déductible ne change pas l’écriture : elle est proposée ensuite dans les réintégrations de la liasse. Ne saisissez pas les intérêts déjà ventilés dans une échéance d’emprunt.</p>
         {!!properties.length && !!openYears.length && <>
           <label className="toolbar-field">Bien
@@ -800,7 +833,7 @@ export default function OperationsPage() {
           missingProperty={!opPropertyId}
           missingYear={!opYearId}
           context={{ property_id: opPropertyId, fiscal_year_id: opYearId, bank_account_id: bankId || null }}
-          onImported={(text) => { setMessage(text); setRevision((value) => value + 1); }}
+          onImported={() => setRevision((value) => value + 1)}
         />
         <div className="form-actions">
           <button type="button" disabled={entryCauses.length > 0} aria-describedby={describedBy(entryCauseId, entryCauses)} onClick={() => newOperation("REVENUE")}>Nouvelle recette</button>
@@ -811,7 +844,7 @@ export default function OperationsPage() {
         {showsLoading(bundleView) && <p>Chargement des opérations…</p>}
         {bundleView.phase === "loaded" && operations.length === 0 && <p>Aucune opération enregistrée.</p>}
         {showsData(bundleView) && operations.map((row) => (
-          <article key={row.id} className="entry-card">
+          <article key={row.id} id={`operation-${row.id}`} className="entry-card">
             <h3>{enumLabel("operationKind", row.kind)} · {row.description} · {formatEuros(row.amount)}</h3>
             <p>{formatIsoDate(row.date)} · {row.counterparty} · {enumLabel("operationStatus", row.status)}{row.remaining_to_settle !== null && " · Reste à régler : " + formatEuros(row.remaining_to_settle)}</p>
             {row.kind === "LOAN_PAYMENT" && (
@@ -846,7 +879,7 @@ export default function OperationsPage() {
           <button type="button" disabled={!offset} onClick={() => setOffset(offset - 50)}>Opérations précédentes</button>
           <button type="button" disabled={operations.length < 50} onClick={() => setOffset(offset + 50)}>Opérations suivantes</button>
         </div>
-      </>}
+      </div>}
 
       {details && (
         <div className="ledger-table">

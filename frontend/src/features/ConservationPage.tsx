@@ -8,6 +8,9 @@ import ApiErrorAlert from "./ApiErrorAlert";
 import { describedBy, linkCauses, restoreCauses } from "./actionCauses";
 import EntryPicker from "./EntryPicker";
 import GlossaryTip from "./GlossaryTip";
+import { GLOSSARY } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice } from "./localFeedback";
 import PrerequisiteList from "./PrerequisiteList";
 import ScreenStatus from "./ScreenStatus";
 import MutationStatus from "./MutationStatus";
@@ -47,7 +50,7 @@ export default function ConservationPage() {
   const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState("");
   const [apiError, setApiError] = useState<RequestError | null>(null);
-  const [receipt, setReceipt] = useState("");
+  const { notice, show, dismiss } = useSaveNotice();
   const { busy, step, run } = useMutation();
   const retryAction = useRef<(() => Promise<void>) | null>(null);
   const documents = showsData(documentsView) ? documentsView.data : null;
@@ -59,7 +62,7 @@ export default function ConservationPage() {
   function clearFeedback() {
     setError("");
     setApiError(null);
-    setReceipt("");
+    dismiss();
   }
 
   function reload() {
@@ -150,7 +153,14 @@ export default function ConservationPage() {
           },
           "/api/filing",
         );
-        setReceipt(`Justificatif ${saved.original_name} enregistré. Empreinte ${saved.sha256}.`);
+        show({
+          kind: GLOSSARY.justificatif.label,
+          name: saved.original_name,
+          action: "enregistré",
+          targetId: "depot-justificatif",
+          detail: `Justificatif ${saved.original_name} enregistré. Empreinte ${saved.sha256}.`,
+          next: { label: "Lier une écriture", href: "#justificatifs" },
+        });
         reload();
       } catch (reason) {
         retryAction.current = upload;
@@ -176,7 +186,14 @@ export default function ConservationPage() {
           },
           "/api/filing",
         );
-        setReceipt(`Justificatif ${saved.original_name} lié à ${entryLabel(saved.entry)}.`);
+        show({
+          kind: GLOSSARY.justificatif.label,
+          name: saved.original_name,
+          action: "lié",
+          targetId: "justificatifs",
+          highlightId: `justificatif-${documentId}`,
+          detail: `Justificatif ${saved.original_name} lié à ${entryLabel(saved.entry)}.`,
+        });
         reload();
       } catch (reason) {
         retryAction.current = () => link(documentId);
@@ -191,7 +208,14 @@ export default function ConservationPage() {
       report("Création de la sauvegarde…");
       try {
         const saved = await request<{ filename: string; sha256: string }>("/backup", "POST", {}, "/api/filing");
-        setReceipt(`Sauvegarde ${saved.filename}. Empreinte ${saved.sha256}.`);
+        show({
+          kind: GLOSSARY.sauvegarde.label,
+          name: saved.filename,
+          action: "créée",
+          targetId: "creer-sauvegarde",
+          highlightId: `sauvegarde-${saved.filename}`,
+          detail: `Sauvegarde ${saved.filename}. Empreinte ${saved.sha256}.`,
+        });
         setSelectedBackup(saved.filename);
         reload();
       } catch (reason) {
@@ -207,7 +231,14 @@ export default function ConservationPage() {
       report("Contrôle de la sauvegarde…");
       try {
         const saved = await request<BackupRow>("/backups/verify", "POST", { filename }, "/api/filing");
-        setReceipt(`Contrôle de ${saved.filename} : ${integrityLabel(saved.integrity)}`);
+        show({
+          kind: "Contrôle",
+          name: saved.filename,
+          action: "effectué",
+          targetId: "sauvegardes",
+          highlightId: `sauvegarde-${saved.filename}`,
+          detail: `Contrôle de ${saved.filename} : ${integrityLabel(saved.integrity)}`,
+        });
         reload();
       } catch (reason) {
         retryAction.current = () => verify(filename);
@@ -235,10 +266,15 @@ export default function ConservationPage() {
           { filename, confirmation: "RESTAURER" },
           "/api/filing",
         );
-        setReceipt(
-          `Base restaurée depuis ${saved.restored_from} (${saved.entries} écritures, ${saved.years} exercices). `
-          + `Copie préalable : ${saved.pre_restore_backup}.`,
-        );
+        show({
+          kind: GLOSSARY.restauration.label,
+          name: saved.restored_from,
+          action: "effectuée",
+          targetId: "restore-preview",
+          detail: `Base restaurée depuis ${saved.restored_from} (${saved.entries} écritures, ${saved.years} exercices). `
+            + `Copie préalable : ${saved.pre_restore_backup}.`,
+          next: { label: "Voir les sauvegardes", href: "#sauvegardes" },
+        });
         setConfirmation("");
         setSelectedBackup("");
         reload();
@@ -278,9 +314,9 @@ export default function ConservationPage() {
           onRetry={() => { void retryAction.current?.(); }}
         />
       )}
-      {receipt && <p role="status">{receipt}</p>}
-
-      <h3 id="justificatifs">Justificatifs</h3>
+      <div id="justificatifs">
+      <h3>Justificatifs</h3>
+      <SaveNoticeHost place="justificatifs" notice={notice} onDismiss={dismiss} />
       <ScreenStatus
         state={documentsView}
         onRetry={reload}
@@ -304,7 +340,7 @@ export default function ConservationPage() {
             </thead>
             <tbody>
               {documents.map((document) => (
-                <tr key={document.id}>
+                <tr key={document.id} id={`justificatif-${document.id}`}>
                   <td>{document.original_name}</td>
                   <td>{frStamp(document.created_at)}</td>
                   <td>{document.media_label}</td>
@@ -332,7 +368,8 @@ export default function ConservationPage() {
         <PrerequisiteList id="link-causes" causes={linkBlocked} />
       )}
       <EntryPicker selected={choice} onSelect={setChoice} />
-      <FrenchForm onSubmit={(event) => { event.preventDefault(); void upload(); }}>
+      <FrenchForm id="depot-justificatif" onSubmit={(event) => { event.preventDefault(); void upload(); }}>
+        <SaveNoticeHost place="depot-justificatif" notice={notice} onDismiss={dismiss} />
         <FrenchFileInput
           label="Justificatif PDF, JPEG ou PNG"
           accept="application/pdf,image/jpeg,image/png"
@@ -341,11 +378,15 @@ export default function ConservationPage() {
         />
         <button type="submit" disabled={busy} aria-busy={busy || undefined}>Déposer le justificatif</button>
       </FrenchForm>
+      </div>
 
-      <h3 id="sauvegardes">Sauvegardes</h3>
-      <div className="toolbar">
+      <div id="sauvegardes">
+      <h3>Sauvegardes</h3>
+      <div className="toolbar" id="creer-sauvegarde">
+        <SaveNoticeHost place="creer-sauvegarde" notice={notice} onDismiss={dismiss} />
         <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void backup(); }}>Créer une sauvegarde</button>
       </div>
+      <SaveNoticeHost place="sauvegardes" notice={notice} onDismiss={dismiss} />
       <ScreenStatus
         state={backupsView}
         onRetry={reload}
@@ -371,7 +412,7 @@ export default function ConservationPage() {
               {backups.map((archive) => {
                 const when = frStamp(archive.created_at);
                 return (
-                  <tr key={archive.filename}>
+                  <tr key={archive.filename} id={`sauvegarde-${archive.filename}`}>
                     <td>
                       <label>
                         <input
@@ -409,8 +450,10 @@ export default function ConservationPage() {
           </table>
         </div>
       )}
+      </div>
 
       <div id="restore-preview">
+        <SaveNoticeHost place="restore-preview" notice={notice} onDismiss={dismiss} />
         <h3>Restauration</h3>
         <ScreenStatus
           state={preview}

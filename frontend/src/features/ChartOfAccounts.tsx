@@ -11,16 +11,22 @@ import {
   type UsageFilter,
 } from "./accountNature";
 import GlossaryTip from "./GlossaryTip";
+import { SaveNoticeHost } from "./LocalFeedback";
+import type { SaveNotice } from "./localFeedback";
 import FrenchForm from "../lib/FrenchForm";
 
 export default function ChartOfAccounts({
   accounts,
   busy,
+  notice,
+  onDismiss,
   onCreate,
   onToggle,
 }: {
   accounts: Account[];
   busy: boolean;
+  notice: SaveNotice | null;
+  onDismiss: () => void;
   onCreate: (input: { number: string; label: string; account_type: string }) => void;
   onToggle: (account: Account) => void;
 }) {
@@ -47,7 +53,7 @@ export default function ChartOfAccounts({
         <GlossaryTip id="nature-compte" />
       </div>
       <p>La nature (Actif, Dette, Capitaux, Charge, Produit) ne dit pas si le compte est utilisé. Activé ou Inactif est un autre choix.</p>
-      <FrenchForm onSubmit={submit}>
+      <FrenchForm id="ajouter-compte" onSubmit={submit}>
         <div className="form-grid">
           <label>Numéro<input name="number" required pattern="[1-7][0-9]{2,9}" /></label>
           <label>Libellé du compte<input name="label" required /></label>
@@ -60,6 +66,7 @@ export default function ChartOfAccounts({
           </label>
         </div>
         <button disabled={busy}>Ajouter le compte</button>
+        <SaveNoticeHost place="ajouter-compte" notice={notice} onDismiss={onDismiss} />
       </FrenchForm>
       <div className="chart-filters">
         <div>
@@ -95,6 +102,7 @@ export default function ChartOfAccounts({
               return (
               <li
                 key={account.number}
+                id={`compte-${account.number}`}
                 aria-label={`${account.number} ${account.label} ${natureLabel} ${usageLabel}`}
               >
                 <span className="chart-id">{account.number} · {account.label}</span>
@@ -113,6 +121,7 @@ export default function ChartOfAccounts({
                 >
                   {account.active ? "Désactiver" : "Réactiver"} {account.number}
                 </button>
+                <SaveNoticeHost place={`compte-${account.number}`} notice={notice} onDismiss={onDismiss} />
               </li>
               );
             })}

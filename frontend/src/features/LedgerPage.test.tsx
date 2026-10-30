@@ -51,6 +51,11 @@ describe("ledger", () => {
     await userEvent.clear(credit); await userEvent.type(credit, "123.45");
     await userEvent.click(screen.getByRole("button", { name: "Enregistrer le brouillon" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Brouillon enregistré"));
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent(/Écriture “Test” enregistrée à \d{2}:\d{2}/);
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).not.toHaveFocus();
+    expect(document.getElementById("ecriture-saisie")).toHaveClass("save-highlight");
     const call = fetcher.mock.calls.find(([url, init]) => url === "/api/ledger/entries" && init?.method === "POST");
     expect(JSON.parse(String(call?.[1]?.body)).lines[0].debit).toBe("123.45");
     expect(fetcher.mock.calls.some(([url]) => url.endsWith("/validate"))).toBe(false);
