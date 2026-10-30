@@ -23,6 +23,8 @@ import {
 } from "../routing/paths";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import ReviewForm, { type Field } from "./ReviewForm";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 import {
   PLAN_HELP, RECORD_HELP, correctionMessage, locked, readInvalidation,
 } from "./correction";
@@ -78,7 +80,7 @@ export default function OperationsPage() {
   const [bankView, setBankView] = useState<ScreenView<{ query: string }>>(idleView());
   const [message, setMessage] = useState("");
   const [revision, setRevision] = useState(0);
-  const [busy, setBusy] = useState(false);
+  const { busy, step, run } = useMutation();
   const [offset, setOffset] = useState(0);
   const [bankOffset, setBankOffset] = useState(0);
   const [details, setDetails] = useState<Entry | null>(null);
@@ -247,26 +249,32 @@ export default function OperationsPage() {
   }
 
   async function save(data: Record<string, unknown>) {
-    if (!editor) return;
-    const result = await api<Record<string, unknown>>(editor.path, editor.method ?? "POST", { ...data, ...editor.fixed });
-    const invalidation = readInvalidation(result.invalidation);
-    setEditor(null); setDetails(null);
-    setMessage(invalidation ? correctionMessage(invalidation) : "Enregistrement effectué.");
-    setRevision((v) => v + 1);
+    await run(async (report) => {
+      if (!editor) return;
+      report("Enregistrement…");
+      setError(""); setApiError(null); setMessage("");
+      const result = await api<Record<string, unknown>>(editor.path, editor.method ?? "POST", { ...data, ...editor.fixed });
+      const invalidation = readInvalidation(result.invalidation);
+      setEditor(null); setDetails(null);
+      setMessage(invalidation ? correctionMessage(invalidation) : "Enregistrement effectué.");
+      setRevision((v) => v + 1);
+    });
   }
 
-  async function action(fn: () => Promise<unknown>) {
-    setBusy(true); setError(""); setApiError(null); setMessage("");
-    try { await fn(); } catch (e) {
-      if (e instanceof RequestError) {
-        setApiError(e);
-        setError("");
-      } else {
-        setApiError(null);
-        setError(e instanceof Error ? e.message : "Service indisponible.");
+  async function action(fn: () => Promise<unknown>, label = "Opération en cours…") {
+    await run(async (report) => {
+      report(label);
+      setError(""); setApiError(null); setMessage("");
+      try { await fn(); } catch (e) {
+        if (e instanceof RequestError) {
+          setApiError(e);
+          setError("");
+        } else {
+          setApiError(null);
+          setError(e instanceof Error ? e.message : "Service indisponible.");
+        }
       }
-    }
-    finally { setBusy(false); }
+    });
   }
 
   async function findCandidates(transaction: BankTransaction) {
@@ -405,6 +413,7 @@ export default function OperationsPage() {
     <section id="operations" className="ledger-page" aria-labelledby="operations-title" data-screen-phase={bundleView.phase}>
     <h2 id="operations-title">Opérations et banque</h2>
     <p>Suivez l’ordre des onglets : bien, banque, emprunts, puis recettes et dépenses.</p>
+    <MutationStatus step={step} />
     {apiError && <ApiErrorAlert detail={apiError.detail} />}
     {error && !apiError && <p role="alert" className="ledger-error">{error}</p>}
     {message && <p role="status">{message}</p>}
@@ -441,6 +450,7 @@ export default function OperationsPage() {
           onSave={save}
           onCancel={() => setEditor(null)}
           retryId={editor.retry}
+          locked={busy}
         />
       )}
 
@@ -813,7 +823,7 @@ export default function OperationsPage() {
             {row.kind === "LOAN_PAYMENT" && (
               <p>Capital {row.principal} € · Intérêts {row.interest} € · Assurance {row.insurance} € · Frais {row.other_costs} €</p>
             )}
-            <button type="button" onClick={() => { void action(async () => setDetails(await request<Entry>("/entries/" + row.accounting_entry_id))); }}>Voir l’écriture</button>
+            <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void action(async () => setDetails(await request<Entry>("/entries/" + row.accounting_entry_id)), "Chargement de l’écriture…"); }}>Voir l’écriture</button>
             {row.status !== "REVERSED" && row.remaining_to_settle && row.remaining_to_settle !== "0.00" && (
               <button type="button" disabled={bankCauses.length > 0} aria-describedby={describedBy(bankCauseId, bankCauses)} onClick={() => setEditor({
                 title: "Régler : " + row.description,

@@ -171,6 +171,27 @@ class DepreciationPostInput(Input):
     piece_reference: Label
 
 
+class DepreciationBatchItem(Input):
+    """One calculated period inside a posting batch."""
+
+    period_id: int = Field(gt=0)
+    request_id: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{8,64}$")]
+    piece_reference: Label
+
+
+class DepreciationBatchInput(Input):
+    """Posts several depreciation periods and reports each one."""
+
+    items: list[DepreciationBatchItem] = Field(min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def unique_periods(self) -> "DepreciationBatchInput":
+        ids = [item.period_id for item in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Une période ne peut figurer qu’une fois dans le lot.")
+        return self
+
+
 class DwellingPlanConfirm(Input):
     """Creates exactly one previously previewed dwelling split."""
 

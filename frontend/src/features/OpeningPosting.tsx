@@ -3,6 +3,8 @@ import { request } from "../api/ledger";
 import { describedBy, openingGenerationCauses } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
 import type { Opening } from "./OpeningPreview";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 
 interface Continuity {
   balances_match: boolean; opening_entry_id: number | null; source_closed?: boolean;
@@ -14,8 +16,7 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
   const [control, setControl] = useState<Continuity | null>(null);
-  const [busy, setBusy] = useState(false);
-  const pending = useRef(false);
+  const { busy, step, run } = useMutation();
   const generation = useRef(0);
   useEffect(() => () => { generation.current += 1; }, []);
   const causes = openingGenerationCauses(preview);
@@ -24,34 +25,37 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
 
   async function post(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!preview || blocked || pending.current) return;
+    if (!preview || blocked) return;
     const fields = new FormData(event.currentTarget);
-    const id = ++generation.current;
-    pending.current = true; setBusy(true); setError(""); setReceipt(""); setControl(null);
-    try {
-      const response = await request<{ created: boolean; entry: { entry_number: string } }>(`/years/${year}/opening`, "POST", {
-        preview_token: preview.preview_token, journal_code: fields.get("journal"),
-        piece_reference: fields.get("reference"), result_account: preview.result_line ? fields.get("result") : null,
-      });
-      if (id === generation.current) setReceipt(`Écriture ${response.entry.entry_number} ${response.created ? "créée et validée" : "déjà enregistrée"}. Actualisez les états pour consulter les nouveaux soldes.`);
-    } catch (reason) {
-      if (id === generation.current) setError((reason as Error).message);
-    } finally {
-      if (id === generation.current) { pending.current = false; setBusy(false); }
-    }
+    const token = preview.preview_token;
+    const resultLine = preview.result_line;
+    await run(async (report) => {
+      const id = ++generation.current;
+      report("Génération des à-nouveaux…");
+      setError(""); setReceipt(""); setControl(null);
+      try {
+        const response = await request<{ created: boolean; entry: { entry_number: string } }>(`/years/${year}/opening`, "POST", {
+          preview_token: token, journal_code: fields.get("journal"),
+          piece_reference: fields.get("reference"), result_account: resultLine ? fields.get("result") : null,
+        });
+        if (id === generation.current) setReceipt(`Écriture ${response.entry.entry_number} ${response.created ? "créée et validée" : "déjà enregistrée"}. Actualisez les états pour consulter les nouveaux soldes.`);
+      } catch (reason) {
+        if (id === generation.current) setError((reason as Error).message);
+      }
+    });
   }
   async function check() {
-    if (pending.current) return;
-    const id = ++generation.current;
-    pending.current = true; setBusy(true); setError(""); setControl(null);
-    try {
-      const value = await request<Continuity>(`/years/${year}/opening-continuity`);
-      if (id === generation.current) setControl(value);
-    } catch (reason) {
-      if (id === generation.current) setError((reason as Error).message);
-    } finally {
-      if (id === generation.current) { pending.current = false; setBusy(false); }
-    }
+    await run(async (report) => {
+      const id = ++generation.current;
+      report("Contrôle de la continuité des à-nouveaux…");
+      setError(""); setControl(null);
+      try {
+        const value = await request<Continuity>(`/years/${year}/opening-continuity`);
+        if (id === generation.current) setControl(value);
+      } catch (reason) {
+        if (id === generation.current) setError((reason as Error).message);
+      }
+    });
   }
   return <section aria-labelledby="opening-posting-title">
     <h4 id="opening-posting-title" tabIndex={-1}>Comptabiliser et contrôler les à-nouveaux</h4>
@@ -65,12 +69,12 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
           <span>Compte actif de capitaux propres {preview.result_line.credit !== "0.00" ? "120 (hors 1209)" : "129"}, à créer dans le plan de comptes si absent. Aucune affectation automatique.</span>
         </label>}
       </fieldset>
-      <button type="submit" disabled={blocked || busy} aria-describedby={describedBy(causeId, causes)}>Générer et valider les à-nouveaux</button>
+      <button type="submit" disabled={blocked || busy} aria-busy={busy || undefined} aria-describedby={describedBy(causeId, causes)}>Générer et valider les à-nouveaux</button>
       <PrerequisiteList id={causeId} causes={causes} />
     </form>}
     {receipt && <p role="status">{receipt}</p>}
-    <button type="button" disabled={busy} onClick={() => { void check(); }}>Contrôler la continuité des à-nouveaux</button>
-    {busy && <p role="status">Opération en cours…</p>}
+    <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void check(); }}>Contrôler la continuité des à-nouveaux</button>
+    <MutationStatus step={step} />
     {error && <p role="alert">{error}</p>}
     {control && <div aria-live="polite">
       <p>{control.opening_entry_id === null ? "Aucun à-nouveau généré pour cet exercice." : control.balances_match ? "Les soldes de l’écriture de reprise correspondent aux soldes source." : "Des écarts ont été détectés dans les soldes repris."} Contrôle provisoire, sans certification des comptes annuels.</p>

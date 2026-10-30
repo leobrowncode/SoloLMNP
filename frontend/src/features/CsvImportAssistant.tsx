@@ -63,7 +63,7 @@ export default function CsvImportAssistant({
   previewLabel: string;
   commitLabel: string;
   busy: boolean;
-  action: (fn: () => Promise<unknown>) => void;
+  action: (fn: () => Promise<unknown>, step?: string) => void;
   missingProperty?: boolean;
   missingYear?: boolean;
   missingBank?: boolean;
@@ -143,23 +143,23 @@ export default function CsvImportAssistant({
         {intro}{" "}
         <GlossaryTip id="import-csv" />
       </p>
-      <button type="button" disabled={busy} onClick={() => {
-        void action(() => downloadImportTemplate(profile));
+      <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => {
+        void action(() => downloadImportTemplate(profile), "Téléchargement du modèle…");
       }}>Télécharger le modèle CSV</button>
       <p className="form-help">
         UTF-8, séparateur point-virgule, décimales avec une virgule, dates JJ/MM/AAAA.
         Un fichier exporté avec une virgule ou collé depuis un tableur (tabulations) est lu aussi.
       </p>
-      <label>Fichier CSV (1 Mo maximum)<input type="file" accept=".csv,text/csv" onChange={(event) => {
+      <label>Fichier CSV (1 Mo maximum)<input type="file" accept=".csv,text/csv" disabled={busy} onChange={(event) => {
         const file = event.target.files?.[0];
-        if (!file) return;
+        if (!file || busy) return;
         void action(async () => {
           if (file.size > 1_000_000) throw new Error("Fichier trop volumineux.");
           updateContent(await file.text());
-        });
+        }, "Lecture du fichier…");
       }} /></label>
       <label>{contentLabel}
-        <textarea id={textareaId} rows={6} value={content} onChange={(event) => updateContent(event.target.value)} />
+        <textarea id={textareaId} rows={6} value={content} disabled={busy} onChange={(event) => updateContent(event.target.value)} />
       </label>
       {headers.length > 0 && fields.length > 0 && (
         <fieldset className="import-map">
@@ -182,6 +182,7 @@ export default function CsvImportAssistant({
       <button
         type="button"
         disabled={busy || causes.length > 0}
+        aria-busy={busy || undefined}
         aria-describedby={describedBy(causeId, causes)}
         onClick={() => {
           const current = generation.current;
@@ -197,7 +198,7 @@ export default function CsvImportAssistant({
             setFields(result.fields);
             setMapping(result.mapping);
             setConfirmed(false);
-          });
+          }, "Analyse du fichier…");
         }}
       >{previewLabel}</button>
       <PrerequisiteList id={causeId} causes={causes} />
@@ -239,7 +240,7 @@ export default function CsvImportAssistant({
             </div>
           )}
           {preview.rejects_csv && (
-            <button type="button" onClick={() => downloadRejects(REJECT_FILE[profile], preview.rejects_csv)}>
+            <button type="button" disabled={busy} onClick={() => downloadRejects(REJECT_FILE[profile], preview.rejects_csv)}>
               Télécharger les lignes à corriger
             </button>
           )}
@@ -256,6 +257,7 @@ export default function CsvImportAssistant({
           <button
             type="button"
             disabled={busy || postCauses.length > 0}
+            aria-busy={busy || undefined}
             aria-describedby={describedBy(postCauseId, postCauses)}
             onClick={() => {
               const current = generation.current;
@@ -272,7 +274,7 @@ export default function CsvImportAssistant({
                 setHeaders([]);
                 setMapping({});
                 setConfirmed(false);
-              });
+              }, "Comptabilisation de l’import…");
             }}
           >{commitLabel}</button>
           <PrerequisiteList id={postCauseId} causes={postCauses} />

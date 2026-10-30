@@ -5,6 +5,8 @@ import ApiErrorAlert from "./ApiErrorAlert";
 import PrerequisiteList from "./PrerequisiteList";
 import type { ExportSlot, ExportStatus } from "./exportStatus";
 import GlossaryTip from "./GlossaryTip";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 
 const OUTPUTS: {
   kind: "liasse" | "pdf" | "fec" | "archive";
@@ -57,31 +59,32 @@ function slotOf(status: ExportStatus, kind: "liasse" | "pdf" | "fec" | "archive"
 
 export default function ExportDownloads({ yearId, status }: { yearId: number; status: ExportStatus }) {
   const [error, setError] = useState<RequestError | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, step, run } = useMutation();
   const errorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     errorRef.current?.querySelector<HTMLElement>("[role=alert]")?.focus();
   }, [error]);
 
   async function download(path: string) {
-    setError(null);
-    setBusy(true);
-    try {
-      await downloadFiling(path);
-    } catch (reason) {
-      setError(reason instanceof RequestError
-        ? reason
-        : new RequestError(
-          { code: "HTTP_ERROR", message: "Le téléchargement a échoué. Réessayez depuis cette page." },
-          0,
-        ));
-    } finally {
-      setBusy(false);
-    }
+    await run(async (report) => {
+      report("Téléchargement…");
+      setError(null);
+      try {
+        await downloadFiling(path);
+      } catch (reason) {
+        setError(reason instanceof RequestError
+          ? reason
+          : new RequestError(
+            { code: "HTTP_ERROR", message: "Le téléchargement a échoué. Réessayez depuis cette page." },
+            0,
+          ));
+      }
+    });
   }
 
   return (
     <div className="export-board">
+      <MutationStatus step={step} />
       <div ref={errorRef}>
         {error && <ApiErrorAlert detail={error.detail} />}
       </div>
@@ -132,6 +135,7 @@ export default function ExportDownloads({ yearId, status }: { yearId: number; st
                 <button
                   type="button"
                   disabled={!slot.download || busy}
+                  aria-busy={busy || undefined}
                   aria-describedby={hintId}
                   onClick={() => { void download(output.path?.(yearId) ?? ""); }}
                 >
@@ -151,6 +155,7 @@ export default function ExportDownloads({ yearId, status }: { yearId: number; st
           <button
             type="button"
             disabled={busy}
+            aria-busy={busy || undefined}
             aria-describedby="export-tableur-hint"
             onClick={() => { void download(`/api/filing/years/${yearId}/export.xlsx`); }}
           >

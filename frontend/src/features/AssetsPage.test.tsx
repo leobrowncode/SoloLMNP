@@ -393,3 +393,124 @@ test("names the missing property on every immobilisation action", async () => {
   expect(post).toBeDisabled();
   expect(post).toHaveAttribute("aria-describedby", expect.stringContaining("asset-period-causes"));
 });
+
+const openPeriods = [
+  { ...period, id: 2, target_label: "Mobilier" },
+  { ...period, id: 3, target_label: "Cuisine", amount: "80.00" },
+  { ...period, id: 4, target_label: "Toiture", amount: "40.00" },
+];
+
+function headerValue(init: RequestInit | undefined, name: string): string | null {
+  const headers = new Headers(init?.headers);
+  return headers.get(name);
+}
+
+test("a double click posts the batch once and keeps the trigger disabled", async () => {
+  const gate = deferred();
+  let posts = 0;
+  mockApi(async (url) => {
+    if (url.endsWith("/post")) {
+      posts += 1;
+      return gate.promise;
+    }
+    if (url.endsWith("/periods")) return response(openPeriods);
+    return response([]);
+  });
+  render(<AssetsPage />);
+  expect(await screen.findByText("Mobilier")).toBeInTheDocument();
+  const button = screen.getByRole("button", { name: "Comptabiliser toutes les dotations" });
+  expect(button).toBeEnabled();
+  fireEvent.click(button);
+  expect(await screen.findByText("Comptabilisation de 3 dotation(s)…")).toBeInTheDocument();
+  expect(button).toBeDisabled();
+  fireEvent.click(button);
+  expect(posts).toBe(1);
+  await act(async () => {
+    gate.resolve(response({
+      idempotency_key: "batch",
+      replayed: false,
+      posted_count: 3,
+      failed_count: 0,
+      skipped_count: 0,
+      items: openPeriods.map((row) => ({ period_id: row.id, status: "posted", entry_id: row.id, replayed: false })),
+    }));
+  });
+  expect(await screen.findByRole("status")).toHaveTextContent("3 dotation(s) comptabilisée(s).");
+  expect(button).toBeEnabled();
+});
+
+test("a lost response reloads the server and retries with the same idempotency key", async () => {
+  const keys: string[] = [];
+  let attempt = 0;
+  mockApi(async (url) => {
+    if (url.endsWith("/periods")) return response(openPeriods);
+    return response([]);
+  });
+  const fetchMock = vi.mocked(globalThis.fetch);
+  const original = fetchMock.getMockImplementation();
+  fetchMock.mockImplementation(async (input, init) => {
+    const url = String(input);
+    if (url.endsWith("/post")) {
+      attempt += 1;
+      keys.push(headerValue(init, "Idempotency-Key") ?? "");
+      if (attempt === 1) throw new Error("Réponse perdue");
+      return response({
+        idempotency_key: keys[0],
+        replayed: true,
+        posted_count: 3,
+        failed_count: 0,
+        skipped_count: 0,
+        items: openPeriods.map((row) => ({ period_id: row.id, status: "posted", entry_id: row.id, replayed: true })),
+      });
+    }
+    if (!original) throw new Error("mock missing");
+    return original(input, init);
+  });
+  render(<AssetsPage />);
+  const button = await screen.findByRole("button", { name: "Comptabiliser toutes les dotations" });
+  expect(await screen.findByText("Mobilier")).toBeInTheDocument();
+  fireEvent.click(button);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Réponse perdue");
+  expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/periods")).length).toBeGreaterThan(1);
+  expect(button).toBeEnabled();
+  fireEvent.click(button);
+  expect(await screen.findByRole("status")).toHaveTextContent("déjà comptabilisée");
+  expect(keys).toHaveLength(2);
+  expect(keys[0]).toBeTruthy();
+  expect(keys[1]).toBe(keys[0]);
+});
+
+test("a partial batch error reloads the periods the server actually kept", async () => {
+  let reads = 0;
+  const posted = openPeriods.map((row, index) => (
+    index === 0 ? { ...row, status: "POSTED" } : row
+  ));
+  mockApi(async (url) => {
+    if (url.endsWith("/post")) {
+      return response({
+        idempotency_key: "batch",
+        replayed: false,
+        posted_count: 1,
+        failed_count: 1,
+        skipped_count: 1,
+        items: [
+          { period_id: 2, status: "posted", entry_id: 9, replayed: false },
+          { period_id: 3, status: "error", code: "PERIOD_YEAR_MISMATCH", message: "Cette période n’appartient pas à l’exercice du lot." },
+          { period_id: 4, status: "skipped", code: "BATCH_INTERRUPTED", message: "Non traitée : une dotation précédente du lot a échoué." },
+        ],
+      });
+    }
+    if (url.endsWith("/periods")) {
+      reads += 1;
+      return response(reads === 1 ? openPeriods : posted);
+    }
+    return response([]);
+  });
+  render(<AssetsPage />);
+  expect(await screen.findByText("Mobilier")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Comptabiliser toutes les dotations" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Cette période n’appartient pas à l’exercice du lot.");
+  expect(await screen.findByText("Comptabilisée")).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: "Comptabiliser" })).toHaveLength(2);
+  expect(reads).toBeGreaterThan(1);
+});

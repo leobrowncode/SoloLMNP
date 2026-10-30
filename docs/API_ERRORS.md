@@ -38,3 +38,13 @@ L’assistant d’import (`POST /api/operations/imports/{profil}/preview` et `/c
 Lorsqu’un rafraîchissement échoue et que les données précédentes ne sont pas des montants calculés (états comptables, balance, grand livre, à-nouveaux), elles restent visibles avec la mention « Ces informations peuvent être périmées ». Les totaux et la prévisualisation des à-nouveaux sont retirés. Les cartes de posture (Provisoire, Bloquée, Finale) restent affichées dans ce cas : le serveur refuse toujours un téléchargement bloqué.
 
 Voir `frontend/src/api/errors.ts`, `frontend/src/features/screenState.ts` et `backend/app/core/api_errors.py`.
+
+## Mutations et lots
+
+Chaque action qui écrit (immobilisation, clôture, sauvegarde, restauration, import, comptabilisation) désactive son bouton jusqu’à la réponse et affiche l’étape en cours. Un second clic pendant ce temps est ignoré.
+
+`POST /api/assets/years/{id}/post` comptabilise un lot de dotations. L’en-tête `Idempotency-Key` (8 à 80 caractères) est obligatoire. La réponse est toujours `200` lorsque le lot a été accepté, avec le statut de chaque période : `posted`, `error` ou `skipped`. Les périodes déjà passées avant l’erreur restent comptabilisées ; les suivantes ne sont pas traitées. Une écriture validée n’est pas réécrite : la période est la clé naturelle, un nouvel envoi retrouve la même écriture.
+
+La même clé et le même lot renvoient le résultat enregistré (`replayed: true`), y compris après une réponse perdue. Une clé déjà utilisée pour un autre lot répond `409` `IDEMPOTENCY_CONFLICT`. Après une erreur partielle, l’écran recharge les périodes réellement enregistrées. Un nouvel envoi des périodes encore ouvertes utilise une nouvelle clé.
+
+`IDEMPOTENCY_KEY_REQUIRED`, `PERIOD_NOT_FOUND`, `PERIOD_YEAR_MISMATCH`, `ZERO_DEPRECIATION` et `BATCH_INTERRUPTED` pointent vers le glossaire `dotation`.

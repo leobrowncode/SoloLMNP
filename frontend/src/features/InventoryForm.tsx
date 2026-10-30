@@ -4,6 +4,8 @@ import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import { describedBy, inventoryVerifyCauses } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 
 type InventoryInput = EntryInput & { justification: string; request_id: string };
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
@@ -45,8 +47,7 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
     attempted,
   });
   const verifyCauseId = "inventory-causes";
-  const [busy, setBusy] = useState(false);
-  const pending = useRef(false);
+  const { busy, step, run } = useMutation();
   const [error, setError] = useState(recovery.error);
   const errorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
@@ -93,18 +94,21 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
     }
   }
   async function post() {
-    if (!review || pending.current) return;
-    pending.current = true; setBusy(true); setError("");
-    try {
-      // Persist the exact intention before any network request, including lost responses.
-      sessionStorage.setItem(storageKey, JSON.stringify(review));
-      setAttempted(true);
-      const entry = await request<Entry>("/inventory", "POST", review);
-      setReceipt(entry);
-      clearConfirmedRequest();
-      onPosted();
-    } catch (reason) { setError((reason as Error).message); }
-    finally { pending.current = false; setBusy(false); }
+    if (!review) return;
+    const payload = review;
+    await run(async (report) => {
+      report(attempted ? "Nouvel envoi de la même demande…" : "Comptabilisation de l’inventaire…");
+      setError("");
+      try {
+        // Persist the exact intention before any network request, including lost responses.
+        sessionStorage.setItem(storageKey, JSON.stringify(payload));
+        setAttempted(true);
+        const entry = await request<Entry>("/inventory", "POST", payload);
+        setReceipt(entry);
+        clearConfirmedRequest();
+        onPosted();
+      } catch (reason) { setError((reason as Error).message); }
+    });
   }
   if (receipt) return <section><div className="heading-with-help"><h3>Inventaire comptabilisé</h3><GlossaryTip id="extourne" /></div><p role="status">Écriture {receipt.entry_number} · {receipt.label}. Consultez le journal et son historique pour retrouver la justification ou effectuer une extourne motivée.</p>
     {cleanupError && <><p role="alert">{cleanupError}</p><button type="button" onClick={clearConfirmedRequest}>Effacer la demande locale confirmée</button></>}
@@ -116,6 +120,7 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
       <GlossaryTip id="inventaire" />
     </div>
     <p>Choisissez les comptes et montants après vérification du traitement et du calcul. La confirmation valide définitivement l’écriture. La référence et la justification ne constituent pas un archivage de pièce.</p>
+    <MutationStatus step={step} />
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
     {!review && <fieldset disabled={year.status !== "OPEN" || !!recovery.error}>
       <legend>Saisie justifiée</legend>
@@ -146,7 +151,7 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
         }}>Abandonner après vérification</button></>}
     </>}
     <p aria-live="polite">{totals}</p>
-    <button disabled={busy || verifyCauses.length > 0} aria-describedby={describedBy(verifyCauseId, verifyCauses)}>{busy ? "Comptabilisation…" : review ? attempted ? "Réessayer la même demande" : "Confirmer la comptabilisation" : "Vérifier l’inventaire"}</button>
+    <button disabled={busy || verifyCauses.length > 0} aria-busy={busy || undefined} aria-describedby={describedBy(verifyCauseId, verifyCauses)}>{busy ? "Comptabilisation…" : review ? attempted ? "Réessayer la même demande" : "Confirmer la comptabilisation" : "Vérifier l’inventaire"}</button>
     <PrerequisiteList id={verifyCauseId} causes={verifyCauses} />
   </form>;
 }

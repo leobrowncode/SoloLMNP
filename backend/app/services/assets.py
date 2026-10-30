@@ -5,23 +5,33 @@ import hashlib
 import json
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy import select
+from fastapi import HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.asset_schemas import (
     AssetInput,
     ComponentInput,
+    DepreciationBatchItem,
     DepreciationPostInput,
     PropertyEntryInput,
 )
 from app.api.ledger_schemas import EntryInput, LineInput
+from app.core.api_errors import HELP_IDS
 from app.core.money import from_cents, to_cents
 from app.domain.assets.accounts import (
     AssetAccountError,
     validate_asset_accounts,
     validate_component_accounts,
+)
+from app.domain.assets.posting_batch import (
+    error_item,
+    fingerprint,
+    posted_item,
+    skipped_item,
+    summarize,
 )
 from app.models import (
     Account,
@@ -32,10 +42,13 @@ from app.models import (
     BankAccount,
     DepreciationPeriod,
     DepreciationSchedule,
+    LedgerEvent,
     Loan,
     Property,
 )
-from app.services.ledger import create_draft, fail, get_year, money, post_entry
+from app.services.ledger import create_draft, event, fail, get_year, money, post_entry
+
+_BATCH_ACTION = "DEPRECIATION_BATCH"
 
 
 def add_months(value: date, months: int) -> date:
@@ -329,6 +342,119 @@ def post_period(session: Session, period_id: int, data: DepreciationPostInput) -
     period.status = "POSTED"
     session.flush()
     return entry
+
+
+def _annotate(item: dict[str, Any]) -> dict[str, Any]:
+    code = item.get("code")
+    if isinstance(code, str) and "help" not in item:
+        help_id = HELP_IDS.get(code)
+        if help_id:
+            return {**item, "help": help_id}
+    return item
+
+
+def _stored_batch(session: Session, key: str) -> tuple[str, dict[str, Any]] | None:
+    row = session.scalar(
+        select(LedgerEvent)
+        .where(
+            LedgerEvent.action == _BATCH_ACTION,
+            func.json_extract(LedgerEvent.details, "$.idempotency_key") == key,
+        )
+        .order_by(LedgerEvent.id.desc())
+    )
+    if row is None:
+        return None
+    stored_fingerprint = row.details.get("fingerprint")
+    stored_result = row.details.get("result")
+    if not isinstance(stored_fingerprint, str) or not isinstance(stored_result, dict):
+        fail("IDEMPOTENCY_RECORD_INVALID", "Le lot enregistré est illisible.", 500)
+    return stored_fingerprint, cast(dict[str, Any], stored_result)
+
+
+def _post_one(session: Session, year_id: int, item: DepreciationBatchItem) -> dict[str, Any]:
+    period = session.get(DepreciationPeriod, item.period_id)
+    if period is None:
+        return error_item(
+            item.period_id, "PERIOD_NOT_FOUND", "Période d’amortissement introuvable."
+        )
+    if period.fiscal_year_id != year_id:
+        return error_item(
+            item.period_id,
+            "PERIOD_YEAR_MISMATCH",
+            "Cette période n’appartient pas à l’exercice du lot.",
+        )
+    already = period.status == "POSTED"
+    payload = DepreciationPostInput(
+        request_id=item.request_id,
+        piece_reference=item.piece_reference,
+    )
+    try:
+        with session.begin_nested():
+            entry = post_period(session, item.period_id, payload)
+            posted = posted_item(item.period_id, entry.id, replayed=already)
+    except HTTPException as exc:
+        session.expire_all()
+        raw = exc.detail
+        detail: dict[str, Any] = raw if isinstance(raw, dict) else {}
+        code = detail.get("code")
+        message = detail.get("message")
+        return error_item(
+            item.period_id,
+            code if isinstance(code, str) else "POSTING_REJECTED",
+            message if isinstance(message, str) else "Comptabilisation refusée.",
+        )
+    return posted
+
+
+def post_period_batch(
+    session: Session,
+    year_id: int,
+    idempotency_key: str,
+    items: list[DepreciationBatchItem],
+) -> dict[str, Any]:
+    """Post each period. Stop at the first refusal and keep what already posted.
+
+    The same Idempotency-Key with the same lot returns the stored result.
+    A validated entry is never rewritten: an already posted period is replayed.
+    """
+    digest = fingerprint(
+        [(item.period_id, item.request_id, item.piece_reference) for item in items]
+    )
+    stored = _stored_batch(session, idempotency_key)
+    if stored is not None:
+        stored_fingerprint, stored_result = stored
+        if stored_fingerprint != digest:
+            fail(
+                "IDEMPOTENCY_CONFLICT",
+                "Cette clé d’idempotence a déjà servi pour un autre lot de dotations.",
+                409,
+            )
+        return {**stored_result, "replayed": True}
+
+    get_year(session, year_id, writable=True)
+    results: list[dict[str, Any]] = []
+    stopped = False
+    for item in items:
+        if stopped:
+            results.append(skipped_item(item.period_id))
+            continue
+        outcome = _post_one(session, year_id, item)
+        results.append(outcome)
+        if outcome["status"] == "error":
+            stopped = True
+    payload = summarize(idempotency_key, [_annotate(item) for item in results], replayed=False)
+    event(
+        session,
+        _BATCH_ACTION,
+        None,
+        {
+            "idempotency_key": idempotency_key,
+            "fingerprint": digest,
+            "year_id": year_id,
+            "result": payload,
+        },
+    )
+    return payload
 
 
 def gross_pieces(session: Session, asset: Asset) -> list[tuple[str, int, date, str]]:

@@ -3,6 +3,8 @@ import { amount, cents, RequestError } from "../api/ledger";
 import { formFieldName, issuesForForm, type ApiErrorIssue } from "../api/errors";
 import ApiErrorAlert from "./ApiErrorAlert";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 
 export interface Field {
   name: string;
@@ -44,6 +46,7 @@ export default function ReviewForm({
   help,
   sumInto,
   derive,
+  locked = false,
 }: {
   title: string;
   fields: Field[];
@@ -55,12 +58,14 @@ export default function ReviewForm({
   sumInto?: { target: string; sources: string[] } | undefined;
   /** Derive dependent fields after a user change. piece_reference is only applied if empty or still auto. */
   derive?: ((draft: Record<string, string>, changed: string) => Partial<Record<string, string>>) | undefined;
+  /** Page-level lock: another mutation is already running. */
+  locked?: boolean;
 }) {
   const [review, setReview] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [businessError, setBusinessError] = useState<RequestError | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, step, run } = useMutation();
   const [draft, setDraft] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((field) => [
       field.name,
@@ -200,14 +205,19 @@ export default function ReviewForm({
           }
           return;
         }
-        setBusy(true);
-        void onSave(review)
-          .catch(applyRequestFailure)
-          .finally(() => setBusy(false));
+        void run(async (report) => {
+          report("Enregistrement…");
+          try {
+            await onSave(review);
+          } catch (reason) {
+            applyRequestFailure(reason);
+          }
+        });
       }}
     >
       <h3>{title}</h3>
       {help && <p className="form-help">{help}</p>}
+      <MutationStatus step={step} />
       {error && <p role="alert" className="ledger-error">{error}</p>}
       {businessError && <ApiErrorAlert detail={businessError.detail} />}
 
@@ -310,15 +320,15 @@ export default function ReviewForm({
               </div>
             )}
           </dl>
-          <button type="button" disabled={busy} onClick={() => setReview(null)}>Corriger la saisie</button>
+          <button type="button" disabled={busy || locked} onClick={() => setReview(null)}>Corriger la saisie</button>
         </div>
       )}
 
       <div className="form-actions">
-        <button disabled={busy} type="submit">
+        <button disabled={busy || locked} aria-busy={busy || undefined} type="submit">
           {busy ? "Enregistrement…" : review ? "Confirmer l’enregistrement" : "Vérifier avant enregistrement"}
         </button>
-        <button type="button" disabled={busy} onClick={onCancel}>Annuler</button>
+        <button type="button" disabled={busy || locked} onClick={onCancel}>Annuler</button>
       </div>
     </form>
   );

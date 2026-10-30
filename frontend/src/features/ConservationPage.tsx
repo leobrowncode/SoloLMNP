@@ -10,6 +10,8 @@ import EntryPicker from "./EntryPicker";
 import GlossaryTip from "./GlossaryTip";
 import PrerequisiteList from "./PrerequisiteList";
 import ScreenStatus from "./ScreenStatus";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 import {
   beginLoad, defer, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
 } from "./screenState";
@@ -44,7 +46,7 @@ export default function ConservationPage() {
   const [error, setError] = useState("");
   const [apiError, setApiError] = useState<RequestError | null>(null);
   const [receipt, setReceipt] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { busy, step, run } = useMutation();
   const retryAction = useRef<(() => Promise<void>) | null>(null);
   const documents = showsData(documentsView) ? documentsView.data : null;
   const backups = showsData(backupsView) ? backupsView.data : null;
@@ -118,123 +120,131 @@ export default function ConservationPage() {
   }, [selectedBackup, previewAttempt]);
 
   async function upload() {
-    clearFeedback();
-    const file = fileRef.current?.files?.[0];
-    if (!file || !TYPES[file.type]) {
-      setError("Choisissez un PDF, un JPEG ou un PNG.");
-      return;
-    }
-    const content = await file.arrayBuffer();
-    const bytes = new Uint8Array(content);
-    let binary = "";
-    bytes.forEach((value) => { binary += String.fromCharCode(value); });
-    try {
-      const saved = await request<{ sha256: string; original_name: string }>(
-        "/documents",
-        "POST",
-        {
-          filename: file.name,
-          media_type: TYPES[file.type],
-          content_base64: btoa(binary),
-          ...(choice ? {
-            entry_number: choice.entry_number,
-            accounting_date: choice.accounting_date,
-            piece_reference: choice.piece_reference,
-          } : {}),
-        },
-        "/api/filing",
-      );
-      setReceipt(`Justificatif ${saved.original_name} enregistré. Empreinte ${saved.sha256}.`);
-      reload();
-    } catch (reason) {
-      retryAction.current = upload;
-      setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
-    }
+    await run(async (report) => {
+      clearFeedback();
+      const file = fileRef.current?.files?.[0];
+      if (!file || !TYPES[file.type]) {
+        setError("Choisissez un PDF, un JPEG ou un PNG.");
+        return;
+      }
+      report("Dépôt du justificatif…");
+      const content = await file.arrayBuffer();
+      const bytes = new Uint8Array(content);
+      let binary = "";
+      bytes.forEach((value) => { binary += String.fromCharCode(value); });
+      try {
+        const saved = await request<{ sha256: string; original_name: string }>(
+          "/documents",
+          "POST",
+          {
+            filename: file.name,
+            media_type: TYPES[file.type],
+            content_base64: btoa(binary),
+            ...(choice ? {
+              entry_number: choice.entry_number,
+              accounting_date: choice.accounting_date,
+              piece_reference: choice.piece_reference,
+            } : {}),
+          },
+          "/api/filing",
+        );
+        setReceipt(`Justificatif ${saved.original_name} enregistré. Empreinte ${saved.sha256}.`);
+        reload();
+      } catch (reason) {
+        retryAction.current = upload;
+        setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
+      }
+    });
   }
 
   async function link(documentId: number) {
     if (!choice) return;
-    clearFeedback();
-    setBusy(true);
-    try {
-      const saved = await request<SupportingDocumentRow>(
-        `/documents/${documentId}/link`,
-        "POST",
-        {
-          entry_number: choice.entry_number,
-          accounting_date: choice.accounting_date,
-          piece_reference: choice.piece_reference,
-        },
-        "/api/filing",
-      );
-      setReceipt(`Justificatif ${saved.original_name} lié à ${entryLabel(saved.entry)}.`);
-      reload();
-    } catch (reason) {
-      retryAction.current = () => link(documentId);
-      setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
-    } finally {
-      setBusy(false);
-    }
+    const selected = choice;
+    await run(async (report) => {
+      clearFeedback();
+      report("Liaison du justificatif…");
+      try {
+        const saved = await request<SupportingDocumentRow>(
+          `/documents/${documentId}/link`,
+          "POST",
+          {
+            entry_number: selected.entry_number,
+            accounting_date: selected.accounting_date,
+            piece_reference: selected.piece_reference,
+          },
+          "/api/filing",
+        );
+        setReceipt(`Justificatif ${saved.original_name} lié à ${entryLabel(saved.entry)}.`);
+        reload();
+      } catch (reason) {
+        retryAction.current = () => link(documentId);
+        setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
+      }
+    });
   }
 
   async function backup() {
-    clearFeedback();
-    try {
-      const saved = await request<{ filename: string; sha256: string }>("/backup", "POST", {}, "/api/filing");
-      setReceipt(`Sauvegarde ${saved.filename}. Empreinte ${saved.sha256}.`);
-      setSelectedBackup(saved.filename);
-      reload();
-    } catch (reason) {
-      retryAction.current = backup;
-      setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
-    }
+    await run(async (report) => {
+      clearFeedback();
+      report("Création de la sauvegarde…");
+      try {
+        const saved = await request<{ filename: string; sha256: string }>("/backup", "POST", {}, "/api/filing");
+        setReceipt(`Sauvegarde ${saved.filename}. Empreinte ${saved.sha256}.`);
+        setSelectedBackup(saved.filename);
+        reload();
+      } catch (reason) {
+        retryAction.current = backup;
+        setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
+      }
+    });
   }
 
   async function verify(filename: string) {
-    clearFeedback();
-    setBusy(true);
-    try {
-      const saved = await request<BackupRow>("/backups/verify", "POST", { filename }, "/api/filing");
-      setReceipt(`Contrôle de ${saved.filename} : ${integrityLabel(saved.integrity)}`);
-      reload();
-    } catch (reason) {
-      retryAction.current = () => verify(filename);
-      setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
-      reload();
-    } finally {
-      setBusy(false);
-    }
+    await run(async (report) => {
+      clearFeedback();
+      report("Contrôle de la sauvegarde…");
+      try {
+        const saved = await request<BackupRow>("/backups/verify", "POST", { filename }, "/api/filing");
+        setReceipt(`Contrôle de ${saved.filename} : ${integrityLabel(saved.integrity)}`);
+        reload();
+      } catch (reason) {
+        retryAction.current = () => verify(filename);
+        setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
+        reload();
+      }
+    });
   }
 
   async function restore() {
     if (restoreBlocked.length > 0 || !selectedBackup) return;
-    clearFeedback();
-    setBusy(true);
-    try {
-      const saved = await request<{
-        restored_from: string;
-        pre_restore_backup: string;
-        entries: number;
-        years: number;
-      }>(
-        "/backup/restore",
-        "POST",
-        { filename: selectedBackup, confirmation: "RESTAURER" },
-        "/api/filing",
-      );
-      setReceipt(
-        `Base restaurée depuis ${saved.restored_from} (${saved.entries} écritures, ${saved.years} exercices). `
-        + `Copie préalable : ${saved.pre_restore_backup}.`,
-      );
-      setConfirmation("");
-      setSelectedBackup("");
-      reload();
-    } catch (reason) {
-      retryAction.current = restore;
-      setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
-    } finally {
-      setBusy(false);
-    }
+    const filename = selectedBackup;
+    await run(async (report) => {
+      clearFeedback();
+      report("Restauration de la sauvegarde…");
+      try {
+        const saved = await request<{
+          restored_from: string;
+          pre_restore_backup: string;
+          entries: number;
+          years: number;
+        }>(
+          "/backup/restore",
+          "POST",
+          { filename, confirmation: "RESTAURER" },
+          "/api/filing",
+        );
+        setReceipt(
+          `Base restaurée depuis ${saved.restored_from} (${saved.entries} écritures, ${saved.years} exercices). `
+          + `Copie préalable : ${saved.pre_restore_backup}.`,
+        );
+        setConfirmation("");
+        setSelectedBackup("");
+        reload();
+      } catch (reason) {
+        retryAction.current = restore;
+        setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
+      }
+    });
   }
 
   const shownPreview = showsData(preview) ? preview.data : null;
@@ -258,6 +268,7 @@ export default function ConservationPage() {
         RESTAURER, et enregistre d’abord une copie de l’état actuel. Une écriture validée ne se modifie pas :
         seule la base entière est reprise.
       </p>
+      <MutationStatus step={step} />
       {error && <p role="alert">{error}</p>}
       {apiError && (
         <ApiErrorAlert
@@ -302,6 +313,7 @@ export default function ConservationPage() {
                     <button
                       type="button"
                       disabled={busy || linkBlocked.length > 0}
+                      aria-busy={busy || undefined}
                       aria-describedby={describedBy("link-causes", linkBlocked)}
                       onClick={() => { void link(document.id); }}
                     >
@@ -321,14 +333,14 @@ export default function ConservationPage() {
       <form onSubmit={(event) => { event.preventDefault(); void upload(); }}>
         <label>
           Justificatif PDF, JPEG ou PNG
-          <input ref={fileRef} type="file" accept="application/pdf,image/jpeg,image/png" />
+          <input ref={fileRef} type="file" accept="application/pdf,image/jpeg,image/png" disabled={busy} />
         </label>
-        <button type="submit">Déposer le justificatif</button>
+        <button type="submit" disabled={busy} aria-busy={busy || undefined}>Déposer le justificatif</button>
       </form>
 
       <h3 id="sauvegardes">Sauvegardes</h3>
       <div className="toolbar">
-        <button type="button" onClick={() => { void backup(); }}>Créer une sauvegarde</button>
+        <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void backup(); }}>Créer une sauvegarde</button>
       </div>
       <ScreenStatus
         state={backupsView}
@@ -380,6 +392,7 @@ export default function ConservationPage() {
                       <button
                         type="button"
                         disabled={busy}
+                        aria-busy={busy || undefined}
                         onClick={() => { void verify(archive.filename); }}
                       >
                         Contrôler la sauvegarde du {when}
@@ -429,6 +442,7 @@ export default function ConservationPage() {
         <button
           type="button"
           disabled={busy || restoreBlocked.length > 0}
+          aria-busy={busy || undefined}
           aria-describedby={describedBy("restore-causes", restoreBlocked)}
           onClick={() => { void restore(); }}
         >

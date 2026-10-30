@@ -2,7 +2,7 @@
 
 ## Source de vérité
 
-Une opération métier produit une commande idempotente, puis une `AccountingEntry` persistée. La validation est transactionnelle et refuse déséquilibre, compte inactif, date hors exercice ou exercice verrouillé. Après validation, correction par extourne et nouvelle écriture ; aucune modification silencieuse.
+Une opération métier produit une commande idempotente, puis une `AccountingEntry` persistée. La validation est transactionnelle et refuse déséquilibre, compte inactif, date hors exercice ou exercice verrouillé. Après validation, correction par extourne et nouvelle écriture ; aucune modification silencieuse. Un lot de dotations (`POST /api/assets/years/{id}/post`, en-tête `Idempotency-Key`) s’arrête à la première période refusée et décrit chaque élément. Les écritures déjà validées dans ce lot restent. La même clé ne les poste pas une seconde fois.
 
 ## Plan initial configurable
 

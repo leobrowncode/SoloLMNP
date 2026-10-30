@@ -4,6 +4,8 @@ import { closeConfirmCauses, closePrepareCauses, describedBy, precheckAction } f
 import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
 import ReopenYear from "./ReopenYear";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 
 interface Notice {
   code: string;
@@ -42,6 +44,7 @@ export default function CloseYear({
   const [closed, setClosed] = useState(false);
   const [seenStatus, setSeenStatus] = useState(yearStatus);
   const errorRef = useRef<HTMLParagraphElement>(null);
+  const { busy, step, run } = useMutation();
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   // Reopen (#33) reports OPEN through the shared exercise status. Drop the
   // ceremony of the previous close so this screen can start again.
@@ -72,59 +75,68 @@ export default function CloseYear({
   const confirmCauseId = "close-confirm-causes";
 
   async function load() {
-    setError("");
-    try {
-      const next = await request<Check>(`/years/${year}/precheck`, "GET", undefined, "/api/filing");
-      setCheck(next);
-      setAcks([]);
-      setPrepared(false);
-      setClosed(next.year_status === "CLOSED");
-      setReceipt("");
-    } catch (reason) {
-      setError((reason as Error).message);
-    }
+    await run(async (report) => {
+      report("Pré-contrôle de l’exercice…");
+      setError("");
+      try {
+        const next = await request<Check>(`/years/${year}/precheck`, "GET", undefined, "/api/filing");
+        setCheck(next);
+        setAcks([]);
+        setPrepared(false);
+        setClosed(next.year_status === "CLOSED");
+        setReceipt("");
+      } catch (reason) {
+        setError((reason as Error).message);
+      }
+    });
   }
 
   async function ready() {
     if (!canPrepare) return;
-    setError("");
-    setReceipt("");
-    try {
-      const next = await request<Check>(
-        `/years/${year}/ready`, "POST", { acknowledged: acks }, "/api/filing",
-      );
-      const kept = acks.filter((code) => next.warnings.some((item) => item.code === code));
-      const accepted = !next.blocking
-        && next.year_status !== "CLOSED"
-        && acknowledgedExactly(next.warnings, kept);
-      setCheck(next);
-      setAcks(kept);
-      setPrepared(accepted);
-      setClosed(next.year_status === "CLOSED");
-      if (!accepted) {
-        setError("Le pré-contrôle a changé. Accusez les avertissements affichés.");
+    await run(async (report) => {
+      report("Préparation de la clôture…");
+      setError("");
+      setReceipt("");
+      try {
+        const next = await request<Check>(
+          `/years/${year}/ready`, "POST", { acknowledged: acks }, "/api/filing",
+        );
+        const kept = acks.filter((code) => next.warnings.some((item) => item.code === code));
+        const accepted = !next.blocking
+          && next.year_status !== "CLOSED"
+          && acknowledgedExactly(next.warnings, kept);
+        setCheck(next);
+        setAcks(kept);
+        setPrepared(accepted);
+        setClosed(next.year_status === "CLOSED");
+        if (!accepted) {
+          setError("Le pré-contrôle a changé. Accusez les avertissements affichés.");
+          onExerciseTransition?.();
+          return;
+        }
+        setReceipt("Exercice marqué prêt à clôturer. La confirmation suivante fige les écritures.");
         onExerciseTransition?.();
-        return;
+      } catch (reason) {
+        setError((reason as Error).message);
       }
-      setReceipt("Exercice marqué prêt à clôturer. La confirmation suivante fige les écritures.");
-      onExerciseTransition?.();
-    } catch (reason) {
-      setError((reason as Error).message);
-    }
+    });
   }
 
   async function closeYear() {
     if (!prepared || sealed || check?.blocking) return;
-    setError("");
-    setReceipt("");
-    try {
-      await request(`/years/${year}/close`, "POST", { confirmation: "CLOTURER" }, "/api/filing");
-      setClosed(true);
-      setReceipt("Exercice clôturé. Les exports déjà figés restent consultables.");
-      onExerciseTransition?.();
-    } catch (reason) {
-      setError((reason as Error).message);
-    }
+    await run(async (report) => {
+      report("Clôture de l’exercice…");
+      setError("");
+      setReceipt("");
+      try {
+        await request(`/years/${year}/close`, "POST", { confirmation: "CLOTURER" }, "/api/filing");
+        setClosed(true);
+        setReceipt("Exercice clôturé. Les exports déjà figés restent consultables.");
+        onExerciseTransition?.();
+      } catch (reason) {
+        setError((reason as Error).message);
+      }
+    });
   }
 
   function toggle(code: string, checked: boolean) {
@@ -142,7 +154,8 @@ export default function CloseYear({
       <GlossaryTip id="cloture" />
     </div>
     <p>Le pré-contrôle vient après le calcul fiscal. Il bloque sur une erreur. Chaque avertissement affiché doit être accusé ; un nouveau pré-contrôle efface les cases précédentes. La réouverture ultérieure exige un motif et invalide les exports.</p>
-    <button type="button" onClick={() => { void load(); }}>Lancer le pré-contrôle</button>
+    <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void load(); }}>Lancer le pré-contrôle</button>
+    <MutationStatus step={step} />
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
     {receipt && <p role="status">{receipt}</p>}
     {check && <div>
@@ -157,15 +170,16 @@ export default function CloseYear({
         const action = precheckAction(item.code);
         return <p key={`${item.code}-${item.message}`} role="alert">{item.message} <a href={action.href}>{action.label}</a></p>;
       })}
-      {check.warnings.map((item) => <label key={item.code}><input type="checkbox" checked={acks.includes(item.code)} onChange={(event) => toggle(item.code, event.target.checked)} />{item.message}</label>)}
-      <button id="close-prepare" type="button" disabled={!canPrepare} aria-describedby={describedBy(prepareCauseId, prepareCauses)} onClick={() => { void ready(); }}>Accuser et préparer la clôture</button>
+      {check.warnings.map((item) => <label key={item.code}><input type="checkbox" disabled={busy} checked={acks.includes(item.code)} onChange={(event) => toggle(item.code, event.target.checked)} />{item.message}</label>)}
+      <button id="close-prepare" type="button" disabled={!canPrepare || busy} aria-busy={busy || undefined} aria-describedby={describedBy(prepareCauseId, prepareCauses)} onClick={() => { void ready(); }}>Accuser et préparer la clôture</button>
       <PrerequisiteList id={prepareCauseId} causes={prepareCauses} />
-      <button type="button" disabled={!prepared || Boolean(check.blocking) || sealed} aria-describedby={describedBy(confirmCauseId, confirmCauses)} onClick={() => { void closeYear(); }}>Confirmer la clôture</button>
+      <button type="button" disabled={!prepared || Boolean(check.blocking) || sealed || busy} aria-busy={busy || undefined} aria-describedby={describedBy(confirmCauseId, confirmCauses)} onClick={() => { void closeYear(); }}>Confirmer la clôture</button>
       <PrerequisiteList id={confirmCauseId} causes={confirmCauses} />
     </div>}
     {sealed && (
       <ReopenYear
         year={year}
+        locked={busy}
         {...(onExerciseTransition ? { onExerciseTransition } : {})}
       />
     )}

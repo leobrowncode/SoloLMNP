@@ -66,7 +66,19 @@ Crédit 28xxxx  Amortissements cumulés de l'actif
 
 L'écriture est équilibrée, validée et rattachée à la période. Un trigger vérifie
 exercice, date, montant, source et comptes avant d'autoriser le passage de la
-période à `POSTED`.
+période à `POSTED`. Une période déjà `POSTED` renvoie cette écriture : le
+montant et la pièce validés ne changent pas.
+
+## Comptabilisation en lot
+
+`POST /api/assets/years/{id}/post` envoie plusieurs périodes dans une requête.
+L’en-tête `Idempotency-Key` identifie le lot. Chaque période est traitée dans
+sa propre sauvegarde de transaction : un refus au milieu laisse les dotations
+précédentes validées, marque l’élément en erreur et ne traite pas la suite.
+Le corps décrit chaque élément (`posted`, `error`, `skipped`). Réessayer la
+même clé renvoie ce résultat sans créer d’écriture. L’interface désactive le
+bouton pendant l’envoi, affiche l’étape, et recharge les périodes après succès
+comme après erreur partielle.
 
 ## Limites explicites
 

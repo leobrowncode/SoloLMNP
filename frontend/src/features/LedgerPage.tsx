@@ -17,6 +17,8 @@ import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import "./ledger.css";
 import InventoryForm from "./InventoryForm";
 import GlossaryTip from "./GlossaryTip";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
 export default function LedgerPage() {
@@ -44,7 +46,7 @@ export default function LedgerPage() {
   const [catalog, setCatalog] = useState<ScreenView<{ ready: true }>>(() => beginLoad(idleView(), false));
   const [listView, setListView] = useState<ScreenView<{ queryKey: string }>>(idleView());
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { busy, step, run } = useMutation();
   const [revision, setRevision] = useState(0);
   const queryKey = JSON.stringify([year, tab, filter, offset, account]);
   const financialView = tab === "Balance" || tab === "Grand livre";
@@ -128,10 +130,12 @@ export default function LedgerPage() {
   }, [year, tab, filter, offset, account, revision, queryKey, financialView]);
 
   async function mutate(action: () => Promise<unknown>, success: string) {
-    setBusy(true); setActionError(""); setMessage("");
-    try { await action(); setMessage(success); setRevision((v) => v + 1); }
-    catch (e) { setActionError(e instanceof Error ? e.message : "Service indisponible."); }
-    finally { setBusy(false); }
+    await run(async (report) => {
+      report("Enregistrement comptable…");
+      setActionError(""); setMessage("");
+      try { await action(); setMessage(success); setRevision((v) => v + 1); }
+      catch (e) { setActionError(e instanceof Error ? e.message : "Service indisponible."); }
+    });
   }
   function formData(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); return new FormData(event.currentTarget);
@@ -170,6 +174,7 @@ export default function LedgerPage() {
       <GlossaryTip id="grand-livre" />
     </div>
     <p>Seules les écritures validées alimentent le journal, le grand livre et la balance. Leur validation est définitive.</p>
+    <MutationStatus step={step} />
     {actionError && <p role="alert" className="ledger-error">{actionError}</p>}
     {message && <p role="status">{message}</p>}
     <ScreenStatus
