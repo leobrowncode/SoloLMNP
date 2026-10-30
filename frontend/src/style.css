@@ -553,6 +553,23 @@ footer{
   color:var(--text-muted);
   margin-top:37px
 }
+.empty-state{
+  display:grid;
+  gap:.45rem;
+  justify-items:start;
+  margin:1rem 0;
+  padding:1rem 1.1rem;
+  border:1px dashed var(--border-hairline);
+  border-radius:12px;
+  background:var(--bg-notice)
+}
+.empty-state p{margin:0}
+.empty-state-title{font-weight:650;color:var(--text-strong)}
+.list-group-title{
+  margin:1rem 0 .25rem;
+  font-weight:650;
+  color:var(--text-strong)
+}
 .notice{
   padding:20px;
   border-radius:7px;

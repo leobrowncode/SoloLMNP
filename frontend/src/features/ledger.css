@@ -443,6 +443,10 @@
   margin: 1rem 0;
 }
 .chart-accounts { list-style: none; padding: 0; margin: 1rem 0; }
+.chart-accounts > li.chart-group-label {
+  display: block;
+  grid-template-columns: none;
+}
 .chart-accounts > li {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(8rem, .7fr) minmax(8rem, .7fr) auto;

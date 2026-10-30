@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { Fragment, useState, type FormEvent } from "react";
 import type { Account } from "../api/ledger";
 import {
   ACCOUNT_NATURES,
@@ -8,8 +8,11 @@ import {
   accountUsageLabel,
   isAccountType,
   matchesChartFilters,
+  type AccountType,
   type UsageFilter,
 } from "./accountNature";
+import { EmptyState, NoResults } from "./EmptyState";
+import { matchesText } from "./listQuery";
 import GlossaryTip from "./GlossaryTip";
 import { SaveNoticeHost } from "./LocalFeedback";
 import type { SaveNotice } from "./localFeedback";
@@ -34,8 +37,22 @@ export default function ChartOfAccounts({
 }) {
   const [nature, setNature] = useState("");
   const [usage, setUsage] = useState<UsageFilter>("");
+  const [search, setSearch] = useState("");
   const mobile = useMediaQuery(MOBILE_QUERY);
-  const visible = accounts.filter((account) => matchesChartFilters(account, nature, usage));
+  const narrowed = Boolean(nature || usage || search.trim());
+  const visible = sortChart(accounts.filter((account) => (
+    matchesChartFilters(account, nature, usage)
+    && matchesText(
+      `${account.number} ${account.label} ${accountNatureLabel(account.account_type)} ${accountUsageLabel(account.active)}`,
+      search,
+    )
+  )));
+
+  function resetFilters() {
+    setNature("");
+    setUsage("");
+    setSearch("");
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,6 +89,15 @@ export default function ChartOfAccounts({
         <SaveNoticeHost place="ajouter-compte" notice={notice} onDismiss={onDismiss} />
       </FrenchForm>
       <div className="chart-filters">
+        <label>
+          Rechercher un compte
+          <input
+            type="search"
+            value={search}
+            autoComplete="off"
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
         <div>
           <label htmlFor="chart-nature-filter">Filtrer par nature</label>
           <FitSelect id="chart-nature-filter" value={nature} onChange={(event) => setNature(event.target.value)}>
@@ -95,18 +121,34 @@ export default function ChartOfAccounts({
           </FitSelect>
         </div>
       </div>
-      {visible.length === 0
-        ? <p>Aucun compte pour cette nature ou cette utilisation.</p>
-        : (
+      {accounts.length === 0 ? (
+        <EmptyState
+          title="Aucun compte dans le plan."
+          reason="Ajoutez un compte pour pouvoir le mouvementer dans une écriture. La nature (Actif, Dette, Capitaux, Charge, Produit) reste distincte de l’utilisation."
+          action={{ label: "Renseigner le formulaire", href: "#ajouter-compte" }}
+        />
+      ) : visible.length === 0 ? (
+        <NoResults
+          reason={search.trim() && !nature && !usage
+            ? "Aucun compte ne correspond à cette recherche."
+            : "Aucun compte pour cette nature ou cette utilisation."}
+          onReset={resetFilters}
+        />
+      ) : (
+        <>
+          {narrowed && <button type="button" onClick={resetFilters}>Réinitialiser les filtres</button>}
           <>
           {mobile && <p className="mobile-table-priority">Colonnes principales : numéro, libellé, nature et utilisation.</p>}
           <ul className="chart-accounts" aria-label="Plan comptable" {...(mobile ? { "data-mobile-variant": "cards" } : {})}>
-            {visible.map((account) => {
+            {visible.map((account, index) => {
               const natureLabel = accountNatureLabel(account.account_type);
               const usageLabel = accountUsageLabel(account.active);
+              const previous = index > 0 ? visible[index - 1] : undefined;
+              const showGroup = nature === "" && previous?.account_type !== account.account_type;
               return (
+              <Fragment key={account.number}>
+              {showGroup ? <li className="chart-group-label"><p className="list-group-title">{natureLabel}</p></li> : null}
               <li
-                key={account.number}
                 id={`compte-${account.number}`}
                 aria-label={`${account.number} ${account.label} ${natureLabel} ${usageLabel}`}
               >
@@ -128,11 +170,23 @@ export default function ChartOfAccounts({
                 </button>
                 <SaveNoticeHost place={`compte-${account.number}`} notice={notice} onDismiss={onDismiss} />
               </li>
+              </Fragment>
               );
             })}
           </ul>
           </>
-        )}
+        </>
+      )}
     </>
   );
+}
+
+function sortChart(rows: Account[]): Account[] {
+  const rank = (type: string) => {
+    const index = ACCOUNT_TYPES.indexOf(type as AccountType);
+    return index === -1 ? ACCOUNT_TYPES.length : index;
+  };
+  return [...rows].sort((left, right) => (
+    rank(left.account_type) - rank(right.account_type) || left.number.localeCompare(right.number, "fr")
+  ));
 }

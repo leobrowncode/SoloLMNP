@@ -65,6 +65,39 @@ describe("ledger", () => {
     expect(await screen.findByText("Balance équilibrée")).toBeInTheDocument();
     expect(screen.getByRole("table")).toHaveTextContent("123,45");
   });
+  it("searches journal entries and resets a miss without showing the empty journal", async () => {
+    const posted = {
+      id: 3, version: 1, fiscal_year_id: 1, journal_code: "OD", accounting_date: "2025-02-01",
+      piece_date: "2025-02-01", piece_reference: "LOY-1", label: "Loyer février", status: "VALIDATED",
+      entry_number: "2025-000003", total_debit: "10.00", total_credit: "10.00", balanced: true,
+      reversal_of_id: null, source_type: "REVENUE",
+      lines: [{ id: 1, position: 1, account_number: "512000", account_label: "Banque", label: "Encaissement", debit: "10.00", credit: "0.00" }],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const path = String(url);
+      if (path.endsWith("/setup")) {
+        return new Response(JSON.stringify({
+          activity: { activity_name: "Fictif" },
+          years: [{ id: 1, year: 2025, start_date: "2025-01-01", end_date: "2025-12-31", status: "OPEN" }],
+        }), { status: 200 });
+      }
+      if (path.endsWith("/accounts")) return new Response(JSON.stringify(accounts), { status: 200 });
+      if (path.endsWith("/journals")) return new Response(JSON.stringify([{ code: "OD", label: "Opérations", active: true }]), { status: 200 });
+      if (path.includes("/entries?")) return new Response(JSON.stringify({ entries: [posted], count: 1 }), { status: 200 });
+      return new Response("{}", { status: 200 });
+    }));
+    const user = userEvent.setup();
+    renderLedger("Journal");
+    expect(await screen.findByRole("heading", { name: /Loyer février/ })).toBeInTheDocument();
+    expect(screen.queryByText("Aucune écriture pour cette vue.")).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("Rechercher une écriture"), "zzzz");
+    expect(screen.getByText("Aucun résultat")).toBeInTheDocument();
+    expect(screen.queryByText("Aucune écriture pour cette vue.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Loyer février/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Réinitialiser les filtres" }));
+    expect(screen.getByRole("heading", { name: /Loyer février/ })).toBeInTheDocument();
+  });
+
   it("filters generated and business entries with readable source choices", async () => {
     const fetcher = mockApi(); renderLedger("Journal");
     const source = await screen.findByRole("combobox", { name: "Source" });

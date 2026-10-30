@@ -17,8 +17,11 @@ import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import { DATE_HINT, enumChoices, enumLabel, formatAmount, formatCents, formatIsoDate } from "../lib/format";
 import FrenchForm from "../lib/FrenchForm";
 import "./ledger.css";
+import { BrowsableList } from "./BrowsableList";
 import ChartOfAccounts from "./ChartOfAccounts";
+import { EmptyState, NoResults } from "./EmptyState";
 import InventoryForm from "./InventoryForm";
+import { matchesText } from "./listQuery";
 import GlossaryTip from "./GlossaryTip";
 import { GLOSSARY } from "./glossary";
 import { SaveNoticeHost } from "./LocalFeedback";
@@ -30,6 +33,18 @@ import { MobileSection, PageAnchors } from "../lib/PageSection";
 import { ResponsiveTable } from "../lib/ResponsiveTable";
 
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
+
+function entryHaystack(entry: Entry): string {
+  return [
+    entry.entry_number,
+    entry.label,
+    entry.piece_reference,
+    entry.journal_code,
+    enumLabel("entryStatus", entry.status),
+    entry.source_type ? enumLabel("entrySource", entry.source_type) : "",
+    ...entry.lines.flatMap((line) => [line.account_number, line.account_label, line.label]),
+  ].filter((part) => part).join(" ");
+}
 export default function LedgerPage() {
   const { hash } = useLocation();
   const { tab: tabSlug } = useParams();
@@ -47,6 +62,7 @@ export default function LedgerPage() {
   const [ledger, setLedger] = useState<LedgerLine[]>([]);
   const [account, setAccount] = useState("512000");
   const [filter, setFilter] = useState({ journal_code: "", account_number: "", date_from: "", date_to: "", piece: "", source: "" });
+  const [entrySearch, setEntrySearch] = useState("");
   const [draft, setDraft] = useState<EntryInput | null>(null);
   const [editing, setEditing] = useState<Entry | null>(null);
   const [confirmation, setConfirmation] = useState<{ action: "validate" | "delete" | "reverse"; entry: Entry } | null>(null);
@@ -60,6 +76,8 @@ export default function LedgerPage() {
   const queryKey = JSON.stringify([year, tab, filter, offset, account]);
   const financialView = tab === "Balance" || tab === "Grand livre";
   const listVisible = showsData(listView) && listView.data.queryKey === queryKey;
+  const visibleEntries = entries.filter((entry) => matchesText(entryHaystack(entry), entrySearch));
+  const serverFiltered = Object.values(filter).some((value) => value !== "");
   const selectedYear = setup?.years.find((item) => item.id === year);
   const writable = selectedYear?.status === "OPEN";
   const yearCauses = selectedYearCauses(selectedYear?.status);
@@ -70,7 +88,14 @@ export default function LedgerPage() {
     navigate(ledgerPath(next));
     setOffset(0);
     setEntries([]);
+    setEntrySearch("");
     if (next === "Inventaire") setDraft(null);
+  }
+
+  function resetEntryFilters() {
+    setFilter({ journal_code: "", account_number: "", date_from: "", date_to: "", piece: "", source: "" });
+    setEntrySearch("");
+    setOffset(0);
   }
 
   useEffect(() => {
@@ -106,13 +131,15 @@ export default function LedgerPage() {
       });
     });
     const params = new URLSearchParams({ fiscal_year_id: String(year), limit: "25", offset: String(offset), status: tab === "Brouillons" ? "DRAFT" : "VALIDATED" });
-    Object.entries(filter).forEach(([key, value]) => { if (value) params.set(key, value); });
+    if (tab === "Inventaire") params.set("source", "INVENTORY");
+    else Object.entries(filter).forEach(([key, value]) => { if (value) params.set(key, value); });
+    const serverFiltered = tab !== "Inventaire" && Object.values(filter).some((value) => value !== "");
     const load = async () => {
       if (tab === "Balance") {
         const result = await request<Balance>("/years/" + year + "/balance");
         if (!active) return;
         setBalance(result);
-        setListView(finishLoad({ queryKey }));
+        setListView(finishLoad({ queryKey }, () => result.balance.length === 0));
       } else if (tab === "Grand livre") {
         const result = await request<{ lines: LedgerLine[] }>("/years/" + year + "/general-ledger?account_number=" + account);
         if (!active) return;
@@ -123,8 +150,8 @@ export default function LedgerPage() {
         if (!active) return;
         setEntries(result.entries);
         setCount(result.count);
-        const listed = tab === "Journal" || tab === "Brouillons";
-        setListView(finishLoad({ queryKey }, () => listed && result.count === 0));
+        const listed = tab === "Journal" || tab === "Brouillons" || tab === "Inventaire";
+        setListView(finishLoad({ queryKey }, () => listed && result.count === 0 && !serverFiltered));
       }
     };
     void load().catch((reason: unknown) => {
@@ -291,7 +318,35 @@ export default function LedgerPage() {
       <div id="ecriture-saisie">
       <SaveNoticeHost place="ecriture-saisie" notice={notice} onDismiss={dismiss} />
       {tab === "Brouillons" && <button id="nouvelle-ecriture" disabled={!writable || busy} aria-describedby={describedBy(yearCauseId, yearCauses)} onClick={() => startDraft()}>Nouvelle écriture</button>}
-      {tab === "Inventaire" && selectedYear && <InventoryForm key={year} year={selectedYear} accounts={accounts} journals={journals} onPosted={() => setRevision((v) => v + 1)} />}
+      {tab === "Inventaire" && selectedYear && <div id="inventaire-saisie"><InventoryForm key={year} year={selectedYear} accounts={accounts} journals={journals} onPosted={() => setRevision((v) => v + 1)} /></div>}
+      {tab === "Inventaire" && <>
+        <p className="list-group-title">Écritures d’inventaire de l’exercice</p>
+        <ScreenStatus
+          state={listView}
+          onRetry={() => setRevision((value) => value + 1)}
+          loading={<p>Chargement…</p>}
+          empty={<EmptyState title="Aucune écriture d’inventaire pour cet exercice." reason="Un inventaire validé apparaît ici. Préparez-le dans le formulaire : la confirmation crée l’écriture définitive." action={{ label: "Préparer un inventaire", href: "#inventaire-saisie" }} />}
+        />
+        {listVisible && entries.length > 0 && (
+          <BrowsableList
+            items={entries}
+            searchLabel="Rechercher une écriture d’inventaire"
+            text={entryHaystack}
+            statusOf={(entry) => entry.status}
+            statusChoices={enumChoices("entryStatus")}
+            emptyTitle="Aucune écriture d’inventaire pour cet exercice."
+            emptyReason="Un inventaire validé apparaît ici."
+            noResultsReason="Aucune écriture d’inventaire ne correspond à la recherche ou au statut."
+          >
+            {(rows) => rows.map((entry) => (
+              <article className="entry-card" key={entry.id}>
+                <h3>{entry.entry_number || "Inventaire #" + entry.id} · {entry.label}</h3>
+                <p>{formatIsoDate(entry.accounting_date)} · {entry.journal_code} · Pièce {entry.piece_reference} · {enumLabel("entryStatus", entry.status)}</p>
+              </article>
+            ))}
+          </BrowsableList>
+        )}
+      </>}
       {draft && <FrenchForm className="entry-editor" onSubmit={(e) => {
         e.preventDefault();
         const savedLabel = draft.label || "brouillon";
@@ -330,6 +385,9 @@ export default function LedgerPage() {
         <button type="button" onClick={() => setDraft(null)}>Annuler la saisie</button>
       </FrenchForm>}
       {(tab === "Journal" || tab === "Brouillons") && <>
+        <label className="toolbar-field">Rechercher une écriture
+          <input type="search" value={entrySearch} autoComplete="off" onChange={(event) => setEntrySearch(event.target.value)} />
+        </label>
         <details><summary>Filtres</summary><div className="ledger-filters">
           {Object.entries(filter).filter(([key]) => key !== "source").map(([key, value]) => <label key={key}>{{ journal_code: "Code journal", account_number: "Numéro de compte", date_from: "Du", date_to: "Au", piece: "Pièce" }[key]}<input type={key.startsWith("date") ? "date" : "text"} lang={key.startsWith("date") ? "fr" : undefined} value={value} onChange={(e) => { setFilter({ ...filter, [key]: e.target.value }); setOffset(0); }} />{key.startsWith("date") ? <span className="field-hint">{DATE_HINT}</span> : null}</label>)}
           <label>Source<FitSelect value={filter.source} onChange={(e) => { setFilter({ ...filter, source: e.target.value }); setOffset(0); }}>
@@ -341,10 +399,26 @@ export default function LedgerPage() {
           state={listView}
           onRetry={() => setRevision((value) => value + 1)}
           loading={<p>Chargement…</p>}
-          empty={<p>Aucune écriture pour cette vue. {tab === "Journal" ? "Validées uniquement." : "Hors états comptables."}</p>}
+          empty={
+            <EmptyState
+              title="Aucune écriture pour cette vue."
+              reason={tab === "Journal"
+                ? "Validées uniquement. Un brouillon reste hors des états comptables tant qu’il n’est pas validé."
+                : "Hors états comptables. Validez un brouillon pour qu’il entre dans le journal."}
+              action={tab === "Journal"
+                ? { label: "Ouvrir les brouillons", href: ledgerPath("Brouillons") }
+                : { label: "Saisir une écriture", onClick: () => startDraft() }}
+            />
+          }
         />
-        {listVisible && <p>{count} écriture(s) · {tab === "Journal" ? "validées uniquement" : "hors états comptables"}</p>}
-        {listVisible && entries.map((entry) => {
+        {listVisible && count === 0 && serverFiltered && (
+          <NoResults reason="Aucune écriture ne correspond aux filtres." onReset={resetEntryFilters} />
+        )}
+        {listVisible && entries.length > 0 && visibleEntries.length === 0 && (
+          <NoResults reason="Aucune écriture ne correspond à la recherche ou aux filtres." onReset={resetEntryFilters} />
+        )}
+        {listVisible && visibleEntries.length > 0 && <p>{count} écriture(s) · {tab === "Journal" ? "validées uniquement" : "hors états comptables"}</p>}
+        {listVisible && visibleEntries.map((entry) => {
           const balanceId = `entry-${entry.id}-balance`;
           const reversalId = `entry-${entry.id}-reversal`;
           return <article className="entry-card" key={entry.id}>
@@ -416,8 +490,22 @@ export default function LedgerPage() {
       </FrenchForm>}
       {audit && <details open><summary>Historique de l’écriture</summary>{audit.map((item, i) => <div key={i}><strong>{item.action} · {item.timestamp}</strong><pre>{JSON.stringify(item.details, null, 2)}</pre></div>)}<button onClick={() => setAudit(null)}>Fermer l’historique</button></details>}
       {tab === "Balance" && <>
-        <ScreenStatus state={listView} onRetry={() => setRevision((value) => value + 1)} loading={<p>Chargement…</p>} />
-        {listVisible && balance?.balance && <ResponsiveTable
+        <ScreenStatus
+          state={listView}
+          onRetry={() => setRevision((value) => value + 1)}
+          loading={<p>Chargement…</p>}
+          empty={<EmptyState title="Aucune ligne de balance." reason="La balance reprend les écritures validées. Elle reste vide tant qu’aucune n’est validée sur cet exercice." action={{ label: "Ouvrir les brouillons", href: ledgerPath("Brouillons") }} />}
+        />
+        {listVisible && balance?.balance && balance.balance.length > 0 && (
+          <BrowsableList
+            items={balance.balance}
+            searchLabel="Rechercher dans la balance"
+            text={(row) => `${row.account_number} ${row.label}`}
+            emptyTitle="Aucune ligne de balance."
+            emptyReason="La balance reprend les écritures validées."
+            noResultsReason="Aucun compte de la balance ne correspond à la recherche."
+          >
+            {(rows) => <ResponsiveTable
           label="Balance générale"
           caption="Balance générale · écritures validées"
           columns={[
@@ -428,7 +516,7 @@ export default function LedgerPage() {
             { key: "debitBalance", label: "Solde débiteur" },
             { key: "creditBalance", label: "Solde créditeur" },
           ]}
-          rows={balance.balance.map((row) => ({
+          rows={rows.map((row) => ({
             key: row.account_number,
             cells: [
               row.account_number,
@@ -441,7 +529,8 @@ export default function LedgerPage() {
           }))}
           footerRow={<tr><th colSpan={2}>{balance.balanced ? "Balance équilibrée" : "ERREUR : balance déséquilibrée"}</th><td>{formatAmount(balance.total_debit)}</td><td>{formatAmount(balance.total_credit)}</td><td colSpan={2}>EUR</td></tr>}
           footerNote={`${balance.balanced ? "Balance équilibrée" : "ERREUR : balance déséquilibrée"} · Débit ${formatAmount(balance.total_debit)} · Crédit ${formatAmount(balance.total_credit)} · EUR`}
-        />}
+        />}</BrowsableList>
+        )}
       </>}
       {tab === "Grand livre" && <>
         <label>Compte du grand livre<FitSelect value={account} onChange={(e) => { setAccount(e.target.value); setLedger([]); }}>{accounts.map((a) => <option key={a.number} value={a.number}>{a.number} · {a.label}</option>)}</FitSelect></label>
@@ -449,9 +538,18 @@ export default function LedgerPage() {
           state={listView}
           onRetry={() => setRevision((value) => value + 1)}
           loading={<p>Chargement…</p>}
-          empty={<p>Aucune ligne dans ce grand livre.</p>}
+          empty={<EmptyState title="Aucune ligne dans ce grand livre." reason="Aucune écriture validée n’a mouvementé ce compte." action={{ label: "Saisir une écriture", href: ledgerPath("Brouillons") }} />}
         />
-        {listVisible && <ResponsiveTable
+        {listVisible && ledger.length > 0 && (
+          <BrowsableList
+            items={ledger}
+            searchLabel="Rechercher dans le grand livre"
+            text={(line) => `${line.entry_number} ${line.label} ${line.date}`}
+            emptyTitle="Aucune ligne dans ce grand livre."
+            emptyReason="Aucune écriture validée n’a mouvementé ce compte."
+            noResultsReason="Aucune ligne du grand livre ne correspond à la recherche."
+          >
+            {(rows) => <ResponsiveTable
           label="Grand livre"
           caption="Solde positif : débiteur · négatif : créditeur"
           columns={[
@@ -462,11 +560,12 @@ export default function LedgerPage() {
             { key: "credit", label: "Crédit" },
             { key: "balance", label: "Solde" },
           ]}
-          rows={ledger.map((line, index) => ({
+          rows={rows.map((line, index) => ({
             key: `${line.entry_number}-${index}`,
             cells: [formatIsoDate(line.date), line.entry_number, line.label, formatAmount(line.debit), formatAmount(line.credit), formatAmount(line.balance)],
           }))}
-        />}
+        />}</BrowsableList>
+        )}
       </>}
       {tab === "Plan comptable" && <>
         <p>Le plan initial est configurable. Les libellés des comptes utilisés par des écritures validées sont figés.</p>
