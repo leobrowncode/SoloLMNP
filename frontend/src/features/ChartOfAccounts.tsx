@@ -11,6 +11,7 @@ import {
   type UsageFilter,
 } from "./accountNature";
 import GlossaryTip from "./GlossaryTip";
+import FrenchForm from "../lib/FrenchForm";
 
 export default function ChartOfAccounts({
   accounts,
@@ -46,7 +47,7 @@ export default function ChartOfAccounts({
         <GlossaryTip id="nature-compte" />
       </div>
       <p>La nature (Actif, Dette, Capitaux, Charge, Produit) ne dit pas si le compte est utilisé. Activé ou Inactif est un autre choix.</p>
-      <form onSubmit={submit}>
+      <FrenchForm onSubmit={submit}>
         <div className="form-grid">
           <label>Numéro<input name="number" required pattern="[1-7][0-9]{2,9}" /></label>
           <label>Libellé du compte<input name="label" required /></label>
@@ -59,7 +60,7 @@ export default function ChartOfAccounts({
           </label>
         </div>
         <button disabled={busy}>Ajouter le compte</button>
-      </form>
+      </FrenchForm>
       <div className="chart-filters">
         <div>
           <label htmlFor="chart-nature-filter">Filtrer par nature</label>

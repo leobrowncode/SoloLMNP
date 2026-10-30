@@ -17,6 +17,9 @@ import LiasseSheet, { type Worksheet } from "./LiasseSheet";
 import { calculationNotice, outputLabel, outputTrust } from "./outputStatus";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
+import {
+  centsToApiAmount, enumLabel, formatAmount, formatAmountFromCents, formatCents, formatEuros, parseAmountToCents,
+} from "../lib/format";
 import "./ledger.css";
 
 interface Vintage {
@@ -114,17 +117,19 @@ function Metric({
         {label}
         <GlossaryTip id={help} label={label} />
       </dt>
-      <dd>{value} €</dd>
+      <dd>{formatEuros(value)}</dd>
     </div>
   );
 }
 
 function parseSigned(value: string): number {
-  const normalized = value.replace(",", ".");
-  if (!/^-?\d+(?:\.\d{1,2})?$/.test(normalized)) return Number.NaN;
-  const [whole = "0", fraction = ""] = normalized.replace("-", "").split(".");
-  const cents = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
-  return normalized.startsWith("-") ? -cents : cents;
+  try {
+    const cents = parseAmountToCents(value);
+    if (cents > BigInt(Number.MAX_SAFE_INTEGER) || cents < -BigInt(Number.MAX_SAFE_INTEGER)) return Number.NaN;
+    return Number(cents);
+  } catch {
+    return Number.NaN;
+  }
 }
 
 function formatComputedAt(value: string): string {
@@ -167,9 +172,16 @@ function Freshness({ result }: { result: Computation }) {
 }
 
 function euros(cents: number): string {
-  const sign = cents < 0 ? "-" : "";
-  const abs = Math.abs(Math.round(cents));
-  return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
+  return formatAmountFromCents(BigInt(Math.trunc(cents)));
+}
+
+function euroLabel(cents: number): string {
+  return formatCents(BigInt(Math.trunc(cents)));
+}
+
+function shownMoney(value: string | null | undefined, empty = "— €"): string {
+  if (!value) return empty;
+  return formatEuros(value);
 }
 
 function projectDotation(dotation: number, base: number, priorDep: number, priorLoss: number) {
@@ -203,13 +215,13 @@ function ZeroCockpit({
   const simulated = dotation !== booked;
   let reading = "Déplacez le curseur pour voir l’effet sur le résultat. Les écritures ne changent pas.";
   if (!simulated && view.fiscal === 0 && view.unused > 0) {
-    reading = `Objectif atteint : 0 €. ${euros(view.unused)} € d’amortissement partent en report.`;
+    reading = `Objectif atteint : 0 €. ${euroLabel(view.unused)} d’amortissement partent en report.`;
   } else if (!simulated && view.fiscal === 0) {
     reading = "Objectif atteint : 0 €, et rien à reporter.";
   } else if (view.fiscal > 0) {
-    reading = `Il reste ${euros(view.fiscal)} €. Une dotation de ${euros(view.capacity)} € met le résultat à 0 €.`;
+    reading = `Il reste ${euroLabel(view.fiscal)}. Une dotation de ${euroLabel(view.capacity)} met le résultat à 0 €.`;
   } else if (view.fiscal < 0) {
-    reading = `Déficit de ${euros(-view.fiscal)} €, reporté sur les LMNP suivants. Ajouter de l’amortissement ne l’augmente pas.`;
+    reading = `Déficit de ${euroLabel(-view.fiscal)}, reporté sur les LMNP suivants. Ajouter de l’amortissement ne l’augmente pas.`;
   }
   const stockRows: { year: number; opening: number; used: number; remaining: number }[] = [];
   let left = view.priorDepUsed;
@@ -224,14 +236,14 @@ function ZeroCockpit({
     <div className="zero-cockpit">
       <p className="zero-kicker">Objectif : 0 €</p>
       <p className={`zero-figure zero-figure-${view.fiscal === 0 ? "good" : "warn"}`}>
-        {euros(view.fiscal)} €
+        {euroLabel(view.fiscal)}
       </p>
       <p>{reading}</p>
       <div className="cap-track" aria-hidden="true">
         <span className="cap-fill" style={{ width: `${fill}%` }} />
       </div>
       <p className="cap-caption">
-        Plafond {euros(view.capacity)} € · déduit {euros(view.current)} € · reporté {euros(view.unused)} €
+        Plafond {euroLabel(view.capacity)} · déduit {euroLabel(view.current)} · reporté {euroLabel(view.unused)}
       </p>
       {upper > 0 && (
         <label className="dotation-slider">
@@ -255,7 +267,7 @@ function ZeroCockpit({
         </label>
       )}
       <p className="field-hint">
-        Comptabilisé : {euros(booked)} €. Le curseur simule une autre dotation.
+        Comptabilisé : {euroLabel(booked)}. Le curseur simule une autre dotation.
         Pour la changer vraiment, ajustez les durées dans Immobilisations.
         {simulated ? " Les écritures actuelles ne sont pas modifiées." : ""}
       </p>
@@ -270,7 +282,7 @@ function ZeroCockpit({
             <span>
               {row.rate_percent.replace(".", ",")} % / an
               {" · "}
-              max {row.annual_max} €
+              max {formatEuros(row.annual_max)}
             </span>
           </li>
         ))}
@@ -281,11 +293,11 @@ function ZeroCockpit({
         {stockRows.length === 0 && <li>Aucun report des années précédentes.</li>}
         {stockRows.map((row) => (
           <li key={row.year}>
-            {row.year} : stock {euros(row.opening)} € · repris {euros(row.used)} € · reste {euros(row.remaining)} €
+            {row.year} : stock {euroLabel(row.opening)} · repris {euroLabel(row.used)} · reste {euroLabel(row.remaining)}
           </li>
         ))}
-        <li>Cette année : {euros(view.unused)} € à reporter</li>
-        {priorLoss > 0 && <li>Déficits LMNP en stock : {euros(priorLoss)} €</li>}
+        <li>Cette année : {euroLabel(view.unused)} à reporter</li>
+        {priorLoss > 0 && <li>Déficits LMNP en stock : {euroLabel(priorLoss)}</li>}
       </ul>
     </div>
   );
@@ -583,7 +595,12 @@ export default function FiscalPage() {
       setError("Choisissez le compte de charge à réintégrer.");
       return;
     }
-    if (!/^\d+(?:[.,]\d{1,2})?$/.test(draft.amount.trim())) {
+    let amount = "";
+    try {
+      const cents = parseAmountToCents(draft.amount);
+      if (cents < 0n) throw new Error("négatif");
+      amount = centsToApiAmount(cents);
+    } catch {
       setError("Indiquez la quote-part non déductible au centime près.");
       return;
     }
@@ -597,7 +614,7 @@ export default function FiscalPage() {
     }
     setAdjustments((current) => [...current, {
       account_number: draft.account_number,
-      amount: draft.amount.trim().replace(",", "."),
+      amount,
       justification: draft.justification.trim(),
     }]);
     setDraft({ account_number: "", amount: "", justification: "" });
@@ -652,7 +669,7 @@ export default function FiscalPage() {
           >
             {years.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.year}{item.status ? ` · ${item.status === "OPEN" ? "ouvert" : item.status === "CLOSED" ? "clôturé" : "prêt à clôturer"}` : ""}
+                {item.year}{item.status ? ` · ${enumLabel("yearStatus", item.status)}` : ""}
               </option>
             ))}
           </select>
@@ -718,7 +735,7 @@ export default function FiscalPage() {
                   <tr key={row.account_number}>
                     <td>{row.account_number}</td>
                     <td>{row.label}</td>
-                    <td>{row.amount}</td>
+                    <td>{formatAmount(row.amount)}</td>
                     <td>
                       {row.account_number.startsWith("681")
                         ? "Dotation — plafonnée fiscalement"
@@ -755,7 +772,7 @@ export default function FiscalPage() {
               <option value="">Choisir…</option>
               {chargeAccounts.map((row) => (
                 <option key={row.account_number} value={row.account_number}>
-                  {row.account_number} · {row.label} ({row.amount} €)
+                  {row.account_number} · {row.label} ({formatEuros(row.amount)})
                 </option>
               ))}
             </select>
@@ -763,13 +780,15 @@ export default function FiscalPage() {
           <label className="field-money">
             Part non déductible (€)
             <HelpTip label="Montant">
-              Montant à réintégrer, plafonné par le solde du compte. Format 12.34.
+              Montant à réintégrer, plafonné par le solde du compte. Exemple : 1 234,56.
             </HelpTip>
             <input
               inputMode="decimal"
+              lang="fr"
+              data-money="true"
               value={draft.amount}
               onChange={(event) => setDraft({ ...draft, amount: event.target.value })}
-              placeholder="0.00"
+              placeholder="1 234,56"
             />
           </label>
           <label>
@@ -794,7 +813,7 @@ export default function FiscalPage() {
           <ul className="fiscal-adjustment-list">
             {adjustments.map((item) => (
               <li key={item.account_number}>
-                <span>{item.account_number} · {item.amount} € — {item.justification}</span>
+                <span>{item.account_number} · {formatEuros(item.amount)} — {item.justification}</span>
                 <button
                   type="button"
                   onClick={() => setAdjustments((rows) => rows.filter((row) => row.account_number !== item.account_number))}
@@ -828,49 +847,49 @@ export default function FiscalPage() {
           <ol className="fiscal-waterfall">
             <li>
               <span>Loyers / produits</span>
-              <strong>{details.operating_income ?? "—"} €</strong>
+              <strong>{shownMoney(details.operating_income)}</strong>
             </li>
             <li>
               <span>− Autres charges (hors 681)</span>
-              <strong>{details.other_charges ?? "—"} €</strong>
+              <strong>{shownMoney(details.other_charges)}</strong>
             </li>
             <li>
               <span>+ Réintégrations</span>
-              <strong>{result.non_deductible} €</strong>
+              <strong>{formatEuros(result.non_deductible)}</strong>
             </li>
             <li className="fiscal-waterfall-key">
               <span>
                 = Capacité d’amortissement
                 <GlossaryTip id="capacite" label="Capacité calculée" />
               </span>
-              <strong>{details.capacity ?? "—"} €</strong>
+              <strong>{shownMoney(details.capacity)}</strong>
             </li>
             <li>
               <span><span>Dotation comptable 681</span> <GlossaryTip id="compte-681" /></span>
-              <strong>{details.accounting_depreciation ?? "—"} €</strong>
+              <strong>{shownMoney(details.accounting_depreciation)}</strong>
             </li>
             <li>
               <span>Dont déductible cette année</span>
-              <strong>{details.current_deductible_depreciation ?? "—"} €</strong>
+              <strong>{shownMoney(details.current_deductible_depreciation)}</strong>
             </li>
             <li>
               <span>+ Reprise reports amortissement</span>
-              <strong>{details.prior_depreciation_used ?? "0.00"} €</strong>
+              <strong>{formatEuros(details.prior_depreciation_used ?? "0.00")}</strong>
             </li>
             <li>
               <span><span>Amortissement non déduit (report N)</span> <GlossaryTip id="report-amortissement" /></span>
-              <strong>{result.unused_depreciation} €</strong>
+              <strong>{formatEuros(result.unused_depreciation)}</strong>
             </li>
             <li>
               <span>− Imputation déficits antérieurs</span>
-              <strong>{details.prior_tax_loss_used ?? "0.00"} €</strong>
+              <strong>{formatEuros(details.prior_tax_loss_used ?? "0.00")}</strong>
             </li>
             <li className={`fiscal-waterfall-result fiscal-waterfall-${goalTone}`}>
               <span>
                 <span>Résultat fiscal</span>
                 <GlossaryTip id="resultat-fiscal" />
               </span>
-              <strong>{result.fiscal_result} €</strong>
+              <strong>{formatEuros(result.fiscal_result)}</strong>
             </li>
           </ol>
 
@@ -920,16 +939,16 @@ export default function FiscalPage() {
                     <tr key={`dep-${item.origin_year}`}>
                       <td>Amortissement non déduit</td>
                       <td>{item.origin_year}</td>
-                      <td>{item.used}</td>
-                      <td>{item.remaining_after}</td>
+                      <td>{formatAmount(item.used)}</td>
+                      <td>{formatAmount(item.remaining_after)}</td>
                     </tr>
                   ))}
                   {lossUses.map((item) => (
                     <tr key={`loss-${item.origin_year}`}>
                       <td>Déficit LMNP</td>
                       <td>{item.origin_year}</td>
-                      <td>{item.used}</td>
-                      <td>{item.remaining_after}</td>
+                      <td>{formatAmount(item.used)}</td>
+                      <td>{formatAmount(item.remaining_after)}</td>
                     </tr>
                   ))}
                 </tbody>

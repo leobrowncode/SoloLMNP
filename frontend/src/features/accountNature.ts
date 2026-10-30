@@ -2,15 +2,11 @@
  * Accounting nature from the ledger API `account_type` enum
  * (ASSET, LIABILITY, EQUITY, EXPENSE, INCOME).
  * Usage (Activé / Inactif) is the separate `active` flag.
+ * Labels come from the central enum map.
  */
+import { ENUM_LABELS } from "../lib/format";
 
-export const ACCOUNT_NATURES = {
-  ASSET: "Actif",
-  LIABILITY: "Dette",
-  EQUITY: "Capitaux",
-  EXPENSE: "Charge",
-  INCOME: "Produit",
-} as const;
+export const ACCOUNT_NATURES = ENUM_LABELS.accountType;
 
 export type AccountType = keyof typeof ACCOUNT_NATURES;
 

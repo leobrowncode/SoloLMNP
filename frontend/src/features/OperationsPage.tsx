@@ -29,12 +29,9 @@ import {
   PLAN_HELP, RECORD_HELP, correctionMessage, locked, readInvalidation,
 } from "./correction";
 import { buildPieceReference, defaultType, findType, typesFor } from "./operationTypes";
+import { enumChoices, enumLabel, formatEuros, formatIsoDate } from "../lib/format";
+import FrenchForm from "../lib/FrenchForm";
 import "./ledger.css";
-
-const kindLabel: Record<string, string> = {
-  REVENUE: "Recette", EXPENSE: "Dépense", SETTLEMENT: "Règlement",
-  LOAN_PAYMENT: "Échéance", LOAN_FUNDING: "Déblocage",
-};
 
 interface Editor {
   title: string;
@@ -238,10 +235,7 @@ export default function OperationsPage() {
           },
           {
             name: "fiscal_treatment", label: "Traitement fiscal envisagé", group: "Fiscalité (indicatif)",
-            choices: [
-              ["REQUIRES_REVIEW", "À vérifier"], ["DEDUCTIBLE", "Déductible"],
-              ["PARTIAL", "Partiellement déductible"], ["NON_DEDUCTIBLE", "Non déductible"],
-            ],
+            choices: enumChoices("fiscalTreatment"),
           } as Field,
         ] : []),
       ],
@@ -490,7 +484,7 @@ export default function OperationsPage() {
         {properties.map((p) => (
           <article key={p.id} className="entry-card">
             <h3>{p.name}</h3>
-            <p>Acquisition : {p.acquisition_price} € · Terrain : {p.land_value} € · Bâtiment : {p.building_value} €</p>
+            <p>Acquisition : {formatEuros(p.acquisition_price)} · Terrain : {formatEuros(p.land_value)} · Bâtiment : {formatEuros(p.building_value)}</p>
             {p.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
             <div className="entry-actions">
               <button type="button" onClick={() => openProperty(p)}>Modifier {p.name}</button>
@@ -499,7 +493,7 @@ export default function OperationsPage() {
             <ul>
               {occupants(p.id).map((tenant) => (
                 <li key={tenant.id}>
-                  {tenant.name} · {tenant.monthly_rent} € / mois · depuis {tenant.entry_date}
+                  {tenant.name} · {formatEuros(tenant.monthly_rent)} / mois · depuis {formatIsoDate(tenant.entry_date)}
                   {tenant.exit_date ? ` · sortie ${tenant.exit_date}` : ""}
                   {tenant.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
                   <div className="entry-actions">
@@ -592,8 +586,8 @@ export default function OperationsPage() {
           {entryCauses.length > 0 && <PrerequisiteList id={entryCauseId} causes={entryCauses} />}
           {showsData(bankView) && transactions.map((t) => (
             <article key={t.id} className="entry-card">
-              <h3>{t.label} · {t.amount} €</h3>
-              <p>{t.date} · {t.external_reference} · {t.matched_entry_id ? "Rapproché avec l’écriture #" + t.matched_entry_id : "À rapprocher"}</p>
+              <h3>{t.label} · {formatEuros(t.amount)}</h3>
+              <p>{formatIsoDate(t.date)} · {t.external_reference} · {t.matched_entry_id ? "Rapproché avec l’écriture #" + t.matched_entry_id : "À rapprocher"}</p>
               {!t.matched_entry_id ? <>
                 <button type="button" disabled={busy} onClick={() => { void action(() => findCandidates(t)); }}>Rapprocher une écriture existante</button>
                 <button type="button" disabled={entryCauses.length > 0} aria-describedby={describedBy(entryCauseId, entryCauses)} onClick={() => newOperation(t.amount.startsWith("-") ? "EXPENSE" : "REVENUE", t)}>Créer une opération liée</button>
@@ -609,7 +603,7 @@ export default function OperationsPage() {
             <button type="button" disabled={!bankOffset} onClick={() => setBankOffset(bankOffset - 50)}>Mouvements précédents</button>
             <button type="button" disabled={transactions.length < 50} onClick={() => setBankOffset(bankOffset + 50)}>Mouvements suivants</button>
           </div>
-          {matchCandidates && <form className="entry-editor" onSubmit={(event) => {
+          {matchCandidates && <FrenchForm className="entry-editor" onSubmit={(event) => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
             void action(async () => {
@@ -627,7 +621,7 @@ export default function OperationsPage() {
               <button type="submit" disabled={busy}>Confirmer le rapprochement</button>
             </> : <p>Aucune écriture de même montant.</p>}
             <button type="button" onClick={() => setMatchCandidates(null)}>Annuler</button>
-          </form>}
+          </FrenchForm>}
         </>}
       </>}
 
@@ -673,7 +667,7 @@ export default function OperationsPage() {
         {loans.map((l) => (
           <article className="entry-card" key={l.id}>
             <h3>{l.lender}</h3>
-            <p>Capital initial : {l.initial_principal} € · Solde comptable : {l.remaining_principal} € · Mensualité : {l.monthly_payment} € + assurance {l.monthly_insurance} € · Compte {l.principal_account}</p>
+            <p>Capital initial : {formatEuros(l.initial_principal)} · Solde comptable : {formatEuros(l.remaining_principal)} · Mensualité : {formatEuros(l.monthly_payment)} + assurance {formatEuros(l.monthly_insurance)} · Compte {l.principal_account}</p>
             {l.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
             <div className="entry-actions">
               <button type="button" onClick={() => openLoan(l)}>Modifier {l.lender}</button>
@@ -725,7 +719,7 @@ export default function OperationsPage() {
             <select value={loanImportId} onChange={(e) => setLoanImportId(Number(e.target.value))}>
               {loans.map((loan) => (
                 <option key={loan.id} value={loan.id}>
-                  {loan.lender} · {loan.initial_principal} € · {loan.principal_account}
+                  {loan.lender} · {formatEuros(loan.initial_principal)} · {loan.principal_account}
                 </option>
               ))}
             </select>
@@ -762,7 +756,7 @@ export default function OperationsPage() {
             missingBank={!bankId}
             missingLoan={!loanImportId}
             context={{ bank_account_id: bankId, fiscal_year_id: opYearId, loan_id: loanImportId }}
-            loanLabel={loanForImport ? `${loanForImport.lender} · ${loanForImport.initial_principal} € · ${loanForImport.principal_account}` : ""}
+            loanLabel={loanForImport ? `${loanForImport.lender} · ${formatEuros(loanForImport.initial_principal)} · ${loanForImport.principal_account}` : ""}
             onImported={(text) => { setMessage(text); setRevision((value) => value + 1); }}
           />
         </>}
@@ -818,10 +812,10 @@ export default function OperationsPage() {
         {bundleView.phase === "loaded" && operations.length === 0 && <p>Aucune opération enregistrée.</p>}
         {showsData(bundleView) && operations.map((row) => (
           <article key={row.id} className="entry-card">
-            <h3>{kindLabel[row.kind]} · {row.description} · {row.amount} €</h3>
-            <p>{row.date} · {row.counterparty} · {row.status === "REVERSED" ? "Extournée" : "Comptabilisée"}{row.remaining_to_settle !== null && " · Reste à régler : " + row.remaining_to_settle + " €"}</p>
+            <h3>{enumLabel("operationKind", row.kind)} · {row.description} · {formatEuros(row.amount)}</h3>
+            <p>{formatIsoDate(row.date)} · {row.counterparty} · {enumLabel("operationStatus", row.status)}{row.remaining_to_settle !== null && " · Reste à régler : " + formatEuros(row.remaining_to_settle)}</p>
             {row.kind === "LOAN_PAYMENT" && (
-              <p>Capital {row.principal} € · Intérêts {row.interest} € · Assurance {row.insurance} € · Frais {row.other_costs} €</p>
+              <p>Capital {formatEuros(row.principal)} · Intérêts {formatEuros(row.interest)} · Assurance {formatEuros(row.insurance)} · Frais {formatEuros(row.other_costs)}</p>
             )}
             <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void action(async () => setDetails(await request<Entry>("/entries/" + row.accounting_entry_id)), "Chargement de l’écriture…"); }}>Voir l’écriture</button>
             {row.status !== "REVERSED" && row.remaining_to_settle && row.remaining_to_settle !== "0.00" && (

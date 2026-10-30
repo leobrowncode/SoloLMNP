@@ -16,7 +16,7 @@ describe("ReviewForm", () => {
     await userEvent.type(input, "90071992547409,91");
     await userEvent.click(screen.getByRole("button", { name: "Vérifier avant enregistrement" }));
     expect(save).not.toHaveBeenCalled();
-    expect(screen.getByText("90071992547409.91")).toBeInTheDocument();
+    expect(screen.getByText("90 071 992 547 409,91 €")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Confirmer l’enregistrement" }));
     expect(save).toHaveBeenCalledOnce();
     expect(save.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
@@ -58,7 +58,7 @@ describe("ReviewForm", () => {
     await userEvent.type(screen.getByLabelText(/Capital remboursé/), "100.00");
     await userEvent.clear(screen.getByLabelText(/Intérêts/));
     await userEvent.type(screen.getByLabelText(/Intérêts/), "25.50");
-    expect(screen.getByText(/Total de l’échéance/)).toHaveTextContent("125.50");
+    expect(screen.getByText(/Total de l’échéance/)).toHaveTextContent("125,50 €");
     await userEvent.click(screen.getByRole("button", { name: "Vérifier avant enregistrement" }));
     await userEvent.click(screen.getByRole("button", { name: "Confirmer l’enregistrement" }));
     expect(save).toHaveBeenCalledOnce();

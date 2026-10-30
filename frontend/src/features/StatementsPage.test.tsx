@@ -18,7 +18,7 @@ test("shows provisional statements and removes stale totals on refresh failure",
   let failed = false;
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => String(input).endsWith("/setup") ? response(setup) : failed ? response({ detail: { message: "Ledger déséquilibré" } }, 409) : response(report(1)));
   render(<StatementsPage />);
-  expect(await screen.findByText("Résultat comptable : -10.01 €")).toBeInTheDocument();
+  expect(await screen.findByText("Résultat comptable : -10,01 €")).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "Pré-contrôle et clôture" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Lancer le pré-contrôle" })).not.toBeInTheDocument();
   expect(screen.getByText(/Brouillons exclus : 1/)).toBeInTheDocument();
@@ -27,7 +27,7 @@ test("shows provisional statements and removes stale totals on refresh failure",
   const alert = await screen.findByRole("alert");
   expect(alert).toHaveTextContent("Ledger déséquilibré");
   expect(alert).toHaveFocus();
-  expect(screen.queryByText("Résultat comptable : -10.01 €")).not.toBeInTheDocument();
+  expect(screen.queryByText("Résultat comptable : -10,01 €")).not.toBeInTheDocument();
 });
 
 test("ignores late responses from the previous year", async () => {
@@ -41,7 +41,7 @@ test("ignores late responses from the previous year", async () => {
   });
   render(<StatementsPage />);
   fireEvent.change(await screen.findByLabelText("Exercice"), { target: { value: "2" } });
-  expect(await screen.findByText(/2026-01-01 — 2026-12-31/)).toBeInTheDocument();
+  expect(await screen.findByText(/01\/01\/2026 — 31\/12\/2026/)).toBeInTheDocument();
   await act(async () => { finish?.(response(report(1))); await pending; });
   await waitFor(() => expect(screen.queryByText(/2025-01-01 — 2025-12-31/)).not.toBeInTheDocument());
 });

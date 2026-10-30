@@ -95,7 +95,7 @@ test("shows account differences and removes stale control on failure", async () 
   }));
   render(<OpeningPosting year={2} preview={null} />);
   fireEvent.click(screen.getByRole("button"));
-  expect(await screen.findByRole("table")).toHaveTextContent("-0.01");
+  expect(await screen.findByRole("table")).toHaveTextContent("-0,01");
   expect(screen.getByRole("alert")).toHaveTextContent("La source a changé");
   fetch.mockResolvedValue(response({ detail: { message: "Source indisponible" } }, 409));
   fireEvent.click(screen.getByRole("button"));

@@ -1,6 +1,8 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { amount, cents, RequestError } from "../api/ledger";
 import { formFieldName, issuesForForm, type ApiErrorIssue } from "../api/errors";
+import { DATE_HINT, formatCents, formatEuros, formatIsoDate } from "../lib/format";
+import FrenchForm from "../lib/FrenchForm";
 import ApiErrorAlert from "./ApiErrorAlert";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import MutationStatus from "./MutationStatus";
@@ -34,6 +36,8 @@ function choicesOf(field: Field, draft: Record<string, string>): [string, string
 
 function labelOf(field: Field, value: unknown, draft: Record<string, string>): string {
   const key = String(value ?? "");
+  if (field.money) return formatEuros(key);
+  if (field.type === "date") return formatIsoDate(key);
   return choicesOf(field, draft)?.find(([choice]) => choice === key)?.[1] ?? (key || "—");
 }
 
@@ -141,7 +145,7 @@ export default function ReviewForm({
     if (!sumInto) return null;
     try {
       const total = sumInto.sources.reduce((sum, name) => sum + cents(draft[name] ?? "0.00"), 0n);
-      return amount(total);
+      return formatCents(total);
     } catch {
       return null;
     }
@@ -190,7 +194,7 @@ export default function ReviewForm({
   }
 
   return (
-    <form
+    <FrenchForm
       className="entry-editor review-form"
       onSubmit={(event) => {
         event.preventDefault();
@@ -227,7 +231,8 @@ export default function ReviewForm({
           <div className="form-grid">
             {groupFields.map((field) => {
               const controlId = `${formUid}-${field.name}`;
-              const hintId = field.hint ? `${controlId}-hint` : undefined;
+              const hintText = [field.hint, field.type === "date" ? DATE_HINT : ""].filter(Boolean).join(" ");
+              const hintId = hintText ? `${controlId}-hint` : undefined;
               const fieldError = fieldErrors[field.name];
               const errorId = fieldError ? `${controlId}-error` : undefined;
               const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
@@ -272,8 +277,10 @@ export default function ReviewForm({
                       aria-invalid={fieldError ? true : undefined}
                       value={draft[field.name] ?? ""}
                       type={field.type === "number" ? "number" : field.type ?? "text"}
+                      lang={field.type === "date" || field.money ? "fr" : undefined}
                       min={field.type === "number" ? "1" : undefined}
-                      step={field.money ? "0.01" : undefined}
+                      placeholder={field.money ? "1 234,56" : undefined}
+                      data-money={field.money ? "true" : undefined}
                       inputMode={field.money ? "decimal" : undefined}
                       required={!field.optional}
                       onChange={(event) => {
@@ -290,14 +297,14 @@ export default function ReviewForm({
                   {fieldError && (
                     <span id={errorId} className="field-error" role="alert">{fieldError}</span>
                   )}
-                  <span id={hintId} className="field-hint">{field.hint ?? ""}</span>
+                  {hintText ? <span id={hintId} className="field-hint">{hintText}</span> : null}
                 </div>
               );
             })}
           </div>
           {sumInto && key && groupFields.some((field) => sumInto.sources.includes(field.name)) && (
             <p className="form-total" aria-live="polite">
-              Total de l’échéance : <strong>{liveTotal ?? "—"} €</strong>
+              Total de l’échéance : <strong>{liveTotal ?? "—"}</strong>
             </p>
           )}
         </fieldset>
@@ -316,7 +323,7 @@ export default function ReviewForm({
             {sumInto && (
               <div>
                 <dt>Montant total débitée / créditée</dt>
-                <dd>{String(review[sumInto.target])} €</dd>
+                <dd>{formatEuros(String(review[sumInto.target]))}</dd>
               </div>
             )}
           </dl>
@@ -330,6 +337,6 @@ export default function ReviewForm({
         </button>
         <button type="button" disabled={busy || locked} onClick={onCancel}>Annuler</button>
       </div>
-    </form>
+    </FrenchForm>
   );
 }

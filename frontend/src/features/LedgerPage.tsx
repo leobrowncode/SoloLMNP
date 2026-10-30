@@ -14,6 +14,8 @@ import {
   type LedgerTab,
 } from "../routing/paths";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
+import { DATE_HINT, enumChoices, enumLabel, formatAmount, formatCents, formatIsoDate } from "../lib/format";
+import FrenchForm from "../lib/FrenchForm";
 import "./ledger.css";
 import ChartOfAccounts from "./ChartOfAccounts";
 import InventoryForm from "./InventoryForm";
@@ -159,7 +161,7 @@ export default function LedgerPage() {
     try {
       const debit = draft.lines.reduce((sum, line) => sum + cents(line.debit), 0n);
       const credit = draft.lines.reduce((sum, line) => sum + cents(line.credit), 0n);
-      totals = "Débit : " + amount(debit) + " € · Crédit : " + amount(credit) + " € · Écart : " + amount(debit - credit) + " €";
+      totals = "Débit : " + formatCents(debit) + " · Crédit : " + formatCents(credit) + " · Écart : " + formatCents(debit - credit);
     } catch { totals = "Saisissez des montants positifs avec deux décimales au maximum."; }
   }
 
@@ -183,7 +185,7 @@ export default function LedgerPage() {
       onRetry={() => setRevision((value) => value + 1)}
       loading={<p>Chargement de la comptabilité…</p>}
     />
-    {setup && !setup.activity && <form id="creer-activite" tabIndex={-1} onSubmit={(e) => {
+    {setup && !setup.activity && <FrenchForm id="creer-activite" tabIndex={-1} onSubmit={(e) => {
       const data = formData(e);
       void mutate(() => request("/activity", "POST", { activity_name: data.get("name"), activity_start_date: data.get("start") }), "Activité créée.");
     }}>
@@ -191,10 +193,10 @@ export default function LedgerPage() {
       <p>Pour une activité déjà existante, les soldes antérieurs devront être repris par des écritures d’à-nouveaux justifiées. La création de cet espace ne reconstitue pas votre historique.</p>
       <GlossaryTip id="a-nouveaux" />
       <label>Nom de l’activité<input name="name" required maxLength={200} /></label>
-      <label>Date réelle de début<input name="start" type="date" required /></label>
+      <label>Date réelle de début<input name="start" type="date" lang="fr" required /><span className="field-hint">{DATE_HINT}</span></label>
       <button disabled={busy}>Créer l’activité</button>
-    </form>}
-    {setup?.activity && <form onSubmit={(e) => {
+    </FrenchForm>}
+    {setup?.activity && <FrenchForm onSubmit={(e) => {
       const data = formData(e);
       void mutate(() => request("/activity/identity", "POST", {
         siren: String(data.get("siren") ?? ""),
@@ -210,34 +212,34 @@ export default function LedgerPage() {
       <label>SIREN<input name="siren" inputMode="numeric" maxLength={9} defaultValue={setup.activity.siren ?? ""} /></label>
       <label>SIRET<input name="siret" inputMode="numeric" maxLength={14} defaultValue={setup.activity.siret ?? ""} /></label>
       <button disabled={busy}>Enregistrer l’identité</button>
-    </form>}
+    </FrenchForm>}
     {setup?.activity && <details id="ajouter-exercice" tabIndex={-1} open={!setup.years.length || hash === "#ajouter-exercice"}>
       <summary>{setup.activity.activity_name} · Ajouter un exercice</summary>
-      <form onSubmit={(e) => {
+      <FrenchForm onSubmit={(e) => {
         const data = formData(e);
         void mutate(() => request("/years", "POST", {
           year: Number(String(data.get("end")).slice(0, 4)), start_date: data.get("start"),
           end_date: data.get("end"), fiscal_vintage: data.get("vintage"),
         }), "Exercice créé.");
       }}>
-        <label>Début de l’exercice<input name="start" type="date" required /></label>
-        <label>Fin de l’exercice<input name="end" type="date" required /></label>
+        <label>Début de l’exercice<input name="start" type="date" lang="fr" required /><span className="field-hint">{DATE_HINT}</span></label>
+        <label>Fin de l’exercice<input name="end" type="date" lang="fr" required /><span className="field-hint">{DATE_HINT}</span></label>
         <label>Millésime fiscal<input name="vintage" pattern="[0-9]{4}" required placeholder="2026" /></label>
         <GlossaryTip id="millesime" />
         <GlossaryTip id="exercice" />
         <button disabled={busy}>Créer l’exercice</button>
-      </form>
+      </FrenchForm>
     </details>}
     {!!setup?.years.length && <>
       <PrerequisiteList id={yearCauseId} causes={yearCauses} intro="Saisie indisponible :" />
       <label id="exercice" tabIndex={-1}>Exercice<select value={year} onChange={(e) => { setYear(Number(e.target.value)); setDraft(null); setConfirmation(null); setOffset(0); setBalance(null); setLedger([]); setEntries([]); }}>
-        {setup.years.map((y) => <option key={y.id} value={y.id}>{y.year} · {y.status === "OPEN" ? "ouvert" : y.status === "CLOSED" ? "clôturé" : "prêt à clôturer"}</option>)}
+        {setup.years.map((y) => <option key={y.id} value={y.id}>{y.year} · {enumLabel("yearStatus", y.status)}</option>)}
       </select></label>
       <nav aria-label="Vues comptables" className="ledger-tabs">{(["Brouillons", "Journal", "Grand livre", "Balance", "Plan comptable", "Inventaire"] as LedgerTab[]).map((name) =>
         <button key={name} aria-pressed={tab === name} onClick={() => openTab(name)}>{name}</button>)}</nav>
       {tab === "Brouillons" && <button id="nouvelle-ecriture" disabled={!writable || busy} aria-describedby={describedBy(yearCauseId, yearCauses)} onClick={() => startDraft()}>Nouvelle écriture</button>}
       {tab === "Inventaire" && selectedYear && <InventoryForm key={year} year={selectedYear} accounts={accounts} journals={journals} onPosted={() => setRevision((v) => v + 1)} />}
-      {draft && <form className="entry-editor" onSubmit={(e) => {
+      {draft && <FrenchForm className="entry-editor" onSubmit={(e) => {
         e.preventDefault();
         void mutate(async () => {
           const body = { ...draft, lines: draft.lines.map((line) => ({ ...line, debit: amount(cents(line.debit)), credit: amount(cents(line.credit)) })) };
@@ -248,8 +250,8 @@ export default function LedgerPage() {
       }}>
         <h3>{editing ? "Modifier le brouillon" : "Nouvelle écriture"}</h3>
         <label>Journal<select value={draft.journal_code} onChange={(e) => setDraft({ ...draft, journal_code: e.target.value })}>{journals.filter((j) => j.active).map((j) => <option key={j.code} value={j.code}>{j.code} · {j.label}</option>)}</select></label>
-        <label>Date comptable<input type="date" required min={selectedYear?.start_date} max={selectedYear?.end_date} value={draft.accounting_date} onChange={(e) => setDraft({ ...draft, accounting_date: e.target.value })} /></label>
-        <label>Date de la pièce<input type="date" required value={draft.piece_date} onChange={(e) => setDraft({ ...draft, piece_date: e.target.value })} /></label>
+        <label>Date comptable<input type="date" lang="fr" required min={selectedYear?.start_date} max={selectedYear?.end_date} value={draft.accounting_date} onChange={(e) => setDraft({ ...draft, accounting_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
+        <label>Date de la pièce<input type="date" lang="fr" required value={draft.piece_date} onChange={(e) => setDraft({ ...draft, piece_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
         <label>Référence de la pièce<input required value={draft.piece_reference} onChange={(e) => setDraft({ ...draft, piece_reference: e.target.value })} /></label>
         <label>Libellé de l’écriture<input required value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} /></label>
         {draft.lines.map((line, index) => <fieldset key={index}>
@@ -257,20 +259,20 @@ export default function LedgerPage() {
           <label>Compte<select required value={line.account_number} onChange={(e) => setDraft({ ...draft, lines: draft.lines.map((l, i) => i === index ? { ...l, account_number: e.target.value } : l) })}>
             <option value="">Choisir un compte</option>{accounts.filter((a) => a.active).map((a) => <option key={a.number} value={a.number}>{a.number} · {a.label}</option>)}
           </select></label>
-          {(["label", "debit", "credit"] as const).map((key) => <label key={key}>{key === "label" ? "Libellé" : key === "debit" ? "Débit (€)" : "Crédit (€)"}<input required inputMode={key === "label" ? "text" : "decimal"} value={line[key]} onChange={(e) => setDraft({ ...draft, lines: draft.lines.map((l, i) => i === index ? { ...l, [key]: e.target.value } : l) })} /></label>)}
+          {(["label", "debit", "credit"] as const).map((key) => <label key={key}>{key === "label" ? "Libellé" : key === "debit" ? "Débit (€)" : "Crédit (€)"}<input required inputMode={key === "label" ? "text" : "decimal"} lang={key === "label" ? undefined : "fr"} placeholder={key === "label" ? undefined : "1 234,56"} data-money={key === "label" ? undefined : "true"} value={line[key]} onChange={(e) => setDraft({ ...draft, lines: draft.lines.map((l, i) => i === index ? { ...l, [key]: e.target.value } : l) })} /></label>)}
           <button type="button" disabled={draft.lines.length <= 2} onClick={() => setDraft({ ...draft, lines: draft.lines.filter((_, i) => i !== index) })}>Retirer la ligne {index + 1}</button>
         </fieldset>)}
         <p aria-live="polite">{totals}</p>
         <button type="button" disabled={draft.lines.length >= 100} onClick={() => setDraft({ ...draft, lines: [...draft.lines, blankLine()] })}>Ajouter une ligne</button>
         <button disabled={busy}>Enregistrer le brouillon</button>
         <button type="button" onClick={() => setDraft(null)}>Annuler la saisie</button>
-      </form>}
+      </FrenchForm>}
       {(tab === "Journal" || tab === "Brouillons") && <>
         <details><summary>Filtres</summary><div className="ledger-filters">
-          {Object.entries(filter).filter(([key]) => key !== "source").map(([key, value]) => <label key={key}>{{ journal_code: "Code journal", account_number: "Numéro de compte", date_from: "Du", date_to: "Au", piece: "Pièce" }[key]}<input type={key.startsWith("date") ? "date" : "text"} value={value} onChange={(e) => { setFilter({ ...filter, [key]: e.target.value }); setOffset(0); }} /></label>)}
+          {Object.entries(filter).filter(([key]) => key !== "source").map(([key, value]) => <label key={key}>{{ journal_code: "Code journal", account_number: "Numéro de compte", date_from: "Du", date_to: "Au", piece: "Pièce" }[key]}<input type={key.startsWith("date") ? "date" : "text"} lang={key.startsWith("date") ? "fr" : undefined} value={value} onChange={(e) => { setFilter({ ...filter, [key]: e.target.value }); setOffset(0); }} />{key.startsWith("date") ? <span className="field-hint">{DATE_HINT}</span> : null}</label>)}
           <label>Source<select value={filter.source} onChange={(e) => { setFilter({ ...filter, source: e.target.value }); setOffset(0); }}>
             <option value="">Toutes les sources</option>
-            {Object.entries({ MANUAL: "Saisie manuelle", REVERSAL: "Extournes", REVENUE: "Recettes", EXPENSE: "Dépenses", SETTLEMENT: "Règlements", LOAN_PAYMENT: "Échéances d’emprunt", LOAN_FUNDING: "Déblocages d’emprunt", DEPRECIATION: "Dotations aux amortissements", OPENING: "À-nouveaux", INVENTORY: "Inventaire manuel" }).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            {enumChoices("entrySource").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select></label>
         </div></details>
         <ScreenStatus
@@ -285,8 +287,8 @@ export default function LedgerPage() {
           const reversalId = `entry-${entry.id}-reversal`;
           return <article className="entry-card" key={entry.id}>
           <h3>{entry.entry_number || "Brouillon #" + entry.id} · {entry.label}</h3>
-          <p>{entry.accounting_date} · {entry.journal_code} · Pièce {entry.piece_reference}</p>
-          <div className="ledger-table"><table><thead><tr><th>Compte</th><th>Libellé</th><th>Débit €</th><th>Crédit €</th></tr></thead><tbody>{entry.lines.map((line, i) => <tr key={i}><td>{line.account_number}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>{entry.balanced ? "Équilibrée" : "Déséquilibrée"}</th><td>{entry.total_debit}</td><td>{entry.total_credit}</td></tr></tfoot></table></div>
+          <p>{formatIsoDate(entry.accounting_date)} · {entry.journal_code} · Pièce {entry.piece_reference} · {enumLabel("entryStatus", entry.status)}</p>
+          <div className="ledger-table"><table><thead><tr><th>Compte</th><th>Libellé</th><th>Débit €</th><th>Crédit €</th></tr></thead><tbody>{entry.lines.map((line, i) => <tr key={i}><td>{line.account_number}</td><td>{line.label}</td><td>{formatAmount(line.debit)}</td><td>{formatAmount(line.credit)}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>{entry.balanced ? "Équilibrée" : "Déséquilibrée"}</th><td>{formatAmount(entry.total_debit)}</td><td>{formatAmount(entry.total_credit)}</td></tr></tfoot></table></div>
           {entry.status === "DRAFT" ? <>
             <button id={`ecriture-${entry.id}`} disabled={!writable || busy} aria-describedby={describedBy(yearCauseId, yearCauses)} onClick={() => startDraft(entry)}>Modifier</button>
             <button disabled={!writable || busy || !entry.balanced} aria-describedby={describedBy(yearCauseId, yearCauses, !entry.balanced ? balanceId : undefined)} onClick={() => setConfirmation({ action: "validate", entry })}>Valider</button>
@@ -302,7 +304,7 @@ export default function LedgerPage() {
         <button disabled={!offset} onClick={() => setOffset(offset - 25)}>Page précédente</button>
         <button disabled={offset + 25 >= count} onClick={() => setOffset(offset + 25)}>Page suivante</button>
       </>}
-      {confirmation && <form className="entry-editor" onSubmit={(e) => {
+      {confirmation && <FrenchForm className="entry-editor" onSubmit={(e) => {
         const data = formData(e); const { action, entry } = confirmation;
         void mutate(async () => {
           await request("/entries/" + entry.id + (action === "delete" ? "" : "/" + action), action === "delete" ? "DELETE" : "POST",
@@ -313,17 +315,17 @@ export default function LedgerPage() {
         <h3>Confirmer : {confirmation.entry.label}</h3>
         <p>{confirmation.action === "validate" ? "La validation attribue un numéro définitif. Cette écriture ne pourra plus être modifiée ou supprimée." : confirmation.action === "delete" ? "Le brouillon sera supprimé. Son historique sera conservé." : "Une nouvelle écriture inversera les débits et crédits. L’écriture d’origine sera conservée."}</p>
         {confirmation.action === "reverse" && <>
-          <label>Date de l’extourne<input name="date" type="date" required min={selectedYear?.start_date} max={selectedYear?.end_date} /></label>
+          <label>Date de l’extourne<input name="date" type="date" lang="fr" required min={selectedYear?.start_date} max={selectedYear?.end_date} /><span className="field-hint">{DATE_HINT}</span></label>
           <label>Pièce de l’extourne<input name="piece" required /></label>
           <label>Motif<input name="reason" required minLength={5} maxLength={300} /></label>
         </>}
         <button disabled={busy}>Confirmer {confirmation.action === "validate" ? "la validation" : confirmation.action === "delete" ? "la suppression" : "l’extourne"}</button>
         <button type="button" onClick={() => setConfirmation(null)}>Annuler</button>
-      </form>}
+      </FrenchForm>}
       {audit && <details open><summary>Historique de l’écriture</summary>{audit.map((item, i) => <div key={i}><strong>{item.action} · {item.timestamp}</strong><pre>{JSON.stringify(item.details, null, 2)}</pre></div>)}<button onClick={() => setAudit(null)}>Fermer l’historique</button></details>}
       {tab === "Balance" && <>
         <ScreenStatus state={listView} onRetry={() => setRevision((value) => value + 1)} loading={<p>Chargement…</p>} />
-        {listVisible && balance && <div className="ledger-table"><table><caption>Balance générale · écritures validées</caption><thead><tr><th>Compte</th><th>Libellé</th><th>Total débit</th><th>Total crédit</th><th>Solde débiteur</th><th>Solde créditeur</th></tr></thead><tbody>{balance.balance.map((row) => <tr key={row.account_number}><td>{row.account_number}</td><td>{row.label}</td><td>{row.total_debit}</td><td>{row.total_credit}</td><td>{row.debit_balance}</td><td>{row.credit_balance}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>{balance.balanced ? "Balance équilibrée" : "ERREUR : balance déséquilibrée"}</th><td>{balance.total_debit}</td><td>{balance.total_credit}</td><td colSpan={2}>EUR</td></tr></tfoot></table></div>}
+        {listVisible && balance && <div className="ledger-table"><table><caption>Balance générale · écritures validées</caption><thead><tr><th>Compte</th><th>Libellé</th><th>Total débit</th><th>Total crédit</th><th>Solde débiteur</th><th>Solde créditeur</th></tr></thead><tbody>{balance.balance.map((row) => <tr key={row.account_number}><td>{row.account_number}</td><td>{row.label}</td><td>{formatAmount(row.total_debit)}</td><td>{formatAmount(row.total_credit)}</td><td>{formatAmount(row.debit_balance)}</td><td>{formatAmount(row.credit_balance)}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>{balance.balanced ? "Balance équilibrée" : "ERREUR : balance déséquilibrée"}</th><td>{formatAmount(balance.total_debit)}</td><td>{formatAmount(balance.total_credit)}</td><td colSpan={2}>EUR</td></tr></tfoot></table></div>}
       </>}
       {tab === "Grand livre" && <>
         <label>Compte du grand livre<select value={account} onChange={(e) => { setAccount(e.target.value); setLedger([]); }}>{accounts.map((a) => <option key={a.number} value={a.number}>{a.number} · {a.label}</option>)}</select></label>
@@ -333,7 +335,7 @@ export default function LedgerPage() {
           loading={<p>Chargement…</p>}
           empty={<p>Aucune ligne dans ce grand livre.</p>}
         />
-        {listVisible && <div className="ledger-table"><table><caption>Solde positif : débiteur · négatif : créditeur</caption><thead><tr><th>Date</th><th>Écriture</th><th>Libellé</th><th>Débit</th><th>Crédit</th><th>Solde</th></tr></thead><tbody>{ledger.map((line, i) => <tr key={i}><td>{line.date}</td><td>{line.entry_number}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td><td>{line.balance}</td></tr>)}</tbody></table></div>}
+        {listVisible && <div className="ledger-table"><table><caption>Solde positif : débiteur · négatif : créditeur</caption><thead><tr><th>Date</th><th>Écriture</th><th>Libellé</th><th>Débit</th><th>Crédit</th><th>Solde</th></tr></thead><tbody>{ledger.map((line, i) => <tr key={i}><td>{formatIsoDate(line.date)}</td><td>{line.entry_number}</td><td>{line.label}</td><td>{formatAmount(line.debit)}</td><td>{formatAmount(line.credit)}</td><td>{formatAmount(line.balance)}</td></tr>)}</tbody></table></div>}
       </>}
       {tab === "Plan comptable" && <>
         <p>Le plan initial est configurable. Les libellés des comptes utilisés par des écritures validées sont figés.</p>

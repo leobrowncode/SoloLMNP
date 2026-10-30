@@ -5,6 +5,7 @@ import PrerequisiteList from "./PrerequisiteList";
 import ScreenStatus from "./ScreenStatus";
 import { useScreenQuery } from "./useScreenQuery";
 import type { GlossaryId } from "./glossary";
+import { formatCents } from "../lib/format";
 
 const STEP_HELP: Record<DashboardStepId, GlossaryId> = {
   structure: "siren",
@@ -21,13 +22,6 @@ const AMOUNT_LABEL: Partial<Record<DashboardStepId, string>> = {
   opening: "Montant des à-nouveaux",
   filing: "Résultat fiscal",
 };
-
-function formatCents(cents: number): string {
-  const value = BigInt(cents);
-  const sign = value < 0n ? "-" : "";
-  const absolute = value < 0n ? -value : value;
-  return `${sign}${absolute / 100n}.${String(absolute % 100n).padStart(2, "0")} €`;
-}
 
 function formatWhen(value: string): string {
   const date = new Date(value);
@@ -53,7 +47,7 @@ function StepCard({ step }: { step: DashboardStep }) {
       <p>{step.summary}</p>
       {amountLabel && step.amount_cents !== null && (
         <p className="dashboard-amount">
-          {amountLabel} : <strong>{formatCents(step.amount_cents)}</strong>
+          {amountLabel} : <strong>{formatCents(BigInt(step.amount_cents))}</strong>
         </p>
       )}
       {step.last_event ? (

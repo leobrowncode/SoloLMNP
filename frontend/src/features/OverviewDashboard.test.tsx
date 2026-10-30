@@ -88,9 +88,9 @@ describe("overview dashboard", () => {
     renderBoard();
     expect((await screen.findAllByText("Bloqué")).length).toBeGreaterThan(0);
     expect(screen.getByText(/Montant des opérations/)).toBeInTheDocument();
-    expect(screen.getByText("123.45 €")).toBeInTheDocument();
-    expect(screen.getByText("25.00 €")).toBeInTheDocument();
-    expect(screen.getByText("0.00 €")).toBeInTheDocument();
+    expect(screen.getByText("123,45 €")).toBeInTheDocument();
+    expect(screen.getByText("25,00 €")).toBeInTheDocument();
+    expect(screen.getByText("0,00 €")).toBeInTheDocument();
     expect(screen.getByText(/Millésime en recherche/)).toBeInTheDocument();
     expect(screen.queryByText(/déclarable/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Continuer" })).toHaveAttribute(
@@ -146,7 +146,7 @@ describe("overview dashboard", () => {
 
     renderBoard();
     expect(await screen.findByText("Les à-nouveaux sont comptabilisés.")).toBeInTheDocument();
-    expect(screen.getByText("2500.50 €")).toBeInTheDocument();
+    expect(screen.getByText("2 500,50 €")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Continuer" })).toHaveAttribute("href", "/fiscalite#calcul-fiscal");
     expect(screen.queryByText(/déclarable/i)).not.toBeInTheDocument();
   });

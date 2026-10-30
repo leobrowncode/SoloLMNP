@@ -6,6 +6,8 @@ import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
+import { DATE_HINT, formatAmount, formatCents, formatIsoDate } from "../lib/format";
+import FrenchForm from "../lib/FrenchForm";
 
 type InventoryInput = EntryInput & { justification: string; request_id: string };
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
@@ -65,7 +67,7 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
     const lines = review?.lines ?? draft.lines;
     const debit = lines.reduce((sum, line) => sum + cents(line.debit), 0n);
     const credit = lines.reduce((sum, line) => sum + cents(line.credit), 0n);
-    totals = `Débit : ${amount(debit)} € · Crédit : ${amount(credit)} € · Écart : ${amount(debit - credit)} €`;
+    totals = `Débit : ${formatCents(debit)} · Crédit : ${formatCents(credit)} · Écart : ${formatCents(debit - credit)}`;
   } catch { /* Invalid input is explained on review. */ }
 
   function prepare() {
@@ -114,7 +116,7 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
     {cleanupError && <><p role="alert">{cleanupError}</p><button type="button" onClick={clearConfirmedRequest}>Effacer la demande locale confirmée</button></>}
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>L’écriture est comptabilisée, mais l’actualisation a échoué : {error}. Actualisez le journal.</p>}
   </section>;
-  return <form className="entry-editor" onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(); }}>
+  return <FrenchForm className="entry-editor" onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(); }}>
     <div className="heading-with-help">
       <h3>Inventaire manuel · exercice {year.year}</h3>
       <GlossaryTip id="inventaire" />
@@ -125,23 +127,23 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
     {!review && <fieldset disabled={year.status !== "OPEN" || !!recovery.error}>
       <legend>Saisie justifiée</legend>
       <label>Journal d’inventaire<select required value={draft.journal_code} onChange={(e) => setDraft({ ...draft, journal_code: e.target.value })}><option value="">Choisir un journal</option>{general.map((j) => <option key={j.code} value={j.code}>{j.code} · {j.label}</option>)}</select></label>
-      <label>Date comptable<input type="date" required min={year.start_date} max={year.end_date} value={draft.accounting_date} onChange={(e) => setDraft({ ...draft, accounting_date: e.target.value })} /></label>
-      <label>Date de la pièce<input type="date" required value={draft.piece_date} onChange={(e) => setDraft({ ...draft, piece_date: e.target.value })} /></label>
+      <label>Date comptable<input type="date" lang="fr" required min={year.start_date} max={year.end_date} value={draft.accounting_date} onChange={(e) => setDraft({ ...draft, accounting_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
+      <label>Date de la pièce<input type="date" lang="fr" required value={draft.piece_date} onChange={(e) => setDraft({ ...draft, piece_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
       <label>Référence de la pièce<input required maxLength={200} value={draft.piece_reference} onChange={(e) => setDraft({ ...draft, piece_reference: e.target.value })} /></label>
       <label>Libellé de l’écriture<input required maxLength={300} value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} /></label>
       <label>Justification et calcul<textarea required minLength={10} maxLength={3000} value={justification} onChange={(e) => setJustification(e.target.value)} /></label>
       {draft.lines.map((line, index) => <fieldset key={index}><legend>Ligne {index + 1}</legend>
         <label>Compte<select required value={line.account_number} onChange={(e) => setDraft({ ...draft, lines: draft.lines.map((l, i) => i === index ? { ...l, account_number: e.target.value } : l) })}><option value="">Choisir un compte</option>{accounts.filter((a) => a.active).map((a) => <option key={a.number} value={a.number}>{a.number} · {a.label}</option>)}</select></label>
-        {(["label", "debit", "credit"] as const).map((key) => <label key={key}>{key === "label" ? "Libellé" : key === "debit" ? "Débit (€)" : "Crédit (€)"}<input required maxLength={key === "label" ? 300 : 30} inputMode={key === "label" ? "text" : "decimal"} value={line[key]} onChange={(e) => setDraft({ ...draft, lines: draft.lines.map((l, i) => i === index ? { ...l, [key]: e.target.value } : l) })} /></label>)}
+        {(["label", "debit", "credit"] as const).map((key) => <label key={key}>{key === "label" ? "Libellé" : key === "debit" ? "Débit (€)" : "Crédit (€)"}<input required maxLength={key === "label" ? 300 : 30} inputMode={key === "label" ? "text" : "decimal"} lang={key === "label" ? undefined : "fr"} placeholder={key === "label" ? undefined : "1 234,56"} data-money={key === "label" ? undefined : "true"} value={line[key]} onChange={(e) => setDraft({ ...draft, lines: draft.lines.map((l, i) => i === index ? { ...l, [key]: e.target.value } : l) })} /></label>)}
         <button type="button" disabled={draft.lines.length <= 2} onClick={() => setDraft({ ...draft, lines: draft.lines.filter((_, i) => i !== index) })}>Retirer la ligne {index + 1}</button>
       </fieldset>)}
       <button type="button" disabled={draft.lines.length >= 100} onClick={() => setDraft({ ...draft, lines: [...draft.lines, blankLine()] })}>Ajouter une ligne</button>
     </fieldset>}
     {review && <>
       <h4>Vérifier avant validation définitive</h4>
-      <p>{review.journal_code} · {review.accounting_date} · {review.label}</p>
-      <p>Pièce {review.piece_reference} du {review.piece_date}</p><p>{review.justification}</p>
-      <table><caption>Lignes à comptabiliser</caption><thead><tr><th>Compte</th><th>Libellé</th><th>Débit €</th><th>Crédit €</th></tr></thead><tbody>{review.lines.map((line, i) => <tr key={i}><td>{line.account_number}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td></tr>)}</tbody></table>
+      <p>{review.journal_code} · {formatIsoDate(review.accounting_date)} · {review.label}</p>
+      <p>Pièce {review.piece_reference} du {formatIsoDate(review.piece_date)}</p><p>{review.justification}</p>
+      <table><caption>Lignes à comptabiliser</caption><thead><tr><th>Compte</th><th>Libellé</th><th>Débit €</th><th>Crédit €</th></tr></thead><tbody>{review.lines.map((line, i) => <tr key={i}><td>{line.account_number}</td><td>{line.label}</td><td>{formatAmount(line.debit)}</td><td>{formatAmount(line.credit)}</td></tr>)}</tbody></table>
       {!attempted && <button type="button" onClick={() => setReview(null)}>Corriger la saisie</button>}
       {attempted && <><p>Demande conservée dans cet onglet, y compris après rechargement. En cas de réponse perdue, réessayez la même demande. Ne fermez pas l’onglet avant résolution. Avant de l’abandonner, vérifiez le journal pour éviter une double saisie.</p>
         <label><input type="checkbox" disabled={busy} checked={checked} onChange={(e) => setChecked(e.target.checked)} />J’ai vérifié le journal et souhaite abandonner cette demande.</label>
@@ -153,5 +155,5 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
     <p aria-live="polite">{totals}</p>
     <button disabled={busy || verifyCauses.length > 0} aria-busy={busy || undefined} aria-describedby={describedBy(verifyCauseId, verifyCauses)}>{busy ? "Comptabilisation…" : review ? attempted ? "Réessayer la même demande" : "Confirmer la comptabilisation" : "Vérifier l’inventaire"}</button>
     <PrerequisiteList id={verifyCauseId} causes={verifyCauses} />
-  </form>;
+  </FrenchForm>;
 }

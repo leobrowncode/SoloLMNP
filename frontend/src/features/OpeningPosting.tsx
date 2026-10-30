@@ -5,6 +5,8 @@ import PrerequisiteList from "./PrerequisiteList";
 import type { Opening } from "./OpeningPreview";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
+import { formatAmount } from "../lib/format";
+import FrenchForm from "../lib/FrenchForm";
 
 interface Continuity {
   balances_match: boolean; opening_entry_id: number | null; source_closed?: boolean;
@@ -60,7 +62,7 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
   return <section aria-labelledby="opening-posting-title">
     <h4 id="opening-posting-title" tabIndex={-1}>Comptabiliser et contrôler les à-nouveaux</h4>
     <p>La génération valide une écriture à la date d’ouverture. Elle exige un exercice précédent clôturé sans brouillon et un exercice destinataire ouvert et vide.</p>
-    {preview && !receipt && <form onSubmit={(event) => { void post(event); }}>
+    {preview && !receipt && <FrenchForm onSubmit={(event) => { void post(event); }}>
       <fieldset disabled={blocked || busy}>
         <legend>Reprise avant affectation du résultat</legend>
         <label>Journal des à-nouveaux<input name="journal" defaultValue="AN" pattern="[A-Z0-9]{2,10}" required maxLength={10} /></label>
@@ -71,7 +73,7 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
       </fieldset>
       <button type="submit" disabled={blocked || busy} aria-busy={busy || undefined} aria-describedby={describedBy(causeId, causes)}>Générer et valider les à-nouveaux</button>
       <PrerequisiteList id={causeId} causes={causes} />
-    </form>}
+    </FrenchForm>}
     {receipt && <p role="status">{receipt}</p>}
     <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void check(); }}>Contrôler la continuité des à-nouveaux</button>
     <MutationStatus step={step} />
@@ -81,7 +83,7 @@ export default function OpeningPosting({ year, preview }: { year: number; previe
       {control.opening_entry_id !== null && (!control.source_closed || !control.source_unchanged || !!control.excluded_draft_count) && <p role="alert">La source a changé, n’est plus clôturée ou contient des brouillons. Réexaminez la reprise.</p>}
       {control.differences.length > 0 && <table><caption>Écarts de reprise par compte</caption>
         <thead><tr><th>Compte</th><th>Attendu (€)</th><th>Repris (€)</th><th>Écart (€)</th></tr></thead>
-        <tbody>{control.differences.map((row) => <tr key={row.account_number}><td>{row.account_number}</td><td>{row.expected_balance}</td><td>{row.opening_balance}</td><td>{row.difference}</td></tr>)}</tbody>
+        <tbody>{control.differences.map((row) => <tr key={row.account_number}><td>{row.account_number}</td><td>{formatAmount(row.expected_balance)}</td><td>{formatAmount(row.opening_balance)}</td><td>{formatAmount(row.difference)}</td></tr>)}</tbody>
       </table>}
     </div>}
   </section>;

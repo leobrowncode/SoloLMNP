@@ -11,6 +11,7 @@ import ApiErrorAlert from "./ApiErrorAlert";
 import GlossaryTip from "./GlossaryTip";
 import PrerequisiteList from "./PrerequisiteList";
 import { idleView, toApiError, type ScreenView } from "./screenState";
+import { centsToApiAmount, formatAmount, formatEuros, formatIsoDate, parseAmountToCents } from "../lib/format";
 
 interface YearOption { id: number; year: number; start_date?: string; status?: string }
 interface EntryLine { account_number: string; label: string; debit: string; credit: string }
@@ -30,9 +31,14 @@ const CHARGES: [string, string, string][] = [
 ];
 
 function amount(value: string): string | null {
-  const cleaned = value.replace(/\s/g, "").replace(",", ".");
-  if (cleaned === "") return "0.00";
-  return /^\d+(\.\d{1,2})?$/.test(cleaned) ? Number(cleaned).toFixed(2) : null;
+  if (value.trim() === "") return "0.00";
+  try {
+    const cents = parseAmountToCents(value);
+    if (cents < 0n) return null;
+    return centsToApiAmount(cents);
+  } catch {
+    return null;
+  }
 }
 
 export default function PropertyEntry({
@@ -193,7 +199,7 @@ export default function PropertyEntry({
       </label>
       {propertyLoans.map((row) => <label key={row.id} className="field-money">
         Capital restant dû au début de l’exercice — {row.lender} ({row.principal_account})
-        <input inputMode="decimal" value={outstanding[row.id] ?? ""} onChange={(event) => {
+        <input inputMode="decimal" lang="fr" data-money="true" placeholder="1 234,56" value={outstanding[row.id] ?? ""} onChange={(event) => {
           setOutstanding({ ...outstanding, [row.id]: event.target.value }); setPreview(null);
         }} />
       </label>)}
@@ -203,11 +209,11 @@ export default function PropertyEntry({
         </select>
       </label>
       <label className="field-money">Solde du compte bancaire au début de l’exercice (€)
-        <input inputMode="decimal" value={bankAmount} placeholder="0,00" onChange={(event) => { setBankAmount(event.target.value); setPreview(null); }} />
+        <input inputMode="decimal" lang="fr" data-money="true" value={bankAmount} placeholder="1 234,56" onChange={(event) => { setBankAmount(event.target.value); setPreview(null); }} />
       </label>
       {CHARGES.map(([key, account, label]) => <label key={key} className="field-money">
         {label} ({account})
-        <input inputMode="decimal" value={charges[key] ?? ""} placeholder="0,00" onChange={(event) => {
+        <input inputMode="decimal" lang="fr" data-money="true" value={charges[key] ?? ""} placeholder="1 234,56" onChange={(event) => {
           setCharges({ ...charges, [key]: event.target.value }); setPreview(null);
         }} />
       </label>)}
@@ -229,15 +235,15 @@ export default function PropertyEntry({
     {preview && <div className="ledger-table">
       <table>
         <caption>
-          Écriture du {preview.accounting_date} (pièce du {preview.piece_date}) ·{" "}
+          Écriture du {formatIsoDate(preview.accounting_date)} (pièce du {formatIsoDate(preview.piece_date)}) ·{" "}
           {preview.owner_contribution.startsWith("-")
-            ? `prélèvement de l’exploitant ${preview.owner_contribution.slice(1)} €`
-            : `apport de l’exploitant ${preview.owner_contribution} €`}
+            ? `prélèvement de l’exploitant ${formatEuros(preview.owner_contribution.slice(1))}`
+            : `apport de l’exploitant ${formatEuros(preview.owner_contribution)}`}
         </caption>
         <thead><tr><th>Compte</th><th>Libellé</th><th>Débit (€)</th><th>Crédit (€)</th></tr></thead>
         <tbody>
           {preview.lines.map((line, index) => <tr key={`${line.account_number}-${index}`}>
-            <td>{line.account_number}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td>
+            <td>{line.account_number}</td><td>{line.label}</td><td>{formatAmount(line.debit)}</td><td>{formatAmount(line.credit)}</td>
           </tr>)}
         </tbody>
       </table>

@@ -71,8 +71,8 @@ describe("OperationsPage", () => {
     mockApi();
     renderOperations();
     await userEvent.click(await screen.findByRole("button", { name: /Transactions/ }));
-    expect(await screen.findByText(/Assurance · 100.00 €/)).toBeInTheDocument();
-    expect(screen.getByText(/Reste à régler : 40.00 €/)).toBeInTheDocument();
+    expect(await screen.findByText(/Assurance · 100,00 €/)).toBeInTheDocument();
+    expect(screen.getByText(/Reste à régler : 40,00 €/)).toBeInTheDocument();
     expect(screen.getByText(/La part déductible ne change pas l’écriture/)).toBeInTheDocument();
   });
 

@@ -9,6 +9,7 @@ import GlossaryTip from "./GlossaryTip";
 import {
   beginLoad, defer, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
 } from "./screenState";
+import { formatAmount, formatEuros, formatIsoDate } from "../lib/format";
 import "./ledger.css";
 
 interface Row { account_number: string; label: string; amount: string }
@@ -23,8 +24,8 @@ export interface Statements {
 function Accounts({ title, rows, total }: { title: string; rows: Row[]; total: string }) {
   return <section><h4>{title}</h4><table><caption>{title} par compte</caption>
     <thead><tr><th>Compte</th><th>Libellé</th><th>Solde (€)</th></tr></thead>
-    <tbody>{rows.map((row) => <tr key={row.account_number}><td>{row.account_number}</td><td>{row.label}</td><td>{row.amount}</td></tr>)}</tbody>
-    <tfoot><tr><th colSpan={2}>Total {title.toLowerCase()}</th><td>{total}</td></tr></tfoot>
+    <tbody>{rows.map((row) => <tr key={row.account_number}><td>{row.account_number}</td><td>{row.label}</td><td>{formatAmount(row.amount)}</td></tr>)}</tbody>
+    <tfoot><tr><th colSpan={2}>Total {title.toLowerCase()}</th><td>{formatAmount(total)}</td></tr></tfoot>
   </table></section>;
 }
 
@@ -118,11 +119,11 @@ export default function StatementsPage() {
       />
     )}
     {data && <div aria-live="polite">
-      <p>Période : {data.start_date} — {data.end_date}. Brouillons exclus : {data.excluded_draft_count}.</p>
+      <p>Période : {formatIsoDate(data.start_date)} — {formatIsoDate(data.end_date)}. Brouillons exclus : {data.excluded_draft_count}.</p>
       <h3>Compte de résultat</h3>
       <Accounts title="Produits" rows={data.income_statement.income} total={data.income_statement.total_income} />
       <Accounts title="Charges" rows={data.income_statement.expenses} total={data.income_statement.total_expenses} />
-      <p><strong>Résultat comptable : {data.income_statement.result} €</strong></p>
+      <p><strong>Résultat comptable : {formatEuros(data.income_statement.result)}</strong></p>
       {data.presentation && <div>
         <h3>Présentation par rubriques</h3>
         <p>{data.presentation.reclassifications_applied ? "Reclassements appliqués." : "Aucun reclassement automatique. Un solde inhabituel reste dans sa rubrique."}</p>
@@ -135,8 +136,8 @@ export default function StatementsPage() {
       <Accounts title="Actif net" rows={data.balance_sheet.assets} total={data.balance_sheet.total_assets} />
       <Accounts title="Dettes" rows={data.balance_sheet.liabilities} total={data.balance_sheet.total_liabilities} />
       <Accounts title="Capitaux propres hors résultat" rows={data.balance_sheet.equity} total={data.balance_sheet.total_equity} />
-      <p>Résultat de l’exercice : {data.balance_sheet.current_result} €</p>
-      <p><strong>Total passif et capitaux propres : {data.balance_sheet.total_liabilities_and_equity} €</strong></p>
+      <p>Résultat de l’exercice : {formatEuros(data.balance_sheet.current_result)}</p>
+      <p><strong>Total passif et capitaux propres : {formatEuros(data.balance_sheet.total_liabilities_and_equity)}</strong></p>
     </div>}
   </section>;
 }

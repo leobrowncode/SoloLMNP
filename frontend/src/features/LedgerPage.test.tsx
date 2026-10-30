@@ -58,7 +58,7 @@ describe("ledger", () => {
   it("loads the balance from the ledger API", async () => {
     mockApi(); renderLedger("Balance");
     expect(await screen.findByText("Balance équilibrée")).toBeInTheDocument();
-    expect(screen.getByRole("table")).toHaveTextContent("123.45");
+    expect(screen.getByRole("table")).toHaveTextContent("123,45");
   });
   it("filters generated and business entries with readable source choices", async () => {
     const fetcher = mockApi(); renderLedger("Journal");

@@ -1,4 +1,3 @@
-export interface Year { id: number; year: number; start_date: string; end_date: string; status: string }
 import {
   errorSummary,
   parseApiErrorDetail,
@@ -6,6 +5,9 @@ import {
   type ApiErrorDetail,
   type ApiErrorIssue,
 } from "./errors";
+import { AMOUNT_INPUT_ERROR, centsToApiAmount, parseAmountToCents } from "../lib/format";
+
+export interface Year { id: number; year: number; start_date: string; end_date: string; status: string }
 
 export interface Setup {
   activity: { activity_name: string; siren?: string | null; siret?: string | null } | null;
@@ -72,12 +74,10 @@ export async function request<T>(
 }
 // Browser arithmetic uses integer cents; money never passes through Number.
 export function cents(value: string): bigint {
-  if (!/^\d+(?:[.,]\d{1,2})?$/.test(value)) throw new Error("Montant au centime requis.");
-  const [whole = "0", fraction = ""] = value.replace(",", ".").split(".");
-  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, "0"));
+  const parsed = parseAmountToCents(value);
+  if (parsed < 0n) throw new Error(AMOUNT_INPUT_ERROR);
+  return parsed;
 }
 export function amount(value: bigint): string {
-  const sign = value < 0n ? "-" : "";
-  const absolute = value < 0n ? -value : value;
-  return sign + String(absolute / 100n) + "." + String(absolute % 100n).padStart(2, "0");
+  return centsToApiAmount(value);
 }

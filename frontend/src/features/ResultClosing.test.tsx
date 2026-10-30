@@ -163,7 +163,7 @@ test("a zero result confirms without a result account", async () => {
   }), async () => response({ created: true, entry: { entry_number: "2025-000011" } }));
   render(<ResultClosing year={1} />);
   fireEvent.click(screen.getByRole("button", { name: "Préparer la centralisation" }));
-  expect(await screen.findByText(/Résultat à centraliser : 0.00/)).toBeInTheDocument();
+  expect(await screen.findByText(/Résultat à centraliser : 0,00/)).toBeInTheDocument();
   expect(screen.queryByLabelText("Compte de résultat")).not.toBeInTheDocument();
   expect(calls.every((call) => call.method === "GET")).toBe(true);
   fill();

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 import { entryLabel, frStamp, type EntryChoice } from "../api/conservation";
@@ -6,6 +6,7 @@ import { RequestError, request } from "../api/ledger";
 import ApiErrorAlert from "./ApiErrorAlert";
 import GlossaryTip from "./GlossaryTip";
 import { toApiError } from "./screenState";
+import { DATE_HINT } from "../lib/format";
 
 export default function EntryPicker({
   selected,
@@ -14,6 +15,7 @@ export default function EntryPicker({
   selected: EntryChoice | null;
   onSelect: (entry: EntryChoice | null) => void;
 }) {
+  const dateId = useId();
   const [number, setNumber] = useState("");
   const [entryDate, setEntryDate] = useState("");
   const [piece, setPiece] = useState("");
@@ -71,8 +73,16 @@ export default function EntryPicker({
           <input value={number} onChange={(event) => setNumber(event.target.value)} autoComplete="off" />
         </label>
         <label>
-          Date de l’écriture
-          <input type="date" value={entryDate} onChange={(event) => setEntryDate(event.target.value)} />
+          <span id={`${dateId}-label`}>Date de l’écriture</span>
+          <input
+            type="date"
+            lang="fr"
+            aria-labelledby={`${dateId}-label`}
+            aria-describedby={`${dateId}-hint`}
+            value={entryDate}
+            onChange={(event) => setEntryDate(event.target.value)}
+          />
+          <span id={`${dateId}-hint`} className="field-hint">{DATE_HINT}</span>
         </label>
         <label>
           Pièce

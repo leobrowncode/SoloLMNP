@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
+import { formatAmount, formatIsoDate } from "../lib/format";
 import OpeningPosting from "./OpeningPosting";
 import GlossaryTip from "./GlossaryTip";
 import ScreenStatus from "./ScreenStatus";
@@ -53,14 +54,14 @@ export default function OpeningPreview({ year }: { year: number }) {
       empty={<p>Aucun solde à reprendre.</p>}
     />
     {data && <div aria-live="polite">
-      <p>Soldes au {data.source_end_date} pour l’ouverture du {data.opening_date}. Brouillons exclus : {data.excluded_draft_count}.</p>
+      <p>Soldes au {formatIsoDate(data.source_end_date)} pour l’ouverture du {formatIsoDate(data.opening_date)}. Brouillons exclus : {data.excluded_draft_count}.</p>
       <ul>{data.warnings.map((warning) => <li key={warning.code}>{warning.message}</li>)}</ul>
       <table><caption>Soldes à reprendre — prévisualisation provisoire</caption>
         <thead><tr><th>Compte</th><th>Libellé</th><th>Débit (€)</th><th>Crédit (€)</th></tr></thead>
         <tbody>{[...data.lines, ...(data.result_line ? [data.result_line] : [])].map((row) => <tr key={row.account_number ?? "result"}>
-          <td>{row.account_number ?? "À déterminer"}</td><td>{row.label}</td><td>{row.debit}</td><td>{row.credit}</td>
+          <td>{row.account_number ?? "À déterminer"}</td><td>{row.label}</td><td>{formatAmount(row.debit)}</td><td>{formatAmount(row.credit)}</td>
         </tr>)}</tbody>
-        <tfoot><tr><th colSpan={2}>Totaux incluant le résultat précédent</th><td>{data.total_debit}</td><td>{data.total_credit}</td></tr></tfoot>
+        <tfoot><tr><th colSpan={2}>Totaux incluant le résultat précédent</th><td>{formatAmount(data.total_debit)}</td><td>{formatAmount(data.total_credit)}</td></tr></tfoot>
       </table>
     </div>}
     <OpeningPosting key={data ? "loaded" : "empty"} year={year} preview={data} />
