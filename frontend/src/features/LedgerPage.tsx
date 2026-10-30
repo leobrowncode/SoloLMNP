@@ -20,6 +20,9 @@ import "./ledger.css";
 import ChartOfAccounts from "./ChartOfAccounts";
 import InventoryForm from "./InventoryForm";
 import GlossaryTip from "./GlossaryTip";
+import { GLOSSARY } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice, type ShowSaveNotice } from "./localFeedback";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 
@@ -48,7 +51,7 @@ export default function LedgerPage() {
   const [actionError, setActionError] = useState("");
   const [catalog, setCatalog] = useState<ScreenView<{ ready: true }>>(() => beginLoad(idleView(), false));
   const [listView, setListView] = useState<ScreenView<{ queryKey: string }>>(idleView());
-  const [message, setMessage] = useState("");
+  const { notice, show, dismiss } = useSaveNotice();
   const { busy, step, run } = useMutation();
   const [revision, setRevision] = useState(0);
   const queryKey = JSON.stringify([year, tab, filter, offset, account]);
@@ -132,12 +135,18 @@ export default function LedgerPage() {
     return () => { active = false; };
   }, [year, tab, filter, offset, account, revision, queryKey, financialView]);
 
-  async function mutate(action: () => Promise<unknown>, success: string) {
+  async function mutate(action: () => Promise<unknown>, saved: ShowSaveNotice) {
     await run(async (report) => {
       report("Enregistrement comptable…");
-      setActionError(""); setMessage("");
-      try { await action(); setMessage(success); setRevision((v) => v + 1); }
-      catch (e) { setActionError(e instanceof Error ? e.message : "Service indisponible."); }
+      setActionError("");
+      dismiss();
+      try {
+        await action();
+        show(saved);
+        setRevision((v) => v + 1);
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : "Service indisponible.");
+      }
     });
   }
   function formData(event: FormEvent<HTMLFormElement>) {
@@ -179,15 +188,24 @@ export default function LedgerPage() {
     <p>Seules les écritures validées alimentent le journal, le grand livre et la balance. Leur validation est définitive.</p>
     <MutationStatus step={step} />
     {actionError && <p role="alert" className="ledger-error">{actionError}</p>}
-    {message && <p role="status">{message}</p>}
     <ScreenStatus
       state={catalog}
       onRetry={() => setRevision((value) => value + 1)}
       loading={<p>Chargement de la comptabilité…</p>}
     />
+    <div id="reglages-comptables">
+    <SaveNoticeHost place="reglages-comptables" notice={notice} onDismiss={dismiss} />
     {setup && !setup.activity && <FrenchForm id="creer-activite" tabIndex={-1} onSubmit={(e) => {
       const data = formData(e);
-      void mutate(() => request("/activity", "POST", { activity_name: data.get("name"), activity_start_date: data.get("start") }), "Activité créée.");
+      const name = String(data.get("name") ?? "");
+      void mutate(() => request("/activity", "POST", { activity_name: name, activity_start_date: data.get("start") }), {
+        kind: "Activité",
+        name: name || "nouvelle activité",
+        action: "créée",
+        targetId: "reglages-comptables",
+        detail: "Activité créée.",
+        next: { label: "Renseigner le SIREN", href: "#identite-liasse" },
+      });
     }}>
       <h3>Initialiser votre activité</h3>
       <p>Pour une activité déjà existante, les soldes antérieurs devront être repris par des écritures d’à-nouveaux justifiées. La création de cet espace ne reconstitue pas votre historique.</p>
@@ -198,10 +216,18 @@ export default function LedgerPage() {
     </FrenchForm>}
     {setup?.activity && <FrenchForm onSubmit={(e) => {
       const data = formData(e);
+      const siren = String(data.get("siren") ?? "");
       void mutate(() => request("/activity/identity", "POST", {
-        siren: String(data.get("siren") ?? ""),
+        siren,
         siret: String(data.get("siret") ?? ""),
-      }), "Identité enregistrée. Elle apparaîtra en tête de la liasse.");
+      }), {
+        kind: GLOSSARY.siren.label,
+        name: siren || "liasse",
+        action: "enregistré",
+        targetId: "reglages-comptables",
+        detail: "Identité enregistrée. Elle apparaîtra en tête de la liasse.",
+        next: { label: "Ajouter un exercice", href: "#ajouter-exercice" },
+      });
     }}>
       <div className="heading-with-help">
         <h3 id="identite-liasse" tabIndex={-1}>Identité pour la liasse</h3>
@@ -217,10 +243,19 @@ export default function LedgerPage() {
       <summary>{setup.activity.activity_name} · Ajouter un exercice</summary>
       <FrenchForm onSubmit={(e) => {
         const data = formData(e);
+        const end = String(data.get("end") ?? "");
+        const vintage = String(data.get("vintage") ?? "");
         void mutate(() => request("/years", "POST", {
-          year: Number(String(data.get("end")).slice(0, 4)), start_date: data.get("start"),
-          end_date: data.get("end"), fiscal_vintage: data.get("vintage"),
-        }), "Exercice créé.");
+          year: Number(end.slice(0, 4)), start_date: data.get("start"),
+          end_date: end, fiscal_vintage: vintage,
+        }), {
+          kind: GLOSSARY.exercice.label,
+          name: vintage || end.slice(0, 4) || "nouvel exercice",
+          action: "créé",
+          targetId: "reglages-comptables",
+          detail: "Exercice créé.",
+          next: { label: "Saisir une écriture", href: `${ledgerPath("Brouillons")}#nouvelle-ecriture` },
+        });
       }}>
         <label>Début de l’exercice<input name="start" type="date" lang="fr" required /><span className="field-hint">{DATE_HINT}</span></label>
         <label>Fin de l’exercice<input name="end" type="date" lang="fr" required /><span className="field-hint">{DATE_HINT}</span></label>
@@ -230,6 +265,7 @@ export default function LedgerPage() {
         <button disabled={busy}>Créer l’exercice</button>
       </FrenchForm>
     </details>}
+    </div>
     {!!setup?.years.length && <>
       <PrerequisiteList id={yearCauseId} causes={yearCauses} intro="Saisie indisponible :" />
       <label id="exercice" tabIndex={-1}>Exercice<select value={year} onChange={(e) => { setYear(Number(e.target.value)); setDraft(null); setConfirmation(null); setOffset(0); setBalance(null); setLedger([]); setEntries([]); }}>
@@ -237,16 +273,27 @@ export default function LedgerPage() {
       </select></label>
       <nav aria-label="Vues comptables" className="ledger-tabs">{(["Brouillons", "Journal", "Grand livre", "Balance", "Plan comptable", "Inventaire"] as LedgerTab[]).map((name) =>
         <button key={name} aria-pressed={tab === name} onClick={() => openTab(name)}>{name}</button>)}</nav>
+      <div id="ecriture-saisie">
+      <SaveNoticeHost place="ecriture-saisie" notice={notice} onDismiss={dismiss} />
       {tab === "Brouillons" && <button id="nouvelle-ecriture" disabled={!writable || busy} aria-describedby={describedBy(yearCauseId, yearCauses)} onClick={() => startDraft()}>Nouvelle écriture</button>}
       {tab === "Inventaire" && selectedYear && <InventoryForm key={year} year={selectedYear} accounts={accounts} journals={journals} onPosted={() => setRevision((v) => v + 1)} />}
       {draft && <FrenchForm className="entry-editor" onSubmit={(e) => {
         e.preventDefault();
+        const savedLabel = draft.label || "brouillon";
+        const wasEditing = Boolean(editing);
         void mutate(async () => {
           const body = { ...draft, lines: draft.lines.map((line) => ({ ...line, debit: amount(cents(line.debit)), credit: amount(cents(line.credit)) })) };
           await request(editing ? "/entries/" + editing.id : "/entries", editing ? "PUT" : "POST",
             editing ? { ...body, expected_version: editing.version } : body);
           setDraft(null); setEditing(null);
-        }, "Brouillon enregistré. Vérifiez-le avant validation.");
+        }, {
+          kind: GLOSSARY.ecriture.label,
+          name: savedLabel,
+          action: wasEditing ? "modifiée" : "enregistrée",
+          targetId: "ecriture-saisie",
+          detail: "Brouillon enregistré. Vérifiez-le avant validation.",
+          next: { label: "Valider dans les brouillons", href: `${ledgerPath("Brouillons")}#ecriture-saisie` },
+        });
       }}>
         <h3>{editing ? "Modifier le brouillon" : "Nouvelle écriture"}</h3>
         <label>Journal<select value={draft.journal_code} onChange={(e) => setDraft({ ...draft, journal_code: e.target.value })}>{journals.filter((j) => j.active).map((j) => <option key={j.code} value={j.code}>{j.code} · {j.label}</option>)}</select></label>
@@ -304,13 +351,29 @@ export default function LedgerPage() {
         <button disabled={!offset} onClick={() => setOffset(offset - 25)}>Page précédente</button>
         <button disabled={offset + 25 >= count} onClick={() => setOffset(offset + 25)}>Page suivante</button>
       </>}
+      </div>
       {confirmation && <FrenchForm className="entry-editor" onSubmit={(e) => {
         const data = formData(e); const { action, entry } = confirmation;
+        const savedLabel = entry.label;
+        const savedAction = action;
         void mutate(async () => {
-          await request("/entries/" + entry.id + (action === "delete" ? "" : "/" + action), action === "delete" ? "DELETE" : "POST",
-            action === "reverse" ? { accounting_date: data.get("date"), piece_reference: data.get("piece"), reason: data.get("reason") } : { expected_version: entry.version });
+          await request("/entries/" + entry.id + (savedAction === "delete" ? "" : "/" + savedAction), savedAction === "delete" ? "DELETE" : "POST",
+            savedAction === "reverse" ? { accounting_date: data.get("date"), piece_reference: data.get("piece"), reason: data.get("reason") } : { expected_version: entry.version });
           setConfirmation(null);
-        }, "Opération enregistrée.");
+        }, {
+          kind: GLOSSARY.ecriture.label,
+          name: savedLabel,
+          action: savedAction === "validate" ? "validée" : savedAction === "delete" ? "supprimée" : "extournée",
+          targetId: "ecriture-saisie",
+          detail: savedAction === "validate"
+            ? "Validation enregistrée. Le numéro est définitif."
+            : savedAction === "delete"
+              ? "Brouillon supprimé. Son historique est conservé."
+              : "Extourne enregistrée. L’écriture d’origine est conservée.",
+          next: savedAction === "delete"
+            ? undefined
+            : { label: "Voir le journal", href: ledgerPath("Journal") },
+        });
       }}>
         <h3>Confirmer : {confirmation.entry.label}</h3>
         <p>{confirmation.action === "validate" ? "La validation attribue un numéro définitif. Cette écriture ne pourra plus être modifiée ou supprimée." : confirmation.action === "delete" ? "Le brouillon sera supprimé. Son historique sera conservé." : "Une nouvelle écriture inversera les débits et crédits. L’écriture d’origine sera conservée."}</p>
@@ -342,13 +405,31 @@ export default function LedgerPage() {
         <ChartOfAccounts
           accounts={accounts}
           busy={busy}
+          notice={notice}
+          onDismiss={dismiss}
           onCreate={(account) => {
-            void mutate(() => request("/accounts", "POST", account), "Compte ajouté.");
+            void mutate(() => request("/accounts", "POST", account), {
+              kind: "Compte",
+              name: `${account.number} ${account.label}`,
+              action: "créé",
+              targetId: "ajouter-compte",
+              highlightId: `compte-${account.number}`,
+              next: { label: "Saisir une écriture", href: `${ledgerPath("Brouillons")}#nouvelle-ecriture` },
+            });
           }}
           onToggle={(account) => {
+            const active = !account.active;
             void mutate(
-              () => request("/accounts/" + account.number + "/active", "PATCH", { active: !account.active }),
-              "Compte mis à jour.",
+              () => request("/accounts/" + account.number + "/active", "PATCH", { active }),
+              {
+                kind: "Compte",
+                name: `${account.number} ${account.label}`,
+                action: active ? "réactivé" : "désactivé",
+                targetId: `compte-${account.number}`,
+                next: active
+                  ? { label: "Saisir une écriture", href: `${ledgerPath("Brouillons")}#nouvelle-ecriture` }
+                  : undefined,
+              },
             );
           }}
         />

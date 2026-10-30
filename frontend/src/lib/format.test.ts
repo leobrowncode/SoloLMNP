@@ -7,6 +7,7 @@ import {
   formatAmount,
   formatCents,
   formatEuros,
+  formatClockTime,
   formatIsoDate,
   formatTimestamp,
   parseAmountToCents,
@@ -55,6 +56,8 @@ describe("French dates and enums", () => {
     expect(formatIsoDate("2026-03-01T08:15:00Z")).toBe("01/03/2026");
     expect(formatTimestamp("2026-03-01T08:15:00Z")).toBe("01/03/2026 08:15");
     expect(formatIsoDate("pas une date")).toBe("pas une date");
+    expect(formatClockTime(new Date(2026, 9, 30, 15, 42))).toBe("15:42");
+    expect(formatClockTime(new Date(2026, 9, 30, 9, 5))).toBe("09:05");
   });
 
   it("translates visible enums and leaves an unknown code visible", () => {

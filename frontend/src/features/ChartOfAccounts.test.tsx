@@ -119,6 +119,10 @@ describe("chart of accounts", () => {
         account_type: "LIABILITY",
       });
     });
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/Compte “164100 Second emprunt” créé à \d{2}:\d{2}/);
+    expect(status).not.toHaveFocus();
+    expect(document.getElementById("ajouter-compte")).toHaveClass("save-highlight");
   });
 
   it("opens the nature glossary from the chart", async () => {

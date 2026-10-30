@@ -4,6 +4,9 @@ import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import { describedBy, inventoryVerifyCauses } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
+import { GLOSSARY } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice } from "./localFeedback";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 import { DATE_HINT, formatAmount, formatCents, formatIsoDate } from "../lib/format";
@@ -55,6 +58,7 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   const [cleanupError, setCleanupError] = useState("");
   const [receipt, setReceipt] = useState<Entry | null>(null);
+  const { notice, show, dismiss } = useSaveNotice();
   const [checked, setChecked] = useState(false);
   const inventoryDirty = !!review
     || justification.trim().length > 0
@@ -107,12 +111,20 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
         setAttempted(true);
         const entry = await request<Entry>("/inventory", "POST", payload);
         setReceipt(entry);
+        show({
+          kind: GLOSSARY.inventaire.label,
+          name: entry.label || "inventaire",
+          action: "comptabilisé",
+          targetId: "inventaire-comptabilise",
+          detail: `Écriture ${entry.entry_number} · ${entry.label}. Consultez le journal et son historique pour retrouver la justification ou effectuer une extourne motivée.`,
+          next: { label: "Voir le journal", href: "/comptabilite/journal" },
+        });
         clearConfirmedRequest();
         onPosted();
       } catch (reason) { setError((reason as Error).message); }
     });
   }
-  if (receipt) return <section><div className="heading-with-help"><h3>Inventaire comptabilisé</h3><GlossaryTip id="extourne" /></div><p role="status">Écriture {receipt.entry_number} · {receipt.label}. Consultez le journal et son historique pour retrouver la justification ou effectuer une extourne motivée.</p>
+  if (receipt) return <section id="inventaire-comptabilise"><SaveNoticeHost place="inventaire-comptabilise" notice={notice} onDismiss={dismiss} /><div className="heading-with-help"><h3>Inventaire comptabilisé</h3><GlossaryTip id="extourne" /></div>
     {cleanupError && <><p role="alert">{cleanupError}</p><button type="button" onClick={clearConfirmedRequest}>Effacer la demande locale confirmée</button></>}
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>L’écriture est comptabilisée, mais l’actualisation a échoué : {error}. Actualisez le journal.</p>}
   </section>;

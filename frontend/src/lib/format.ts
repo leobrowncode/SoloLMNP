@@ -154,6 +154,21 @@ export function formatTimestamp(value: string): string {
   return time ? `${date} ${time}` : date;
 }
 
+const CLOCK = new Intl.DateTimeFormat("fr-FR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** Local time as HH:MM, for example 15:42. Independent of the locale's hour separator. */
+export function formatClockTime(value: Date): string {
+  const parts = CLOCK.formatToParts(value);
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "";
+  if (!hour || !minute) return CLOCK.format(value);
+  return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+}
+
 export const ENUM_LABELS = {
   accountType: {
     ASSET: "Actif",

@@ -1,4 +1,8 @@
 import { useState } from "react";
+import GlossaryTip from "./GlossaryTip";
+import { GLOSSARY } from "./glossary";
+import { SaveNoticeHost } from "./LocalFeedback";
+import { useSaveNotice } from "./localFeedback";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 import { assetsRequest as api } from "../api/assets";
@@ -8,7 +12,6 @@ import {
   describedBy, propertyEntryPostCauses, propertyEntryPreviewCauses, propertyEntryStartCauses,
 } from "./actionCauses";
 import ApiErrorAlert from "./ApiErrorAlert";
-import GlossaryTip from "./GlossaryTip";
 import PrerequisiteList from "./PrerequisiteList";
 import { idleView, toApiError, type ScreenView } from "./screenState";
 import { centsToApiAmount, formatAmount, formatEuros, formatIsoDate, parseAmountToCents } from "../lib/format";
@@ -46,7 +49,7 @@ export default function PropertyEntry({
 }: {
   properties: Property[];
   years: YearOption[];
-  onDone: (message: string) => void;
+  onDone: () => void;
   locked?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -63,6 +66,7 @@ export default function PropertyEntry({
   const [error, setError] = useState("");
   const [loadState, setLoadState] = useState<ScreenView<{ ready: true }>>(idleView());
   const { busy, step, run } = useMutation();
+  const { notice, show, dismiss } = useSaveNotice();
   const entryDirty = open && (
     preview !== null
     || bankAmount.trim() !== ""
@@ -130,9 +134,19 @@ export default function PropertyEntry({
       try {
         const result = await api<Preview>(`/properties/${propertyId}/entry`, "POST", body);
         if (result.posted) {
+          const propertyName = properties.find((row) => row.id === propertyId)?.name ?? "bien";
+          const entryNumber = result.entry_number ?? "";
           setOpen(false);
           setPreview(null);
-          onDone(`Bien entré en comptabilité (écriture ${result.entry_number ?? ""}).`);
+          show({
+            kind: GLOSSARY.ecriture.label,
+            name: propertyName,
+            action: "comptabilisée",
+            targetId: "entree-bien-zone",
+            detail: `Bien entré en comptabilité (écriture ${entryNumber}).`,
+            next: { label: "Voir le journal", href: "/comptabilite/journal" },
+          });
+          onDone();
         } else {
           setPreview(result);
         }
@@ -146,7 +160,8 @@ export default function PropertyEntry({
   const startCauses = propertyEntryStartCauses(properties.length, years);
   const startCauseId = "property-entry-causes";
   if (!open) {
-    return <div className="property-entry">
+    return <div className="property-entry" id="entree-bien-zone">
+      <SaveNoticeHost place="entree-bien-zone" notice={notice} onDismiss={dismiss} />
       <button
         id="entree-bien"
         type="button"

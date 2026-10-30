@@ -14,6 +14,23 @@
 .ledger-page td, .ledger-page th { padding: .7rem; border-bottom: 1px solid #d8e0d8; text-align: left; }
 .ledger-page caption { text-align: left; padding: .5rem 0; }
 .entry-card, .entry-editor { border: 1px solid #d8e0d8; border-radius: 12px; padding: 1.25rem; margin: 1rem 0; background: #fbfdfb; }
+.save-highlight {
+  outline: 3px solid #d18d25;
+  outline-offset: 4px;
+  background: #fff8ea;
+  scroll-margin: 1.25rem;
+}
+.local-feedback {
+  margin: .75rem 0;
+  padding: .8rem 1rem;
+  background: #eef6ea;
+  border: 1px solid #b7d2ae;
+  border-radius: 8px;
+  color: #173c2e;
+}
+.local-feedback p { margin: 0; max-width: 68ch; line-height: 1.45; }
+.local-feedback-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .65rem; }
+.local-feedback-actions a, .local-feedback-actions button { margin: 0; }
 .entry-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .ledger-page fieldset, .form-fieldset { border: 1px solid #d8e0d8; margin: 1rem 0; padding: 1rem 1.1rem 1.2rem; border-radius: 10px; background: #fff; }
 .form-fieldset legend { padding: 0 .4rem; font-weight: 650; color: #173c2e; }
