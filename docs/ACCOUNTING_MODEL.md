@@ -24,7 +24,7 @@ Une opération métier produit une commande idempotente, puis une `AccountingEnt
 | 6811 | dotations aux amortissements |
 | 706 | loyers et prestations ; sous-comptes pour charges refacturées |
 
-Cette liste est une proposition à valider lors de la phase Ledger selon le PCG en vigueur. Les comptes sont configurables, historisés et typés ACTIF/PASSIF/CHARGE/PRODUIT/CAPITAUX.
+Cette liste est une proposition à valider lors de la phase Ledger selon le PCG en vigueur. Les comptes sont configurables et historisés. Le type enregistré (`account_type`) est `ASSET`, `LIABILITY`, `EQUITY`, `EXPENSE` ou `INCOME`. L’écran Plan comptable traduit ces valeurs en nature Actif, Dette, Capitaux, Charge ou Produit, à part de l’état Activé ou Inactif.
 
 ## Projections
 

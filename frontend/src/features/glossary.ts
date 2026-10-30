@@ -187,6 +187,13 @@ export const GLOSSARY = {
     example: "Charge constatée d’avance, deux lignes équilibrées, justification d’au moins 10 caractères, puis vérification avant validation.",
     mistake: "S’en servir pour une dotation déjà prévue à l’écran Immobilisations, ou valider sans le calcul dans la justification.",
   },
+  "nature-compte": {
+    label: "Nature du compte",
+    what: "Classement du compte dans le plan : Actif, Dette, Capitaux, Charge ou Produit. Il vient du type enregistré. Il ne dit pas si le compte est utilisé : Activé ou Inactif est un autre état.",
+    why: "Un emprunt activé reste une dette. Une charge désactivée reste une charge. Mélanger les deux fait croire que le plan comptable est faux.",
+    example: "164000 emprunt : nature Dette, utilisation Activé. 615000 entretien désactivé : nature Charge, utilisation Inactif. 512000 banque : nature Actif, utilisation Activé.",
+    mistake: "Lire Actif comme « compte activé », ou désactiver un compte pour en changer la nature. La désactivation retire le compte des saisies, elle ne le reclasse pas.",
+  },
   bilan: {
     label: "Bilan",
     what: "Photo des comptes de bilan à la date de fin : actif, dettes, capitaux, et le résultat en cours. Il est calculé sur les écritures validées, brouillons exclus.",
