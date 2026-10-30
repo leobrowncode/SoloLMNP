@@ -119,7 +119,7 @@ export default function ExportDownloads({ yearId, status }: { yearId: number; st
                   <PrerequisiteList causes={prerequisites} intro="" />
                 )}
                 {slot.posture === "bloquee" && output.kind === "pdf" && (
-                  <p>Le PDF reste bloqué tant que la liasse l’est. Les prérequis sont indiqués au-dessus.</p>
+                  <p>Le PDF, le CSV et le JSON restent bloqués tant que la liasse l’est. Les prérequis sont indiqués au-dessus.</p>
                 )}
                 {slot.posture === "bloquee" && output.kind === "fec" && (
                   <PrerequisiteList causes={prerequisites} intro="" />
@@ -141,6 +141,28 @@ export default function ExportDownloads({ yearId, status }: { yearId: number; st
                 >
                   {output.action}
                 </button>
+              )}
+              {output.kind === "pdf" && (
+                <>
+                  <button
+                    type="button"
+                    disabled={!slot.download || busy}
+                    aria-busy={busy || undefined}
+                    aria-describedby={hintId}
+                    onClick={() => { void download(`/api/filing/years/${yearId}/efi.csv`); }}
+                  >
+                    Télécharger la feuille CSV
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!slot.download || busy}
+                    aria-busy={busy || undefined}
+                    aria-describedby={hintId}
+                    onClick={() => { void download(`/api/filing/years/${yearId}/efi.json`); }}
+                  >
+                    Télécharger la feuille JSON
+                  </button>
+                </>
               )}
             </article>
           );

@@ -17,7 +17,7 @@ Le **2 octobre 2026**, les PDF officiels suivants ont été téléchargés et em
 
 Le registre [`fiscal/2025/forms/cases.yaml`](../fiscal/2025/forms/cases.yaml) mappe chaque case MVP
 vers une source vérifiée. Les entreprises individuelles n’ont pas à servir 2033-F ni 2033-G
-(notice). La 2042-C-PRO reste un produit séparé : `official_case` nul, `case_not_verified`.
+(notice). La 2042-C-PRO est un produit séparé. Revenus 2025 : CERFA 11222*28 archivé, cases 5NA / 5NY vérifiées, 5NK et 5NZ bloquées. Millésime projet 2026 : `case_not_verified`.
 
 `fiscal/2025/forms/2033.json` porte les formules du 2033-B. Le registre
 `cases.yaml` dit si les contrôles internes de la feuille sont satisfaits. Le

@@ -6,6 +6,7 @@
   "source": "Cases officielles lues sur fiscal/2025/sources (liasse 2033-SD 2025). Feuille de recopie : aucun envoi.",
   "source_manifest": "../sources/manifest.json",
   "cases_registry": "cases.yaml",
+  "case_publication": "verified_from_archive",
   "fields": [
     {
       "code": "SERVICES_VENDUS",

@@ -154,11 +154,36 @@ def test_prior_tax_loss_is_consumed_fifo_without_global_income(client):
     assert by_case["370"] == "400.00"
     assert not any(item["code"] == "INTERFORM" for item in sheet["blocking"])
     personal = sheet["personal_return"]
-    assert {line["case"]: line["amount"] for line in personal["lines"]} == {
-        "5NA": "400.00",
-        "5NY": "0.00",
-    }
-    assert personal["prior_deficits"] == [{"origin_year": 2025, "case": "5GJ", "amount": "150.00"}]
+    assert personal["status"] == "case_not_verified"
+    assert personal["declarable"] is False
+    by_code = {line["code"]: line for line in personal["lines"]}
+    assert by_code["benefit"]["case"] is None
+    assert by_code["benefit"]["case_status"] == "blocked"
+    assert by_code["benefit"]["amount"] == "400.00"
+    assert by_code["deficit"]["case"] is None
+    assert personal["prior_deficits"] == [
+        {
+            "origin_year": 2025,
+            "case": None,
+            "case_status": "blocked",
+            "amount": "150.00",
+            "block_reason": (
+                "Le formulaire 2042-C-PRO du millésime 2027 (revenus 2026) n’est pas publié. "
+                "Les numéros du CERFA 11222*28 (revenus 2025) ne sont pas reconduits."
+            ),
+        }
+    ]
+    assert personal["deficit_usage"] == [
+        {
+            "origin_year": 2025,
+            "opening": "150.00",
+            "used": "150.00",
+            "remaining_after": "0.00",
+            "case": None,
+            "case_status": "blocked",
+            "register": "tax_loss",
+        }
+    ]
     _book_year_two(client, "512000", "706000", "100.00")
     recomputed = client.post("/api/fiscal/years/2", json={"adjustments": []}).json()
     assert recomputed["replayed"] is False

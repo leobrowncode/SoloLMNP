@@ -13,7 +13,7 @@
 
 - P0–P12 et liasse 2025 : 2033-A, B, C, E, 2031 et 2031-bis, cases lues sur les PDF archivés
 - 23/10/2026 : 370/372 = 352/354 (ligne 360 réservée à l’IS), ligne 350 = reprise d’amortissements 39 C antérieurs, 2033-D cadre II retiré, consignes de saisie (case 018…), état de suivi 39 C
-- 2042-C-PRO : 5NA / 5NY / 5GA–5GJ, statut `verified_by_cross_reference` (PDF officiel non téléchargé)
+- 2042-C-PRO revenus 2025 : 5NA / 5NY et 5GA (2015) à 5GJ (2024), lus sur le CERFA 11222*28 archivé. 5NK et 5NZ bloquées. Exercice 2026 : cases non publiées (`case_not_verified`)
 - `POST /api/assets/properties/{id}/entry` : entrée du bien (immobilisations, emprunts, banque, frais d’avant début, 108), aperçu puis confirmation, extournable
 - FEC nommé `SirenFECAAAAMMJJ.txt`, bloqué sans SIREN ; `GET /api/filing/years/{id}/archive` : zip FEC + description A47 A-1 + liasse + SHA256SUMS
 - Contrôle immobilisations et 2033-E lus hors centralisation (bug qui bloquait toute clôture avec immobilisations)
@@ -38,7 +38,7 @@
 
 - Périmètre LMNP déclaré. Le LMP n’est pas calculé.
 - Cession, TVA, plus-values et ventilation automatique du terrain : désactivées, et bloquantes si elles apparaissent
-- Millésime 2026 : formulaires 2027 non publiés au 23/10/2026 ; numéros repris du registre 2025
+- Millésime 2026 : formulaires 2027 non publiés au 30/10/2026 ; numéros de cases bloqués, non repris comme officiels
 - SQLite refuse les écritures datées dans le futur : dotations au 31/12 validables à partir de cette date
 - Pas d’authentification ; l’instance doit rester privée
 
@@ -53,8 +53,8 @@ python scripts/check.py
 ## Next action
 
 1. Archiver les PDF 2031/2033 et 2042-C-PRO du millésime 2027 dès publication, puis créer `fiscal/2026/forms/cases.yaml`.
-2. Comparer les numéros de cases avec le registre 2025 et ajuster si besoin.
+2. Comparer les numéros de cases avec le registre 2025 et ne publier que ceux lus sur le PDF.
 
 ## Last updated
 
-- Date: 2026-10-23
+- Date: 2026-10-30

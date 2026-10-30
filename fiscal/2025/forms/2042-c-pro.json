@@ -1,0 +1,94 @@
+{
+  "form": "2042-C-PRO",
+  "project_vintage": "2025",
+  "form_millesime": "2026",
+  "income_year": "2025",
+  "cerfa": "11222*28",
+  "status": "research_only",
+  "declarable": false,
+  "verification": "verified",
+  "consulted_at": "2026-10-30",
+  "source": {
+    "id": "2042-C-PRO-2026",
+    "title": "Déclaration complémentaire des revenus des professions non salariées",
+    "page_url": "https://www.impots.gouv.fr/formulaire/2042/declaration-des-revenus",
+    "pdf_url": "https://www.impots.gouv.fr/sites/default/files/formulaires/2042/2026/2042_5474.pdf",
+    "local_path": "fiscal/2025/sources/official/2042-c-pro_2026.pdf",
+    "sha256": "293de292c87cf77251e659ac5611dac416104d6019e7a458078f7421707c993b",
+    "bytes": 1020894,
+    "notice_url": "https://www.impots.gouv.fr/particulier/location-meublee",
+    "reading": "Page « Revenus des locations meublées non professionnelles », régime du bénéfice réel, cas général. Une seule des lignes bénéfice ou déficit est servie. Un résultat nul se déclare 0 en 5NA."
+  },
+  "lines": [
+    {
+      "code": "benefit",
+      "role": "benefit",
+      "case": "5NA",
+      "case_declarant_2": "5OA",
+      "case_dependant": "5PA",
+      "label": "Locations meublées non professionnelles, régime réel — revenus imposables, cas général",
+      "verification": "verified"
+    },
+    {
+      "code": "deficit",
+      "role": "deficit",
+      "case": "5NY",
+      "case_declarant_2": "5OY",
+      "case_dependant": "5PY",
+      "label": "Locations meublées non professionnelles, régime réel — déficits, cas général",
+      "verification": "verified"
+    }
+  ],
+  "prior_deficit_cases": {
+    "2015": "5GA",
+    "2016": "5GB",
+    "2017": "5GC",
+    "2018": "5GD",
+    "2019": "5GE",
+    "2020": "5GF",
+    "2021": "5GG",
+    "2022": "5GH",
+    "2023": "5GI",
+    "2024": "5GJ"
+  },
+  "blocked": [
+    {
+      "case": "5NK",
+      "reason": "CERFA 11222*28 : régime micro-BIC, meublés de tourisme non classés soumis aux cotisations sociales (5NK / 5OK / 5PK). Ce n’est pas le résultat du régime réel."
+    },
+    {
+      "case": "5NZ",
+      "reason": "5NZ n’apparaît pas sur le CERFA 11222*28 archivé. Le déficit du régime réel, cas général, est en 5NY / 5OY / 5PY."
+    }
+  ],
+  "unfilled": [
+    {
+      "case": "5OA",
+      "reason": "Même ligne que 5NA, déclarant 2. Le foyer n’indique pas le déclarant : le montant n’y est pas recopié."
+    },
+    {
+      "case": "5PA",
+      "reason": "Même ligne que 5NA, personne à charge. Montant non recopié."
+    },
+    {
+      "case": "5OY",
+      "reason": "Même ligne que 5NY, déclarant 2. Montant non recopié."
+    },
+    {
+      "case": "5PY",
+      "reason": "Même ligne que 5NY, personne à charge. Montant non recopié."
+    },
+    {
+      "case": "5NM",
+      "reason": "Revenus réels soumis aux cotisations des organismes de sécurité sociale : à la place de 5NA, pas en plus. Ce rattachement n’est pas connu."
+    },
+    {
+      "case": "5WE",
+      "reason": "Déficit relevant des organismes de sécurité sociale : à la place de 5NY, pas en plus. Ce rattachement n’est pas connu."
+    },
+    {
+      "case": "5CD",
+      "reason": "Nombre de mois si l’exercice dure moins de 12 mois, hors location saisonnière. Le nombre de mois n’est pas calculé."
+    }
+  ]
+}

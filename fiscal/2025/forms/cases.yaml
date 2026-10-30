@@ -61,7 +61,7 @@
     {
       "form": "2042-C-PRO",
       "applicable": "separate_product",
-      "reason": "Report du résultat LMNP sur la déclaration de revenus : 5NA (bénéfice) ou 5NY (déficit), déficits antérieurs en 5GA à 5GJ. Cases relevées par recoupement de sources secondaires le 23/10/2026 (PDF officiel indisponible, site en maintenance). Ne bloque pas la liasse BIC."
+      "reason": "Report du résultat LMNP sur la déclaration de revenus, formulaire séparé. CERFA 11222*28 (millésime 2026, revenus 2025) lu le 30/10/2026 : 5NA/5OA/5PA bénéfice, 5NY/5OY/5PY déficit, déficits antérieurs 5GA (2015) à 5GJ (2024). 5NK et 5NZ ne reçoivent pas ce résultat. Ne bloque pas la liasse BIC. Le millésime projet 2026 reste sans formulaire 2027."
     }
   ],
   "cases": [
@@ -950,9 +950,9 @@
       "official_case": "5NA",
       "label": "Locations meublées non professionnelles, régime réel — bénéfice (déclarant 2 : 5OA)",
       "mvp_role": "Report du résultat 2031 ligne 7a. Formulaire séparé de la liasse.",
-      "source_document": null,
-      "verification": "verified_by_cross_reference",
-      "consulted_at": "2026-10-23",
+      "source_document": "2042-C-PRO-2026",
+      "verification": "verified",
+      "consulted_at": "2026-10-30",
       "work_code": "PERSONAL_5NA"
     },
     {
@@ -961,9 +961,9 @@
       "official_case": "5NY",
       "label": "Locations meublées non professionnelles, régime réel — déficit (déclarant 2 : 5OY)",
       "mvp_role": "Report du résultat 2031 ligne 7b, sans signe.",
-      "source_document": null,
-      "verification": "verified_by_cross_reference",
-      "consulted_at": "2026-10-23",
+      "source_document": "2042-C-PRO-2026",
+      "verification": "verified",
+      "consulted_at": "2026-10-30",
       "work_code": "PERSONAL_5NY"
     },
     {
@@ -971,10 +971,10 @@
       "form": "2042-C-PRO",
       "official_case": "5GA-5GJ",
       "label": "Déficits LMNP des dix années antérieures non encore déduits, une case par année d’origine",
-      "mvp_role": "5GJ = année précédant les revenus déclarés ; 5GA = dix ans avant. Souvent prérempli.",
-      "source_document": null,
-      "verification": "verified_by_cross_reference",
-      "consulted_at": "2026-10-23",
+      "mvp_role": "Sur le CERFA 11222*28 : 5GA = 2015, 5GJ = 2024. Pas une reconduction automatique l’année suivante.",
+      "source_document": "2042-C-PRO-2026",
+      "verification": "verified",
+      "consulted_at": "2026-10-30",
       "work_code": "PERSONAL_PRIOR_DEFICITS"
     }
   ],
@@ -1003,6 +1003,20 @@
       "form": "2033-D-SD",
       "area": "II Déficits reportables (860, 870, 982 à 984)",
       "reason": "Notice 2033-NOT-SD : cadre servi par les seules entreprises à l’IS, sauf stock d’ARD antérieur à 2004.",
+      "status": "blocked"
+    },
+    {
+      "form": "2042-C-PRO",
+      "official_case": "5NK",
+      "label": "Micro-BIC — meublés de tourisme non classés soumis aux cotisations sociales",
+      "reason": "CERFA 11222*28, revenus 2025 : ce n’est pas le résultat du régime réel. Ne pas y reporter le bénéfice LMNP.",
+      "status": "blocked"
+    },
+    {
+      "form": "2042-C-PRO",
+      "official_case": "5NZ",
+      "label": "Case non lue",
+      "reason": "Aucune occurrence de 5NZ sur le CERFA 11222*28 archivé. Ne pas y reporter le déficit LMNP.",
       "status": "blocked"
     }
   ],

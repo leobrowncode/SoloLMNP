@@ -1,6 +1,7 @@
 import { outputLabel, outputTrust, readyToCopy } from "./outputStatus";
 import GlossaryTip from "./GlossaryTip";
 import { enumLabel, formatAmount, formatEuros, formatIsoDate } from "../lib/format";
+import { ResponsiveTable } from "../lib/ResponsiveTable";
 
 interface Field {
   code: string;
@@ -21,7 +22,65 @@ interface PropertySegment {
   depreciation: string;
 }
 interface Notice { code: string; message: string; level?: string }
-interface PersonalLine { case: string; case_declarant_2: string; label: string; amount: string }
+interface PersonalLine {
+  code?: string;
+  case: string | null;
+  case_declarant_2?: string | null;
+  case_status?: string;
+  served?: boolean;
+  label: string;
+  amount: string;
+  source_url?: string | null;
+  block_reason?: string | null;
+}
+interface RuleRef { id: string | null; source?: string | null; source_url?: string | null }
+interface EntryBrief {
+  id: number;
+  accounting_date: string;
+  journal_code: string;
+  piece_reference: string;
+  label: string;
+  accounts: string[];
+}
+interface Explanation {
+  code: string;
+  label: string;
+  amount: string | null;
+  formula: string;
+  rules: RuleRef[];
+  entries: EntryBrief[];
+}
+interface EfiRow {
+  code: string;
+  form: string;
+  case: string | null;
+  case_status: string;
+  block_reason?: string | null;
+  label: string;
+  amount: string | null;
+  formula: string;
+  rules: RuleRef[];
+  source_label?: string | null;
+  source_url?: string | null;
+  entries?: EntryBrief[];
+}
+interface BlockedCase { case: string; reason: string }
+interface UsageRow {
+  origin_year: number;
+  opening: string;
+  used: string;
+  remaining_after: string;
+  case: string | null;
+  case_status: string;
+}
+export interface Declaration {
+  marker: string;
+  status: string;
+  vintage: string;
+  rules_version?: string | null;
+  explanations: Explanation[];
+  efi_rows: EfiRow[];
+}
 interface Tracking {
   accounting_depreciation: string;
   capacity: string;
@@ -53,10 +112,23 @@ export interface Worksheet {
   personal_return: {
     form: string;
     status: string;
+    cerfa?: string | null;
+    form_millesime?: string | null;
     lines?: PersonalLine[];
-    prior_deficits?: { origin_year: number; case: string | null; amount: string }[];
+    prior_deficits?: {
+      origin_year: number;
+      case: string | null;
+      case_status?: string;
+      amount: string;
+      block_reason?: string | null;
+    }[];
+    deficit_usage?: UsageRow[];
+    blocked_cases?: BlockedCase[];
+    unfilled_cases?: BlockedCase[];
+    source?: { title?: string | null; pdf_url?: string | null; page_url?: string | null } | null;
     note?: string;
   };
+  declaration?: Declaration;
 }
 
 function levelLabel(level?: string): string {
@@ -72,6 +144,205 @@ const FORMS: [string, string][] = [
   ["2033-C-SD", "2033-C — immobilisations et amortissements"],
   ["2033-E-SD", "2033-E — valeur ajoutée"],
 ];
+
+function shownAmount(value: string | null | undefined): string {
+  if (!value) return "—";
+  return formatAmount(value);
+}
+
+function caseText(status: string | undefined, official: string | null | undefined): string {
+  if (status === "verified" && official) return official;
+  if (status === "unnumbered") return "non numérotée";
+  if (!status && official) return official;
+  return "bloquée";
+}
+
+function RuleLinks({ rules }: { rules: RuleRef[] }) {
+  if (rules.length === 0) return null;
+  return (
+    <ul className="field-hint">
+      {rules.map((rule) => (
+        <li key={rule.id ?? rule.source_url ?? "regle"}>
+          {rule.source_url ? (
+            <a href={rule.source_url} target="_blank" rel="noreferrer">
+              {rule.id ?? "source officielle"}
+            </a>
+          ) : (
+            <span>{rule.id ?? "règle"}</span>
+          )}
+          {rule.source ? ` — ${rule.source}` : ""}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function EntryList({ entries }: { entries: EntryBrief[] }) {
+  if (entries.length === 0) return <p className="field-hint">Aucune écriture de ledger sur cette ligne.</p>;
+  return (
+    <details>
+      <summary>{entries.length} écriture{entries.length > 1 ? "s" : ""} source</summary>
+      <ul>
+        {entries.map((entry) => (
+          <li key={entry.id}>
+            {frDate(entry.accounting_date)} · {entry.journal_code} · {entry.piece_reference || "sans pièce"} · {entry.label}
+            {entry.accounts.length > 0 ? ` · ${entry.accounts.join(", ")}` : ""}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function DeclarationPanel({
+  declaration,
+  personal,
+}: {
+  declaration: Declaration;
+  personal: Worksheet["personal_return"];
+}) {
+  const usage = personal.deficit_usage ?? [];
+  return (
+    <section id="declaration" aria-label="Déclaration">
+      <h3>Déclaration</h3>
+      <p className="fiscal-goal fiscal-goal-recherche" data-declaration-status={declaration.status}>
+        <strong>{declaration.marker}</strong>
+        {` — millésime ${declaration.vintage}`}
+        {declaration.rules_version ? ` · règles ${declaration.rules_version}` : " · version de règles non rapprochée du calcul"}
+        . Cette feuille reste en recherche.
+      </p>
+      <p>
+        Saisie et envoi manuels uniquement. Pas de scraping, pas d’EDI, pas de télétransmission.
+      </p>
+
+      <h3>Calculs</h3>
+      {declaration.explanations.map((item) => (
+        <details key={item.code}>
+          <summary>{item.label} — {shownAmount(item.amount)} €</summary>
+          <p>Formule : {item.formula}</p>
+          <RuleLinks rules={item.rules} />
+          <EntryList entries={item.entries} />
+        </details>
+      ))}
+
+      <ResponsiveTable
+        label="Feuille EFI"
+        caption="EFI — liasse à recopier (2031 et 2033)"
+        columns={[
+          { key: "form", label: "Formulaire" },
+          { key: "case", label: "Case" },
+          { key: "label", label: "Libellé" },
+          { key: "amount", label: "Montant (€)" },
+          { key: "formula", label: "Formule", priority: "secondary" },
+        ]}
+        rows={declaration.efi_rows.map((row) => ({
+          key: row.code,
+          cells: [
+            row.form,
+            caseText(row.case_status, row.case),
+            <>
+              {row.label}
+              {row.block_reason && <p className="field-hint">{row.block_reason} Ne pas recopier.</p>}
+              {row.source_url && (
+                <p className="field-hint">
+                  <a href={row.source_url} target="_blank" rel="noreferrer">
+                    {row.source_label ?? "Source officielle"}
+                  </a>
+                </p>
+              )}
+              <EntryList entries={row.entries ?? []} />
+            </>,
+            shownAmount(row.amount),
+            row.formula,
+          ],
+        }))}
+      />
+
+      <h3>2042-C-PRO</h3>
+      <p className="field-hint">
+        Déclaration de revenus du foyer, à part de la liasse.
+        {personal.cerfa ? ` CERFA ${personal.cerfa}` : ""}
+        {personal.form_millesime ? `, formulaire ${personal.form_millesime}` : ""}
+        {personal.status === "case_not_verified" ? ". Cases non publiées pour ce millésime." : "."}
+      </p>
+      {personal.source?.pdf_url && (
+        <p className="liasse-links">
+          <a href={personal.source.pdf_url} target="_blank" rel="noreferrer">
+            {personal.source.title ?? "Formulaire 2042-C-PRO"}
+          </a>
+        </p>
+      )}
+      <ResponsiveTable
+        label="2042-C-PRO"
+        caption="2042-C-PRO — résultat BIC non professionnel"
+        columns={[
+          { key: "case", label: "Case" },
+          { key: "label", label: "Libellé" },
+          { key: "amount", label: "Montant (€)" },
+        ]}
+        rows={(personal.lines ?? []).map((line) => ({
+          key: line.code ?? line.case ?? line.label,
+          cells: [
+            caseText(line.case_status, line.case),
+            <>
+              {line.label}
+              {line.block_reason && <p className="field-hint">{line.block_reason}</p>}
+            </>,
+            line.served === false ? "non servie" : shownAmount(line.amount),
+          ],
+        }))}
+      />
+      {usage.length > 0 && (
+        <ResponsiveTable
+          label="Reports de déficits"
+          caption="Registre des déficits LMNP — usage du report"
+          columns={[
+            { key: "year", label: "Origine" },
+            { key: "case", label: "Case" },
+            { key: "opening", label: "Avant imputation (€)" },
+            { key: "used", label: "Imputé (€)", priority: "secondary" },
+            { key: "after", label: "Reste (€)", priority: "secondary" },
+          ]}
+          rows={usage.map((row) => ({
+            key: String(row.origin_year),
+            cells: [
+              String(row.origin_year),
+              caseText(row.case_status, row.case),
+              shownAmount(row.opening),
+              shownAmount(row.used),
+              shownAmount(row.remaining_after),
+            ],
+          }))}
+        />
+      )}
+      {(personal.prior_deficits ?? []).length > 0 && usage.length === 0 && (
+        <ul>
+          {personal.prior_deficits?.map((row) => (
+            <li key={row.origin_year}>
+              Déficit LMNP {row.origin_year} : {caseText(row.case_status, row.case)} — {shownAmount(row.amount)} €
+              {row.block_reason ? `. ${row.block_reason}` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
+      {(personal.blocked_cases ?? []).length > 0 && (
+        <ul aria-label="Cases 2042 bloquées">
+          {personal.blocked_cases?.map((item) => (
+            <li key={item.case}>Ne pas utiliser la case {item.case}. {item.reason}</li>
+          ))}
+        </ul>
+      )}
+      {(personal.unfilled_cases ?? []).length > 0 && (
+        <ul aria-label="Cases 2042 non remplies">
+          {personal.unfilled_cases?.map((item) => (
+            <li key={item.case}>Case {item.case} non remplie. {item.reason}</li>
+          ))}
+        </ul>
+      )}
+      {personal.note && <p className="field-hint">{personal.note}</p>}
+    </section>
+  );
+}
 
 function frDate(value?: string): string {
   if (!value) return "—";
@@ -150,7 +421,9 @@ export default function LiasseSheet({ worksheet }: { worksheet: Worksheet }) {
         </details>
       )}
 
-      {FORMS.map(([form, title]) => {
+      {worksheet.declaration ? (
+        <DeclarationPanel declaration={worksheet.declaration} personal={personal} />
+      ) : FORMS.map(([form, title]) => {
         const rows = fields.filter((field) => (field.form_ref ?? worksheet.liasse?.form) === form);
         if (rows.length === 0) return null;
         return (
@@ -194,7 +467,7 @@ export default function LiasseSheet({ worksheet }: { worksheet: Worksheet }) {
         </div>
       )}
 
-      {(personal.lines ?? []).length > 0 && (
+      {!worksheet.declaration && (personal.lines ?? []).length > 0 && (
         <div className="ledger-table">
           <table>
             <caption>2042-C-PRO — déclaration de revenus du foyer (à part de la liasse)</caption>

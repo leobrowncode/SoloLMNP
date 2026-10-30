@@ -729,6 +729,7 @@ export default function FiscalPage() {
           { href: "#capacite-amortissements", label: "Capacité" },
           { href: "#cloture-exercice", label: "Clôture" },
           { href: "#sorties-figees", label: "Sorties figées" },
+          { href: "#declaration", label: "Déclaration" },
         ]}
       />
       <div className="heading-with-help">

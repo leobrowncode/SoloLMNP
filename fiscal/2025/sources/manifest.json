@@ -42,12 +42,26 @@
       "sha256": "6bcda8ac8ea76cb08fb8e9b9863d314e887abea2f4c5ed9b0f9f644a7d6f291b",
       "bytes": 446663,
       "notes": "Confirme que les entreprises individuelles n’ont pas à servir 2033-F ni 2033-G. Rappelle le report manuel ou automatique vers 2042-C-PRO."
+    },
+    {
+      "id": "2042-C-PRO-2026",
+      "form": "2042-C-PRO",
+      "title": "Déclaration complémentaire des revenus des professions non salariées — revenus 2025",
+      "cerfa": "11222*28",
+      "kind": "form",
+      "page_url": "https://www.impots.gouv.fr/formulaire/2042/declaration-des-revenus",
+      "pdf_url": "https://www.impots.gouv.fr/sites/default/files/formulaires/2042/2026/2042_5474.pdf",
+      "local_path": "official/2042-c-pro_2026.pdf",
+      "sha256": "293de292c87cf77251e659ac5611dac416104d6019e7a458078f7421707c993b",
+      "bytes": 1020894,
+      "consulted_at": "2026-10-30",
+      "notes": "Millésime de formulaire 2026, revenus 2025. Sert la 2042-C-PRO du millésime projet 2025. Lecture du 30/10/2026 : régime réel LMNP, cas général, 5NA/5OA/5PA (bénéfice) et 5NY/5OY/5PY (déficit). 5NK est une case micro-BIC. 5NZ est absente. Le formulaire 2027 n’est pas dans cette archive."
     }
   ],
   "out_of_scope_documents": [
     {
-      "form": "2042-C-PRO",
-      "reason": "Déclaration personnelle séparée. Les numéros de cases du millésime ne sont pas archivés ici ; le produit reste case_not_verified sur cette partie uniquement.",
+      "form": "2042-C-PRO millésime 2027",
+      "reason": "Revenus 2026 : formulaire non publié. Le millésime projet 2026 reste case_not_verified. Ne pas reconduire les numéros du CERFA 11222*28.",
       "status": "deferred"
     },
     {

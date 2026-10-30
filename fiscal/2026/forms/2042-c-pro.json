@@ -1,0 +1,38 @@
+{
+  "form": "2042-C-PRO",
+  "project_vintage": "2026",
+  "form_millesime": null,
+  "income_year": "2026",
+  "cerfa": null,
+  "status": "research_only",
+  "declarable": false,
+  "verification": "case_not_verified",
+  "consulted_at": "2026-10-30",
+  "source": null,
+  "block_reason": "Le formulaire 2042-C-PRO du millésime 2027 (revenus 2026) n’est pas publié. Les numéros du CERFA 11222*28 (revenus 2025) ne sont pas reconduits.",
+  "lines": [],
+  "prior_deficit_cases": {},
+  "blocked": [
+    {
+      "case": "5NA",
+      "reason": "Numéro du millésime 2026 (revenus 2025). Non reconduit tant que le formulaire 2027 n’est pas lu."
+    },
+    {
+      "case": "5NY",
+      "reason": "Numéro du millésime 2026 (revenus 2025). Non reconduit tant que le formulaire 2027 n’est pas lu."
+    },
+    {
+      "case": "5NK",
+      "reason": "Sur le CERFA 11222*28, 5NK est une case micro-BIC, pas le résultat réel. Le formulaire 2027 n’est pas lu."
+    },
+    {
+      "case": "5NZ",
+      "reason": "Absent du CERFA 11222*28. Non reconduit."
+    },
+    {
+      "case": "5GA",
+      "reason": "Le couple année d’origine / case 5GA à 5GJ est celui des revenus 2025. Il n’est pas reconduit pour 2026."
+    }
+  ],
+  "unfilled": []
+}

@@ -19,6 +19,7 @@ from app.api.filing_schemas import (
 from app.api.sessions import dependencies
 from app.core.config import Settings
 from app.core.database import Database
+from app.domain.filing.declaration import archival_csv, archival_json
 from app.domain.filing.fec import export_fec
 from app.domain.filing.mappings import compile_package
 from app.services.archive import control_archive
@@ -97,6 +98,32 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
             "application/pdf",
             f"liasse-{worksheet['year']}.pdf",
             _posture(status, "pdf"),
+        )
+
+    @router.get("/years/{year_id}/efi.json")
+    def efi_json(year_id: int, session: Read) -> Response:
+        status = require_export(session, year_id, "pdf")
+        worksheet = efi_worksheet(session, year_id)
+        content, digest = archival_json(worksheet)
+        return _download(
+            content,
+            "application/json",
+            f"efi-{worksheet['year']}.json",
+            _posture(status, "pdf"),
+            sha256=digest,
+        )
+
+    @router.get("/years/{year_id}/efi.csv")
+    def efi_csv(year_id: int, session: Read) -> Response:
+        status = require_export(session, year_id, "pdf")
+        worksheet = efi_worksheet(session, year_id)
+        content, digest = archival_csv(worksheet)
+        return _download(
+            content,
+            "text/csv; charset=utf-8",
+            f"efi-{worksheet['year']}.csv",
+            _posture(status, "pdf"),
+            sha256=digest,
         )
 
     @router.get("/years/{year_id}/export.xlsx")
