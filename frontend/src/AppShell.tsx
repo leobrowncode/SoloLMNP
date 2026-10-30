@@ -4,6 +4,7 @@ import { fetchStatus } from "./api/status";
 import { focusRouteTarget } from "./routing/focusTarget";
 import { navItems, pageIdFromPathname, ROUTES, type PageId } from "./routing/paths";
 import { UnsavedChangesProvider } from "./routing/unsaved";
+import DossierProgress from "./features/DossierProgress";
 import DossierStatus from "./features/DossierStatus";
 import GlossaryTip from "./features/GlossaryTip";
 import OverviewDashboard from "./features/OverviewDashboard";
@@ -51,6 +52,7 @@ export default function AppShell() {
   const serviceReady = status?.database.status === "ready";
   const dossier = status?.dossier;
   const liveDossier = showsDossierIndicator(state.phase, serviceReady, dossier) ? dossier : null;
+  const showProgress = state.phase === "loaded" && Boolean(serviceReady);
   const storageLive = showsOperationalStorage(state.phase, serviceReady);
   const showWorkspace = Boolean(serviceReady) && (
     state.phase === "loaded" || state.phase === "loading" || state.stale
@@ -108,7 +110,10 @@ export default function AppShell() {
         <main id="main" tabIndex={-1}>
           <header className="topbar">
             <p className="topbar-title">{activeNav?.label}</p>
-            {liveDossier && <DossierStatus dossier={liveDossier} />}
+            <div className="topbar-meta">
+              {liveDossier && <DossierStatus dossier={liveDossier} />}
+              {showProgress && <DossierProgress />}
+            </div>
           </header>
           <div className="content">
             {status?.storage_warning && (

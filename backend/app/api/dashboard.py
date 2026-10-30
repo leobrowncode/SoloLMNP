@@ -18,9 +18,9 @@ StepStatus = Literal["a_faire", "en_cours", "bloque", "pret", "fait"]
 _STATUS_LABELS: dict[str, str] = {
     "a_faire": "À faire",
     "en_cours": "En cours",
-    "bloque": "Bloquée",
+    "bloque": "Bloqué",
     "pret": "Prête",
-    "fait": "Faite",
+    "fait": "Terminé",
 }
 _DOSSIER_LABELS = {
     "incomplet": "Incomplet",
@@ -50,7 +50,7 @@ class DashboardStep(BaseModel):
     id: StepId
     label: str
     status: StepStatus
-    status_label: Literal["À faire", "En cours", "Bloquée", "Prête", "Faite"]
+    status_label: Literal["À faire", "En cours", "Bloqué", "Prête", "Terminé"]
     summary: str
     prerequisites: list[DashboardPrerequisite]
     last_event: DashboardEvent | None
@@ -68,6 +68,27 @@ class DashboardContinue(BaseModel):
     href: str
     detail: str
     step: StepId
+
+
+class DashboardProgression(BaseModel):
+    done: int = Field(ge=0)
+    total: int = Field(ge=0)
+    label: str
+    current_step: StepId
+    current_label: str
+    current_status: StepStatus
+    current_status_label: Literal["À faire", "En cours", "Bloqué", "Prête", "Terminé"]
+    summary: str
+
+    @model_validator(mode="after")
+    def label_matches_count(self) -> Self:
+        if self.label != f"{self.done}/{self.total}":
+            raise ValueError("Le libellé de progression ne correspond pas au décompte.")
+        if self.current_status_label != _STATUS_LABELS[self.current_status]:
+            raise ValueError("Le libellé de l’étape en cours ne correspond pas à son état.")
+        if self.done > self.total:
+            raise ValueError("La progression dépasse le nombre d’étapes.")
+        return self
 
 
 class DossierView(BaseModel):
@@ -91,6 +112,34 @@ class DashboardResponse(BaseModel):
     dossier: DossierView
     continue_action: DashboardContinue = Field(alias="continue")
     steps: list[DashboardStep]
+    progression: DashboardProgression
+
+    @model_validator(mode="after")
+    def progression_matches_steps(self) -> Self:
+        done = sum(1 for step in self.steps if step.status == "fait")
+        if self.progression.done != done or self.progression.total != len(self.steps):
+            raise ValueError("La progression ne correspond pas aux étapes.")
+        if self.steps and self.progression.current_step != self.continue_action.step:
+            raise ValueError("La progression ne correspond pas à la prochaine action.")
+        current = next(
+            (step for step in self.steps if step.id == self.progression.current_step),
+            None,
+        )
+        if current is None:
+            if self.steps:
+                raise ValueError("La progression ne correspond pas à une étape.")
+            return self
+        if (
+            current.status != self.progression.current_status
+            or current.status_label != self.progression.current_status_label
+            or current.label != self.progression.current_label
+            or current.summary != self.progression.summary
+        ):
+            raise ValueError("La progression ne correspond pas à l’étape en cours.")
+        for step in self.steps:
+            if step.status == "bloque" and not step.prerequisites:
+                raise ValueError("Chaque blocage a un lien correctif.")
+        return self
 
     @model_validator(mode="after")
     def not_declarable(self) -> Self:

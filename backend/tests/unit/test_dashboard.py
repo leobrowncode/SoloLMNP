@@ -86,9 +86,22 @@ def _board(facts: DashboardFacts) -> dict[str, Any]:
     assert payload["dossier"]["vintage_status"] == "research_only"
     assert [step["id"] for step in payload["steps"]] == list(STEP_IDS)
     assert payload["continue"]["label"] == "Continuer"
+    progress = payload["progression"]
+    done = sum(1 for step in payload["steps"] if step["status"] == "fait")
+    assert progress["done"] == done
+    assert progress["total"] == len(payload["steps"])
+    assert progress["label"] == f"{done}/{progress['total']}"
+    assert progress["current_step"] == payload["continue"]["step"]
+    current = next(step for step in payload["steps"] if step["id"] == progress["current_step"])
+    assert progress["summary"] == current["summary"]
+    assert progress["current_status_label"] == current["status_label"]
     for step in payload["steps"]:
         amount = step["amount_cents"]
         assert amount is None or type(amount) is int
+        assert step["summary"]
+        assert step["status_label"] in {"À faire", "En cours", "Bloqué", "Prête", "Terminé"}
+        if step["status"] == "bloque":
+            assert step["prerequisites"][0]["action"]["href"].startswith("/")
     return payload
 
 
@@ -200,7 +213,7 @@ def test_blocked_dossier_reuses_the_export_prerequisite_link() -> None:
     assert _step(payload, "structure")["status"] == "bloque"
     filing = _step(payload, "filing")
     assert filing["status"] == "bloque"
-    assert filing["status_label"] == "Bloquée"
+    assert filing["status_label"] == "Bloqué"
     assert filing["amount_cents"] == 0
     assert filing["prerequisites"][0]["code"] == "SIREN_MANQUANT"
     assert filing["prerequisites"][0]["action"]["href"] == (
@@ -363,6 +376,215 @@ def test_closed_research_year_with_a_final_fec_is_done() -> None:
     assert _step(payload, "filing")["amount_cents"] == -4000
     assert "Finale" in _step(payload, "filing")["summary"]
     assert payload["continue"]["href"] == "/fiscalite#sorties-figees"
+
+
+def test_first_year_transitions_follow_prerequisites_until_close() -> None:
+    empty = _board(_facts())
+    assert empty["progression"]["label"] == "0/6"
+    assert empty["continue"]["href"] == "/comptabilite/brouillons#creer-activite"
+    assert all(step["status_label"] == "À faire" for step in empty["steps"])
+
+    activity = _board(_facts(activity_present=True))
+    assert _step(activity, "structure")["status_label"] == "En cours"
+    assert activity["continue"]["href"] == "/comptabilite/brouillons#ajouter-exercice"
+    assert activity["progression"]["done"] == 0
+
+    year = _board(
+        _facts(
+            activity_present=True,
+            year_id=1,
+            year=2026,
+            year_status="OPEN",
+            close_errors=(("FISCAL_NOT_COMPUTED", "Aucun calcul fiscal n’est enregistré."),),
+            dossier=_dossier(year_status="OPEN", year=2026, fiscal_year_id=1),
+        )
+    )
+    assert _step(year, "opening")["status_label"] == "Terminé"
+    assert "Premier exercice" in _step(year, "opening")["summary"]
+    assert year["continue"]["href"] == "/comptabilite/brouillons#identite-liasse"
+    assert year["progression"]["done"] == 1
+
+    common: dict[str, Any] = {
+        "activity_present": True,
+        "siren_present": True,
+        "year_id": 1,
+        "year": 2026,
+        "year_status": "OPEN",
+        "property_count": 1,
+        "bank_count": 1,
+        "dossier": _dossier(year_status="OPEN", year=2026, fiscal_year_id=1),
+    }
+    missing_fiscal = (("FISCAL_NOT_COMPUTED", "Aucun calcul fiscal n’est enregistré."),)
+    ready_to_record = _board(_facts(**common, close_errors=missing_fiscal))
+    assert _step(ready_to_record, "structure")["status_label"] == "Terminé"
+    assert _step(ready_to_record, "operations")["status_label"] == "En cours"
+    assert ready_to_record["continue"]["href"] == "/operations/biens"
+    assert ready_to_record["progression"]["done"] == 2
+
+    with_operations = _board(_facts(**common, operation_count=2, operation_amount_cents=15000))
+    assert _step(with_operations, "operations")["status_label"] == "Terminé"
+    assert _step(with_operations, "operations")["amount_cents"] == 15000
+    assert with_operations["continue"]["href"] == "/immobilisations#nouvelle-immobilisation"
+    assert with_operations["progression"]["done"] == 3
+
+    blocked_assets = _board(
+        _facts(
+            **common,
+            operation_count=1,
+            operation_amount_cents=100,
+            asset_count=2,
+            depreciable_asset_count=1,
+            calculated_period_count=1,
+            close_errors=(
+                ("DEPRECIATION_UNPOSTED", "Des dotations calculées ne sont pas comptabilisées."),
+            ),
+        )
+    )
+    assert _step(blocked_assets, "assets")["status_label"] == "Bloqué"
+    assert blocked_assets["continue"]["href"] == "/immobilisations#dotations"
+    assert blocked_assets["progression"]["done"] == 3
+
+    ready = _board(
+        _facts(
+            activity_present=True,
+            siren_present=True,
+            year_id=1,
+            year=2026,
+            year_status="READY_TO_CLOSE",
+            property_count=1,
+            bank_count=1,
+            operation_count=1,
+            operation_amount_cents=10000,
+            asset_count=1,
+            depreciable_asset_count=1,
+            posted_period_count=1,
+            posted_depreciation_cents=2500,
+            fiscal_produced=True,
+            fiscal_result_cents=0,
+            exports=_exports(liasse=_PROVISOIRE, fec=_BLOQUEE),
+            dossier=_dossier(
+                "pret_a_verifier",
+                "Prêt à vérifier",
+                year_status="READY_TO_CLOSE",
+                year=2026,
+                fiscal_year_id=1,
+            ),
+        )
+    )
+    assert _step(ready, "closing")["status_label"] == "Prête"
+    assert ready["continue"]["href"] == "/fiscalite#close-title"
+    assert ready["continue"]["detail"] == "Prochaine action : confirmer la clôture."
+    assert ready["progression"]["done"] == 4
+
+    closed = _board(
+        _facts(
+            activity_present=True,
+            siren_present=True,
+            year_id=1,
+            year=2026,
+            year_status="CLOSED",
+            property_count=1,
+            bank_count=1,
+            operation_count=1,
+            operation_amount_cents=10000,
+            asset_count=1,
+            depreciable_asset_count=1,
+            posted_period_count=1,
+            posted_depreciation_cents=2500,
+            fiscal_produced=True,
+            fiscal_result_cents=0,
+            exports=_exports(liasse=_PROVISOIRE, fec=_FINALE),
+            dossier=_dossier(
+                "cloture", "Clôturé", year_status="CLOSED", year=2026, fiscal_year_id=1
+            ),
+        )
+    )
+    assert _step(closed, "closing")["status_label"] == "Terminé"
+    assert _step(closed, "filing")["status_label"] == "Terminé"
+    assert closed["progression"]["label"] == "6/6"
+    assert closed["continue"]["href"] == "/fiscalite#sorties-figees"
+    assert "recherche" in _step(closed, "filing")["summary"].lower()
+    dones = [
+        board["progression"]["done"]
+        for board in (
+            empty,
+            activity,
+            year,
+            ready_to_record,
+            with_operations,
+            blocked_assets,
+            ready,
+            closed,
+        )
+    ]
+    assert dones == sorted(dones)
+
+
+def test_following_year_opening_transitions_before_the_precheck() -> None:
+    base: dict[str, Any] = {
+        "activity_present": True,
+        "siren_present": True,
+        "year_id": 2,
+        "year": 2026,
+        "year_status": "OPEN",
+        "property_count": 1,
+        "bank_count": 1,
+        "operation_count": 1,
+        "operation_amount_cents": 5000,
+        "asset_count": 1,
+        "depreciable_asset_count": 1,
+        "posted_period_count": 1,
+        "posted_depreciation_cents": 1000,
+        "has_previous_year": True,
+        "previous_year_closed": False,
+        "dossier": _dossier(year_status="OPEN", year=2026, fiscal_year_id=2),
+    }
+    blocked = _board(_facts(**base))
+    opening = _step(blocked, "opening")
+    assert opening["status_label"] == "Bloqué"
+    assert opening["prerequisites"][0]["code"] == "SOURCE_NOT_CLOSED"
+    assert opening["prerequisites"][0]["action"] == {
+        "label": "Clôturer l’exercice précédent",
+        "href": "/fiscalite#close-title",
+    }
+    assert blocked["continue"]["href"] == "/fiscalite#close-title"
+    assert blocked["continue"]["step"] == "opening"
+    assert blocked["progression"]["current_status_label"] == "Bloqué"
+
+    waiting = _board(_facts(**{**base, "previous_year_closed": True}))
+    opening = _step(waiting, "opening")
+    assert opening["status_label"] == "En cours"
+    assert opening["prerequisites"][0]["code"] == "OPENING_MISSING"
+    assert opening["prerequisites"][0]["action"]["href"] == "/etats-comptables#opening-title"
+    assert _step(waiting, "closing")["status"] == "pret"
+    assert waiting["continue"]["step"] == "opening"
+    assert waiting["continue"]["href"] == "/etats-comptables#opening-title"
+    assert waiting["progression"]["done"] == blocked["progression"]["done"]
+
+    conflict = _board(_facts(**{**base, "previous_year_closed": True, "target_has_entries": True}))
+    assert _step(conflict, "opening")["status_label"] == "Bloqué"
+    assert conflict["continue"]["href"] == "/comptabilite/journal"
+    assert conflict["progression"]["current_step"] == "opening"
+
+    posted = _board(
+        _facts(
+            **{
+                **base,
+                "previous_year_closed": True,
+                "opening_posted": True,
+                "opening_amount_cents": 250050,
+                "close_errors": (("FISCAL_NOT_COMPUTED", "Aucun calcul fiscal n’est enregistré."),),
+            }
+        )
+    )
+    opening = _step(posted, "opening")
+    assert opening["status_label"] == "Terminé"
+    assert opening["amount_cents"] == 250050
+    assert "comptabilisés" in opening["summary"]
+    assert posted["progression"]["done"] == waiting["progression"]["done"] + 1
+    assert posted["continue"]["href"] == "/fiscalite#calcul-fiscal"
+    assert posted["continue"]["step"] == "closing"
+    assert posted["dossier"]["vintage_status"] == "research_only"
 
 
 def test_a_declarable_label_is_refused() -> None:

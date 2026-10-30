@@ -60,7 +60,9 @@ describe("Foundation status", () => {
     expect(within(steps).queryByRole("link", { name: /Fiscalité LMNP/ })).not.toBeInTheDocument();
     expect(within(steps).getByRole("heading", { name: "Clôture" })).toBeInTheDocument();
     expect(within(steps).getByRole("heading", { name: "Fiscalité et exports" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Continuer" })).toHaveAttribute("href", "/fiscalite#close-title");
+    const resume = screen.getAllByRole("link", { name: "Continuer" });
+    expect(resume.length).toBeGreaterThan(1);
+    expect(resume.every((link) => link.getAttribute("href") === "/fiscalite#close-title")).toBe(true);
     expect(screen.queryByText("Bilan, résultat, puis centralisation.")).not.toBeInTheDocument();
   });
 
@@ -70,6 +72,9 @@ describe("Foundation status", () => {
     renderApp();
     expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
     expect(screen.getByText("Statut dossier")).toBeInTheDocument();
+    const progress = await screen.findByRole("region", { name: "Progression du dossier" });
+    expect(progress).toHaveTextContent("4/6");
+    expect(progress).toHaveTextContent("Prête");
     const diagnostic = screen.getByText("Stockage opérationnel").closest("details");
     expect(diagnostic).toHaveAttribute("data-diagnostic", "storage");
     expect(document.querySelector(".topbar")).not.toHaveTextContent("Stockage opérationnel");
@@ -175,6 +180,7 @@ describe("Foundation status", () => {
     expect(screen.queryByText("Stockage opérationnel")).not.toBeInTheDocument();
     expect(screen.queryByText(/Base prête/)).not.toBeInTheDocument();
     expect(screen.getByText("Prêt à vérifier")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Progression du dossier" })).toHaveTextContent("4/6");
     expect(await screen.findByRole("heading", { name: "Votre comptabilité" })).toBeInTheDocument();
   });
 
