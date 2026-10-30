@@ -29,6 +29,9 @@ import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 import { ENUM_LABELS, enumLabel, formatEuros, formatIsoDate } from "../lib/format";
 import "./ledger.css";
+import FitSelect from "../lib/FitSelect";
+import { MobileSection, PageAnchors } from "../lib/PageSection";
+import { ResponsiveTable } from "../lib/ResponsiveTable";
 
 interface Editor {
   title: string; path: string; fields: Field[]; retry?: boolean;
@@ -511,6 +514,14 @@ export default function AssetsPage() {
       <GlossaryTip id="composant" />
     </div>
     <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations. Le formulaire ne propose que les comptes de la catégorie. Un couple déjà enregistré et incohérent est signalé ; il n’est pas réécrit. Modifier une fiche demande un motif : tant qu’aucune dotation n’est comptabilisée, la valeur, la durée et les comptes peuvent être corrigés.</p>
+    <PageAnchors
+      label="Sections des immobilisations"
+      links={[
+        { href: "#creer-immobilisation", label: "Nouvelle immobilisation" },
+        { href: "#registre-immobilisations", label: "Registre" },
+        { href: "#dotations", label: "Dotations" },
+      ]}
+    />
     {error && <p role="alert" className="ledger-error">{error}</p>}
     <MutationStatus step={step} />
     <ScreenStatus
@@ -530,39 +541,45 @@ export default function AssetsPage() {
       <PrerequisiteList id={assetCauseId} causes={assetCauses} />
       <div className="toolbar">
         <label>Logement
-          <select value={selectedProperty} disabled={confirming || busy} onChange={(event) => {
+          <FitSelect value={selectedProperty} disabled={confirming || busy} onChange={(event) => {
             if (confirming) return;
             ++planRequest.current;
             setPlan(null);
             setPlanProperty(Number(event.target.value));
           }}>
             {properties.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
-          </select>
+          </FitSelect>
         </label>
         <button id="preview-amortissement" type="button" disabled={planCauses.length > 0 || busy} aria-busy={busy || undefined} aria-describedby={describedBy(planCauseId, planCauses)} onClick={() => { void previewPlan(); }}>Prévisualiser l’amortissement du logement</button>
         <PrerequisiteList id={planCauseId} causes={planCauses} />
       </div>
       <p className="form-help">La prévisualisation n’enregistre ni immobilisation ni compte. Après vérification, « Créer les immobilisations affichées » inscrit le terrain à part, ajoute les frais de notaire et d’agence à la base du bâtiment, puis crée six composants (gros œuvre, toiture, façade, électricité, plomberie, agencements). Les durées sont à confirmer : ce n’est pas un barème légal. Annuler laisse la base inchangée. Répéter la confirmation ne crée pas de doublon. Le mobilier reste à saisir à part.</p>
       {visiblePlan && <>
-        <div className="ledger-table">
-          <table>
-            <caption>
-              Aperçu non enregistré · base amortissable {formatEuros(visiblePlan.depreciable_base)} · frais inclus {formatEuros(visiblePlan.acquisition_costs_included)}
-            </caption>
-            <thead><tr><th>Élément</th><th>Libellé</th><th>Montant</th><th>Compte</th><th>Amortissement</th><th>Durée</th><th>Mise en service</th></tr></thead>
-            <tbody>
-              {visiblePlan.items.map((item) => <tr key={`${item.kind}-${item.label}`}>
-                <td>{planKind(item.kind)}</td>
-                <td>{item.label}</td>
-                <td>{formatEuros(item.amount)}</td>
-                <td>{item.asset_account}</td>
-                <td>{item.depreciation_account ?? "—"}</td>
-                <td>{item.useful_life_months === null ? "Non amortissable" : `${item.useful_life_months} mois`}</td>
-                <td>{formatIsoDate(item.service_start_date)}</td>
-              </tr>)}
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveTable
+          label="Aperçu d’amortissement"
+          caption={`Aperçu non enregistré · base amortissable ${formatEuros(visiblePlan.depreciable_base)} · frais inclus ${formatEuros(visiblePlan.acquisition_costs_included)}`}
+          columns={[
+            { key: "kind", label: "Élément" },
+            { key: "label", label: "Libellé" },
+            { key: "amount", label: "Montant" },
+            { key: "account", label: "Compte", priority: "secondary" },
+            { key: "depreciation", label: "Amortissement", priority: "secondary" },
+            { key: "life", label: "Durée", priority: "secondary" },
+            { key: "start", label: "Mise en service", priority: "secondary" },
+          ]}
+          rows={visiblePlan.items.map((item) => ({
+            key: `${item.kind}-${item.label}`,
+            cells: [
+              planKind(item.kind),
+              item.label,
+              formatEuros(item.amount),
+              item.asset_account,
+              item.depreciation_account ?? "—",
+              item.useful_life_months === null ? "Non amortissable" : `${item.useful_life_months} mois`,
+              formatIsoDate(item.service_start_date),
+            ],
+          }))}
+        />
         <div className="form-actions">
           <button type="button" disabled={busy || !visiblePlan.preview_token} aria-busy={busy || undefined} onClick={() => { void confirmPlan(); }}>Créer les immobilisations affichées</button>
           <button type="button" disabled={confirming} onClick={cancelPlan}>Annuler l’aperçu</button>
@@ -575,6 +592,7 @@ export default function AssetsPage() {
         onDone={() => { setError(""); setRevision((value) => value + 1); }}
       />
       {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} help={editor.help} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} derive={editor.derive} locked={busy} />}
+      <MobileSection id="registre-immobilisations" title="Registre des immobilisations" open={assets.length > 0}>
       {assets.map((row) => <article className="entry-card" id={`asset-${row.id}`} key={row.id}><h3>{row.label}</h3>
         <p>{enumLabel("assetCategory", row.category)} · Valeur {formatEuros(row.acquisition_value)} · Base {formatEuros(row.depreciable_value)} · Non amortissable {formatEuros(row.non_depreciable_value)}</p>
         <p>{row.category === "LAND" ? "Terrain protégé : aucun plan d’amortissement" : `${enumLabel("depreciationMethod", row.method ?? "LINEAR")} sur ${row.useful_life_months} mois · ${row.asset_account} / ${row.depreciation_account}`}</p>
@@ -598,12 +616,13 @@ export default function AssetsPage() {
         </div>)}
         <SaveNoticeHost place={`asset-${row.id}`} notice={notice} onDismiss={dismiss} />
       </article>)}
+      </MobileSection>
       <div className="section-heading" id="dotations" tabIndex={-1}><div><div className="heading-with-help"><h3>Dotations comptables</h3><GlossaryTip id="dotation" /><GlossaryTip id="compte-681" /></div><p>Le calcul en jours calendaires ne modifie jamais la couche fiscale.</p></div>
-        <label>Exercice<select value={yearId} onChange={(event) => {
+        <label>Exercice<FitSelect value={yearId} onChange={(event) => {
           ++periodRequest.current;
           setPeriods([]); setError(""); dismiss(); setEditor(null);
           setYearId(Number(event.target.value));
-        }}>{setup.years.filter((year) => year.status === "OPEN").map((year) => <option key={year.id} value={year.id}>{year.year}</option>)}</select></label>
+        }}>{setup.years.filter((year) => year.status === "OPEN").map((year) => <option key={year.id} value={year.id}>{year.year}</option>)}</FitSelect></label>
         <SaveNoticeHost place="dotations" notice={notice} onDismiss={dismiss} />
       </div>
       <button id="calculer-periodes" disabled={periodCauses.length > 0 || busy} aria-busy={busy || undefined} aria-describedby={describedBy(periodCauseId, periodCauses)} onClick={() => { void calculate(); }}>Calculer les périodes</button>
@@ -616,9 +635,32 @@ export default function AssetsPage() {
         loading={<p>Chargement des dotations…</p>}
         empty={<p>Aucune dotation calculée pour cet exercice.</p>}
       />
-      <div className="ledger-table"><table><thead><tr><th>Actif / composant</th><th>Période</th><th>Jours</th><th>Dotation</th><th>Cumul</th><th>VNC de la base <GlossaryTip id="vnc" /></th><th>État</th></tr></thead><tbody>
-        {periods.map((row) => <tr key={row.id}><td>{row.target_label}</td><td>{formatIsoDate(row.period_start)} → {formatIsoDate(row.period_end)}</td><td>{row.days}</td><td>{formatEuros(row.amount)}</td><td>{formatEuros(row.accumulated)}</td><td>{formatEuros(row.net_book_value)}</td><td>{row.status === "POSTED" ? enumLabel("periodStatus", row.status) : <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => setEditor({ title: `Comptabiliser ${row.target_label}`, path: `/periods/${row.id}/post`, retry: true, fields: [{ name: "piece_reference", label: "Référence de la pièce d’inventaire" }] })}>Comptabiliser</button>}</td></tr>)}
-      </tbody></table></div>
+      <ResponsiveTable
+        label="Dotations"
+        columns={[
+          { key: "target", label: "Actif / composant" },
+          { key: "period", label: "Période", priority: "secondary" },
+          { key: "days", label: "Jours", priority: "secondary" },
+          { key: "amount", label: "Dotation" },
+          { key: "accumulated", label: "Cumul", priority: "secondary" },
+          { key: "vnc", label: "VNC de la base", header: <>VNC de la base <GlossaryTip id="vnc" /></>, priority: "secondary" },
+          { key: "status", label: "État" },
+        ]}
+        rows={periods.map((row) => ({
+          key: String(row.id),
+          cells: [
+            row.target_label,
+            `${formatIsoDate(row.period_start)} → ${formatIsoDate(row.period_end)}`,
+            row.days,
+            formatEuros(row.amount),
+            formatEuros(row.accumulated),
+            formatEuros(row.net_book_value),
+            row.status === "POSTED"
+              ? enumLabel("periodStatus", row.status)
+              : <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => setEditor({ title: `Comptabiliser ${row.target_label}`, path: `/periods/${row.id}/post`, retry: true, fields: [{ name: "piece_reference", label: "Référence de la pièce d’inventaire" }] })}>Comptabiliser</button>,
+          ],
+        }))}
+      />
     </>}
   </section>;
 }

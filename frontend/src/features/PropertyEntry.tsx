@@ -15,6 +15,7 @@ import ApiErrorAlert from "./ApiErrorAlert";
 import PrerequisiteList from "./PrerequisiteList";
 import { idleView, toApiError, type ScreenView } from "./screenState";
 import { centsToApiAmount, formatAmount, formatEuros, formatIsoDate, parseAmountToCents } from "../lib/format";
+import FitSelect from "../lib/FitSelect";
 
 interface YearOption { id: number; year: number; start_date?: string; status?: string }
 interface EntryLine { account_number: string; label: string; debit: string; credit: string }
@@ -203,14 +204,14 @@ export default function PropertyEntry({
     <MutationStatus step={step} />
     <div className="form-grid">
       <label>Bien
-        <select value={propertyId} onChange={(event) => { setPropertyId(Number(event.target.value)); setPreview(null); }}>
+        <FitSelect value={propertyId} onChange={(event) => { setPropertyId(Number(event.target.value)); setPreview(null); }}>
           {properties.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
-        </select>
+        </FitSelect>
       </label>
       <label>Exercice
-        <select value={yearId} onChange={(event) => { setYearId(Number(event.target.value)); setPreview(null); }}>
+        <FitSelect value={yearId} onChange={(event) => { setYearId(Number(event.target.value)); setPreview(null); }}>
           {openYears.map((row) => <option key={row.id} value={row.id}>{row.year}</option>)}
-        </select>
+        </FitSelect>
       </label>
       {propertyLoans.map((row) => <label key={row.id} className="field-money">
         Capital restant dû au début de l’exercice — {row.lender} ({row.principal_account})
@@ -219,9 +220,9 @@ export default function PropertyEntry({
         }} />
       </label>)}
       <label>Compte bancaire
-        <select value={bankId} onChange={(event) => { setBankId(Number(event.target.value)); setPreview(null); }}>
+        <FitSelect value={bankId} onChange={(event) => { setBankId(Number(event.target.value)); setPreview(null); }}>
           {banks.map((row) => <option key={row.id} value={row.id}>{row.name} ({row.account_number})</option>)}
-        </select>
+        </FitSelect>
       </label>
       <label className="field-money">Solde du compte bancaire au début de l’exercice (€)
         <input inputMode="decimal" lang="fr" data-money="true" value={bankAmount} placeholder="1 234,56" onChange={(event) => { setBankAmount(event.target.value); setPreview(null); }} />

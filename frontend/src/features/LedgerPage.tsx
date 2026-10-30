@@ -25,6 +25,9 @@ import { SaveNoticeHost } from "./LocalFeedback";
 import { useSaveNotice, type ShowSaveNotice } from "./localFeedback";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
+import FitSelect from "../lib/FitSelect";
+import { MobileSection, PageAnchors } from "../lib/PageSection";
+import { ResponsiveTable } from "../lib/ResponsiveTable";
 
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
 export default function LedgerPage() {
@@ -186,6 +189,14 @@ export default function LedgerPage() {
       <GlossaryTip id="grand-livre" />
     </div>
     <p>Seules les écritures validées alimentent le journal, le grand livre et la balance. Leur validation est définitive.</p>
+    <PageAnchors
+      label="Sections de la comptabilité"
+      links={[
+        { href: "#reglages-comptables", label: "Réglages" },
+        { href: "#exercice", label: "Exercice" },
+        { href: "#ecriture-saisie", label: "Écritures" },
+      ]}
+    />
     <MutationStatus step={step} />
     {actionError && <p role="alert" className="ledger-error">{actionError}</p>}
     <ScreenStatus
@@ -193,7 +204,11 @@ export default function LedgerPage() {
       onRetry={() => setRevision((value) => value + 1)}
       loading={<p>Chargement de la comptabilité…</p>}
     />
-    <div id="reglages-comptables">
+    <MobileSection
+      id="reglages-comptables"
+      title="Réglages comptables"
+      open={!setup?.activity || (setup?.years.length ?? 0) === 0 || hash === "#ajouter-exercice" || hash === "#identite-liasse" || hash === "#reglages-comptables"}
+    >
     <SaveNoticeHost place="reglages-comptables" notice={notice} onDismiss={dismiss} />
     {setup && !setup.activity && <FrenchForm id="creer-activite" tabIndex={-1} onSubmit={(e) => {
       const data = formData(e);
@@ -265,12 +280,12 @@ export default function LedgerPage() {
         <button disabled={busy}>Créer l’exercice</button>
       </FrenchForm>
     </details>}
-    </div>
+    </MobileSection>
     {!!setup?.years.length && <>
       <PrerequisiteList id={yearCauseId} causes={yearCauses} intro="Saisie indisponible :" />
-      <label id="exercice" tabIndex={-1}>Exercice<select value={year} onChange={(e) => { setYear(Number(e.target.value)); setDraft(null); setConfirmation(null); setOffset(0); setBalance(null); setLedger([]); setEntries([]); }}>
+      <label id="exercice" tabIndex={-1}>Exercice<FitSelect value={year} onChange={(e) => { setYear(Number(e.target.value)); setDraft(null); setConfirmation(null); setOffset(0); setBalance(null); setLedger([]); setEntries([]); }}>
         {setup.years.map((y) => <option key={y.id} value={y.id}>{y.year} · {enumLabel("yearStatus", y.status)}</option>)}
-      </select></label>
+      </FitSelect></label>
       <nav aria-label="Vues comptables" className="ledger-tabs">{(["Brouillons", "Journal", "Grand livre", "Balance", "Plan comptable", "Inventaire"] as LedgerTab[]).map((name) =>
         <button key={name} aria-pressed={tab === name} onClick={() => openTab(name)}>{name}</button>)}</nav>
       <div id="ecriture-saisie">
@@ -296,16 +311,16 @@ export default function LedgerPage() {
         });
       }}>
         <h3>{editing ? "Modifier le brouillon" : "Nouvelle écriture"}</h3>
-        <label>Journal<select value={draft.journal_code} onChange={(e) => setDraft({ ...draft, journal_code: e.target.value })}>{journals.filter((j) => j.active).map((j) => <option key={j.code} value={j.code}>{j.code} · {j.label}</option>)}</select></label>
+        <label>Journal<FitSelect value={draft.journal_code} onChange={(e) => setDraft({ ...draft, journal_code: e.target.value })}>{journals.filter((j) => j.active).map((j) => <option key={j.code} value={j.code}>{j.code} · {j.label}</option>)}</FitSelect></label>
         <label>Date comptable<input type="date" lang="fr" required min={selectedYear?.start_date} max={selectedYear?.end_date} value={draft.accounting_date} onChange={(e) => setDraft({ ...draft, accounting_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
         <label>Date de la pièce<input type="date" lang="fr" required value={draft.piece_date} onChange={(e) => setDraft({ ...draft, piece_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
         <label>Référence de la pièce<input required value={draft.piece_reference} onChange={(e) => setDraft({ ...draft, piece_reference: e.target.value })} /></label>
         <label>Libellé de l’écriture<input required value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} /></label>
         {draft.lines.map((line, index) => <fieldset key={index}>
           <legend>Ligne {index + 1}</legend>
-          <label>Compte<select required value={line.account_number} onChange={(e) => setDraft({ ...draft, lines: draft.lines.map((l, i) => i === index ? { ...l, account_number: e.target.value } : l) })}>
+          <label>Compte<FitSelect required value={line.account_number} onChange={(e) => setDraft({ ...draft, lines: draft.lines.map((l, i) => i === index ? { ...l, account_number: e.target.value } : l) })}>
             <option value="">Choisir un compte</option>{accounts.filter((a) => a.active).map((a) => <option key={a.number} value={a.number}>{a.number} · {a.label}</option>)}
-          </select></label>
+          </FitSelect></label>
           {(["label", "debit", "credit"] as const).map((key) => <label key={key}>{key === "label" ? "Libellé" : key === "debit" ? "Débit (€)" : "Crédit (€)"}<input required inputMode={key === "label" ? "text" : "decimal"} lang={key === "label" ? undefined : "fr"} placeholder={key === "label" ? undefined : "1 234,56"} data-money={key === "label" ? undefined : "true"} value={line[key]} onChange={(e) => setDraft({ ...draft, lines: draft.lines.map((l, i) => i === index ? { ...l, [key]: e.target.value } : l) })} /></label>)}
           <button type="button" disabled={draft.lines.length <= 2} onClick={() => setDraft({ ...draft, lines: draft.lines.filter((_, i) => i !== index) })}>Retirer la ligne {index + 1}</button>
         </fieldset>)}
@@ -317,10 +332,10 @@ export default function LedgerPage() {
       {(tab === "Journal" || tab === "Brouillons") && <>
         <details><summary>Filtres</summary><div className="ledger-filters">
           {Object.entries(filter).filter(([key]) => key !== "source").map(([key, value]) => <label key={key}>{{ journal_code: "Code journal", account_number: "Numéro de compte", date_from: "Du", date_to: "Au", piece: "Pièce" }[key]}<input type={key.startsWith("date") ? "date" : "text"} lang={key.startsWith("date") ? "fr" : undefined} value={value} onChange={(e) => { setFilter({ ...filter, [key]: e.target.value }); setOffset(0); }} />{key.startsWith("date") ? <span className="field-hint">{DATE_HINT}</span> : null}</label>)}
-          <label>Source<select value={filter.source} onChange={(e) => { setFilter({ ...filter, source: e.target.value }); setOffset(0); }}>
+          <label>Source<FitSelect value={filter.source} onChange={(e) => { setFilter({ ...filter, source: e.target.value }); setOffset(0); }}>
             <option value="">Toutes les sources</option>
             {enumChoices("entrySource").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select></label>
+          </FitSelect></label>
         </div></details>
         <ScreenStatus
           state={listView}
@@ -335,7 +350,21 @@ export default function LedgerPage() {
           return <article className="entry-card" key={entry.id}>
           <h3>{entry.entry_number || "Brouillon #" + entry.id} · {entry.label}</h3>
           <p>{formatIsoDate(entry.accounting_date)} · {entry.journal_code} · Pièce {entry.piece_reference} · {enumLabel("entryStatus", entry.status)}</p>
-          <div className="ledger-table"><table><thead><tr><th>Compte</th><th>Libellé</th><th>Débit €</th><th>Crédit €</th></tr></thead><tbody>{entry.lines.map((line, i) => <tr key={i}><td>{line.account_number}</td><td>{line.label}</td><td>{formatAmount(line.debit)}</td><td>{formatAmount(line.credit)}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>{entry.balanced ? "Équilibrée" : "Déséquilibrée"}</th><td>{formatAmount(entry.total_debit)}</td><td>{formatAmount(entry.total_credit)}</td></tr></tfoot></table></div>
+          <ResponsiveTable
+            label="Lignes de l’écriture"
+            columns={[
+              { key: "account", label: "Compte" },
+              { key: "label", label: "Libellé", priority: "secondary" },
+              { key: "debit", label: "Débit €" },
+              { key: "credit", label: "Crédit €" },
+            ]}
+            rows={entry.lines.map((line, index) => ({
+              key: String(index),
+              cells: [line.account_number, line.label, formatAmount(line.debit), formatAmount(line.credit)],
+            }))}
+            footerRow={<tr><th colSpan={2}>{entry.balanced ? "Équilibrée" : "Déséquilibrée"}</th><td>{formatAmount(entry.total_debit)}</td><td>{formatAmount(entry.total_credit)}</td></tr>}
+            footerNote={`${entry.balanced ? "Équilibrée" : "Déséquilibrée"} · Débit ${formatAmount(entry.total_debit)} · Crédit ${formatAmount(entry.total_credit)}`}
+          />
           {entry.status === "DRAFT" ? <>
             <button id={`ecriture-${entry.id}`} disabled={!writable || busy} aria-describedby={describedBy(yearCauseId, yearCauses)} onClick={() => startDraft(entry)}>Modifier</button>
             <button disabled={!writable || busy || !entry.balanced} aria-describedby={describedBy(yearCauseId, yearCauses, !entry.balanced ? balanceId : undefined)} onClick={() => setConfirmation({ action: "validate", entry })}>Valider</button>
@@ -388,17 +417,56 @@ export default function LedgerPage() {
       {audit && <details open><summary>Historique de l’écriture</summary>{audit.map((item, i) => <div key={i}><strong>{item.action} · {item.timestamp}</strong><pre>{JSON.stringify(item.details, null, 2)}</pre></div>)}<button onClick={() => setAudit(null)}>Fermer l’historique</button></details>}
       {tab === "Balance" && <>
         <ScreenStatus state={listView} onRetry={() => setRevision((value) => value + 1)} loading={<p>Chargement…</p>} />
-        {listVisible && balance && <div className="ledger-table"><table><caption>Balance générale · écritures validées</caption><thead><tr><th>Compte</th><th>Libellé</th><th>Total débit</th><th>Total crédit</th><th>Solde débiteur</th><th>Solde créditeur</th></tr></thead><tbody>{balance.balance.map((row) => <tr key={row.account_number}><td>{row.account_number}</td><td>{row.label}</td><td>{formatAmount(row.total_debit)}</td><td>{formatAmount(row.total_credit)}</td><td>{formatAmount(row.debit_balance)}</td><td>{formatAmount(row.credit_balance)}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>{balance.balanced ? "Balance équilibrée" : "ERREUR : balance déséquilibrée"}</th><td>{formatAmount(balance.total_debit)}</td><td>{formatAmount(balance.total_credit)}</td><td colSpan={2}>EUR</td></tr></tfoot></table></div>}
+        {listVisible && balance?.balance && <ResponsiveTable
+          label="Balance générale"
+          caption="Balance générale · écritures validées"
+          columns={[
+            { key: "account", label: "Compte" },
+            { key: "label", label: "Libellé" },
+            { key: "debit", label: "Total débit", priority: "secondary" },
+            { key: "credit", label: "Total crédit", priority: "secondary" },
+            { key: "debitBalance", label: "Solde débiteur" },
+            { key: "creditBalance", label: "Solde créditeur" },
+          ]}
+          rows={balance.balance.map((row) => ({
+            key: row.account_number,
+            cells: [
+              row.account_number,
+              row.label,
+              formatAmount(row.total_debit),
+              formatAmount(row.total_credit),
+              formatAmount(row.debit_balance),
+              formatAmount(row.credit_balance),
+            ],
+          }))}
+          footerRow={<tr><th colSpan={2}>{balance.balanced ? "Balance équilibrée" : "ERREUR : balance déséquilibrée"}</th><td>{formatAmount(balance.total_debit)}</td><td>{formatAmount(balance.total_credit)}</td><td colSpan={2}>EUR</td></tr>}
+          footerNote={`${balance.balanced ? "Balance équilibrée" : "ERREUR : balance déséquilibrée"} · Débit ${formatAmount(balance.total_debit)} · Crédit ${formatAmount(balance.total_credit)} · EUR`}
+        />}
       </>}
       {tab === "Grand livre" && <>
-        <label>Compte du grand livre<select value={account} onChange={(e) => { setAccount(e.target.value); setLedger([]); }}>{accounts.map((a) => <option key={a.number} value={a.number}>{a.number} · {a.label}</option>)}</select></label>
+        <label>Compte du grand livre<FitSelect value={account} onChange={(e) => { setAccount(e.target.value); setLedger([]); }}>{accounts.map((a) => <option key={a.number} value={a.number}>{a.number} · {a.label}</option>)}</FitSelect></label>
         <ScreenStatus
           state={listView}
           onRetry={() => setRevision((value) => value + 1)}
           loading={<p>Chargement…</p>}
           empty={<p>Aucune ligne dans ce grand livre.</p>}
         />
-        {listVisible && <div className="ledger-table"><table><caption>Solde positif : débiteur · négatif : créditeur</caption><thead><tr><th>Date</th><th>Écriture</th><th>Libellé</th><th>Débit</th><th>Crédit</th><th>Solde</th></tr></thead><tbody>{ledger.map((line, i) => <tr key={i}><td>{formatIsoDate(line.date)}</td><td>{line.entry_number}</td><td>{line.label}</td><td>{formatAmount(line.debit)}</td><td>{formatAmount(line.credit)}</td><td>{formatAmount(line.balance)}</td></tr>)}</tbody></table></div>}
+        {listVisible && <ResponsiveTable
+          label="Grand livre"
+          caption="Solde positif : débiteur · négatif : créditeur"
+          columns={[
+            { key: "date", label: "Date" },
+            { key: "entry", label: "Écriture", priority: "secondary" },
+            { key: "label", label: "Libellé" },
+            { key: "debit", label: "Débit" },
+            { key: "credit", label: "Crédit" },
+            { key: "balance", label: "Solde" },
+          ]}
+          rows={ledger.map((line, index) => ({
+            key: `${line.entry_number}-${index}`,
+            cells: [formatIsoDate(line.date), line.entry_number, line.label, formatAmount(line.debit), formatAmount(line.credit), formatAmount(line.balance)],
+          }))}
+        />}
       </>}
       {tab === "Plan comptable" && <>
         <p>Le plan initial est configurable. Les libellés des comptes utilisés par des écritures validées sont figés.</p>

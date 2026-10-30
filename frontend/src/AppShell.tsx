@@ -1,6 +1,7 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { fetchStatus } from "./api/status";
+import { MOBILE_QUERY, NARROW_CONTROL_QUERY, useMediaQuery } from "./lib/viewport";
 import { focusRouteTarget } from "./routing/focusTarget";
 import { navItems, pageIdFromPathname, ROUTES, type PageId } from "./routing/paths";
 import { UnsavedChangesProvider } from "./routing/unsaved";
@@ -45,8 +46,26 @@ export default function AppShell() {
   });
   const location = useLocation();
   const page: PageId = pageIdFromPathname(location.pathname);
+  const mobileNav = useMediaQuery(MOBILE_QUERY);
+  const narrowControls = useMediaQuery(NARROW_CONTROL_QUERY);
+  const [navState, setNavState] = useState({ path: location.pathname, open: false });
+  if (navState.path !== location.pathname) {
+    setNavState({ path: location.pathname, open: false });
+  }
+  const navOpen = navState.open;
+  function setNavOpen(open: boolean) {
+    setNavState({ path: location.pathname, open });
+  }
 
   useEffect(() => focusCurrentRoute(location.hash), [location.pathname, location.hash]);
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNavState((current) => ({ ...current, open: false }));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
 
   const status = state.data;
   const serviceReady = status?.database.status === "ready";
@@ -65,10 +84,29 @@ export default function AppShell() {
   }
 
   const activeNav = navItems.find((item) => item.id === page);
+  const menuOpen = !mobileNav || navOpen;
+
+  function renderNavLink(item: (typeof navItems)[number], className?: string) {
+    return (
+      <NavLink
+        key={item.id}
+        to={item.path}
+        end={item.id === "overview"}
+        className={({ isActive }) => [isActive ? "nav-active" : undefined, className].filter(Boolean).join(" ") || undefined}
+        onClick={() => {
+          setNavOpen(false);
+          focusMain();
+        }}
+      >
+        {item.step ? <span className="nav-step" aria-hidden="true">{item.step}</span> : <span aria-hidden="true">◫</span>}
+        {item.label}
+      </NavLink>
+    );
+  }
 
   return (
     <UnsavedChangesProvider>
-      <div className="app-layout">
+      <div className={narrowControls ? "app-layout narrow-controls" : "app-layout"}>
         <a
           className="skip-link"
           href="#main"
@@ -86,18 +124,21 @@ export default function AppShell() {
           </Link>
           <p className="sidebar-label">PARCOURS DÉCLARATIF</p>
           <nav aria-label="Navigation principale">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.id}
-                to={item.path}
-                end={item.id === "overview"}
-                className={({ isActive }) => (isActive ? "nav-active" : undefined)}
-                onClick={focusMain}
+            {mobileNav && (
+              <button
+                type="button"
+                className="nav-toggle"
+                aria-expanded={navOpen}
+                aria-controls="primary-nav-links"
+                onClick={() => setNavOpen(!navOpen)}
               >
-                {item.step ? <span className="nav-step" aria-hidden="true">{item.step}</span> : <span aria-hidden="true">◫</span>}
-                {item.label}
-              </NavLink>
-            ))}
+                {navOpen ? "Replier le menu" : "Ouvrir le menu"}
+              </button>
+            )}
+            {mobileNav && !navOpen && activeNav && renderNavLink(activeNav, "nav-current")}
+            <div id="primary-nav-links" className="nav-links" {...(menuOpen ? {} : { hidden: true })}>
+              {navItems.map((item) => renderNavLink(item))}
+            </div>
           </nav>
           <div className="sidebar-note">
             <span className="small-dot" aria-hidden="true" />
