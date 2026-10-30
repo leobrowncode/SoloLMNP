@@ -15,6 +15,7 @@ import {
 } from "../routing/paths";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import "./ledger.css";
+import ChartOfAccounts from "./ChartOfAccounts";
 import InventoryForm from "./InventoryForm";
 import GlossaryTip from "./GlossaryTip";
 import MutationStatus from "./MutationStatus";
@@ -336,16 +337,19 @@ export default function LedgerPage() {
       </>}
       {tab === "Plan comptable" && <>
         <p>Le plan initial est configurable. Les libellés des comptes utilisés par des écritures validées sont figés.</p>
-        <form onSubmit={(e) => {
-          const data = formData(e);
-          void mutate(() => request("/accounts", "POST", { number: data.get("number"), label: data.get("label"), account_type: data.get("kind") }), "Compte ajouté.");
-        }}>
-          <label>Numéro<input name="number" required pattern="[1-7][0-9]{2,9}" /></label>
-          <label>Libellé du compte<input name="label" required /></label>
-          <label>Type<select name="kind">{[["ASSET", "Actif"], ["LIABILITY", "Dette"], ["EQUITY", "Capitaux"], ["EXPENSE", "Charge"], ["INCOME", "Produit"]].map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label>
-          <button disabled={busy}>Ajouter le compte</button>
-        </form>
-        <ul>{accounts.map((a) => <li key={a.number}>{a.number} · {a.label} · {a.active ? "Actif" : "Inactif"} <button disabled={busy} onClick={() => { void mutate(() => request("/accounts/" + a.number + "/active", "PATCH", { active: !a.active }), "Compte mis à jour."); }}>{a.active ? "Désactiver" : "Réactiver"} {a.number}</button></li>)}</ul>
+        <ChartOfAccounts
+          accounts={accounts}
+          busy={busy}
+          onCreate={(account) => {
+            void mutate(() => request("/accounts", "POST", account), "Compte ajouté.");
+          }}
+          onToggle={(account) => {
+            void mutate(
+              () => request("/accounts/" + account.number + "/active", "PATCH", { active: !account.active }),
+              "Compte mis à jour.",
+            );
+          }}
+        />
       </>}
     </>}
   </section>

@@ -417,6 +417,29 @@
   gap: .35rem .5rem;
   margin-bottom: .8rem;
 }
+.chart-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: .75rem 1rem;
+  margin: 1rem 0;
+}
+.chart-accounts { list-style: none; padding: 0; margin: 1rem 0; }
+.chart-accounts > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(8rem, .7fr) minmax(8rem, .7fr) auto;
+  gap: .35rem 1rem;
+  align-items: center;
+  padding: .85rem 0;
+  border-bottom: 1px solid #d8e0d8;
+}
+.chart-k {
+  display: block;
+  font-size: .75rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #5b7466;
+}
+.chart-id { font-weight: 650; overflow-wrap: anywhere; }
 .heading-with-help > :is(h1, h2, h3, h4) {
   margin-block: 0;
 }
@@ -427,4 +450,6 @@
   .fiscal-waterfall li { flex-direction: column; align-items: flex-start; gap: .25rem; }
   .fiscal-dashboard .ledger-table table { table-layout: fixed; width: 100%; }
   .fiscal-dashboard td, .fiscal-dashboard th { overflow-wrap: anywhere; }
+  .chart-accounts > li { grid-template-columns: 1fr 1fr; }
+  .chart-id, .chart-accounts > li > button { grid-column: 1 / -1; }
 }
