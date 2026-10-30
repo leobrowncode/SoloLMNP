@@ -172,7 +172,7 @@
   justify-content: space-between;
   align-items: baseline;
 }
-.export-card h4 { margin: 0; }
+.export-card h3 { display: block; margin: 0; font-size: 1em; font-weight: 700; }
 .export-card p, .export-card li { overflow-wrap: anywhere; margin: 0; }
 .export-card ul { margin: 0; padding-left: 1.15rem; }
 .export-card button { justify-self: start; min-height: 2.75rem; }

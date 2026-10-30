@@ -102,7 +102,7 @@ export default function ExportDownloads({ yearId, status }: { yearId: number; st
             >
               <header>
                 <div className="heading-with-help">
-                  <h4>{output.title}</h4>
+                  <h3>{output.title}</h3>
                   {output.kind === "liasse" && <GlossaryTip id="liasse" />}
                   {output.kind === "pdf" && <GlossaryTip id="efi" />}
                   {output.kind === "fec" && <GlossaryTip id="fec" />}
@@ -147,7 +147,7 @@ export default function ExportDownloads({ yearId, status }: { yearId: number; st
         })}
         <article className="export-card" data-export="tableur">
           <header>
-            <h4>Tableur de travail</h4>
+            <h3>Tableur de travail</h3>
           </header>
           <p id="export-tableur-hint">
             Opérations, journal, balance et amortissements. La feuille Liasse reprend la posture affichée ci-dessus.

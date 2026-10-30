@@ -25,7 +25,7 @@ export interface Statements {
 }
 
 function Accounts({ title, rows, total }: { title: string; rows: Row[]; total: string }) {
-  return <section><h4>{title}</h4>
+  return <section><h3>{title}</h3>
     <ResponsiveTable
       label={title}
       caption={`${title} par compte`}

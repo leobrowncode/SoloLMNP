@@ -525,7 +525,7 @@ export default function OperationsPage() {
             <div className="entry-actions">
               <button type="button" onClick={() => openProperty(p)}>Modifier {p.name}</button>
             </div>
-            <h4 id={`colocataires-${p.id}`} tabIndex={-1}>Colocataires</h4>
+            <h3 id={`colocataires-${p.id}`} tabIndex={-1}>Colocataires</h3>
             <ul>
               {occupants(p.id).map((tenant) => (
                 <li key={tenant.id}>

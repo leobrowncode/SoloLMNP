@@ -29,6 +29,8 @@ Chaque étape du menu possède une adresse stable (`/comptabilite/brouillons`,
 utiliser Précédent/Suivant du navigateur ou enregistrer un favori sans perdre
 votre écran. Une saisie non enregistrée demande confirmation avant de quitter.
 
+Chaque vue a un seul titre de niveau 1 : le nom du bandeau (Vue d’ensemble, Comptabilité, Opérations & banque, et les autres étapes). Le nom SoloLMNP dans le menu n’est pas un titre. Les sections sont en niveau 2, leurs sous-parties en niveau 3, sans saut. Changer de vue met à jour le titre de l’onglet (`Comptabilité — SoloLMNP`), l’annonce à voix haute et place le focus sur ce titre. Un lien vers un endroit de la page (`#ancre`) place le focus sur cette ancre. Passer d’un onglet à l’autre dans la même vue ne déplace pas le focus. Le message affiché après un enregistrement reste à côté de la saisie : il n’est pas remplacé par l’annonce de la vue, et il ne prend le focus que si l’action le demande.
+
 Sur un écran étroit (768 px et moins), le menu se replie. La page en cours
 reste affichée : **Ouvrir le menu** montre toutes les étapes, **Replier le menu**
 les range. La navigation n’est pas retirée. Les pages longues proposent des

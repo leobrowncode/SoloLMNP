@@ -1,9 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { fetchStatus } from "./api/status";
 import { MOBILE_QUERY, NARROW_CONTROL_QUERY, useMediaQuery } from "./lib/viewport";
 import { focusRouteTarget } from "./routing/focusTarget";
-import { navItems, pageIdFromPathname, ROUTES, type PageId } from "./routing/paths";
+import { navItems, pageIdFromPathname, ROUTES, viewDocumentTitle, type PageId } from "./routing/paths";
 import { UnsavedChangesProvider } from "./routing/unsaved";
 import DossierProgress from "./features/DossierProgress";
 import DossierStatus from "./features/DossierStatus";
@@ -19,8 +19,29 @@ const SERVICE_DOWN = {
   message: "Connexion au service indisponible. Vérifiez que l’application est démarrée, puis réessayez.",
 };
 
+function publishViewTitle(label: string) {
+  document.title = viewDocumentTitle(label);
+}
+
+function focusElement(target: HTMLElement) {
+  try {
+    target.focus({ preventScroll: true });
+  } catch {
+    target.focus();
+  }
+}
+
 function focusMain() {
-  document.getElementById("main")?.focus();
+  const main = document.getElementById("main");
+  if (main instanceof HTMLElement) focusElement(main);
+}
+
+function focusPageHeading() {
+  const heading = document.getElementById("page-title");
+  if (!(heading instanceof HTMLElement)) return;
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active.closest(".local-feedback, .save-highlight")) return;
+  focusElement(heading);
 }
 
 function focusCurrentRoute(hash: string) {
@@ -30,7 +51,7 @@ function focusCurrentRoute(hash: string) {
     if (stopped) return;
     if (focusRouteTarget(hash)) return;
     if (performance.now() - started > 4000) {
-      focusMain();
+      focusPageHeading();
       return;
     }
     window.setTimeout(tick, 50);
@@ -57,7 +78,25 @@ export default function AppShell() {
     setNavState({ path: location.pathname, open });
   }
 
-  useEffect(() => focusCurrentRoute(location.hash), [location.pathname, location.hash]);
+  const activeNav = navItems.find((item) => item.id === page);
+  const pageTitle = activeNav?.label ?? "SoloLMNP";
+
+  useEffect(() => {
+    publishViewTitle(pageTitle);
+  }, [pageTitle]);
+
+  const focusedView = useRef<PageId | null>(null);
+  useEffect(() => {
+    const viewChanged = focusedView.current !== page;
+    focusedView.current = page;
+    if (!viewChanged || location.hash) return;
+    focusPageHeading();
+  }, [page, location.hash]);
+
+  useEffect(() => {
+    if (!location.hash) return undefined;
+    return focusCurrentRoute(location.hash);
+  }, [location.pathname, location.hash]);
   useEffect(() => {
     if (!navOpen) return;
     const onKey = (event: KeyboardEvent) => {
@@ -83,7 +122,6 @@ export default function AppShell() {
     workspace = <Outlet />;
   }
 
-  const activeNav = navItems.find((item) => item.id === page);
   const menuOpen = !mobileNav || navOpen;
 
   function renderNavLink(item: (typeof navItems)[number], className?: string) {
@@ -95,7 +133,6 @@ export default function AppShell() {
         className={({ isActive }) => [isActive ? "nav-active" : undefined, className].filter(Boolean).join(" ") || undefined}
         onClick={() => {
           setNavOpen(false);
-          focusMain();
         }}
       >
         {item.step ? <span className="nav-step" aria-hidden="true">{item.step}</span> : <span aria-hidden="true">◫</span>}
@@ -118,7 +155,7 @@ export default function AppShell() {
           Aller au contenu
         </a>
         <aside className="sidebar">
-          <Link to={ROUTES.home} className="brand" aria-label="SoloLMNP — accueil" onClick={focusMain}>
+          <Link to={ROUTES.home} className="brand" aria-label="SoloLMNP — accueil">
             <span className="brand-mark" aria-hidden="true">S</span>
             <span>Solo<span className="brand-light">LMNP</span></span>
           </Link>
@@ -150,7 +187,8 @@ export default function AppShell() {
 
         <main id="main" tabIndex={-1}>
           <header className="topbar">
-            <p className="topbar-title">{activeNav?.label}</p>
+            <p id="route-announcement" className="sr-only" aria-live="polite" aria-atomic="true">{pageTitle}</p>
+            <h1 id="page-title" className="topbar-title" tabIndex={-1}>{pageTitle}</h1>
             <div className="topbar-meta">
               {liveDossier && <DossierStatus dossier={liveDossier} />}
               {showProgress && <DossierProgress />}
@@ -167,7 +205,7 @@ export default function AppShell() {
 
             {page === "overview" && showWorkspace && (
               <section className="intro" aria-labelledby="welcome-title">
-                <h1 id="welcome-title">De l’écriture à la liasse que vous recopierez.</h1>
+                <h2 id="welcome-title">De l’écriture à la liasse que vous recopierez.</h2>
                 <p className="intro-description">LMNP au réel, location longue durée. Le menu sert à naviguer. Ici, chaque étape du dossier indique son état. SoloLMNP prépare la liasse et le FEC. Il n’envoie rien aux impôts.</p>
                 <div className="heading-with-help">
                   <GlossaryTip id="lmnp-reel" />
