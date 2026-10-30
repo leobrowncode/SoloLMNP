@@ -1,0 +1,76 @@
+/* Jetons de couleur SoloLMNP.
+   Texte normal : 4,5:1. Grand texte, bordures de contrôle, anneau de focus
+   et icônes : 3:1. Les filets décoratifs ne identifient pas un contrôle.
+   Le texte désactivé peut descendre sous 4,5:1 ; il reste lisible (3:1)
+   et l’opacité le distingue de l’état actif. */
+:root {
+  --bg-canvas: #f6f7f3; /* role: background */
+  --bg-surface: #ffffff; /* role: background */
+  --bg-surface-muted: #fbfdfb; /* role: background */
+  --bg-surface-green: #f7faf7; /* role: background */
+  --bg-nav-hover: #f5f7f3; /* role: background */
+  --bg-nav-active: #eaf1e9; /* role: background */
+  --bg-button: #f2f7f2; /* role: background */
+  --bg-button-hover: #dfe8df; /* role: background */
+  --bg-soft: #eef5ef; /* role: background */
+  --bg-soft-strong: #eaf1e6; /* role: background */
+  --bg-notice: #eef1eb; /* role: background */
+  --bg-feedback: #eef6ea; /* role: background */
+  --bg-success: #e7f6e8; /* role: background */
+  --bg-success-soft: #f3faf3; /* role: background */
+  --bg-warning: #fff9ef; /* role: background */
+  --bg-warning-strong: #fff6ec; /* role: background */
+  --bg-highlight: #fff8ea; /* role: background */
+  --bg-obsolete: #fff3df; /* role: background */
+  --bg-danger: #fff0eb; /* role: background */
+  --bg-danger-soft: #fbf6f6; /* role: background */
+  --bg-info: #f4f7fb; /* role: background */
+  --bg-neutral: #f4f6f4; /* role: background */
+  --bg-badge: #dfe8df; /* role: background */
+  --bg-badge-muted: #d8e0d8; /* role: background */
+  --bg-step-active: #d18d25; /* role: background */
+  --bg-current: #e9efe2; /* role: background */
+  --bg-track: #e4eee4; /* role: background */
+  --bg-inverse: #173c2e; /* role: background */
+  --bg-brand: #254e3f; /* role: background */
+  --bg-accent: #254536; /* role: background */
+  --bg-overlay: rgba(20, 32, 24, 0.45); /* role: scrim */
+
+  --text-body: #263c35; /* role: text */
+  --text-strong: #15372a; /* role: text */
+  --text-heading: #254536; /* role: text */
+  --text-secondary: #355245; /* role: text */
+  --text-muted: #5d6a60; /* role: text */
+  --text-nav-active: #274d3d; /* role: text */
+  --text-button: #46614b; /* role: text */
+  --text-on-accent: #ffffff; /* role: text */
+  --text-on-inverse: #f5faf6; /* role: text */
+  --text-inverse-meta: #b7dcc6; /* role: text */
+  --text-warning: #6a4b12; /* role: text */
+  --text-danger: #852800; /* role: text */
+  --text-blocked: #8a4b32; /* role: text */
+  --text-info: #3d4f73; /* role: text */
+  --text-success: #1f6b3a; /* role: text */
+  --text-amber: #836838; /* role: text */
+
+  --focus-ring: #a56f27; /* role: ui */
+  --border-control: #798b7f; /* role: ui */
+  --border-button: #456a54; /* role: ui */
+  --border-button-quiet: #838882; /* role: ui */
+  --border-icon: #808a77; /* role: ui */
+  --border-success: #738a71; /* role: ui */
+  --border-warning: #99835e; /* role: ui */
+  --border-info: #7c889e; /* role: ui */
+  --border-danger: #a27d73; /* role: ui */
+  --border-danger-soft: #998282; /* role: ui */
+  --border-notice: #918675; /* role: ui */
+  --border-feedback: #788a73; /* role: ui */
+  --mark-ok: #658b5c; /* role: ui */
+  --mark-dot: #6a8f6d; /* role: ui */
+  --mark-fill: #2f6b45; /* role: ui */
+
+  --border-hairline: #d8e0d8; /* role: decorative */
+  --shadow-dot: 0 0 0 4px #d5e4d4; /* role: decorative */
+  --shadow-dialog: 0 16px 48px rgba(20, 32, 24, 0.18); /* role: decorative */
+  --shadow-tooltip: 0 8px 24px rgba(23, 60, 46, 0.18); /* role: decorative */
+}

@@ -17,6 +17,10 @@ Monolithe modulaire : FastAPI/Pydantic/SQLAlchemy 2/Alembic, SQLite (WAL, foreig
 5. Les rapports et FEC sont des projections reproductibles d'écritures validées.
 6. Les règles/mappings sont immuables par millésime et leur empreinte entre dans le snapshot.
 
+## Interface
+
+Les couleurs du frontend sont des jetons CSS dans `frontend/src/tokens.css`. Le texte normal reste à au moins 4,5:1. Le grand texte, les bordures qui identifient un contrôle, l’anneau de focus et les icônes restent à au moins 3:1. Les filets décoratifs ne servent pas à reconnaître un composant. Les états survol, focus, actif et désactivé restent distincts : le texte désactivé peut passer sous 4,5:1, mais il reste lisible et l’opacité le sépare de l’état disponible. `frontend/src/contrast.test.ts` recalcule ces ratios à partir des jetons et des feuilles de style.
+
 ## Déploiement
 
 Deux conteneurs, bind-mount `data`, écoute loopback par défaut. Une instance = une activité et sa base ; aucune authentification n'est fournie, donc l'exposition Internet directe est interdite. Un reverse proxy privé avec TLS/authentification externe est requis si accès distant.
