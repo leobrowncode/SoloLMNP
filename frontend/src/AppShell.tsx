@@ -155,9 +155,11 @@ export default function AppShell() {
           Aller au contenu
         </a>
         <aside className="sidebar">
-          <Link to={ROUTES.home} className="brand" aria-label="SoloLMNP — accueil">
+          <Link to={ROUTES.home} className="brand">
             <span className="brand-mark" aria-hidden="true">S</span>
             <span>Solo<span className="brand-light">LMNP</span></span>
+            {" "}
+            <span className="sr-only">— accueil</span>
           </Link>
           <p className="sidebar-label">PARCOURS DÉCLARATIF</p>
           <nav aria-label="Navigation principale">

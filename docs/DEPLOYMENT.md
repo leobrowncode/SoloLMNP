@@ -1,7 +1,7 @@
-# Déploiement et vérification des fondations
+# Déploiement
 
-Cette phase fournit l'infrastructure de l'application. Elle ne permet pas encore de tenir
-une comptabilité ni de produire une déclaration fiscale.
+Installation locale ou Docker. Les millésimes chargés restent en recherche : l’application
+prépare une comptabilité et une feuille à contrôler, elle ne produit pas une déclaration fiable.
 
 ## Lanceur local (sans Docker)
 
@@ -16,7 +16,12 @@ Prérequis : Python 3.12+ et Node.js 24 avec `npm`.
 Le script `scripts/start_local.py` crée `.venv`, installe `backend/requirements.lock` et les
 dépendances frontend si besoin, copie `.env.example` vers `.env`, applique les migrations,
 démarre Uvicorn (`127.0.0.1:8000`) et Vite (`127.0.0.1:5173`), puis ouvre le navigateur.
-Arrêt avec Ctrl+C. Guide métier : [TUTORIAL.md](TUTORIAL.md).
+Arrêt avec Ctrl+C. Guide métier : [TUTORIAL.md](TUTORIAL.md). Cycle d’un exercice :
+[ANNUAL_CYCLE.md](ANNUAL_CYCLE.md). Limites : [LIMITS.md](LIMITS.md).
+
+Le parcours navigateur n’utilise pas `data/`. Depuis `e2e/`, après `npm ci` et
+`npx playwright install chromium`, `npm test` démarre l’API sur une base temporaire
+et Vite. Il faut le Python du dépôt (dépendances backend installées).
 
 ## Docker Compose
 

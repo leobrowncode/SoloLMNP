@@ -26,7 +26,9 @@ export async function downloadFiling(path: string): Promise<void> {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  // The browser reads the blob after the click. Revoking immediately can
+  // cancel the download before the file is written.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 function filenameFrom(header: string | null): string {

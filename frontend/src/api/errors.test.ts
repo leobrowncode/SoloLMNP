@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { helpForError, parseApiErrorDetail, formFieldName, issuesForForm, importIssueLines } from "./errors";
+import { errorSummary, helpForError, parseApiErrorDetail, formFieldName, issuesForForm, importIssueLines } from "./errors";
 
 describe("parseApiErrorDetail", () => {
   it("preserves business error metadata", () => {
@@ -10,6 +10,21 @@ describe("parseApiErrorDetail", () => {
     });
     expect(detail.code).toBe("ACTIVITY_REQUIRED");
     expect(detail.action?.href).toBe("/comptabilite");
+  });
+
+  it("shows a model-level validation message instead of the generic refusal", () => {
+    const detail = parseApiErrorDetail({
+      code: "VALIDATION_ERROR",
+      message: "Les données envoyées sont invalides.",
+      issues: [{
+        code: "value_error",
+        message: "La date de fin doit être postérieure ou égale à la date de début.",
+        location: "body",
+      }],
+    });
+    expect(errorSummary(detail)).toBe(
+      "La date de fin doit être postérieure ou égale à la date de début.",
+    );
   });
 
   it("maps pydantic validation arrays to issues", () => {

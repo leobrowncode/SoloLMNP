@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import CloseYear from "./CloseYear";
 
@@ -14,7 +14,7 @@ test("focuses the precheck error and names each warning", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
   const alert = await screen.findByRole("alert");
   expect(alert).toHaveTextContent("Exercice verrouillé");
-  expect(alert).toHaveFocus();
+  await waitFor(() => expect(alert).toHaveFocus());
 });
 
 test("links a missing or stale fiscal computation to the calculation", async () => {

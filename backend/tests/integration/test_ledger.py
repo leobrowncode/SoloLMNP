@@ -226,6 +226,35 @@ def test_sql_cannot_validate_unbalanced_entry(client, database):
     assert client.get("/api/ledger/years/1/balance").json()["balance"] == []
 
 
+def test_inverted_exercise_dates_name_the_end(client):
+    inverted = client.post(
+        "/api/ledger/years",
+        json={
+            "year": 2026,
+            "start_date": "2026-12-31",
+            "end_date": "2026-01-01",
+            "fiscal_vintage": "2026",
+        },
+    )
+    assert inverted.status_code == 422
+    issue = inverted.json()["detail"]["issues"][0]
+    assert issue["field"] == "end_date"
+    assert issue["message"] == ("La date de fin doit être postérieure ou égale à la date de début.")
+    mismatch = client.post(
+        "/api/ledger/years",
+        json={
+            "year": 2024,
+            "start_date": "2026-01-01",
+            "end_date": "2026-12-31",
+            "fiscal_vintage": "2026",
+        },
+    )
+    assert mismatch.status_code == 422
+    assert mismatch.json()["detail"]["issues"][0]["message"] == (
+        "L’année de clôture doit être celle de la date de fin."
+    )
+
+
 def test_account_deactivation_and_overlapping_year(client):
     entry = draft(client)
     assert (

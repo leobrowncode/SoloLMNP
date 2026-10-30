@@ -9,7 +9,7 @@ from sqlalchemy.pool import ConnectionPoolEntry
 
 from app.core.config import Settings
 
-SCHEMA_REVISION = "0010_carry_events"
+SCHEMA_REVISION = "0011_entry_year_status"
 
 
 def create_database_engine(settings: Settings) -> Engine:

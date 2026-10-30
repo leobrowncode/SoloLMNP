@@ -22,6 +22,7 @@ from app.core.database import Database
 from app.models import Asset, AssetComponent, DepreciationPeriod, DepreciationSchedule
 from app.services import assets as service
 from app.services import structuring
+from app.services.asset_read_cache import prime_asset_reads
 from app.services.ledger import entry_json, fail
 
 _IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
@@ -47,10 +48,9 @@ def build_assets_router(database: Database) -> APIRouter:
 
     @router.get("")
     def assets(session: Read) -> list[dict[str, Any]]:
-        return [
-            structuring.present_asset(session, asset)
-            for asset in session.scalars(select(Asset).order_by(Asset.id))
-        ]
+        rows = list(session.scalars(select(Asset).order_by(Asset.id)))
+        prime_asset_reads(session, rows)
+        return [structuring.present_asset(session, asset) for asset in rows]
 
     @router.get("/properties/{property_id}/plan")
     def preview_dwelling_plan(property_id: int, session: Read) -> dict[str, Any]:

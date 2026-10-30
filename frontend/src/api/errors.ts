@@ -240,8 +240,8 @@ export function importIssueLines(detail: ApiErrorDetail): ApiErrorIssue[] {
 
 export function errorSummary(detail: ApiErrorDetail): string {
   if (detail.issues?.length) {
-    const fieldIssues = detail.issues.filter((issue) => issue.field);
-    if (fieldIssues.length) return fieldIssues.map((issue) => issue.message).join(" ");
+    const messages = detail.issues.map((issue) => issue.message.trim()).filter(Boolean);
+    if (messages.length) return messages.join(" ");
   }
   return detail.message;
 }

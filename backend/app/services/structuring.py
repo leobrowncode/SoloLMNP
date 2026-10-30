@@ -45,6 +45,12 @@ from app.models import (
     Property,
     Tenant,
 )
+from app.services.asset_read_cache import (
+    cached_asset_schedule,
+    cached_component_schedule,
+    cached_component_schedules,
+    cached_components,
+)
 from app.services.assets import (
     _live_property_entry,
     add_months,
@@ -922,6 +928,9 @@ def _covered(locks: list[dict[str, Any]], groups: set[str]) -> bool:
 
 
 def _components(session: Session, asset_id: int) -> list[AssetComponent]:
+    cached = cached_components(session, asset_id)
+    if cached is not None:
+        return cached
     return list(
         session.scalars(
             select(AssetComponent)
@@ -932,18 +941,27 @@ def _components(session: Session, asset_id: int) -> list[AssetComponent]:
 
 
 def _schedule_for_asset(session: Session, asset_id: int) -> DepreciationSchedule | None:
+    hit, schedule = cached_asset_schedule(session, asset_id)
+    if hit:
+        return schedule
     return session.scalar(
         select(DepreciationSchedule).where(DepreciationSchedule.asset_id == asset_id)
     )
 
 
 def _schedule_for_component(session: Session, component_id: int) -> DepreciationSchedule | None:
+    hit, schedule = cached_component_schedule(session, component_id)
+    if hit:
+        return schedule
     return session.scalar(
         select(DepreciationSchedule).where(DepreciationSchedule.component_id == component_id)
     )
 
 
 def _component_schedules(session: Session, asset_id: int) -> list[DepreciationSchedule]:
+    cached = cached_component_schedules(session, asset_id)
+    if cached is not None:
+        return cached
     component_ids = select(AssetComponent.id).where(AssetComponent.asset_id == asset_id)
     return list(
         session.scalars(

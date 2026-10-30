@@ -219,6 +219,14 @@ def import_line_fail(code: str, message: str, line: int, status: int = 422) -> N
     fail(code, message, status, line=line, location="import")
 
 
+def readable_validation_message(message: object) -> str:
+    text = str(message or "Valeur invalide.")
+    prefix = "Value error, "
+    if text.startswith(prefix):
+        return text[len(prefix) :]
+    return text
+
+
 def validation_issues(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
     for error in errors:
@@ -228,7 +236,7 @@ def validation_issues(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
         issues.append(
             {
                 "code": str(error.get("type", "invalid")),
-                "message": str(error.get("msg", "Valeur invalide.")),
+                "message": readable_validation_message(error.get("msg", "Valeur invalide.")),
                 "field": field,
                 "location": location,
             }
@@ -284,7 +292,9 @@ def register_exception_handlers(application: FastAPI) -> None:
                         field = ".".join(location_parts[1:])
                     else:
                         field = item.get("field")
-                    message = str(item.get("msg", item.get("message", "Valeur invalide.")))
+                    message = readable_validation_message(
+                        item.get("msg", item.get("message", "Valeur invalide."))
+                    )
                     issues.append(
                         {
                             "code": str(item.get("type", item.get("code", "invalid"))),

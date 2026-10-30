@@ -477,6 +477,11 @@ def gross_pieces(session: Session, asset: Asset) -> list[tuple[str, int, date, s
 
 
 def _live_property_entry(session: Session, property_id: int) -> AccountingEntry | None:
+    from app.services.asset_read_cache import cached_property_entry
+
+    hit, cached = cached_property_entry(session, property_id)
+    if hit:
+        return cached
     rows = session.scalars(
         select(AccountingEntry).where(
             AccountingEntry.source_type == "ACQUISITION",
