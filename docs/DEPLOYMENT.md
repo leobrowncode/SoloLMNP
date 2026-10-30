@@ -95,7 +95,7 @@ ne suffit donc pas à déclarer l'application prête.
 Avant une mise à jour, arrêter l'instance et sauvegarder tout `data/` ainsi que la
 version de l'application et les paramètres locaux. Ne pas copier seulement le fichier
 SQLite d'une instance en cours d'écriture : ses fichiers journal/WAL peuvent être nécessaires.
-Le workflow applicatif de sauvegarde/restauration reste prévu à la phase 11.
+La sauvegarde et la restauration applicatives sont décrites dans [BACKUP.md](BACKUP.md). Une restauration confirmée prend d’abord une copie de l’état actuel.
 
 ```sh
 docker compose logs --tail=100

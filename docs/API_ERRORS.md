@@ -22,6 +22,8 @@ Les erreurs Pydantic (`422`) sont normalisées en `VALIDATION_ERROR` avec `issue
 
 `help` pointe vers le glossaire du frontend (`frontend/src/features/glossary.ts`). Le serveur le remplit pour les codes listés dans `HELP_IDS` (`backend/app/core/api_errors.py`). Si le champ est absent, l’interface applique la même table (`ERROR_HELP`). Un `help` explicite et connu l’emporte sur cette table. Ce n’est pas un lien de navigation : la pastille **?** ouvre la définition (ce que c’est, pourquoi, un exemple, l’erreur fréquente). Le glossaire ne présente pas la liasse comme déclarable : les millésimes restent en recherche.
 
+Les refus de justificatif (`INVALID_DOCUMENT`, `DOCUMENT_SIZE`, `DOCUMENT_SIGNATURE`, `DOCUMENT_PATH`, `DOCUMENT_NOT_FOUND`) pointent vers `justificatif`. La recherche et la liaison d’écriture (`ENTRY_SEARCH`, `ENTRY_NOT_FOUND`, `ENTRY_AMBIGUOUS`) pointent vers `ecriture`. Les refus d’archive (`BACKUP_PATH`, `BACKUP_NOT_FOUND`, `BACKUP_REJECTED`) pointent vers `sauvegarde`. `RESTORE_CONFIRMATION` pointe vers `restauration`.
+
 Un téléchargement de liasse, de PDF, de FEC ou de dossier de contrôle refusé parce que la posture est Bloquée utilise ce contrat (`409`). L’interface affiche le message, la liste `issues` lorsqu’il y en a plusieurs, et le lien `action`. Elle ne quitte pas la page.
 
 ## Interface
