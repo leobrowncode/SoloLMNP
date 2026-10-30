@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.ledger_schemas import FiscalInput
 from app.api.sessions import dependencies
 from app.core.database import Database
-from app.domain.fiscal.loader import available_vintages, load_vintage
+from app.domain.fiscal.loader import available_vintages, load_vintage, public_rule
 from app.domain.fiscal.output_status import calculation_status
 from app.services.fiscal import compute_fiscal, displayed_fiscal, reintegration_suggestions
 
@@ -34,8 +34,16 @@ def build_fiscal_router(database: Database) -> APIRouter:
                     "declarable": presented["declarable"],
                     "sha256": loaded["sha256"],
                     "executable": [rule["id"] for rule in loaded["executable"]],
-                    "blocked": loaded["blocked"],
+                    "blocked": [public_rule(rule) for rule in loaded["blocked"]],
                     "scope": loaded["scope"],
+                    "rules": [
+                        public_rule(rule)
+                        for rule in (
+                            *loaded["executable"],
+                            *loaded["scope_rules"],
+                            *loaded["blocked"],
+                        )
+                    ],
                 }
             )
         return {

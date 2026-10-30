@@ -294,14 +294,14 @@ export const GLOSSARY = {
   },
   "report-amortissement": {
     label: "Report d’amortissement",
-    what: "Part de dotation non déduite faute de capacité, suivie par année d’origine. Elle se reprend plus tard, dans l’ordre d’ancienneté, s’il reste de la capacité après la dotation de l’année. Elle n’est pas perdue au bout de 10 ans : ce délai concerne le déficit, pas ce stock.",
+    what: "Part de dotation non déduite faute de capacité (CGI art. 39 C, II). Elle se reprend plus tard, du plus ancien au plus récent, s’il reste de la capacité. Elle n’expire pas au bout de 10 ans : ce délai est celui du déficit. Ce n’est pas l’ancien régime des amortissements réputés différés, supprimé en 2004.",
     why: "L’état de suivi (art. 39 C dans la liasse de travail) conserve l’ouverture, le repris et le reste. Vous le gardez avec la liasse. Le montant n’est pas une base de déclaration tant que le millésime est en recherche.",
     example: "2026 : 1 000 € non déduits. 2027 : capacité restante 400 € après la dotation de 2027 : on reprend 400 €, il reste 600 €.",
     mistake: "Le confondre avec le déficit LMNP (10 ans, hors salaire), ou le déduire en plus de la capacité.",
   },
   deficit: {
     label: "Déficit",
-    what: "Résultat fiscal négatif de l’activité LMNP. Il se reporte sur les bénéfices LMNP des 10 années suivantes. Il ne diminue pas les salaires ni les autres revenus du foyer.",
+    what: "Résultat fiscal négatif de l’activité LMNP (CGI art. 156, I, 1° ter). Il se reporte sur les bénéfices de la même activité pendant les 10 années suivantes. Il ne diminue pas les salaires. Le 1° bis (six ans) ne s’applique pas à la location meublée.",
     why: "Le plafond d’amortissement vise en pratique un résultat fiscal proche de 0 €. Un déficit peut quand même venir des charges autres que la dotation. La case de rappel côté foyer est 5NY, à contrôler sur la déclaration.",
     example: "Loyers 10 000 €, charges hors dotation 12 000 €, dotation plafonnée à 0 : déficit 2 000 €, reportable sur les LMNP suivants, pas sur le salaire.",
     mistake: "L’imputer sur le revenu global, ou le mélanger avec le stock d’amortissement non déduit.",
@@ -382,6 +382,13 @@ export const GLOSSARY = {
     why: "Le justificatif se rattache à cette écriture par son numéro, sa date et sa pièce. Ce n’est pas un identifiant interne de la base.",
     example: "2026-000012 · 05/03/2026 · LOY-2026-03. Le sélecteur retrouve cette écriture avec ces trois informations.",
     mistake: "Chercher l’écriture par un numéro technique de base, ou modifier une écriture validée au lieu de l’extourner.",
+  },
+  "registre-reports": {
+    label: "Registre de report",
+    what: "Suivi séparé, par exercice d’origine : montant créé, utilisé, expiré et restant. Les amortissements non déduits et les déficits LMNP sont deux registres. Un recalcul remplace les lignes de l’exercice recalculé.",
+    why: "Le résultat comptable reste au journal. Ces registres disent ce qui est encore utilisable, sans réécrire les écritures.",
+    example: "2025 : 200 € d’amortissement non déduit. 2026 : 200 € utilisés, reste 0 €. Un déficit de 2015 non utilisé est expiré en 2026, au-delà des dix années.",
+    mistake: "Additionner le déficit et l’amortissement non déduit, ou croire qu’un recalcul double le stock.",
   },
   cession: {
     label: "Cession et plus-values",

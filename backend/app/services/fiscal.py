@@ -13,6 +13,15 @@ from sqlalchemy.orm import Session
 
 from app.api.ledger_schemas import FiscalInput
 from app.core.money import to_cents
+from app.domain.fiscal.blocks import triggered_rule_ids
+from app.domain.fiscal.engine import (
+    DEPRECIATION_RULE_ID,
+    TAX_LOSS_HORIZON_YEARS,
+    TAX_LOSS_RULE_ID,
+    Movement,
+    Stock,
+    apply_lmnp,
+)
 from app.domain.fiscal.loader import load_vintage
 from app.domain.fiscal.output_status import calculation_status
 from app.models import (
@@ -26,11 +35,15 @@ from app.models import (
 )
 from app.models.assets import Asset, AssetComponent
 from app.models.base import utc_now
-from app.models.fiscal import DepreciationCarryForward, FiscalComputation, TaxLossCarryForward
+from app.models.fiscal import (
+    CarryForwardEvent,
+    DepreciationCarryForward,
+    FiscalComputation,
+    TaxLossCarryForward,
+)
 from app.services.ledger import fail, get_year, money
 from app.services.statements import statements
 
-TAX_LOSS_HORIZON_YEARS = 10
 PRIOR_USE_ORDER = "FIFO_oldest_origin_year_first"
 
 
@@ -158,6 +171,28 @@ def structuring_fingerprint(session: Session, activity_id: int) -> str:
     return hashlib.sha256(json.dumps(payload).encode()).hexdigest()
 
 
+def _stored_carry(row: FiscalComputation) -> str | None:
+    details = row.details if isinstance(row.details, dict) else {}
+    stored = details.get("carry_inputs_sha256")
+    if isinstance(stored, str) and len(stored) == 64:
+        return stored
+    return None
+
+
+def _carry_fingerprint(depreciation: list[Stock], tax_loss: list[Stock]) -> str:
+    payload = {
+        "depreciation": [
+            [stock.origin_year_id, stock.created, stock.used_before, stock.expired_before]
+            for stock in depreciation
+        ],
+        "tax_loss": [
+            [stock.origin_year_id, stock.created, stock.used_before, stock.expired_before]
+            for stock in tax_loss
+        ],
+    }
+    return hashlib.sha256(json.dumps(payload).encode()).hexdigest()
+
+
 def _stored_structuring(row: FiscalComputation) -> str | None:
     details = row.details if isinstance(row.details, dict) else {}
     stored = details.get("structuring_sha256")
@@ -187,6 +222,7 @@ def _with_freshness(
         payload["current_structuring_sha256"] = structuring_fingerprint(
             session, year.rental_activity_id
         )
+    payload["blocked_facts"] = _blocking_issues(session, year, load_vintage(year.fiscal_vintage))
     return payload
 
 
@@ -210,6 +246,18 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
     for item in adjustments:
         item["amount"] = money(to_cents(Decimal(item["amount"])))
     adjustments_hash = hashlib.sha256(json.dumps(adjustments, sort_keys=True).encode()).hexdigest()
+    blocked = _blocking_issues(session, year, vintage)
+    if blocked:
+        fail(
+            "FISCAL_RULE_BLOCKED",
+            "Calcul fiscal bloqué. "
+            + " ".join(f"{item['code']} : {item['message']}" for item in blocked),
+            409,
+            issues=blocked,
+        )
+    dep_stocks = _stocks(session, year, "depreciation")
+    loss_stocks = _stocks(session, year, "tax_loss")
+    carry_hash = _carry_fingerprint(dep_stocks, loss_stocks)
     current = _current(session, year.id)
     if (
         current is not None
@@ -218,6 +266,7 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
         and current.rules_sha256 == vintage["sha256"]
         and current.invalidated_at is None
         and _stored_structuring(current) == structuring
+        and _stored_carry(current) == carry_hash
     ):
         return _with_freshness(session, year, current, _json(current, replayed=True))
     if year.status != "OPEN":
@@ -228,28 +277,34 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
     _land_invariant(session)
     other = expenses - depreciation
     additions, addition_accounts = _additions(expense_balances, data)
-    capacity = max(0, income - (other - additions))
-    current_deductible = min(depreciation, capacity)
-    capacity_left = capacity - current_deductible
-    unused = depreciation - current_deductible
-    dep_stocks = _prior_remaining(session, year, "depreciation")
-    dep_uses, prior_dep_used = _consume_fifo(dep_stocks, capacity_left)
-    deductible = current_deductible + prior_dep_used
-    fiscal_before_losses = income - other - deductible + additions
-    loss_stocks = _prior_remaining(
-        session,
-        year,
-        "tax_loss",
-        min_origin_year=year.year - TAX_LOSS_HORIZON_YEARS,
+    split = apply_lmnp(
+        year=year.year,
+        income=income,
+        other_charges=other,
+        depreciation=depreciation,
+        additions=additions,
+        depreciation_stocks=dep_stocks,
+        tax_loss_stocks=loss_stocks,
     )
-    loss_budget = max(0, fiscal_before_losses)
-    loss_uses, prior_loss_used = _consume_fifo(loss_stocks, loss_budget)
-    fiscal_result = fiscal_before_losses - prior_loss_used
-    tax_loss = max(0, -fiscal_result)
-    accounting = income - expenses
+    dep_uses = _use_dicts(split.depreciation_uses)
+    loss_uses = _use_dicts(split.tax_loss_uses)
+    prior_loss_available = sum(
+        stock.remaining_before()
+        for stock in loss_stocks
+        if stock.origin_year >= year.year - TAX_LOSS_HORIZON_YEARS
+    )
     details = {
         "applied_rules": [rule["id"] for rule in vintage["executable"]],
-        "blocked_rules": vintage["blocked"],
+        "blocked_rules": [
+            {
+                "id": rule["id"],
+                "blocking_reason": rule["blocking_reason"],
+                "source": rule["source"],
+                "source_url": rule["source_url"],
+                "consulted_at": rule["consulted_at"],
+            }
+            for rule in vintage["blocked"]
+        ],
         "scope_rules": vintage["scope"],
         "prior_carry_forward_use": {
             "status": "enabled",
@@ -257,29 +312,67 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
             "tax_loss_horizon_years": TAX_LOSS_HORIZON_YEARS,
             "depreciation": dep_uses,
             "tax_loss": loss_uses,
+            "tax_loss_expired": [
+                {
+                    "origin_year_id": move.origin_year_id,
+                    "origin_year": move.origin_year,
+                    "expired": money(move.amount),
+                    "remaining_after": money(move.remaining_after),
+                }
+                for move in split.tax_loss_expiries
+            ],
             "notes": (
-                "Registres d’origine inchangés. La consommation est tracée ici ; "
-                "les soldes restants des exercices clôturés sont dérivés. "
-                "Cession, TVA, plus-values et ventilation automatique du terrain restent hors MVP."
+                "Le montant créé reste sur le registre de l’exercice d’origine. "
+                "Création, utilisation et expiration sont des lignes distinctes du calcul "
+                "qui les constate. Un recalcul ou une réouverture invalide ces lignes. "
+                "Cession, TVA, plus-values et ventilation automatique du terrain restent bloquées."
             ),
         },
-        "fiscal_result_before_prior_losses": money(fiscal_before_losses),
-        "prior_depreciation_used": money(prior_dep_used),
-        "prior_tax_loss_used": money(prior_loss_used),
+        "carry_registers": {
+            "depreciation": _register_view(
+                dep_stocks,
+                split.depreciation_uses,
+                (),
+                year,
+                split.unused_depreciation,
+                DEPRECIATION_RULE_ID,
+                expires=False,
+            ),
+            "tax_loss": _register_view(
+                loss_stocks,
+                split.tax_loss_uses,
+                split.tax_loss_expiries,
+                year,
+                split.tax_loss,
+                TAX_LOSS_RULE_ID,
+                expires=True,
+            ),
+        },
+        "fiscal_result_before_prior_losses": money(split.fiscal_before_losses),
+        "prior_depreciation_used": money(split.prior_depreciation_used),
+        "prior_tax_loss_used": money(split.prior_tax_loss_used),
         "imputed_on_global_income": "0.00",
         "additions": adjustments,
         "addition_accounts": addition_accounts,
         "operating_income": money(income),
         "other_charges": money(other),
         "accounting_depreciation": money(depreciation),
-        "capacity": money(capacity),
-        "current_deductible_depreciation": money(current_deductible),
-        "prior_depreciation_available": money(sum(stock["remaining"] for stock in dep_stocks)),
-        "prior_tax_loss_available": money(sum(stock["remaining"] for stock in loss_stocks)),
+        "capacity": money(split.capacity),
+        "current_deductible_depreciation": money(split.current_deductible),
+        "prior_depreciation_available": money(
+            sum(stock.remaining_before() for stock in dep_stocks)
+        ),
+        "prior_tax_loss_available": money(prior_loss_available),
         "depreciation_reports": _report_rows(dep_stocks, dep_uses),
         "depreciation_categories": _category_caps(session),
-        "goal_hint": _goal_hint(fiscal_result, unused, prior_dep_used, prior_loss_used),
+        "goal_hint": _goal_hint(
+            split.fiscal_result,
+            split.unused_depreciation,
+            split.prior_depreciation_used,
+            split.prior_tax_loss_used,
+        ),
         "structuring_sha256": structuring,
+        "carry_inputs_sha256": carry_hash,
     }
     row = FiscalComputation(
         fiscal_year_id=year.id,
@@ -287,11 +380,11 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
         rules_sha256=vintage["sha256"],
         ledger_sha256=fingerprint,
         adjustments_sha256=adjustments_hash,
-        accounting_result=accounting,
-        fiscal_result=fiscal_result,
-        deductible_depreciation=deductible,
-        unused_depreciation=unused,
-        tax_loss=tax_loss,
+        accounting_result=split.accounting_result,
+        fiscal_result=split.fiscal_result,
+        deductible_depreciation=split.current_deductible + split.prior_depreciation_used,
+        unused_depreciation=split.unused_depreciation,
+        tax_loss=split.tax_loss,
         non_deductible=additions,
         status="research_only",
         details=details,
@@ -303,9 +396,10 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
         DepreciationCarryForward,
         year.id,
         row.id,
-        unused,
-        "RULE-LMNP-DEPRECIATION-LIMIT-001",
+        split.unused_depreciation,
+        DEPRECIATION_RULE_ID,
     )
+    _persist_events(session, row, year, split)
     loss = session.scalar(
         select(TaxLossCarryForward).where(TaxLossCarryForward.fiscal_year_id == year.id)
     )
@@ -314,8 +408,8 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
             TaxLossCarryForward(
                 fiscal_year_id=year.id,
                 computation_id=row.id,
-                amount=tax_loss,
-                rule_id="RULE-LMNP-LOSS-001",
+                amount=split.tax_loss,
+                rule_id=TAX_LOSS_RULE_ID,
                 note=(
                     "Non imputé sur le revenu global. "
                     "Consommation FIFO des reports antérieurs (horizon 10 ans) activée pour le MVP."
@@ -324,7 +418,7 @@ def compute_fiscal(session: Session, year_id: int, data: FiscalInput) -> dict[st
         )
     else:
         loss.computation_id = row.id
-        loss.amount = tax_loss
+        loss.amount = split.tax_loss
         loss.note = (
             "Non imputé sur le revenu global. "
             "Consommation FIFO des reports antérieurs (horizon 10 ans) activée pour le MVP."
@@ -465,6 +559,132 @@ def _additions(balances: dict[str, int], data: FiscalInput) -> tuple[int, list[s
     return total, accounts
 
 
+def _blocking_issues(
+    session: Session, year: FiscalYear, vintage: dict[str, Any]
+) -> list[dict[str, str]]:
+    numbers = session.scalars(
+        select(AccountingEntryLine.account_number)
+        .join(AccountingEntry, AccountingEntry.id == AccountingEntryLine.accounting_entry_id)
+        .where(
+            AccountingEntry.fiscal_year_id == year.id,
+            AccountingEntry.status == "VALIDATED",
+        )
+        .distinct()
+    ).all()
+    disposal = (
+        session.scalar(
+            select(Asset.id).where(
+                Asset.disposed_at.is_not(None),
+                Asset.disposed_at <= year.end_date,
+            )
+        )
+        is not None
+    )
+    by_id = {rule["id"]: rule for rule in vintage["blocked"]}
+    issues: list[dict[str, str]] = []
+    for rule_id in triggered_rule_ids(numbers, disposal=disposal):
+        rule = by_id.get(rule_id)
+        if rule is None:
+            fail("RULE_INCOMPLETE", f"Règle bloquante {rule_id} absente du millésime.")
+        issues.append({"code": rule_id, "message": str(rule["blocking_reason"])})
+    return issues
+
+
+def _stocks(session: Session, year: FiscalYear, register: str) -> list[Stock]:
+    """Closed prior stocks. Live events win; older computations without events still count."""
+    model = DepreciationCarryForward if register == "depreciation" else TaxLossCarryForward
+    live_ids, totals = _event_index(session, year.rental_activity_id, exclude_year_id=year.id)
+    legacy = _legacy_used(
+        session, year.rental_activity_id, register, live_ids, exclude_year_id=year.id
+    )
+    rows = session.execute(
+        select(FiscalYear, model)
+        .join(model, model.fiscal_year_id == FiscalYear.id)
+        .where(
+            FiscalYear.rental_activity_id == year.rental_activity_id,
+            FiscalYear.status == "CLOSED",
+            FiscalYear.year < year.year,
+        )
+        .order_by(FiscalYear.year.asc(), FiscalYear.id.asc())
+    )
+    stocks: list[Stock] = []
+    for origin, register_row in rows:
+        used = totals.get((register, "used", origin.id), 0) + legacy.get(origin.id, 0)
+        expired = totals.get((register, "expired", origin.id), 0)
+        if register_row.amount == 0 and used == 0 and expired == 0:
+            continue
+        stocks.append(
+            Stock(
+                origin_year_id=origin.id,
+                origin_year=origin.year,
+                created=register_row.amount,
+                used_before=used,
+                expired_before=expired,
+            )
+        )
+    return stocks
+
+
+def _event_index(
+    session: Session, activity_id: int, *, exclude_year_id: int
+) -> tuple[set[int], dict[tuple[str, str, int], int]]:
+    rows = session.execute(
+        select(
+            CarryForwardEvent.computation_id,
+            CarryForwardEvent.register,
+            CarryForwardEvent.kind,
+            CarryForwardEvent.origin_fiscal_year_id,
+            CarryForwardEvent.amount,
+        )
+        .join(FiscalComputation, FiscalComputation.id == CarryForwardEvent.computation_id)
+        .join(FiscalYear, FiscalYear.id == FiscalComputation.fiscal_year_id)
+        .where(
+            FiscalYear.rental_activity_id == activity_id,
+            FiscalComputation.invalidated_at.is_(None),
+            FiscalComputation.fiscal_year_id != exclude_year_id,
+        )
+    )
+    live: set[int] = set()
+    totals: dict[tuple[str, str, int], int] = {}
+    for computation_id, register, kind, origin_id, amount in rows:
+        live.add(computation_id)
+        key = (str(register), str(kind), int(origin_id))
+        totals[key] = totals.get(key, 0) + int(amount)
+    return live, totals
+
+
+def _legacy_used(
+    session: Session,
+    activity_id: int,
+    register: str,
+    live_computation_ids: set[int],
+    *,
+    exclude_year_id: int,
+) -> dict[int, int]:
+    """Uses stored only in computation JSON, before carry_forward_event existed."""
+    key = "depreciation" if register == "depreciation" else "tax_loss"
+    rows = session.execute(
+        select(FiscalComputation.id, FiscalComputation.details)
+        .join(FiscalYear, FiscalYear.id == FiscalComputation.fiscal_year_id)
+        .where(
+            FiscalYear.rental_activity_id == activity_id,
+            FiscalComputation.invalidated_at.is_(None),
+            FiscalComputation.fiscal_year_id != exclude_year_id,
+        )
+    )
+    totals: dict[int, int] = {}
+    for computation_id, details in rows:
+        if computation_id in live_computation_ids:
+            continue
+        uses = (details or {}).get("prior_carry_forward_use") or {}
+        if uses.get("status") != "enabled":
+            continue
+        for item in uses.get(key) or []:
+            origin = int(item["origin_year_id"])
+            totals[origin] = totals.get(origin, 0) + _cents(str(item["used"]))
+    return totals
+
+
 def _prior_remaining(
     session: Session,
     year: FiscalYear,
@@ -472,80 +692,181 @@ def _prior_remaining(
     *,
     min_origin_year: int | None = None,
 ) -> list[dict[str, int]]:
-    """Remaining stocks from CLOSED prior years; registers are not mutated."""
-    model = DepreciationCarryForward if kind == "depreciation" else TaxLossCarryForward
-    query = (
-        select(FiscalYear, model)
-        .join(model, model.fiscal_year_id == FiscalYear.id)
-        .where(
-            FiscalYear.rental_activity_id == year.rental_activity_id,
-            FiscalYear.status == "CLOSED",
-            FiscalYear.year < year.year,
-            model.amount > 0,
-        )
-        .order_by(FiscalYear.year.asc(), FiscalYear.id.asc())
-    )
-    if min_origin_year is not None:
-        query = query.where(FiscalYear.year >= min_origin_year)
-    stocks: list[dict[str, int]] = []
-    for origin, register in session.execute(query):
-        remaining = register.amount - _already_consumed(session, year, kind, origin.id, origin.year)
-        if remaining > 0:
-            stocks.append(
-                {
-                    "origin_year_id": origin.id,
-                    "origin_year": origin.year,
-                    "remaining": remaining,
-                }
-            )
-    return stocks
-
-
-def _already_consumed(
-    session: Session,
-    current: FiscalYear,
-    kind: str,
-    origin_year_id: int,
-    origin_year: int,
-) -> int:
-    rows = session.execute(
-        select(FiscalComputation.details)
-        .join(FiscalYear, FiscalYear.id == FiscalComputation.fiscal_year_id)
-        .where(
-            FiscalYear.rental_activity_id == current.rental_activity_id,
-            FiscalYear.year > origin_year,
-            FiscalYear.id != current.id,
-            FiscalComputation.invalidated_at.is_(None),
-        )
-    )
-    total = 0
-    key = "depreciation" if kind == "depreciation" else "tax_loss"
-    for (details,) in rows:
-        uses = (details or {}).get("prior_carry_forward_use") or {}
-        if uses.get("status") != "enabled":
+    """Remaining stocks from closed prior years. Registers are not mutated."""
+    rows: list[dict[str, int]] = []
+    for stock in _stocks(session, year, kind):
+        remaining = stock.remaining_before()
+        if remaining <= 0:
             continue
-        for item in uses.get(key, []):
-            if int(item["origin_year_id"]) == origin_year_id:
-                total += _cents(str(item["used"]))
-    return total
+        if min_origin_year is not None and stock.origin_year < min_origin_year:
+            continue
+        rows.append(
+            {
+                "origin_year_id": stock.origin_year_id,
+                "origin_year": stock.origin_year,
+                "remaining": remaining,
+            }
+        )
+    return rows
+
+
+def _use_dicts(moves: tuple[Movement, ...] | list[Movement]) -> list[dict[str, str | int]]:
+    return [
+        {
+            "origin_year_id": move.origin_year_id,
+            "origin_year": move.origin_year,
+            "used": money(move.amount),
+            "remaining_after": money(move.remaining_after),
+        }
+        for move in moves
+    ]
 
 
 def _report_rows(
-    stocks: list[dict[str, int]], uses: list[dict[str, str | int]]
+    stocks: list[Stock], uses: list[dict[str, str | int]]
 ) -> list[dict[str, str | int]]:
     used_by_year = {int(item["origin_year"]): item for item in uses}
     rows: list[dict[str, str | int]] = []
     for stock in stocks:
-        used = used_by_year.get(stock["origin_year"])
+        opening = stock.remaining_before()
+        if opening <= 0:
+            continue
+        used = used_by_year.get(stock.origin_year)
         rows.append(
             {
-                "origin_year": stock["origin_year"],
-                "opening": money(stock["remaining"]),
+                "origin_year": stock.origin_year,
+                "opening": money(opening),
                 "used": used["used"] if used else "0.00",
-                "remaining_after": used["remaining_after"] if used else money(stock["remaining"]),
+                "remaining_after": used["remaining_after"] if used else money(opening),
             }
         )
     return rows
+
+
+def _register_row(
+    origin_year: int, created: int, used: int, expired: int, remaining: int
+) -> dict[str, str | int]:
+    return {
+        "origin_year": origin_year,
+        "created": money(created),
+        "used": money(used),
+        "expired": money(expired),
+        "remaining": money(remaining),
+    }
+
+
+def _register_view(
+    stocks: list[Stock],
+    uses: tuple[Movement, ...] | list[Movement],
+    expiries: tuple[Movement, ...] | list[Movement],
+    year: FiscalYear,
+    created_now: int,
+    rule_id: str,
+    *,
+    expires: bool,
+) -> dict[str, Any]:
+    used_now = {move.origin_year_id: move.amount for move in uses}
+    expired_now = {move.origin_year_id: move.amount for move in expiries}
+    rows = [
+        _register_row(
+            stock.origin_year,
+            stock.created,
+            stock.used_before + used_now.get(stock.origin_year_id, 0),
+            stock.expired_before + expired_now.get(stock.origin_year_id, 0),
+            stock.created
+            - (stock.used_before + used_now.get(stock.origin_year_id, 0))
+            - (stock.expired_before + expired_now.get(stock.origin_year_id, 0)),
+        )
+        for stock in stocks
+    ]
+    rows.append(_register_row(year.year, created_now, 0, 0, created_now))
+    rows.sort(key=lambda row: int(row["origin_year"]))
+    totals = {
+        key: money(sum(_cents(str(row[key])) for row in rows))
+        for key in ("created", "used", "expired", "remaining")
+    }
+    return {
+        "rule_id": rule_id,
+        "horizon_years": TAX_LOSS_HORIZON_YEARS if expires else None,
+        "expires": expires,
+        "rows": rows,
+        "totals": totals,
+    }
+
+
+def _persist_events(session: Session, row: FiscalComputation, year: FiscalYear, split: Any) -> None:
+    _add_event(
+        session,
+        computation_id=row.id,
+        event_year_id=year.id,
+        origin_year_id=year.id,
+        register="depreciation",
+        kind="created",
+        amount=split.unused_depreciation,
+        remaining_after=split.unused_depreciation,
+        rule_id=DEPRECIATION_RULE_ID,
+    )
+    _add_event(
+        session,
+        computation_id=row.id,
+        event_year_id=year.id,
+        origin_year_id=year.id,
+        register="tax_loss",
+        kind="created",
+        amount=split.tax_loss,
+        remaining_after=split.tax_loss,
+        rule_id=TAX_LOSS_RULE_ID,
+    )
+    for move in split.depreciation_uses:
+        _add_event(
+            session,
+            computation_id=row.id,
+            event_year_id=year.id,
+            origin_year_id=move.origin_year_id,
+            register="depreciation",
+            kind=move.kind,
+            amount=move.amount,
+            remaining_after=move.remaining_after,
+            rule_id=DEPRECIATION_RULE_ID,
+        )
+    for move in (*split.tax_loss_uses, *split.tax_loss_expiries):
+        _add_event(
+            session,
+            computation_id=row.id,
+            event_year_id=year.id,
+            origin_year_id=move.origin_year_id,
+            register="tax_loss",
+            kind=move.kind,
+            amount=move.amount,
+            remaining_after=move.remaining_after,
+            rule_id=TAX_LOSS_RULE_ID,
+        )
+
+
+def _add_event(
+    session: Session,
+    *,
+    computation_id: int,
+    event_year_id: int,
+    origin_year_id: int,
+    register: str,
+    kind: str,
+    amount: int,
+    remaining_after: int,
+    rule_id: str,
+) -> None:
+    session.add(
+        CarryForwardEvent(
+            computation_id=computation_id,
+            event_fiscal_year_id=event_year_id,
+            origin_fiscal_year_id=origin_year_id,
+            register=register,
+            kind=kind,
+            amount=amount,
+            remaining_after=remaining_after,
+            rule_id=rule_id,
+        )
+    )
 
 
 def _category_caps(session: Session) -> list[dict[str, str]]:
@@ -628,31 +949,6 @@ def _goal_hint(fiscal_result: int, unused: int, prior_dep_used: int, prior_loss_
         "Il n’est pas imputable sur votre revenu global : il se reporte sur les revenus "
         "LMNP des dix années suivantes. L’amortissement comptable, lui, reste inchangé au ledger."
     )
-
-
-def _consume_fifo(
-    stocks: list[dict[str, int]], budget: int
-) -> tuple[list[dict[str, str | int]], int]:
-    remaining_budget = budget
-    uses: list[dict[str, str | int]] = []
-    used_total = 0
-    for stock in stocks:
-        if remaining_budget <= 0:
-            break
-        take = min(stock["remaining"], remaining_budget)
-        if take <= 0:
-            continue
-        remaining_budget -= take
-        used_total += take
-        uses.append(
-            {
-                "origin_year_id": stock["origin_year_id"],
-                "origin_year": stock["origin_year"],
-                "used": money(take),
-                "remaining_after": money(stock["remaining"] - take),
-            }
-        )
-    return uses, used_total
 
 
 def _replace_register(

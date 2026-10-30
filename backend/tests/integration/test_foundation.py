@@ -69,6 +69,7 @@ def test_migration_idempotent_and_metadata_matches(database: Database, settings:
             "fiscal_computation",
             "depreciation_carry_forward",
             "tax_loss_carry_forward",
+            "carry_forward_event",
             "audit_event",
             "tax_return_snapshot",
             "supporting_document",

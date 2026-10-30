@@ -1,13 +1,31 @@
 # Registre des règles fiscales
 
-Dernière vérification documentaire : **2 octobre 2026** (sources formulaires 2025
-archivées ; règles BOFiP encore celles du 16/09/2026). Les fichiers
-`fiscal/2025/rules.yaml` et `fiscal/2026/rules.yaml` restent en recherche
-(`research_only` pour le calcul stocké). Quatre règles sont exécutables en code avec tests. L’ordre MVP
-de consommation des reports (FIFO, exercices clôturés ; déficits horizon 10 ans)
-est implémenté et golden-testé. Aucun millésime n’est déclarable : `fiscal/2025/validation.json`
-et `fiscal/2026/validation.json` restent `research_only`. Consulter un
-texte et confirmer sa référence ne valide pas une déclaration.
+Dernière vérification documentaire des règles de calcul : **30 octobre 2026**.
+Les fichiers `fiscal/2025/rules.yaml` et `fiscal/2026/rules.yaml` sont en
+`research-2` et restent `research_only`. `declarable` y est `false`. Aucun
+millésime n’est déclarable : `fiscal/2025/validation.json` et
+`fiscal/2026/validation.json` restent `research_only`. Consulter un texte et
+confirmer sa référence ne valide pas une déclaration.
+
+Le résultat comptable, les réintégrations et l’amortissement fiscalement
+utilisable sont trois montants distincts. Le stock créé reste dans
+`depreciation_carry_forward` ou `tax_loss_carry_forward`. Chaque création,
+utilisation ou expiration est une ligne `carry_forward_event` du calcul qui
+la constate. Un recalcul ou une réouverture invalide ce calcul : les lignes
+cessent de compter, et le calcul suivant les réécrit. L’amortissement non
+déduit (art. 39 C, II) n’expire pas. Le déficit LMNP (art. 156, I, 1° ter)
+expire au-delà des dix années suivantes.
+
+Deux lectures demandées à tort ne sont pas appliquées, et le moteur le dit :
+
+- L’article 156, I, 1° bis (déficits BIC sans participation personnelle,
+  report de six ans) exclut expressément les déficits de location meublée de
+  locaux d’habitation. La règle exécutée est le 1° ter.
+- Les amortissements réputés différés de l’ancien article 39, 1-2° et de
+  l’ancien second alinéa de l’article 39 B sont supprimés pour les exercices
+  ouverts à compter du 1er janvier 2004. L’article 39 B en vigueur impose un
+  amortissement minimal linéaire. Le stock LMNP suivi ici est celui de
+  l’article 39 C, II, pas un ARD.
 
 ## Statuts affichés : Recherche, Provisoire, Déclarable
 
@@ -70,8 +88,14 @@ chaque exercice et chaque millésime de formulaires.
 | Rule ID | Principe identifié et référence précise | Source officielle consultée | Application / tests | État restant |
 |---|---|---|---|---|
 | RULE-LMNP-BIC-001 | Périmètre produit : activité déclarée LMNP. Le LMP et les seuils du foyer (CGI art. 155 IV) sont hors outil. | Décision de périmètre, pas un calcul fiscal. | Aucun seuil ni comparaison de revenus. | Le LMP n'est pas implémenté. Cette règle ne bloque plus les calculs LMNP. |
-| RULE-LMNP-DEPRECIATION-LIMIT-001 | Limitation de la déduction fiscale pour les personnes physiques, distincte de la dotation comptabilisée ; CGI art. 39 C II-2 et II-3 ; BOI-BIC-AMT-20-40-10-20, I-B § 20 et II § 40-100. | [CGI art. 39 C, version en vigueur depuis le 01/01/2015](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000029355753/2015-01-01) ; [BOFiP, publication du 01/03/2017](https://bofip.impots.gouv.fr/bofip/4527-PGP.html/identifiant=BOI-BIC-AMT-20-40-10-20-20170301) | Plafond + stock N ; reprise FIFO des reports d’exercices **clôturés** sur capacité résiduelle (`test_fiscal_carryforward`). | Cession/cessation et ventilation multi-biens hors MVP. |
-| RULE-LMNP-LOSS-001 | Déficits LMNP non imputables sur le revenu global ; report sur revenus LMNP des dix années suivantes sous les conditions de qualification décrites ; BOI-BIC-CHAMP-40-20, III-A § 240-250, renvoyant au CGI art. 156 I 1° ter. | [BOI-BIC-CHAMP-40-20, publication du 14/02/2024](https://bofip.impots.gouv.fr/bofip/3610-PGP.html/identifiant=BOI-BIC-CHAMP-40-20-20240214) | Déficit N séparé ; imputation FIFO sur résultat positif N+1, horizon 10 ans, hors revenu global (`test_fiscal_carryforward`). | Changements de statut LMP/LMNP et report en arrière hors MVP. |
+| RULE-LMNP-DEPRECIATION-LIMIT-001 | Pour une personne physique, l’amortissement déductible est la différence positive entre les loyers acquis et les autres charges (CGI art. 39 C, II-2). La fraction écartée se déduit les années suivantes dans la même limite (II-3). Elle ne crée ni n’augmente un déficit. Pas de délai de dix ans dans l’article ni dans l’état de suivi BOI-FORM-000038. | [CGI art. 39 C depuis le 01/01/2015](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000029355753/2015-01-01) ; [BOI-BIC-AMT-20-40-10-20 du 01/03/2017](https://bofip.impots.gouv.fr/bofip/4527-PGP.html/identifiant=BOI-BIC-AMT-20-40-10-20-20170301) ; [BOI-FORM-000038](https://bofip.impots.gouv.fr/bofip/4547-PGP.html/identifiant=BOI-FORM-000038-20130826). Textes relus le 30/10/2026 (la page Legifrance brute a renvoyé un contrôle anti-robot ; le libellé utilisé est celui renvoyé avec l’URL officielle, recoupé avec le BOFiP récupéré en entier). | Exemple BOFiP 2 500 / 1 000 / 3 050 → 1 500 déductibles et 1 550 reportés (`test_fiscal_engine`). FIFO des exercices clôturés. | Cession, cessation et ventilation par bien non calculées. Ce stock n’est pas un ARD. |
+| RULE-LMNP-LOSS-001 | Déficits LMNP non imputables sur le revenu global. Report sur les revenus de la même activité pendant les dix années suivantes. CGI art. 156, I, 1° ter, version en vigueur depuis le 01/07/2026. BOI-BIC-DEF-20-20, § 110-120. | [CGI art. 156, LEGIARTI000053544806](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000053544806) ; [BOI-BIC-DEF-20-20](https://bofip.impots.gouv.fr/bofip/2011-PGP.html/identifiant=BOI-BIC-DEF-20-20-20120912) ; [notice DGFiP](https://www.impots.gouv.fr/particulier/location-meublee) | Déficit séparé ; FIFO ; expiration après dix années (`test_fiscal_engine`, `test_fiscal_carryforward`). Consulté le 30/10/2026. | Passage LMP / LMNP et report en arrière non calculés. |
+| RULE-BLOCKED-156-BIS-001 | Le 1° bis du I de l’art. 156 (six ans, BIC sans participation personnelle) ne s’applique pas à la location meublée d’habitation. Le texte l’exclut. | Même URL que l’art. 156, consultée le 30/10/2026. | Règle bloquée, jamais imputée. Motif renvoyé par `GET /api/fiscal/vintages`. | Ne pas coder un report de six ans pour un LMNP. |
+| RULE-BLOCKED-ARD-39B-001 | ARD abolis pour les exercices ouverts à compter du 01/01/2004 (LF 2004, art. 89). L’art. 39 B actuel est l’amortissement minimal linéaire. | [BOI-BIC-AMT-10-50 du 04/01/2017](https://bofip.impots.gouv.fr/bofip/4667-PGP.html/identifiant=BOI-BIC-AMT-10-50-20170104), consulté le 30/10/2026. | Règle bloquée. Le stock exécuté est l’art. 39 C, II. | Ne pas reconstituer d’ARD. |
+| RULE-BLOCKED-CESSION-001 | Cession et cessation non calculées. L’art. 39 C, II prévoit un sort propre du stock à la cessation. | [CGI art. 39 C](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000029355753/2015-01-01), consulté le 30/10/2026. | Mouvement 675 ou 775, ou immobilisation sortie : `FISCAL_RULE_BLOCKED`. | Le calcul de cessation reste à écrire. |
+| RULE-BLOCKED-TVA-001 | La TVA n’est pas un loyer ni une charge de ce moteur. | [Notice DGFiP location meublée](https://www.impots.gouv.fr/particulier/location-meublee), consultée le 30/10/2026. | Mouvement 445 : `FISCAL_RULE_BLOCKED`. | Pas de régime de TVA. |
+| RULE-BLOCKED-PLUS-VALUE-001 | Plus-values et moins-values non calculées. | Même art. 39 C, consulté le 30/10/2026. | Même déclencheur que la cession (675, 775, sortie). | Pas de formulaire de plus-value. |
+| RULE-BLOCKED-LAND-AUTO-001 | Pas d’estimation du prix du sol. | [BOI-BIC-AMT-10-20 du 05/08/2026](https://bofip.impots.gouv.fr/bofip/4590-PGP.html/identifiant=BOI-BIC-AMT-10-20-20260805), URL déjà contrôlée le 02/10/2026. | Règle bloquée, listée par l’API. La saisie manuelle reste la règle exécutable du terrain. | Ventilation automatique non écrite. |
 | RULE-LAND-NON-DEPRECIABLE-001 | Le prix du sol est exclu de la base amortissable des constructions ; BOI-BIC-AMT-10-20, I-A § 10 et I-S § 230 ; application LMNP confirmée au BOI-BIC-CHAMP-40-20 § 58. | [Publication BOFiP du 05/08/2026](https://bofip.impots.gouv.fr/bofip/4590-PGP.html/identifiant=BOI-BIC-AMT-10-20-20260805) ; [BOI LMNP du 14/02/2024](https://bofip.impots.gouv.fr/bofip/3610-PGP.html/identifiant=BOI-BIC-CHAMP-40-20-20240214) | Invariant registre + échec fiscal si base amortissable terrain. | Ventilation manuelle utilisateur ; aucune estimation automatique. |
 | RULE-FISCAL-VINTAGE-IMMUTABLE-001 | Les versions de calcul utilisées historiquement doivent rester reproductibles avec leurs empreintes. | Politique interne de reproductibilité ; aucune portée normative fiscale. | Le test actuel distingue les fichiers de recherche 2025/2026. | Ajouter des résultats chiffrés figés et tests d'empreintes avec les moteurs futurs. |
 

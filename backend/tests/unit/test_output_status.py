@@ -37,7 +37,7 @@ VALIDATED: dict[str, Any] = {
         "regime": "réel simplifié BIC",
         "excluded": ["cession", "TVA", "plus-values", "LMP"],
     },
-    "rules_version": "research-1",
+    "rules_version": "research-2",
 }
 
 

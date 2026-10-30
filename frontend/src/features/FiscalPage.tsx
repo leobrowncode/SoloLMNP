@@ -27,14 +27,32 @@ import "./ledger.css";
 import FitSelect from "../lib/FitSelect";
 import { MobileSection, PageAnchors } from "../lib/PageSection";
 
+interface BlockedRule {
+  id: string;
+  blocking_reason: string;
+}
 interface Vintage {
   vintage: string;
   status: string;
   output_status?: string;
   output_label?: string;
-  blocked: string[];
+  blocked: BlockedRule[];
   scope?: string[];
   executable: string[];
+}
+interface CarryRow {
+  origin_year: number;
+  created: string;
+  used: string;
+  expired: string;
+  remaining: string;
+}
+interface CarryRegister {
+  rule_id?: string;
+  horizon_years: number | null;
+  expires: boolean;
+  rows: CarryRow[];
+  totals: { created: string; used: string; expired: string; remaining: string };
 }
 interface YearRow { id: number; year: number; status?: string }
 interface ReportRow {
@@ -71,6 +89,7 @@ interface Computation {
   current_ledger_sha256?: string;
   structuring_sha256?: string | null;
   current_structuring_sha256?: string | null;
+  blocked_facts?: { code: string; message: string }[];
   details?: {
     prior_carry_forward_use?: {
       status: string;
@@ -92,6 +111,10 @@ interface Computation {
     current_deductible_depreciation?: string;
     fiscal_result_before_prior_losses?: string;
     goal_hint?: string;
+    carry_registers?: {
+      depreciation: CarryRegister;
+      tax_loss: CarryRegister;
+    };
     additions?: { account_number: string; amount: string; justification: string }[];
   };
 }
@@ -123,6 +146,50 @@ function Metric({
         <GlossaryTip id={help} label={label} />
       </dt>
       <dd>{formatEuros(value)}</dd>
+    </div>
+  );
+}
+
+function RegisterTable({
+  title, help, register,
+}: {
+  title: string;
+  help: GlossaryId;
+  register: CarryRegister;
+}) {
+  const horizon = register.expires
+    ? `Échéance : ${register.horizon_years ?? 10} ans`
+    : "Pas d’échéance";
+  return (
+    <div className="ledger-table">
+      <table>
+        <caption>
+          <span>{title}</span>
+          <GlossaryTip id={help} />
+          <GlossaryTip id="registre-reports" />
+          <span> {horizon}</span>
+        </caption>
+        <thead>
+          <tr>
+            <th>Exercice d’origine</th>
+            <th>Créé (€)</th>
+            <th>Utilisé (€)</th>
+            <th>Expiré (€)</th>
+            <th>Restant (€)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {register.rows.map((row) => (
+            <tr key={row.origin_year}>
+              <td>{row.origin_year}</td>
+              <td>{formatAmount(row.created)}</td>
+              <td>{formatAmount(row.used)}</td>
+              <td>{formatAmount(row.expired)}</td>
+              <td>{formatAmount(row.remaining)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -672,6 +739,11 @@ export default function FiscalPage() {
       </div>
 
       {error && <p className="ledger-error" role="alert">{error}</p>}
+      {result?.blocked_facts && result.blocked_facts.length > 0 && (
+        <p className="ledger-error" role="alert">
+          Calcul bloqué. {result.blocked_facts.map((item) => item.message).join(" ")}
+        </p>
+      )}
       <ScreenStatus
         state={boot}
         onRetry={() => setBootAttempt((value) => value + 1)}
@@ -958,6 +1030,21 @@ export default function FiscalPage() {
             />
           </dl>
 
+          {details.carry_registers && (
+            <>
+              <RegisterTable
+                title="Amortissements non déduits (art. 39 C, II)"
+                help="report-amortissement"
+                register={details.carry_registers.depreciation}
+              />
+              <RegisterTable
+                title="Déficits LMNP (art. 156, I, 1° ter)"
+                help="deficit"
+                register={details.carry_registers.tax_loss}
+              />
+            </>
+          )}
+
           {(depUses.length > 0 || lossUses.length > 0) && (
             <div className="ledger-table">
               <table>
@@ -1047,7 +1134,13 @@ export default function FiscalPage() {
           {vintages.map((item) => (
             <li key={item.vintage}>
               Millésime {item.vintage} · {item.output_label ?? "Recherche"} · périmètre LMNP
-              {item.blocked.length ? ` · règles bloquées : ${item.blocked.join(", ")}` : ""}
+              {item.blocked.length > 0 && (
+                <ul>
+                  {item.blocked.map((rule) => (
+                    <li key={rule.id}>{rule.id} — {rule.blocking_reason}</li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>

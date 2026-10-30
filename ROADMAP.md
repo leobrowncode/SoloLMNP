@@ -4,7 +4,7 @@
 
 - P0 à P4 : livrés. Voir les rapports de phase et l’historique ci-dessous.
 - P5 : présentation par rubriques, centralisation et affectation du résultat livrées. Les états restent provisoires jusqu’à la clôture. Voir [le rapport](docs/PHASE5_REPORT.md).
-- P6 : calcul fiscal versionné et registres de reports séparés. Statut `research_only`. Voir [le rapport](docs/PHASE6_REPORT.md).
+- P6 : calcul fiscal versionné (`research-2`, toujours `research_only`) et registres séparés d’amortissements non déduits et de déficits LMNP, avec historique créé / utilisé / expiré / restant. Les règles incertaines (cession, TVA, plus-values, ventilation automatique, ARD antérieurs à 2004, art. 156 I 1° bis) sont bloquées et non appliquées. Voir [le rapport](docs/PHASE6_REPORT.md) et [les sources](docs/FISCAL_RULES.md). L’issue [#7](https://github.com/leobrowncode/SoloLMNP/issues/7) reste ouverte : aucun millésime n’est déclarable.
 - P7 : pré-contrôle, clôture, réouverture motivée et audit. Voir [le rapport](docs/PHASE7_REPORT.md).
 - P8 : export FEC déterministe des écritures validées d’un exercice clôturé, hors centralisation. Voir [le rapport](docs/PHASE8_REPORT.md).
 - P9 : compilateur de mappings en liste blanche et snapshots immuables. Structure de travail, pas une liasse certifiée. Voir [le rapport](docs/PHASE9_REPORT.md).

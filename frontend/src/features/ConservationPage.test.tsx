@@ -30,7 +30,7 @@ const backupRow = {
   created_at: "2026-03-06T08:30:00Z",
   size: 4096,
   application_version: "1.0.0",
-  schema_revision: "0009_structuring",
+  schema_revision: "0010_carry_events",
   sha256: BACKUP_HASH,
   integrity: {
     status: "unchecked" as const,
@@ -188,7 +188,7 @@ test("previews a known backup and restores only after RESTAURER", async () => {
   });
   renderPage();
   expect(await screen.findByText(BACKUP_HASH)).toBeInTheDocument();
-  expect(screen.getByText("1.0.0 · schéma 0009_structuring")).toBeInTheDocument();
+  expect(screen.getByText("1.0.0 · schéma 0010_carry_events")).toBeInTheDocument();
   expect(screen.getByText("Aucun contrôle enregistré.")).toBeInTheDocument();
   const restore = screen.getByRole("button", { name: "Restaurer la sauvegarde" });
   expect(restore).toBeDisabled();

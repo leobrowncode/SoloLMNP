@@ -159,6 +159,30 @@ def test_prior_tax_loss_is_consumed_fifo_without_global_income(client):
         "5NY": "0.00",
     }
     assert personal["prior_deficits"] == [{"origin_year": 2025, "case": "5GJ", "amount": "150.00"}]
+    _book_year_two(client, "512000", "706000", "100.00")
+    recomputed = client.post("/api/fiscal/years/2", json={"adjustments": []}).json()
+    assert recomputed["replayed"] is False
+    assert recomputed["id"] != year_two["id"]
+    assert recomputed["details"]["prior_tax_loss_used"] == "150.00"
+    assert recomputed["fiscal_result"] == "350.00"
+    loss = recomputed["details"]["carry_registers"]["tax_loss"]
+    origin = next(row for row in loss["rows"] if row["origin_year"] == 2025)
+    assert origin == {
+        "origin_year": 2025,
+        "created": "150.00",
+        "used": "150.00",
+        "expired": "0.00",
+        "remaining": "0.00",
+    }
+    reopened = client.post(
+        "/api/filing/years/1/reopen",
+        json={"confirmation": "ROUVRIR", "reason": "Corriger le déficit avant un nouveau calcul."},
+    )
+    assert reopened.status_code == 200, reopened.text
+    after_reopen = client.post("/api/fiscal/years/2", json={"adjustments": []}).json()
+    assert after_reopen["details"]["prior_tax_loss_used"] == "0.00"
+    assert after_reopen["fiscal_result"] == "500.00"
+    assert after_reopen["details"]["carry_registers"]["tax_loss"]["totals"]["used"] == "0.00"
 
 
 def test_open_prior_year_is_not_consumed_until_closed(client):
