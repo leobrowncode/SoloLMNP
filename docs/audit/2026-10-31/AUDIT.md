@@ -151,13 +151,21 @@ Dossier vide, chaque carte répète « L’activité n’est pas créée », « 
 
 En 390 px, statut + progression + Continuer passent sur plusieurs lignes avant le titre de la page. Le même schéma reste après clôture : le bandeau « Bloqué » et le détail des exports sont répétés dans l’en-tête de chaque écran.
 
-La page Immobilisations empile, pour chaque composant, le même paragraphe « Préciser la justification… » et six boutons identiques. Le message de succès après les dotations relit toute la liste. Quatre « ? » en haut de page. Ce n’est pas une page qu’on parcourt : c’est une page qu’on scrolle.
+**Reproduction.** Ouvrir la vue d’ensemble avant toute saisie, en 1 280 px puis en 390 px.
 
-**Reproduction.** Ouvrir la vue d’ensemble avant toute saisie, en 1 280 px puis en 390 px. Puis Immobilisations après création du plan.
+**Captures.** `screenshots/1280-empty-overview.png`, `screenshots/390-empty-overview.png`, `screenshots/1280-glossary-open.png`.
 
-**Captures.** `screenshots/1280-empty-overview.png`, `screenshots/390-empty-overview.png`, `screenshots/1280-assets-preview.png`, `screenshots/1280-depreciation-posted.png`, `screenshots/1280-glossary-open.png`.
+**Correction simple.** Une seule zone « prochaine action ». Sur les cartes, une ligne d’état, pas le même manque recopié trois fois. Sur mobile, garder le titre de la page ; replier statut et progression. Remplacer le « ? » nu par le mot (« LMNP », « Liasse », « FEC »).
 
-**Correction simple.** Une seule zone « prochaine action ». Sur les cartes, une ligne d’état, pas le même manque recopié trois fois. Sur mobile, garder le titre de la page ; replier statut et progression. Remplacer le « ? » nu par le mot (« LMNP », « Liasse », « FEC »). Sur les immobilisations, une justification par composant dans la ligne du tableau, pas un pavé sous chaque fiche.
+### P1-7. La page Immobilisations répète six fois la même justification
+
+Après le plan, chaque composant a le même paragraphe « Préciser la justification… » et son bouton. Le message de succès des dotations relit toute la liste. Quatre « ? » en haut de page. La saisie utile (entrée du bien, calcul, comptabilisation) est noyée.
+
+**Reproduction.** Créer le plan d’amortissement, puis comptabiliser les dotations. Scroller la page Immobilisations.
+
+**Captures.** `screenshots/1280-assets-preview.png`, `screenshots/1280-depreciation-posted.png`.
+
+**Correction simple.** Une ligne par composant dans le tableau, avec la justification dans la ligne. Un seul message de succès, avec le total des dotations et le lien vers le journal.
 
 ### P1-6. Le FEC est « Finale » pendant que la liasse est « Bloquée »
 
