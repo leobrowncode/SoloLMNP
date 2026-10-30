@@ -2,9 +2,9 @@ import { expect, test } from "vitest";
 import {
   activityCause, assetCreateCauses, centralizationCauses, closeConfirmCauses, closePrepareCauses,
   csvPreviewCauses, depreciationCalculateCauses, duplicatePostCauses, fiscalActionCauses,
-  inventoryVerifyCauses, loanPostCauses, openYearCauses, openingGenerationCauses,
+  inventoryVerifyCauses, linkCauses, loanPostCauses, openYearCauses, openingGenerationCauses,
   operationEntryCauses, postDepreciationCauses, propertyCause, propertyEntryPostCauses,
-  propertyEntryPreviewCauses, propertyEntryStartCauses, rentCauses, reopenCauses,
+  propertyEntryPreviewCauses, propertyEntryStartCauses, rentCauses, reopenCauses, restoreCauses,
   selectedYearCauses, unbalancedCause,
 } from "./actionCauses";
 
@@ -109,6 +109,13 @@ test("inventory, centralization, closing and reopen list each unmet condition", 
   }).map((item) => item.code)).toEqual(["NOT_PREPARED", "SEALED", "BLOCKING"]);
   expect(reopenCauses("ROUVRIR", "motif assez long")).toEqual([]);
   expect(reopenCauses("NON", "court").map((item) => item.code)).toEqual(["REOPEN_REASON", "REOPEN_CONFIRMATION"]);
+  expect(linkCauses(true)).toEqual([]);
+  expect(linkCauses(false)[0]?.code).toBe("ENTRY_PICK");
+  expect(restoreCauses(true, true, "RESTAURER")).toEqual([]);
+  expect(restoreCauses(false, false, "NON").map((item) => item.code)).toEqual([
+    "RESTORE_BACKUP", "RESTORE_CONFIRMATION",
+  ]);
+  expect(restoreCauses(true, false, "RESTAURER").map((item) => item.code)).toEqual(["RESTORE_PREVIEW"]);
 });
 
 test("import buttons explain a missing file, a missing context and duplicates", () => {

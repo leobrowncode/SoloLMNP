@@ -403,6 +403,36 @@ export function reopenCauses(confirmation: string, reason: string): ActionCause[
   );
 }
 
+export function linkCauses(selected: boolean): ActionCause[] {
+  return listed(
+    !selected ? {
+      code: "ENTRY_PICK",
+      message: "Choisissez une écriture par son numéro, sa date ou sa pièce.",
+      action: { label: "Choisir une écriture", href: "/conservation#entry-picker" },
+    } : null,
+  );
+}
+
+export function restoreCauses(selected: boolean, previewReady: boolean, confirmation: string): ActionCause[] {
+  return listed(
+    !selected ? {
+      code: "RESTORE_BACKUP",
+      message: "Choisissez une sauvegarde connue de la liste.",
+      action: { label: "Voir les sauvegardes", href: "/conservation#sauvegardes" },
+    } : null,
+    selected && !previewReady ? {
+      code: "RESTORE_PREVIEW",
+      message: "L’aperçu de la restauration n’est pas affiché.",
+      action: { label: "Voir l’aperçu", href: "/conservation#restore-preview" },
+    } : null,
+    confirmation !== "RESTAURER" ? {
+      code: "RESTORE_CONFIRMATION",
+      message: "La confirmation doit être exactement RESTAURER.",
+      action: { label: "Saisir RESTAURER", href: "/conservation#restore-confirmation" },
+    } : null,
+  );
+}
+
 export function fiscalActionCauses(yearId: number, years: readonly { status?: string }[]): ActionCause[] {
   if (yearId) return [];
   return openYearCauses(years);

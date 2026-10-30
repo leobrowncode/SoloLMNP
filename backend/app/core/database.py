@@ -42,5 +42,12 @@ def create_database_engine(settings: Settings) -> Engine:
 
 class Database:
     def __init__(self, settings: Settings) -> None:
+        self.settings = settings
         self.engine = create_database_engine(settings)
+        self.sessions = sessionmaker(self.engine, expire_on_commit=False)
+
+    def reopen(self) -> None:
+        """Drop pooled connections and bind again. Used after an on-disk restore."""
+        self.engine.dispose()
+        self.engine = create_database_engine(self.settings)
         self.sessions = sessionmaker(self.engine, expire_on_commit=False)

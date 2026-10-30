@@ -151,9 +151,10 @@ Voir aussi [FILING.md](FILING.md).
 
 Menu **Conservation** :
 
-- Déposer les justificatifs (PDF, JPEG ou PNG), éventuellement liés à une écriture.
-- **Créer une sauvegarde** régulièrement.
-- La restauration écrit une **copie de contrôle** ; elle ne remplace pas la base en service.
+- Déposer les justificatifs (PDF, JPEG ou PNG). La liste montre le nom, la date, le type, la taille, l’empreinte SHA-256 et l’écriture liée.
+- Lier une écriture par le sélecteur : numéro, date et pièce. Pas d’identifiant interne. Lier un justificatif ne modifie pas l’écriture, y compris si elle est validée.
+- **Créer une sauvegarde** régulièrement. La liste montre la date, la taille, la version de l’application, la révision du schéma, l’empreinte et le dernier contrôle. **Contrôler** vérifie l’archive.
+- **Restaurer** une sauvegarde de la liste. L’aperçu indique la date et les nombres d’écritures et d’exercices qui remplaceront l’état actuel. Il faut saisir `RESTAURER`. Une copie de l’état actuel est prise avant. Les écritures validées ne se corrigent pas une à une.
 
 ---
 

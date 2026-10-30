@@ -273,7 +273,8 @@ def test_backup_round_trip_rejects_escape(client, settings):
         manifest = json.loads(bundle.read("manifest.json"))
     assert {item["vintage"] for item in manifest["fiscal_vintages"]} >= {"2025", "2026"}
     restored = client.post(
-        "/api/filing/backup/restore", json={"filename": created.json()["filename"]}
+        "/api/filing/backup/restore",
+        json={"filename": created.json()["filename"], "confirmation": "RESTAURER"},
     )
     assert restored.status_code == 200, restored.text
     escaped = client.post("/api/filing/backup/restore", json={"filename": "../sololmnp.sqlite3"})

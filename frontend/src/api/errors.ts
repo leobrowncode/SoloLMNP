@@ -105,6 +105,18 @@ export const ERROR_HELP = {
   LOAN_CSV_SHAPE: "import-csv",
   LOAN_CSV_SPLIT: "emprunt",
   LOAN_PREVIEW_REQUIRED: "emprunt",
+  BACKUP_NOT_FOUND: "sauvegarde",
+  BACKUP_PATH: "sauvegarde",
+  BACKUP_REJECTED: "sauvegarde",
+  DOCUMENT_NOT_FOUND: "justificatif",
+  DOCUMENT_PATH: "justificatif",
+  DOCUMENT_SIGNATURE: "justificatif",
+  DOCUMENT_SIZE: "justificatif",
+  ENTRY_AMBIGUOUS: "ecriture",
+  ENTRY_NOT_FOUND: "ecriture",
+  ENTRY_SEARCH: "ecriture",
+  INVALID_DOCUMENT: "justificatif",
+  RESTORE_CONFIRMATION: "restauration",
 } as const satisfies Record<string, GlossaryId>;
 
 export function knownHelp(value: unknown): GlossaryId | undefined {

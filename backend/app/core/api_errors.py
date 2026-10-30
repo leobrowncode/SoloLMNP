@@ -77,6 +77,18 @@ HELP_IDS: dict[str, str] = {
     "LOAN_CSV_SHAPE": "import-csv",
     "LOAN_CSV_SPLIT": "emprunt",
     "LOAN_PREVIEW_REQUIRED": "emprunt",
+    "BACKUP_NOT_FOUND": "sauvegarde",
+    "BACKUP_PATH": "sauvegarde",
+    "BACKUP_REJECTED": "sauvegarde",
+    "DOCUMENT_NOT_FOUND": "justificatif",
+    "DOCUMENT_PATH": "justificatif",
+    "DOCUMENT_SIGNATURE": "justificatif",
+    "DOCUMENT_SIZE": "justificatif",
+    "ENTRY_AMBIGUOUS": "ecriture",
+    "ENTRY_NOT_FOUND": "ecriture",
+    "ENTRY_SEARCH": "ecriture",
+    "INVALID_DOCUMENT": "justificatif",
+    "RESTORE_CONFIRMATION": "restauration",
 }
 
 RESOLUTION_ACTIONS: dict[str, dict[str, str]] = {
@@ -102,6 +114,19 @@ RESOLUTION_ACTIONS: dict[str, dict[str, str]] = {
     "RESULT_JOURNAL": {"label": "Plan comptable", "href": "/comptabilite/plan-comptable"},
     "BANK_REQUIRED": {"label": "Onglet Banque", "href": "/operations/banque"},
     "LOAN_PREVIEW_REQUIRED": {"label": "Onglet Emprunts", "href": "/operations/emprunts"},
+    "BACKUP_NOT_FOUND": {"label": "Voir les sauvegardes", "href": "/conservation#sauvegardes"},
+    "BACKUP_REJECTED": {"label": "Contrôler la sauvegarde", "href": "/conservation#sauvegardes"},
+    "DOCUMENT_NOT_FOUND": {
+        "label": "Voir les justificatifs",
+        "href": "/conservation#justificatifs",
+    },
+    "ENTRY_AMBIGUOUS": {"label": "Choisir une écriture", "href": "/conservation#entry-picker"},
+    "ENTRY_NOT_FOUND": {"label": "Choisir une écriture", "href": "/conservation#entry-picker"},
+    "ENTRY_SEARCH": {"label": "Choisir une écriture", "href": "/conservation#entry-picker"},
+    "RESTORE_CONFIRMATION": {
+        "label": "Saisir RESTAURER",
+        "href": "/conservation#restore-confirmation",
+    },
 }
 
 

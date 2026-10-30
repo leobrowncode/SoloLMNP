@@ -1,21 +1,42 @@
 """Closing, FEC, liasse worksheet, documents and backups."""
 
+from datetime import date
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.api.filing_schemas import CloseInput, DocumentInput, ReadyInput, ReopenInput, RestoreInput
+from app.api.filing_schemas import (
+    BackupNameInput,
+    CloseInput,
+    DocumentInput,
+    EntryLinkInput,
+    ReadyInput,
+    ReopenInput,
+    RestoreInput,
+)
 from app.api.sessions import dependencies
 from app.core.config import Settings
 from app.core.database import Database
 from app.domain.filing.fec import export_fec
 from app.domain.filing.mappings import compile_package
 from app.services.archive import control_archive
-from app.services.backup import create_backup, restore_backup
+from app.services.backup import (
+    create_backup,
+    list_backups,
+    preview_restore,
+    restore_backup,
+    verify_backup,
+)
 from app.services.closing import close_year, mark_ready, precheck, reopen_year
-from app.services.documents import store_document
+from app.services.documents import (
+    link_document,
+    list_documents,
+    published_document,
+    search_entries,
+    store_document,
+)
 from app.services.efi import efi_worksheet, worksheet_pdf
 from app.services.export_gate import export_status, require_export
 from app.services.spreadsheet import year_workbook
@@ -99,26 +120,49 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
             sha256=bundle["sha256"],
         )
 
+    @router.get("/documents")
+    def document_list(session: Read) -> dict[str, Any]:
+        return {"documents": list_documents(session)}
+
+    @router.get("/entries")
+    def entry_picker(
+        session: Read,
+        number: str | None = None,
+        entry_date: date | None = None,
+        piece: str | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "entries": search_entries(session, number=number, entry_date=entry_date, piece=piece)
+        }
+
     @router.post("/documents", status_code=201)
     def documents(data: DocumentInput, session: Write) -> dict[str, Any]:
         row = store_document(session, settings, data)
-        return {
-            "id": row.id,
-            "sha256": row.sha256,
-            "size": row.size,
-            "media_type": row.media_type,
-            "original_name": row.original_name,
-            "entry_id": row.entry_id,
-        }
+        return published_document(session, row)
+
+    @router.post("/documents/{document_id}/link")
+    def link(document_id: int, data: EntryLinkInput, session: Write) -> dict[str, Any]:
+        return link_document(session, document_id, data)
 
     @router.post("/backup", status_code=201)
     def backup() -> dict[str, str]:
         return create_backup(settings)
 
+    @router.get("/backups")
+    def backups() -> dict[str, Any]:
+        return list_backups(settings)
+
+    @router.post("/backups/verify")
+    def backup_verify(data: BackupNameInput) -> dict[str, Any]:
+        return verify_backup(settings, data.filename)
+
+    @router.get("/backups/preview")
+    def backup_preview(filename: str) -> dict[str, Any]:
+        return preview_restore(settings, filename)
+
     @router.post("/backup/restore")
-    def restore(data: RestoreInput) -> dict[str, str]:
-        destination = settings.database_path.parent / "restore-check.sqlite3"
-        return restore_backup(settings, data.filename, destination)
+    def restore(data: RestoreInput) -> dict[str, Any]:
+        return restore_backup(settings, database, data.filename, data.confirmation)
 
     return router
 
