@@ -35,18 +35,24 @@ une revue (pas d’écran) : les champs du tableau, plus `rules_version` égal �
 en Provisoire tant que ce fichier n’est pas réaligné. Les millésimes 2025 et
 2026 ne sont pas validés.
 
-### Posture d’export (pour l’issue #49)
+### Posture d’export
 
 `exports.liasse`, `exports.pdf`, `exports.fec` et `exports.archive` portent
-chacun `posture` : `provisoire`, `bloquee` ou `finale`. Rien ne bloque encore
-un téléchargement sur cette posture.
+chacun `posture` (`provisoire`, `bloquee` ou `finale`), `label` (Provisoire,
+Bloquée, Finale) et `download`. `GET /api/filing/years/{id}/exports` expose
+aussi les prérequis. Un téléchargement dont `download` est faux répond `409`
+avec le contrat d’erreur (`code`, `message`, `action`, et `issues` s’il y en
+a plusieurs). L’écran n’utilise pas de lien direct vers le fichier : le refus
+reste dans la page, avec le lien d’action.
 
-- Liasse et PDF : Bloquée si les portes de cases échouent ; Finale seulement si
-  le statut est Déclarable et l’exercice est clôturé ; sinon Provisoire.
-- FEC et dossier de contrôle : Bloquée tant que l’exercice n’est pas clôturé
-  (ou si le FEC a une erreur) ; Finale quand l’exercice est clôturé et le FEC
-  n’a pas d’erreur. Le FEC est un fichier comptable : sa posture Finale n’exige
-  pas un millésime Déclarable.
+- Liasse et PDF : Bloquée si les portes de cases échouent ou si le calcul
+  fiscal n’existe pas ; Finale seulement si le statut est Déclarable et
+  l’exercice est clôturé ; sinon Provisoire. Une sortie Provisoire se
+  télécharge, marquée Provisoire. Une sortie Bloquée ne se télécharge pas.
+- FEC et dossier de contrôle : Bloquée tant que l’exercice n’est pas clôturé,
+  sans SIREN, ou si le FEC a une erreur ; Finale quand l’exercice est clôturé
+  et le FEC n’a pas d’erreur. Le FEC est un fichier comptable : sa posture
+  Finale n’exige pas un millésime Déclarable.
 
 ## Références consultées et portée de la vérification
 

@@ -5,8 +5,8 @@ this module. A vintage stays in Recherche until `fiscal/<year>/validation.json`
 records an official source, a date, a scope and a version that still matches
 `rules.yaml`. Nothing in that file is marked validated today.
 
-`exports` is the posture issue #49 will gate on (Provisoire, Bloquée, Finale).
-Download routes do not enforce it yet.
+`exports.*.posture` is Provisoire, Bloquée or Finale. `download` is false only
+for Bloquée. Download routes refuse that slot; they do not recompute the gates.
 """
 
 from __future__ import annotations
@@ -314,8 +314,88 @@ def _public_validation(record: Mapping[str, Any], *, effective: bool) -> dict[st
     }
 
 
-def _named(posture: str) -> dict[str, str]:
-    return {"posture": posture, "label": POSTURE_LABELS[posture]}
+def export_slot(posture: str) -> dict[str, Any]:
+    """One export as the API and the screen share it. Unknown values stay Bloquée."""
+    if posture not in POSTURES:
+        posture = POSTURE_BLOQUEE
+    return {
+        "posture": posture,
+        "label": POSTURE_LABELS[posture],
+        "download": posture != POSTURE_BLOQUEE,
+    }
+
+
+def align_controlled_exports(
+    exports: Mapping[str, Any],
+    *,
+    year_closed: bool,
+    fec_blocked: bool,
+) -> dict[str, Any]:
+    """Keep liasse and PDF slots. FEC and the control archive stay Bloquée until both gates pass."""
+    stamped: dict[str, Any] = {}
+    for key, value in exports.items():
+        posture = POSTURE_BLOQUEE
+        if isinstance(value, dict):
+            raw = value.get("posture")
+            if isinstance(raw, str):
+                posture = raw
+        stamped[key] = export_slot(posture)
+    if not year_closed or fec_blocked:
+        blocked = export_slot(POSTURE_BLOQUEE)
+        stamped["fec"] = blocked
+        stamped["archive"] = blocked
+    return stamped
+
+
+def download_refusal(kind: str, status: Mapping[str, Any]) -> dict[str, Any] | None:
+    """None when the slot says download is allowed. Otherwise the structured refusal."""
+    exports = status.get("exports")
+    slot = exports.get(kind) if isinstance(exports, dict) else None
+    if isinstance(slot, dict) and slot.get("download") is True:
+        return None
+    family = "fec" if kind in {"fec", "archive"} else "liasse"
+    raw = status.get("prerequisites")
+    matched = (
+        [item for item in raw if isinstance(item, dict) and item.get("export") in {kind, family}]
+        if isinstance(raw, list)
+        else []
+    )
+    if not matched:
+        return {
+            "code": "EXPORT_BLOCKED",
+            "message": "Ce téléchargement est bloqué.",
+            "action": {"label": "Voir la liasse", "href": "/fiscalite#sorties-figees"},
+        }
+    primary = matched[0]
+    refusal: dict[str, Any] = {
+        "code": str(primary.get("code") or "EXPORT_BLOCKED"),
+        "message": str(primary.get("message") or "Ce téléchargement est bloqué."),
+    }
+    action = primary.get("action")
+    if isinstance(action, dict):
+        label = action.get("label")
+        href = action.get("href")
+        if isinstance(label, str) and isinstance(href, str):
+            refusal["action"] = {"label": label, "href": href}
+    if len(matched) > 1:
+        refusal["code"] = "EXPORT_BLOCKED"
+        refusal["message"] = (
+            "La liasse indique des prérequis manquants."
+            if family == "liasse"
+            else "Le FEC et le dossier de contrôle indiquent des prérequis manquants."
+        )
+        refusal["issues"] = [
+            {
+                "code": str(item.get("code") or "EXPORT_BLOCKED"),
+                "message": str(item.get("message") or ""),
+            }
+            for item in matched
+        ]
+    return refusal
+
+
+def _named(posture: str) -> dict[str, Any]:
+    return export_slot(posture)
 
 
 def _research_record(vintage: str, defect: str) -> dict[str, Any]:

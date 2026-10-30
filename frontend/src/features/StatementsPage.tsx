@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { request, type Setup } from "../api/ledger";
+import { downloadFiling } from "../api/download";
+import { RequestError, request, type Setup } from "../api/ledger";
+import ApiErrorAlert from "./ApiErrorAlert";
 import OpeningPreview from "./OpeningPreview";
 import ResultClosing from "./ResultClosing";
 import "./ledger.css";
@@ -26,6 +28,7 @@ export default function StatementsPage() {
   const [year, setYear] = useState(0);
   const [data, setData] = useState<Statements | null>(null);
   const [error, setError] = useState("");
+  const [downloadError, setDownloadError] = useState<RequestError | null>(null);
   const [attempt, setAttempt] = useState(0);
   const errorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
@@ -55,9 +58,17 @@ export default function StatementsPage() {
       <label>Exercice <select value={year} onChange={(event) => refresh(Number(event.target.value))}>{setup.years.map((item) => <option key={item.id} value={item.id}>{item.year}</option>)}</select></label>
       <button type="button" onClick={() => refresh()}>Actualiser les états</button>
       {setup.years.find((item) => item.id === year)?.status === "CLOSED"
-        ? <a href={`/api/filing/years/${year}/fec`}>Télécharger le FEC</a>
+        ? <button type="button" onClick={() => {
+          setDownloadError(null);
+          void downloadFiling(`/api/filing/years/${year}/fec`).catch((reason: unknown) => {
+            setDownloadError(reason instanceof RequestError
+              ? reason
+              : new RequestError({ code: "HTTP_ERROR", message: "Le téléchargement du FEC a échoué." }, 0));
+          });
+        }}>Télécharger le FEC</button>
         : <p>Le FEC se télécharge dans Fiscalité LMNP, après le calcul fiscal et la clôture.</p>}
     </div>}
+    {downloadError && <ApiErrorAlert detail={downloadError.detail} />}
     {year !== 0 && <OpeningPreview key={`${year}-${attempt}`} year={year} />}
     {year !== 0 && <ResultClosing key={`result-${year}-${attempt}`} year={year} />}
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}

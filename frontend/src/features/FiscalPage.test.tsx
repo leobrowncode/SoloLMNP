@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import FiscalPage from "./FiscalPage";
 
@@ -14,6 +14,37 @@ const notComputed = () => response({
     message: "Aucun calcul fiscal n’est enregistré pour cet exercice.",
   },
 }, 404);
+
+function slot(posture: "provisoire" | "bloquee" | "finale") {
+  const label = posture === "finale" ? "Finale" : posture === "provisoire" ? "Provisoire" : "Bloquée";
+  return { posture, label, download: posture !== "bloquee" };
+}
+
+function exportBody(closed = false, liasse: "provisoire" | "bloquee" | "finale" = closed ? "provisoire" : "bloquee") {
+  const liasseSlot = slot(liasse);
+  const fecSlot = slot(closed ? "finale" : "bloquee");
+  const prerequisites = [];
+  if (liasse === "bloquee") {
+    prerequisites.push({
+      code: "SIREN_MANQUANT",
+      message: "Indiquez le SIREN de l’activité.",
+      export: "liasse",
+      action: { label: "Renseigner le SIREN", href: "/comptabilite/brouillons#identite-liasse" },
+    });
+  }
+  if (!closed) {
+    prerequisites.push({
+      code: "YEAR_NOT_CLOSED",
+      message: "Le FEC final et le dossier de contrôle exigent un exercice clôturé.",
+      export: "fec",
+      action: { label: "Clôturer l’exercice", href: "/fiscalite#close-title" },
+    });
+  }
+  return {
+    exports: { liasse: liasseSlot, pdf: liasseSlot, fec: fecSlot, archive: fecSlot },
+    prerequisites,
+  };
+}
 
 function isFiscalRead(url: string, method: string) {
   return method === "GET" && /\/api\/fiscal\/years\/\d+$/.test(url);
@@ -74,6 +105,7 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
         },
       });
     }
+    if (url.endsWith("/exports")) return response(exportBody(false, "bloquee"));
     if (url.includes("/efi")) {
       return response({
         transmission: false,
@@ -168,10 +200,10 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
   expect(within(warningList).getByText("La case 117 est une base, pas une cotisation.")).toBeInTheDocument();
   expect(within(warningList).getByText("Erreur")).toBeInTheDocument();
   expect(within(warningList).getByText("Écart à relire avant recopie.")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: /PDF de recopie/ })).toHaveAttribute(
-    "href",
-    "/api/filing/years/1/efi.pdf",
-  );
+  expect(screen.getByRole("button", { name: "Télécharger le PDF de recopie" })).toBeDisabled();
+  expect(screen.getAllByText("Bloquée").length).toBeGreaterThan(0);
+  expect(screen.getByText(/exigent un exercice clôturé/)).toBeInTheDocument();
+  expect(document.querySelector('a[href*="/api/filing"]')).toBeNull();
   expect(screen.queryByRole("link", { name: /Dossier de contrôle/ })).not.toBeInTheDocument();
 });
 
@@ -220,6 +252,7 @@ test("closing reloads the exercise status, the dashboard and the frozen exports"
       phase = "closed";
       return response({ fiscal_year_id: 1, status: "CLOSED", generation: 1 });
     }
+    if (url.endsWith("/exports")) return response(exportBody(phase === "closed"));
     if (url.endsWith("/efi")) {
       return response({
         transmission: false,
@@ -240,7 +273,8 @@ test("closing reloads the exercise status, the dashboard and the frozen exports"
   render(<FiscalPage />);
   expect(await screen.findByRole("option", { name: "2025 · ouvert" })).toBeInTheDocument();
   expect(await screen.findByText("-200.00 €")).toBeInTheDocument();
-  expect(screen.getByText("Le FEC sera disponible après la clôture.")).toBeInTheDocument();
+  expect(await screen.findByText(/exigent un exercice clôturé/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Télécharger le FEC" })).toBeDisabled();
 
   fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
   fireEvent.click(await screen.findByRole("checkbox", { name: "Le calcul fiscal reste en recherche." }));
@@ -250,16 +284,16 @@ test("closing reloads the exercise status, the dashboard and the frozen exports"
   fireEvent.click(screen.getByRole("button", { name: "Liasse à recopier" }));
   expect(await screen.findByText(/calcul en cours/)).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: /Dossier de contrôle/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Télécharger le dossier de contrôle" })).toBeDisabled();
 
   fireEvent.click(screen.getByRole("button", { name: "Confirmer la clôture" }));
   expect(await screen.findByRole("option", { name: "2025 · clôturé" })).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Télécharger le FEC" })).toHaveAttribute(
-    "href",
-    "/api/filing/years/1/fec",
-  );
-  expect(screen.queryByText("Le FEC sera disponible après la clôture.")).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Télécharger le FEC" })).toBeEnabled());
+  expect(screen.queryByText(/exigent un exercice clôturé/)).not.toBeInTheDocument();
   expect(await screen.findByText(/montants figés à la clôture/)).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: /Dossier de contrôle/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Télécharger le dossier de contrôle" })).toBeEnabled();
+  expect(screen.getAllByText("Finale").length).toBeGreaterThan(0);
+  expect(document.querySelector('a[href*="/api/filing"]')).toBeNull();
   expect(screen.getByText("60.00 €")).toBeInTheDocument();
   expect(screen.queryByText("-200.00 €")).not.toBeInTheDocument();
   expect(screen.getByText(/Exercice clôturé/)).toBeInTheDocument();
@@ -298,6 +332,7 @@ test("a refused close keeps the ready exercise and explains the failure", async 
     if (url.endsWith("/close")) {
       return response({ detail: { message: "La clôture a été refusée." } }, 409);
     }
+    if (url.endsWith("/exports")) return response(exportBody(false));
     throw new Error(`unexpected ${method} ${url}`);
   });
 
@@ -311,7 +346,8 @@ test("a refused close keeps the ready exercise and explains the failure", async 
   expect(await screen.findByRole("alert")).toHaveTextContent("La clôture a été refusée.");
   expect(screen.getByRole("option", { name: "2025 · prêt à clôturer" })).toBeInTheDocument();
   expect(screen.queryByRole("option", { name: "2025 · clôturé" })).not.toBeInTheDocument();
-  expect(screen.getByText("Le FEC sera disponible après la clôture.")).toBeInTheDocument();
+  expect(screen.getByText(/exigent un exercice clôturé/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Télécharger le FEC" })).toBeDisabled();
   expect(screen.queryByText(/Exercice clôturé/)).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Confirmer la clôture" })).toBeEnabled();
 });
@@ -345,6 +381,7 @@ test("reopening a closed exercise reloads open status and frozen exports", async
         warnings: [],
       });
     }
+    if (url.endsWith("/exports")) return response(exportBody(phase === "closed"));
     if (url.endsWith("/reopen") && method === "POST") {
       phase = "open";
       return response({ fiscal_year_id: 1, status: "OPEN" });
@@ -365,7 +402,8 @@ test("reopening a closed exercise reloads open status and frozen exports", async
   fireEvent.click(screen.getByRole("button", { name: "Réouvrir l’exercice" }));
   expect(await screen.findByRole("option", { name: "2025 · ouvert" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "Réouvrir l’exercice" })).not.toBeInTheDocument();
-  expect(screen.getByText("Le FEC sera disponible après la clôture.")).toBeInTheDocument();
+  expect(await screen.findByText(/exigent un exercice clôturé/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Télécharger le FEC" })).toBeDisabled();
 });
 
 const STORED = "a".repeat(64);
@@ -422,6 +460,7 @@ function fiscalScreen(handler: (url: string, method: string) => Response | null)
     if (url.endsWith("/precheck")) {
       return response({ blocking: false, year_status: "OPEN", errors: [], warnings: [] });
     }
+    if (url.endsWith("/exports")) return response(exportBody(false, "provisoire"));
     throw new Error(`unexpected ${method} ${url}`);
   });
 }

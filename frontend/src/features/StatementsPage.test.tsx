@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
 import StatementsPage, { type Statements } from "./StatementsPage";
 
@@ -58,6 +59,38 @@ test("shows rubric presentation without applying reclassifications", async () =>
   expect(await screen.findByText("Découvert signalé sur 512000.")).toBeInTheDocument();
   expect(screen.getByText("Trésorerie")).toBeInTheDocument();
   expect(screen.getByText(/Aucun reclassement automatique/)).toBeInTheDocument();
+});
+
+test("a refused FEC stays on the statements page with a corrective link", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url.endsWith("/setup")) {
+      return response({ activity: {}, years: [{ id: 1, year: 2025, status: "CLOSED" }] });
+    }
+    if (url.endsWith("/fec")) {
+      return response({
+        detail: {
+          code: "SIREN_REQUIRED",
+          message: "Le nom du FEC commence par le SIREN. Indiquez-le dans Comptabilité → Identité.",
+          action: { label: "Renseigner le SIREN", href: "/comptabilite/brouillons#identite-liasse" },
+        },
+      }, 409);
+    }
+    return response(report(1));
+  });
+  render(
+    <MemoryRouter>
+      <StatementsPage />
+    </MemoryRouter>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Télécharger le FEC" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("SIREN");
+  expect(screen.getByRole("link", { name: "Renseigner le SIREN" })).toHaveAttribute(
+    "href",
+    "/comptabilite/brouillons#identite-liasse",
+  );
+  expect(screen.queryByRole("link", { name: "Télécharger le FEC" })).not.toBeInTheDocument();
 });
 
 test("explains how to start without an exercise", async () => {

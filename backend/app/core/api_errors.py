@@ -11,9 +11,20 @@ from fastapi.responses import JSONResponse
 RESOLUTION_ACTIONS: dict[str, dict[str, str]] = {
     "ACTIVITY_REQUIRED": {"label": "Ouvrir Comptabilité", "href": "/comptabilite"},
     "ACTIVITY_EXISTS": {"label": "Ouvrir Comptabilité", "href": "/comptabilite"},
-    "FISCAL_NOT_COMPUTED": {"label": "Calculer la fiscalité", "href": "/fiscalite"},
+    "FISCAL_NOT_COMPUTED": {"label": "Calculer la fiscalité", "href": "/fiscalite#calcul-fiscal"},
     "CLOSE_BLOCKED": {"label": "Voir le pré-contrôle", "href": "/fiscalite"},
     "WARNINGS_UNACKNOWLEDGED": {"label": "Voir le pré-contrôle", "href": "/fiscalite"},
+    "YEAR_NOT_CLOSED": {"label": "Clôturer l’exercice", "href": "/fiscalite#close-title"},
+    "SIREN_REQUIRED": {
+        "label": "Renseigner le SIREN",
+        "href": "/comptabilite/brouillons#identite-liasse",
+    },
+    "SIREN_MANQUANT": {
+        "label": "Renseigner le SIREN",
+        "href": "/comptabilite/brouillons#identite-liasse",
+    },
+    "FEC_INVALID": {"label": "Voir le pré-contrôle", "href": "/fiscalite#close-title"},
+    "EXPORT_BLOCKED": {"label": "Voir la liasse", "href": "/fiscalite#sorties-figees"},
     "DATABASE_UNAVAILABLE": {"label": "Consulter la documentation", "href": "/"},
     "DATABASE_BUSY": {"label": "Réessayer dans un instant", "href": "/"},
     "INVENTORY_JOURNAL": {"label": "Plan comptable", "href": "/comptabilite/plan-comptable"},
@@ -57,6 +68,7 @@ def fail(
     location: str | None = None,
     line: int | None = None,
     action: dict[str, str] | None = None,
+    issues: list[dict[str, Any]] | None = None,
 ) -> NoReturn:
     raise HTTPException(
         status_code=status,
@@ -67,6 +79,7 @@ def fail(
             location=location,
             line=line,
             action=action,
+            issues=issues,
         ),
     )
 

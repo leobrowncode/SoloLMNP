@@ -68,6 +68,6 @@ Les montants Python utilisent `Decimal`, avec stockage en centimes entiers SQLit
 - Disponible : contrats d'écritures immuables avec validation d'équilibre ; aucun enregistrement comptable persistant.
 - Disponible : API de santé/disponibilité, interface responsive, restrictions réseau et configuration.
 - Disponible : ledger, opérations, banque CSV, import CSV de justificatifs et d’échéances d’emprunt, emprunts, immobilisations, états provisoires, centralisation, clôture, FEC, mappings de travail, feuille EFI, justificatifs et sauvegarde.
-- Recherche : le calcul fiscal enregistré reste `research_only`. Tant que `fiscal/<millésime>/validation.json` n’est pas une attestation effective, chaque calcul et chaque export affichent **Recherche**. Les conditions de passage à **Déclarable** sont dans [docs/FISCAL_RULES.md](docs/FISCAL_RULES.md).
+- Recherche : le calcul fiscal enregistré reste `research_only`. Tant que `fiscal/<millésime>/validation.json` n’est pas une attestation effective, chaque calcul et chaque export affichent **Recherche**. La liasse, le PDF, le FEC et le dossier de contrôle affichent en plus **Provisoire**, **Bloquée** ou **Finale** ; une sortie Bloquée ne se télécharge pas. Les conditions sont dans [docs/FISCAL_RULES.md](docs/FISCAL_RULES.md).
 
 Voir [le rapport de phase 1](docs/PHASE1_REPORT.md), [l'architecture](ARCHITECTURE.md), [la roadmap](ROADMAP.md), [le modèle de données](docs/DATA_MODEL.md), [la sécurité](SECURITY.md) et [le workflow EFI](docs/FILING.md).

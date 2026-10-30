@@ -158,6 +158,7 @@ def _liasse(session: Session, year_id: int) -> list[list[Cell]]:
         return [["Liasse non disponible"], [str(detail.get("message", "Calcul fiscal absent."))]]
     rows: list[list[Cell]] = [
         ["Statut", str(sheet.get("output_headline") or sheet.get("output_label") or "Recherche")],
+        ["Posture d’export", str(sheet.get("export_posture_label") or "")],
         [],
         ["Formulaire", "Case", "Libellé", "Montant"],
     ]

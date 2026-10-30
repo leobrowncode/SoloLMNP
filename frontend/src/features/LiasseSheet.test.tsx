@@ -15,7 +15,6 @@ function sheet(partial: Partial<Worksheet>): Worksheet {
 test("a research sheet never says it is ready to copy", () => {
   render(
     <LiasseSheet
-      yearId={1}
       worksheet={sheet({
         output_status: "recherche",
         output_label: "Recherche",
@@ -33,7 +32,6 @@ test("a research sheet never says it is ready to copy", () => {
 test("a provisional sheet stays short of ready to copy", () => {
   render(
     <LiasseSheet
-      yearId={1}
       worksheet={sheet({
         output_status: "provisoire",
         output_label: "Provisoire",
@@ -48,7 +46,6 @@ test("a provisional sheet stays short of ready to copy", () => {
 test("only a declarable sheet says it is ready to copy", () => {
   render(
     <LiasseSheet
-      yearId={1}
       worksheet={sheet({
         output_status: "declarable",
         output_label: "Déclarable",
