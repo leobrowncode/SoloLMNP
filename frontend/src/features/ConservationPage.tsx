@@ -20,6 +20,8 @@ import {
 } from "./screenState";
 import FrenchFileInput from "../lib/FrenchFileInput";
 import FrenchForm from "../lib/FrenchForm";
+import { MobileSection, PageAnchors } from "../lib/PageSection";
+import { ResponsiveTable } from "../lib/ResponsiveTable";
 
 const TYPES: Record<string, string> = {
   "application/pdf": "application/pdf",
@@ -306,6 +308,14 @@ export default function ConservationPage() {
         RESTAURER, et enregistre d’abord une copie de l’état actuel. Une écriture validée ne se modifie pas :
         seule la base entière est reprise.
       </p>
+      <PageAnchors
+        label="Sections de la conservation"
+        links={[
+          { href: "#justificatifs", label: "Justificatifs" },
+          { href: "#sauvegardes", label: "Sauvegardes" },
+          { href: "#restore-preview", label: "Restauration" },
+        ]}
+      />
       <MutationStatus step={step} />
       {error && <p role="alert">{error}</p>}
       {apiError && (
@@ -314,7 +324,7 @@ export default function ConservationPage() {
           onRetry={() => { void retryAction.current?.(); }}
         />
       )}
-      <div id="justificatifs">
+      <MobileSection id="justificatifs" title="Justificatifs" open>
       <h3>Justificatifs</h3>
       <SaveNoticeHost place="justificatifs" notice={notice} onDismiss={dismiss} />
       <ScreenStatus
@@ -324,45 +334,40 @@ export default function ConservationPage() {
         empty={<p>Aucun justificatif déposé.</p>}
       />
       {documents && documents.length > 0 && (
-        <div className="ledger-table">
-          <table>
-            <caption>Inventaire des justificatifs</caption>
-            <thead>
-              <tr>
-                <th>Nom</th>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Taille</th>
-                <th>Empreinte SHA-256</th>
-                <th>Écriture liée</th>
-                <th>Liaison</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((document) => (
-                <tr key={document.id} id={`justificatif-${document.id}`}>
-                  <td>{document.original_name}</td>
-                  <td>{frStamp(document.created_at)}</td>
-                  <td>{document.media_label}</td>
-                  <td>{octets(document.size)}</td>
-                  <td className="fingerprint">{document.sha256}</td>
-                  <td>{entryLabel(document.entry)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      disabled={busy || linkBlocked.length > 0}
-                      aria-busy={busy || undefined}
-                      aria-describedby={describedBy("link-causes", linkBlocked)}
-                      onClick={() => { void link(document.id); }}
-                    >
-                      {document.entry ? "Changer la liaison" : "Lier cette écriture"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveTable
+          label="Justificatifs"
+          caption="Inventaire des justificatifs"
+          columns={[
+            { key: "name", label: "Nom" },
+            { key: "date", label: "Date", priority: "secondary" },
+            { key: "type", label: "Type", priority: "secondary" },
+            { key: "size", label: "Taille", priority: "secondary" },
+            { key: "sha", label: "Empreinte SHA-256", priority: "secondary" },
+            { key: "entry", label: "Écriture liée" },
+            { key: "link", label: "Liaison" },
+          ]}
+          rows={documents.map((document) => ({
+            key: String(document.id),
+            cells: [
+              <span id={`justificatif-${document.id}`} key="name">{document.original_name}</span>,
+              frStamp(document.created_at),
+              document.media_label,
+              octets(document.size),
+              <span className="fingerprint" key="sha">{document.sha256}</span>,
+              entryLabel(document.entry),
+              <button
+                key="link"
+                type="button"
+                disabled={busy || linkBlocked.length > 0}
+                aria-busy={busy || undefined}
+                aria-describedby={describedBy("link-causes", linkBlocked)}
+                onClick={() => { void link(document.id); }}
+              >
+                {document.entry ? "Changer la liaison" : "Lier cette écriture"}
+              </button>,
+            ],
+          }))}
+        />
       )}
       {documents && documents.length > 0 && (
         <PrerequisiteList id="link-causes" causes={linkBlocked} />
@@ -378,9 +383,9 @@ export default function ConservationPage() {
         />
         <button type="submit" disabled={busy} aria-busy={busy || undefined}>Déposer le justificatif</button>
       </FrenchForm>
-      </div>
+      </MobileSection>
 
-      <div id="sauvegardes">
+      <MobileSection id="sauvegardes" title="Sauvegardes">
       <h3>Sauvegardes</h3>
       <div className="toolbar" id="creer-sauvegarde">
         <SaveNoticeHost place="creer-sauvegarde" notice={notice} onDismiss={dismiss} />
@@ -394,65 +399,58 @@ export default function ConservationPage() {
         empty={<p>Aucune sauvegarde enregistrée.</p>}
       />
       {backups && backups.length > 0 && (
-        <div className="ledger-table">
-          <table>
-            <caption>Inventaire des sauvegardes</caption>
-            <thead>
-              <tr>
-                <th>Choisir</th>
-                <th>Date</th>
-                <th>Taille</th>
-                <th>Version</th>
-                <th>Empreinte SHA-256</th>
-                <th>Dernier contrôle</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {backups.map((archive) => {
-                const when = frStamp(archive.created_at);
-                return (
-                  <tr key={archive.filename} id={`sauvegarde-${archive.filename}`}>
-                    <td>
-                      <label>
-                        <input
-                          type="radio"
-                          name="backup-choice"
-                          checked={selectedBackup === archive.filename}
-                          onChange={() => setSelectedBackup(archive.filename)}
-                        />
-                        Choisir la sauvegarde du {when}
-                      </label>
-                    </td>
-                    <td>{when}</td>
-                    <td>{octets(archive.size)}</td>
-                    <td>
-                      {archive.application_version ?? "—"}
-                      {" · schéma "}
-                      {archive.schema_revision ?? "—"}
-                    </td>
-                    <td className="fingerprint">{archive.sha256}</td>
-                    <td>{integrityLabel(archive.integrity)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        aria-busy={busy || undefined}
-                        onClick={() => { void verify(archive.filename); }}
-                      >
-                        Contrôler la sauvegarde du {when}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveTable
+          label="Sauvegardes"
+          caption="Inventaire des sauvegardes"
+          columns={[
+            { key: "choose", label: "Choisir" },
+            { key: "date", label: "Date" },
+            { key: "size", label: "Taille", priority: "secondary" },
+            { key: "version", label: "Version", priority: "secondary" },
+            { key: "sha", label: "Empreinte SHA-256", priority: "secondary" },
+            { key: "check", label: "Dernier contrôle", priority: "secondary" },
+            { key: "action", label: "Action" },
+          ]}
+          rows={backups.map((archive) => {
+            const when = frStamp(archive.created_at);
+            return {
+              key: archive.filename,
+              cells: [
+                <label key="choose" id={`sauvegarde-${archive.filename}`}>
+                  <input
+                    type="radio"
+                    name="backup-choice"
+                    checked={selectedBackup === archive.filename}
+                    onChange={() => setSelectedBackup(archive.filename)}
+                  />
+                  Choisir la sauvegarde du {when}
+                </label>,
+                when,
+                octets(archive.size),
+                <>
+                  {archive.application_version ?? "—"}
+                  {" · schéma "}
+                  {archive.schema_revision ?? "—"}
+                </>,
+                <span className="fingerprint" key="sha">{archive.sha256}</span>,
+                integrityLabel(archive.integrity),
+                <button
+                  key="action"
+                  type="button"
+                  disabled={busy}
+                  aria-busy={busy || undefined}
+                  onClick={() => { void verify(archive.filename); }}
+                >
+                  Contrôler la sauvegarde du {when}
+                </button>,
+              ],
+            };
+          })}
+        />
       )}
-      </div>
+      </MobileSection>
 
-      <div id="restore-preview">
+      <MobileSection id="restore-preview" title="Restauration" open>
         <SaveNoticeHost place="restore-preview" notice={notice} onDismiss={dismiss} />
         <h3>Restauration</h3>
         <ScreenStatus
@@ -496,7 +494,7 @@ export default function ConservationPage() {
           {busy ? "Restauration…" : "Restaurer la sauvegarde"}
         </button>
         <PrerequisiteList id="restore-causes" causes={restoreBlocked} />
-      </div>
+      </MobileSection>
     </section>
   );
 }

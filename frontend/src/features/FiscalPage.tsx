@@ -23,6 +23,8 @@ import {
   centsToApiAmount, enumLabel, formatAmount, formatAmountFromCents, formatCents, formatEuros, parseAmountToCents,
 } from "../lib/format";
 import "./ledger.css";
+import FitSelect from "../lib/FitSelect";
+import { MobileSection, PageAnchors } from "../lib/PageSection";
 
 interface Vintage {
   vintage: string;
@@ -649,6 +651,18 @@ export default function FiscalPage() {
         La comptabilité ne change pas. Cession, TVA et plus-values restent hors de cet écran.
         Ordre de fin d’exercice : calcul fiscal, pré-contrôle, clôture, puis liasse et FEC figés.
       </p>
+      <PageAnchors
+        label="Sections de la fiscalité"
+        links={[
+          { href: "#calcul-fiscal-zone", label: "Calcul fiscal" },
+          { href: "#regles-lmnp", label: "Règles LMNP" },
+          { href: "#loyers-comptabilises", label: "Loyers et charges" },
+          { href: "#reintegrations", label: "Réintégrations" },
+          { href: "#capacite-amortissements", label: "Capacité" },
+          { href: "#cloture-exercice", label: "Clôture" },
+          { href: "#sorties-figees", label: "Sorties figées" },
+        ]}
+      />
       <div className="heading-with-help">
         <GlossaryTip id="cession" />
         <GlossaryTip id="liasse" />
@@ -678,7 +692,7 @@ export default function FiscalPage() {
         <label>
           Exercice
           <GlossaryTip id="exercice" />
-          <select
+          <FitSelect
             value={year}
             onChange={(event) => { chooseYear(Number(event.target.value)); }}
           >
@@ -687,7 +701,7 @@ export default function FiscalPage() {
                 {item.year}{item.status ? ` · ${enumLabel("yearStatus", item.status)}` : ""}
               </option>
             ))}
-          </select>
+          </FitSelect>
         </label>
         <button id="calcul-fiscal" type="button" disabled={!year || busy} aria-busy={busy || undefined} aria-describedby={describedBy(fiscalCauseId, fiscalCauses)} onClick={() => { void compute(); }}>
           {busy ? "Calcul…" : "Calculer le résultat fiscal"}
@@ -696,7 +710,7 @@ export default function FiscalPage() {
         <PrerequisiteList id={fiscalCauseId} causes={fiscalCauses} />
       </div>
 
-      <ul className="fiscal-rules-strip" aria-label="Règles LMNP utiles">
+      <ul id="regles-lmnp" className="fiscal-rules-strip" aria-label="Règles LMNP utiles">
         <li>
           <strong>Plafond amortissement</strong>
           <GlossaryTip id="plafond" />
@@ -712,7 +726,7 @@ export default function FiscalPage() {
       </ul>
 
       {statements && (
-        <div className="fiscal-panel">
+        <div className="fiscal-panel" id="loyers-comptabilises">
           <h3>
             1. Loyers & charges comptabilisés
             <GlossaryTip id="loyers-charges" />
@@ -767,7 +781,7 @@ export default function FiscalPage() {
         </div>
       )}
 
-      <div className="fiscal-panel">
+      <MobileSection id="reintegrations" title="Quote-part de charge non déductible" className="fiscal-panel">
         <h3>
           2. Quote-part de charge non déductible
           <GlossaryTip id="reintegration" />
@@ -780,7 +794,7 @@ export default function FiscalPage() {
           <label>
             Compte de charge
             <HelpTip label="Compte">Compte de charge hors 681, déjà présent au ledger.</HelpTip>
-            <select
+            <FitSelect
               value={draft.account_number}
               onChange={(event) => setDraft({ ...draft, account_number: event.target.value })}
             >
@@ -790,7 +804,7 @@ export default function FiscalPage() {
                   {row.account_number} · {row.label} ({formatEuros(row.amount)})
                 </option>
               ))}
-            </select>
+            </FitSelect>
           </label>
           <label className="field-money">
             Part non déductible (€)
@@ -839,10 +853,10 @@ export default function FiscalPage() {
             ))}
           </ul>
         )}
-      </div>
+      </MobileSection>
 
       {result && details && (
-        <div className="fiscal-panel" aria-live="polite">
+        <div className="fiscal-panel" id="capacite-amortissements" aria-live="polite">
           <Freshness result={result} />
           <ZeroCockpit
             key={`${details.accounting_depreciation ?? "0"}-${details.capacity ?? "0"}`}
@@ -979,7 +993,7 @@ export default function FiscalPage() {
       )}
 
       {year !== 0 && (
-        <div className="fiscal-panel">
+        <div className="fiscal-panel" id="cloture-exercice">
           <CloseYear
             key={year}
             year={year}

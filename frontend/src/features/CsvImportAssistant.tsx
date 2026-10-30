@@ -22,6 +22,8 @@ import { useSaveNotice } from "./localFeedback";
 import PrerequisiteList from "./PrerequisiteList";
 import FrenchFileInput from "../lib/FrenchFileInput";
 import { enumLabel } from "../lib/format";
+import { ResponsiveTable } from "../lib/ResponsiveTable";
+import FitSelect from "../lib/FitSelect";
 
 const REJECT_FILE = {
   bank: "rejets-releve-bancaire.csv",
@@ -173,14 +175,14 @@ export default function CsvImportAssistant({
           {fields.map((field) => (
             <label key={field.key}>
               {field.label}{field.required ? "" : " (facultatif)"}
-              <select
+              <FitSelect
                 aria-label={field.label}
                 value={mapping[field.key] ?? ""}
                 onChange={(event) => updateMapping(field.key, event.target.value)}
               >
                 <option value="">— Choisir —</option>
                 {headers.map((header) => <option key={header} value={header}>{header}</option>)}
-              </select>
+              </FitSelect>
             </label>
           ))}
         </fieldset>
@@ -217,33 +219,32 @@ export default function CsvImportAssistant({
             {preview.summary.error} erreur(s).
           </p>
           {preview.rows.length > 0 && (
-            <div className="ledger-table">
-              <table>
-                <caption>Aperçu de l’import</caption>
-                <thead>
-                  <tr>
-                    <th>Ligne</th>
-                    <th>Statut</th>
-                    {preview.fields.map((field) => <th key={field.key}>{field.label}</th>)}
-                    {profile === "bank" && <th>Compte suggéré</th>}
-                    <th>Détail</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.rows.map((row) => (
-                    <tr key={row.line} className={`import-row-${row.status}`}>
-                      <td>{row.line}</td>
-                      <td>{enumLabel("importStatus", row.status)}</td>
-                      {preview.fields.map((field) => (
-                        <td key={field.key}>{row.display[field.key] || "—"}</td>
-                      ))}
-                      {profile === "bank" && <td>{row.suggested_account || "À choisir"}</td>}
-                      <td>{rowDetail(row)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ResponsiveTable
+              label="Aperçu de l’import"
+              caption="Aperçu de l’import"
+              columns={[
+                { key: "line", label: "Ligne" },
+                { key: "status", label: "Statut" },
+                ...preview.fields.map((field) => ({
+                  key: field.key,
+                  label: field.label,
+                  priority: "secondary" as const,
+                })),
+                ...(profile === "bank" ? [{ key: "suggested", label: "Compte suggéré", priority: "secondary" as const }] : []),
+                { key: "detail", label: "Détail" },
+              ]}
+              rows={preview.rows.map((row) => ({
+                key: String(row.line),
+                className: `import-row-${row.status}`,
+                cells: [
+                  row.line,
+                  enumLabel("importStatus", row.status),
+                  ...preview.fields.map((field) => row.display[field.key] || "—"),
+                  ...(profile === "bank" ? [row.suggested_account || "À choisir"] : []),
+                  rowDetail(row),
+                ],
+              }))}
+            />
           )}
           {preview.rejects_csv && (
             <button type="button" disabled={busy} onClick={() => downloadRejects(REJECT_FILE[profile], preview.rejects_csv)}>

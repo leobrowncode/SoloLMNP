@@ -14,6 +14,8 @@ import GlossaryTip from "./GlossaryTip";
 import { SaveNoticeHost } from "./LocalFeedback";
 import type { SaveNotice } from "./localFeedback";
 import FrenchForm from "../lib/FrenchForm";
+import { MOBILE_QUERY, useMediaQuery } from "../lib/viewport";
+import FitSelect from "../lib/FitSelect";
 
 export default function ChartOfAccounts({
   accounts,
@@ -32,6 +34,7 @@ export default function ChartOfAccounts({
 }) {
   const [nature, setNature] = useState("");
   const [usage, setUsage] = useState<UsageFilter>("");
+  const mobile = useMediaQuery(MOBILE_QUERY);
   const visible = accounts.filter((account) => matchesChartFilters(account, nature, usage));
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -58,11 +61,11 @@ export default function ChartOfAccounts({
           <label>Numéro<input name="number" required pattern="[1-7][0-9]{2,9}" /></label>
           <label>Libellé du compte<input name="label" required /></label>
           <label>Nature
-            <select name="account_type" required>
+            <FitSelect name="account_type" required>
               {ACCOUNT_TYPES.map((type) => (
                 <option key={type} value={type}>{ACCOUNT_NATURES[type]}</option>
               ))}
-            </select>
+            </FitSelect>
           </label>
         </div>
         <button disabled={busy}>Ajouter le compte</button>
@@ -71,16 +74,16 @@ export default function ChartOfAccounts({
       <div className="chart-filters">
         <div>
           <label htmlFor="chart-nature-filter">Filtrer par nature</label>
-          <select id="chart-nature-filter" value={nature} onChange={(event) => setNature(event.target.value)}>
+          <FitSelect id="chart-nature-filter" value={nature} onChange={(event) => setNature(event.target.value)}>
             <option value="">Toutes les natures</option>
             {ACCOUNT_TYPES.map((type) => (
               <option key={type} value={type}>{ACCOUNT_NATURES[type]}</option>
             ))}
-          </select>
+          </FitSelect>
         </div>
         <div>
           <label htmlFor="chart-usage-filter">Filtrer par utilisation</label>
-          <select
+          <FitSelect
             id="chart-usage-filter"
             value={usage}
             onChange={(event) => setUsage(event.target.value as UsageFilter)}
@@ -89,13 +92,15 @@ export default function ChartOfAccounts({
             {USAGE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
-          </select>
+          </FitSelect>
         </div>
       </div>
       {visible.length === 0
         ? <p>Aucun compte pour cette nature ou cette utilisation.</p>
         : (
-          <ul className="chart-accounts" aria-label="Plan comptable">
+          <>
+          {mobile && <p className="mobile-table-priority">Colonnes principales : numéro, libellé, nature et utilisation.</p>}
+          <ul className="chart-accounts" aria-label="Plan comptable" {...(mobile ? { "data-mobile-variant": "cards" } : {})}>
             {visible.map((account) => {
               const natureLabel = accountNatureLabel(account.account_type);
               const usageLabel = accountUsageLabel(account.active);
@@ -126,6 +131,7 @@ export default function ChartOfAccounts({
               );
             })}
           </ul>
+          </>
         )}
     </>
   );

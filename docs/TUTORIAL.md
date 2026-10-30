@@ -29,6 +29,15 @@ Chaque étape du menu possède une adresse stable (`/comptabilite/brouillons`,
 utiliser Précédent/Suivant du navigateur ou enregistrer un favori sans perdre
 votre écran. Une saisie non enregistrée demande confirmation avant de quitter.
 
+Sur un écran étroit (768 px et moins), le menu se replie. La page en cours
+reste affichée : **Ouvrir le menu** montre toutes les étapes, **Replier le menu**
+les range. La navigation n’est pas retirée. Les pages longues proposent des
+ancres, et certaines sections se replient. Le journal, la balance, le plan
+comptable, les dotations et les imports se lisent en cartes : les colonnes
+principales restent visibles, les autres sous **Autres colonnes**. Entre 320 et
+430 px, chaque liste déroulante répète en entier la valeur choisie sous le
+champ. Au-dessus de 768 px, la disposition de bureau ne change pas.
+
 Les pastilles **?** à côté d’un terme comptable ouvrent le glossaire : ce que c’est, pourquoi c’est demandé, un exemple et l’erreur fréquente. Clic, Entrée ou Espace ouvrent l’aide ; un second clic, Échap ou un clic à l’extérieur la ferment. Le texte reste dans l’écran, y compris sur un téléphone (320 px et plus). Une erreur peut proposer la même entrée. Le glossaire ne dit pas qu’une sortie est déclarable : les millésimes restent en recherche. SoloLMNP n’envoie rien aux impôts.
 
 Une action métier désactivée (nouvelle recette, nouvelle dépense, immobilisation,

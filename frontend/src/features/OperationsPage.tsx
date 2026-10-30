@@ -36,6 +36,9 @@ import { buildPieceReference, defaultType, findType, typesFor } from "./operatio
 import { enumChoices, enumLabel, formatEuros, formatIsoDate } from "../lib/format";
 import FrenchForm from "../lib/FrenchForm";
 import "./ledger.css";
+import FitSelect from "../lib/FitSelect";
+import { PageAnchors } from "../lib/PageSection";
+import { ResponsiveTable } from "../lib/ResponsiveTable";
 
 interface Editor {
   title: string;
@@ -420,6 +423,26 @@ export default function OperationsPage() {
     <section id="operations" className="ledger-page" aria-labelledby="operations-title" data-screen-phase={bundleView.phase}>
     <h2 id="operations-title">Opérations et banque</h2>
     <p>Suivez l’ordre des onglets : bien, banque, emprunts, puis recettes et dépenses.</p>
+    <PageAnchors
+      label="Sections des opérations"
+      links={
+        tab === "Biens" ? [
+          { href: "#biens-saisie", label: "Biens" },
+          { href: "#ajouter-bien", label: "Ajouter un bien" },
+        ] : tab === "Banque" ? [
+          { href: "#banque-saisie", label: "Banque" },
+          { href: "#ajouter-banque", label: "Ajouter une banque" },
+          { href: "#import-import-releve", label: "Import du relevé" },
+        ] : tab === "Emprunts" ? [
+          { href: "#emprunts-saisie", label: "Emprunts" },
+          { href: "#ajouter-emprunt", label: "Ajouter un emprunt" },
+          { href: "#import-import-echeances", label: "Import des échéances" },
+        ] : [
+          { href: "#transactions-saisie", label: "Transactions" },
+          { href: "#import-import-operations", label: "Import CSV" },
+        ]
+      }
+    />
     <MutationStatus step={step} />
     {apiError && <ApiErrorAlert detail={apiError.detail} />}
     {error && !apiError && <p role="alert" className="ledger-error">{error}</p>}
@@ -575,11 +598,11 @@ export default function OperationsPage() {
         ))}
         {!!banks.length && <>
           <label className="toolbar-field">Banque sélectionnée
-            <select value={bankId} onChange={(e) => {
+            <FitSelect value={bankId} onChange={(e) => {
               setBankId(Number(e.target.value)); setBankOffset(0); setEditor(null); setMatchCandidates(null);
             }}>
               {banks.map((b) => <option key={b.id} value={b.id}>{b.name} · {b.account_number}</option>)}
-            </select>
+            </FitSelect>
           </label>
           <CsvImportAssistant
             key={String(bankId)}
@@ -647,7 +670,7 @@ export default function OperationsPage() {
             <p>Vérifiez la référence et la date : un montant égal ne suffit pas.</p>
             {matchCandidates.lines.length ? <>
               <label>Écriture de même montant
-                <select name="line" required>{matchCandidates.lines.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}</select>
+                <FitSelect name="line" required>{matchCandidates.lines.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}</FitSelect>
               </label>
               <button type="submit" disabled={busy}>Confirmer le rapprochement</button>
             </> : <p>Aucune écriture de même montant.</p>}
@@ -748,27 +771,27 @@ export default function OperationsPage() {
         )}
         {!!loans.length && !!banks.length && !!openYears.length && <>
           <label className="toolbar-field">Emprunt
-            <select value={loanImportId} onChange={(e) => setLoanImportId(Number(e.target.value))}>
+            <FitSelect value={loanImportId} onChange={(e) => setLoanImportId(Number(e.target.value))}>
               {loans.map((loan) => (
                 <option key={loan.id} value={loan.id}>
                   {loan.lender} · {formatEuros(loan.initial_principal)} · {loan.principal_account}
                 </option>
               ))}
-            </select>
+            </FitSelect>
           </label>
           <label className="toolbar-field">Exercice
-            <select value={opYearId} onChange={(e) => setOpYearId(Number(e.target.value))}>
+            <FitSelect value={opYearId} onChange={(e) => setOpYearId(Number(e.target.value))}>
               {openYears.map((year) => (
                 <option key={year.id} value={year.id}>{year.year}</option>
               ))}
-            </select>
+            </FitSelect>
           </label>
           <label className="toolbar-field">Compte bancaire
-            <select value={bankId} onChange={(e) => { setBankId(Number(e.target.value)); setBankOffset(0); }}>
+            <FitSelect value={bankId} onChange={(e) => { setBankId(Number(e.target.value)); setBankOffset(0); }}>
               {banks.map((bank) => (
                 <option key={bank.id} value={bank.id}>{bank.name} · {bank.account_number}</option>
               ))}
-            </select>
+            </FitSelect>
           </label>
           <CsvImportAssistant
             key={`${loanImportId}-${opYearId}-${bankId}`}
@@ -799,21 +822,21 @@ export default function OperationsPage() {
         <p className="form-help">Enregistrez les loyers et charges. La part déductible ne change pas l’écriture : elle est proposée ensuite dans les réintégrations de la liasse. Ne saisissez pas les intérêts déjà ventilés dans une échéance d’emprunt.</p>
         {!!properties.length && !!openYears.length && <>
           <label className="toolbar-field">Bien
-            <select value={opPropertyId} onChange={(e) => setOpPropertyId(Number(e.target.value))}>
+            <FitSelect value={opPropertyId} onChange={(e) => setOpPropertyId(Number(e.target.value))}>
               {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
-            </select>
+            </FitSelect>
           </label>
           <label className="toolbar-field">Exercice
-            <select value={opYearId} onChange={(e) => setOpYearId(Number(e.target.value))}>
+            <FitSelect value={opYearId} onChange={(e) => setOpYearId(Number(e.target.value))}>
               {openYears.map((year) => (
                 <option key={year.id} value={year.id}>{year.year}</option>
               ))}
-            </select>
+            </FitSelect>
           </label>
           {!!banks.length && <label className="toolbar-field">Compte des lignes payées
-            <select value={bankId} onChange={(e) => setBankId(Number(e.target.value))}>
+            <FitSelect value={bankId} onChange={(e) => setBankId(Number(e.target.value))}>
               {banks.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.account_number})</option>)}
-            </select>
+            </FitSelect>
           </label>}
         </>}
         <CsvImportAssistant
@@ -882,14 +905,21 @@ export default function OperationsPage() {
       </div>}
 
       {details && (
-        <div className="ledger-table">
+        <div>
           <h3>{details.entry_number} · {details.label}</h3>
-          <table>
-            <thead><tr><th>Compte</th><th>Libellé</th><th>Débit</th><th>Crédit</th></tr></thead>
-            <tbody>{details.lines.map((line, i) => (
-              <tr key={i}><td>{line.account_number}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td></tr>
-            ))}</tbody>
-          </table>
+          <ResponsiveTable
+            label="Lignes de l’écriture"
+            columns={[
+              { key: "account", label: "Compte" },
+              { key: "label", label: "Libellé", priority: "secondary" },
+              { key: "debit", label: "Débit" },
+              { key: "credit", label: "Crédit" },
+            ]}
+            rows={details.lines.map((line, index) => ({
+              key: String(index),
+              cells: [line.account_number, line.label, line.debit, line.credit],
+            }))}
+          />
         </div>
       )}
     </>}

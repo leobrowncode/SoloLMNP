@@ -7,6 +7,7 @@ import ApiErrorAlert from "./ApiErrorAlert";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
+import FitSelect from "../lib/FitSelect";
 
 export interface Field {
   name: string;
@@ -243,7 +244,7 @@ export default function ReviewForm({
                     {field.label}{field.optional ? " (facultatif)" : ""}
                   </label>
                   {choices ? (
-                    <select
+                    <FitSelect
                       id={controlId}
                       name={field.name}
                       aria-describedby={describedBy}
@@ -268,7 +269,7 @@ export default function ReviewForm({
                       {choices.filter(([value]) => value !== "").map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
                       ))}
-                    </select>
+                    </FitSelect>
                   ) : (
                     <input
                       id={controlId}

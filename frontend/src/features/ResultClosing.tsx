@@ -10,6 +10,7 @@ import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 import { formatAmount, formatEuros } from "../lib/format";
 import FrenchForm from "../lib/FrenchForm";
+import FitSelect from "../lib/FitSelect";
 
 interface PreviewLine { account_number: string; label: string; debit: string; credit: string }
 interface ProposedAccount { number: string; label: string; account_type: string }
@@ -197,9 +198,9 @@ export default function ResultClosing({ year }: { year: number }) {
         <ul>{proposed.map((account) => <li key={account.number}>{account.number} · {account.label}</li>)}</ul>
       </div>}
       {!review && <>
-        <label>Journal<select name="journal" required>{general.map((journal) => <option key={journal.code} value={journal.code}>{journal.code}</option>)}</select></label>
+        <label>Journal<FitSelect name="journal" required>{general.map((journal) => <option key={journal.code} value={journal.code}>{journal.code}</option>)}</FitSelect></label>
         <label>Référence de pièce<input name="piece" required maxLength={200} /></label>
-        {!!resultChoices.length && <label>Compte de résultat<select name="result" required defaultValue={saved?.result_account ?? resultChoices[0]?.number}>{resultChoices.map((account) => <option key={account.number} value={account.number}>{account.number} · {account.label}{account.create ? " (sera créé)" : ""}</option>)}</select></label>}
+        {!!resultChoices.length && <label>Compte de résultat<FitSelect name="result" required defaultValue={saved?.result_account ?? resultChoices[0]?.number}>{resultChoices.map((account) => <option key={account.number} value={account.number}>{account.number} · {account.label}{account.create ? " (sera créé)" : ""}</option>)}</FitSelect></label>}
         <label>Justification<textarea name="justification" required minLength={10} maxLength={3000} /></label>
       </>}
       {review && saved && <p>Demande {saved.request_id} conservée dans cet onglet. Réessayez la même demande si la réponse a été perdue.</p>}
@@ -213,14 +214,14 @@ export default function ResultClosing({ year }: { year: number }) {
       {!appropriation.proposals.length && <p>Aucun solde 120 ou 129 à affecter.</p>}
       {!!appropriation.proposals.length && <>
         {!review && <>
-          <label>Compte source<select name="source" required onChange={(event) => {
+          <label>Compte source<FitSelect name="source" required onChange={(event) => {
             const chosen = appropriation.proposals.find((item) => item.source_account === event.target.value);
             const amount = event.currentTarget.form?.elements.namedItem("amount");
             if (chosen && amount instanceof HTMLInputElement) amount.value = chosen.amount;
-          }}>{appropriation.proposals.map((item) => <option key={item.source_account} value={item.source_account}>{item.source_account} · {formatEuros(item.amount)}</option>)}</select></label>
+          }}>{appropriation.proposals.map((item) => <option key={item.source_account} value={item.source_account}>{item.source_account} · {formatEuros(item.amount)}</option>)}</FitSelect></label>
           <label>Montant confirmé<input name="amount" required data-money="true" lang="fr" placeholder="1 234,56" inputMode="decimal" defaultValue={appropriation.proposals[0]?.amount ?? ""} /></label>
-          <label>Compte d’affectation<select name="target" required>{accounts.filter((account) => account.active && account.account_type === "EQUITY" && !account.number.startsWith("120") && !account.number.startsWith("129")).map((account) => <option key={account.number} value={account.number}>{account.number} · {account.label}</option>)}</select></label>
-          <label>Journal<select name="journal" required>{general.map((journal) => <option key={journal.code} value={journal.code}>{journal.code}</option>)}</select></label>
+          <label>Compte d’affectation<FitSelect name="target" required>{accounts.filter((account) => account.active && account.account_type === "EQUITY" && !account.number.startsWith("120") && !account.number.startsWith("129")).map((account) => <option key={account.number} value={account.number}>{account.number} · {account.label}</option>)}</FitSelect></label>
+          <label>Journal<FitSelect name="journal" required>{general.map((journal) => <option key={journal.code} value={journal.code}>{journal.code}</option>)}</FitSelect></label>
           <label>Référence de pièce<input name="piece" required maxLength={200} /></label>
           <label>Justification<textarea name="justification" required minLength={10} maxLength={3000} /></label>
         </>}
