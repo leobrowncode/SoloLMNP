@@ -31,6 +31,8 @@ votre écran. Une saisie non enregistrée demande confirmation avant de quitter.
 
 Si l’alerte « Stockage non sûr » apparaît, la base est dans OneDrive. Elle reste visible sur toutes les vues, même quand la base est prête. Copiez le projet hors de ce dossier synchronisé avant de saisir : la synchronisation peut corrompre SQLite.
 
+Si un écran affiche une erreur de chargement, **Réessayer** relance la lecture. Ce n’est pas un dossier vide. Quand c’est sans risque, les informations déjà affichées restent, marquées comme pouvant être périmées. Les totaux des états comptables disparaissent plutôt que de montrer un chiffre incertain.
+
 Alternative Docker : voir [DEPLOYMENT.md](DEPLOYMENT.md).
 
 Vérifier que l’écran « État de l’installation » affiche **Base SQLite : Prête**.

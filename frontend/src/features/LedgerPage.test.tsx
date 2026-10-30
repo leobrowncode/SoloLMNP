@@ -81,5 +81,40 @@ describe("ledger", () => {
     renderLedger();
     expect(await screen.findByRole("alert")).toHaveTextContent("Hors ligne");
     expect(screen.queryByText("Balance équilibrée")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Chargement de la comptabilité/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Initialiser votre activité" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Réessayer" })).toBeInTheDocument();
+  });
+  it("recovers from an initial failure and distinguishes an empty journal from a read error", async () => {
+    let setupFailed = true;
+    let entriesFailed = false;
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const path = String(url);
+      if (setupFailed && path.endsWith("/setup")) throw new Error("Hors ligne");
+      if (path.endsWith("/setup")) {
+        return new Response(JSON.stringify({
+          activity: { activity_name: "Fictif" },
+          years: [{ id: 1, year: 2025, start_date: "2025-01-01", end_date: "2025-12-31", status: "OPEN" }],
+        }), { status: 200 });
+      }
+      if (path.endsWith("/accounts")) return new Response(JSON.stringify(accounts), { status: 200 });
+      if (path.endsWith("/journals")) return new Response(JSON.stringify([{ code: "OD", label: "Opérations", active: true }]), { status: 200 });
+      if (path.includes("/entries?")) {
+        if (entriesFailed) return new Response(JSON.stringify({ detail: { code: "LEDGER_OFFLINE", message: "Journal illisible" } }), { status: 503 });
+        return new Response(JSON.stringify({ entries: [], count: 0 }), { status: 200 });
+      }
+      return new Response("{}", { status: 200 });
+    }));
+    renderLedger();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Hors ligne");
+    setupFailed = false;
+    await userEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+    expect(await screen.findByRole("button", { name: "Nouvelle écriture" })).toBeInTheDocument();
+    expect(await screen.findByText(/Aucune écriture pour cette vue/)).toBeInTheDocument();
+    entriesFailed = true;
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Source" }), "MANUAL");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Journal illisible");
+    expect(screen.queryByText(/Chargement…/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Aucune écriture pour cette vue/)).not.toBeInTheDocument();
   });
 });

@@ -4,6 +4,10 @@ import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import CloseYear from "./CloseYear";
 import ExportDownloads from "./ExportDownloads";
 import { asExportStatus, type ExportStatus } from "./exportStatus";
+import ScreenStatus from "./ScreenStatus";
+import {
+  beginLoad, defer, emptyView, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
+} from "./screenState";
 import LiasseSheet, { type Worksheet } from "./LiasseSheet";
 import { calculationNotice, outputLabel, outputTrust } from "./outputStatus";
 import "./ledger.css";
@@ -298,9 +302,14 @@ export default function FiscalPage() {
   const [result, setResult] = useState<Computation | null>(null);
   const [statements, setStatements] = useState<Statements | null>(null);
   const [worksheet, setWorksheet] = useState<Worksheet | null>(null);
-  const [exportStatus, setExportStatus] = useState<ExportStatus | null>(null);
-  const [exportFailed, setExportFailed] = useState(false);
+  const [exportView, setExportView] = useState<ScreenView<{ yearId: number; status: ExportStatus }>>(idleView());
   const [exportTick, setExportTick] = useState(0);
+  const [boot, setBoot] = useState<ScreenView<{ ready: true }>>(() => beginLoad(idleView(), false));
+  const [bootAttempt, setBootAttempt] = useState(0);
+  const [statementsView, setStatementsView] = useState<ScreenView<Statements>>(idleView());
+  const [statementsAttempt, setStatementsAttempt] = useState(0);
+  const [resultView, setResultView] = useState<ScreenView<Computation>>(idleView());
+  const [resultAttempt, setResultAttempt] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [adjustments, setAdjustments] = useState<AdjustmentDraft[]>([]);
@@ -315,6 +324,10 @@ export default function FiscalPage() {
 
   useEffect(() => {
     let current = true;
+    defer(() => {
+      if (!current) return;
+      setBoot((previous) => beginLoad(previous, previous.data !== null));
+    });
     void Promise.all([
       request<{ vintages: Vintage[] }>("/vintages", "GET", undefined, "/api/fiscal"),
       request<{ years: YearRow[] }>("/setup"),
@@ -323,49 +336,101 @@ export default function FiscalPage() {
       setVintages(loaded.vintages);
       setYears(setup.years);
       setYear(setup.years.find((item) => item.status === "OPEN")?.id ?? setup.years[0]?.id ?? 0);
-    }, (reason: Error) => { if (current) setError(reason.message); });
+      setBoot(finishLoad({ ready: true }));
+    }, (reason: unknown) => {
+      if (current) setBoot((previous) => failLoad(previous, toApiError(reason), previous.data !== null));
+    });
     return () => { current = false; };
-  }, []);
+  }, [bootAttempt]);
 
   useEffect(() => {
-    if (!year) return;
     let current = true;
+    if (!year) {
+      defer(() => {
+        if (current) setStatementsView(idleView());
+      });
+      return () => { current = false; };
+    }
+    defer(() => {
+      if (!current) return;
+      setStatements(null);
+      setStatementsView((previous) => beginLoad(previous, false));
+    });
     void request<Statements>(`/years/${year}/statements`).then((value) => {
-      if (current) setStatements(value);
-    }, (reason: Error) => { if (current) setError(reason.message); });
+      if (!current) return;
+      setStatements(value);
+      setStatementsView(finishLoad(value));
+    }, (reason: unknown) => {
+      if (!current) return;
+      setStatements(null);
+      setStatementsView((previous) => failLoad(previous, toApiError(reason), false));
+    });
     return () => { current = false; };
-  }, [year]);
+  }, [year, statementsAttempt]);
 
   useEffect(() => {
-    if (!year) return;
     let current = true;
-    void request<unknown>(`/years/${year}/exports`, "GET", undefined, "/api/filing").then((value) => {
+    if (!year) {
+      defer(() => {
+        if (current) setExportView(idleView());
+      });
+      return () => { current = false; };
+    }
+    const selected = year;
+    defer(() => {
+      if (!current) return;
+      setExportView((previous) => beginLoad(previous, previous.data?.yearId === selected));
+    });
+    void request<unknown>(`/years/${selected}/exports`, "GET", undefined, "/api/filing").then((value) => {
       if (!current) return;
       const parsed = asExportStatus(value);
-      setExportStatus(parsed);
-      setExportFailed(parsed === null);
-    }, () => {
+      if (!parsed) {
+        setExportView((previous) => failLoad(previous, {
+          code: "EXPORTS_UNAVAILABLE",
+          message: "Les sorties n’ont pas pu être lues.",
+        }, previous.data?.yearId === selected));
+        return;
+      }
+      setExportView(finishLoad({ yearId: selected, status: parsed }));
+    }, (reason: unknown) => {
       if (!current) return;
-      setExportStatus(null);
-      setExportFailed(true);
+      setExportView((previous) => failLoad(
+        previous,
+        toApiError(reason),
+        previous.data?.yearId === selected,
+      ));
     });
     return () => { current = false; };
   }, [year, exportTick]);
 
   useEffect(() => {
-    if (!year) return;
-    const epoch = resultEpoch.current;
     let current = true;
+    if (!year) {
+      defer(() => {
+        if (current) setResultView(idleView());
+      });
+      return () => { current = false; };
+    }
+    const epoch = resultEpoch.current;
+    defer(() => {
+      if (!current) return;
+      setResultView((previous) => beginLoad(previous, false));
+    });
     void request<Computation>(`/years/${year}`, "GET", undefined, "/api/fiscal").then((value) => {
-      if (current && resultEpoch.current === epoch) setResult(value);
+      if (!(current && resultEpoch.current === epoch)) return;
+      setResult(value);
+      setResultView(finishLoad(value));
     }, (reason: unknown) => {
       if (!current || resultEpoch.current !== epoch) return;
       setResult(null);
-      if (reason instanceof RequestError && reason.status === 404) return;
-      setError(reason instanceof Error ? reason.message : "Calcul fiscal indisponible.");
+      if (reason instanceof RequestError && reason.status === 404) {
+        setResultView(emptyView());
+        return;
+      }
+      setResultView((previous) => failLoad(previous, toApiError(reason), false));
     });
     return () => { current = false; };
-  }, [year]);
+  }, [year, resultAttempt]);
 
   const chargeAccounts = useMemo(() => {
     const rows = statements?.income_statement.expenses ?? [];
@@ -383,6 +448,7 @@ export default function FiscalPage() {
     setBusy(true);
     setWorksheet(null);
     setResult(null);
+    setResultView((previous) => beginLoad(previous, false));
     try {
       const payload = {
         adjustments: adjustments.map((item) => ({
@@ -392,11 +458,15 @@ export default function FiscalPage() {
         })),
       };
       const next = await request<Computation>(`/years/${year}`, "POST", payload, "/api/fiscal");
-      if (resultEpoch.current === epoch) setResult(next);
+      if (resultEpoch.current === epoch) {
+        setResult(next);
+        setResultView(finishLoad(next));
+      }
       setExportTick((tick) => tick + 1);
     } catch (reason) {
       if (resultEpoch.current !== epoch) return;
       setResult(null);
+      setResultView(idleView());
       setError(reason instanceof Error ? reason.message : "Calcul fiscal refusé.");
     } finally {
       if (resultEpoch.current === epoch) setBusy(false);
@@ -446,8 +516,14 @@ export default function FiscalPage() {
     }, (reason: Error) => { failures.push(reason.message); });
     const statementTask = selected
       ? request<Statements>(`/years/${selected}/statements`).then((value) => {
-        if (current()) setStatements(value);
-      }, (reason: Error) => { failures.push(reason.message); })
+        if (!current()) return;
+        setStatements(value);
+        setStatementsView(finishLoad(value));
+      }, (reason: unknown) => {
+        if (!current()) return;
+        setStatements(null);
+        setStatementsView((previous) => failLoad(previous, toApiError(reason), false));
+      })
       : Promise.resolve();
     const worksheetTask = selected && hadWorksheet
       ? request<Worksheet>(`/years/${selected}/efi`, "GET", undefined, "/api/filing").then((value) => {
@@ -459,12 +535,17 @@ export default function FiscalPage() {
       : Promise.resolve();
     const resultTask = selected && hadResult
       ? request<Computation>(`/years/${selected}`, "GET", undefined, "/api/fiscal").then((value) => {
-        if (current() && resultEpoch.current === epoch) setResult(value);
+        if (!(current() && resultEpoch.current === epoch)) return;
+        setResult(value);
+        setResultView(finishLoad(value));
       }, (reason: unknown) => {
         if (!current() || resultEpoch.current !== epoch) return;
         setResult(null);
-        if (reason instanceof RequestError && reason.status === 404) return;
-        failures.push(reason instanceof Error ? reason.message : "Calcul fiscal indisponible.");
+        if (reason instanceof RequestError && reason.status === 404) {
+          setResultView(emptyView());
+          return;
+        }
+        setResultView((previous) => failLoad(previous, toApiError(reason), false));
       })
       : Promise.resolve();
     await Promise.all([setupTask, statementTask, worksheetTask, resultTask]);
@@ -531,7 +612,7 @@ export default function FiscalPage() {
   const lossUses = details?.prior_carry_forward_use?.tax_loss ?? [];
 
   return (
-    <section className="ledger-page fiscal-dashboard" aria-labelledby="fiscal-title">
+    <section className="ledger-page fiscal-dashboard" aria-labelledby="fiscal-title" data-screen-phase={boot.phase}>
       <h2 id="fiscal-title">Charges & amortissements LMNP</h2>
         <p className="form-help">
         Le plafond d’amortissement vise un résultat fiscal proche de 0 €.
@@ -540,6 +621,21 @@ export default function FiscalPage() {
       </p>
 
       {error && <p className="ledger-error" role="alert">{error}</p>}
+      <ScreenStatus
+        state={boot}
+        onRetry={() => setBootAttempt((value) => value + 1)}
+        loading={<p role="status">Chargement de la fiscalité…</p>}
+      />
+      <ScreenStatus
+        state={statementsView}
+        onRetry={() => setStatementsAttempt((value) => value + 1)}
+        loading={<p role="status">Chargement des données comptables…</p>}
+      />
+      <ScreenStatus
+        state={resultView}
+        onRetry={() => setResultAttempt((value) => value + 1)}
+        empty={<p>Aucun calcul fiscal n’est enregistré pour cet exercice.</p>}
+      />
 
       <div className="toolbar fiscal-toolbar">
         <label>
@@ -892,17 +988,23 @@ export default function FiscalPage() {
             Liasse à recopier
           </button>
         </div>
-        {year !== 0 && exportStatus && <ExportDownloads yearId={year} status={exportStatus} />}
-        {year !== 0 && !exportStatus && exportFailed && (
-          <p>Les sorties n’ont pas pu être lues. Rechargez la page.</p>
+        {year !== 0 && (
+          <ScreenStatus
+            state={exportView}
+            onRetry={() => setExportTick((tick) => tick + 1)}
+            loading={<p role="status">Chargement des sorties…</p>}
+          />
         )}
-        {year !== 0 && !exportStatus && !exportFailed && <p role="status">Chargement des sorties…</p>}
+        {year !== 0 && showsData(exportView) && exportView.data.yearId === year && (
+          <ExportDownloads yearId={year} status={exportView.data.status} />
+        )}
       </div>
       {worksheet && <LiasseSheet worksheet={worksheet} />}
 
       <details className="fiscal-panel">
         <summary>Millésimes chargés (technique)</summary>
         <ul>
+          {boot.phase === "loaded" && vintages.length === 0 && <li>Aucun millésime chargé.</li>}
           {vintages.map((item) => (
             <li key={item.vintage}>
               Millésime {item.vintage} · {item.output_label ?? "Recherche"} · périmètre LMNP

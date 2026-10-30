@@ -18,6 +18,8 @@
 .ledger-page fieldset, .form-fieldset { border: 1px solid #d8e0d8; margin: 1rem 0; padding: 1rem 1.1rem 1.2rem; border-radius: 10px; background: #fff; }
 .form-fieldset legend { padding: 0 .4rem; font-weight: 650; color: #173c2e; }
 .ledger-error { background: #fff0eb; padding: 1rem; color: #852800; border-radius: 8px; }
+.screen-stale { margin: .75rem 0; padding: .8rem 1rem; border-radius: 8px; background: #fff9ef; border: 1px solid #e0c08a; color: #6a4b12; }
+.ledger-error button { margin-top: .6rem; }
 .ledger-page pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 25rem; overflow: auto; }
 .ledger-page summary { cursor: pointer; padding: .8rem 0; }
 .form-help { margin: .4rem 0 1rem; max-width: 68ch; line-height: 1.45; color: #355245; }

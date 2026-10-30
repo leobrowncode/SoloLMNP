@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
-import { request } from "../api/ledger";
+import { RequestError, request } from "../api/ledger";
+import ApiErrorAlert from "./ApiErrorAlert";
+import { toApiError } from "./screenState";
 
 const TYPES: Record<string, string> = {
   "application/pdf": "application/pdf",
@@ -13,9 +15,17 @@ export default function ConservationPage() {
   const [archive, setArchive] = useState("");
   const [receipt, setReceipt] = useState("");
   const [error, setError] = useState("");
+  const [apiError, setApiError] = useState<RequestError | null>(null);
+  const retryAction = useRef<(() => Promise<void>) | null>(null);
+
+  function clearFeedback() {
+    setError("");
+    setApiError(null);
+    setReceipt("");
+  }
 
   async function upload() {
-    setError(""); setReceipt("");
+    clearFeedback();
     const file = fileRef.current?.files?.[0];
     if (!file || !TYPES[file.type]) {
       setError("Choisissez un PDF, un JPEG ou un PNG.");
@@ -38,20 +48,26 @@ export default function ConservationPage() {
         "/api/filing",
       );
       setReceipt(`Justificatif ${saved.original_name} enregistré. Empreinte ${saved.sha256}.`);
-    } catch (reason) { setError((reason as Error).message); }
+    } catch (reason) {
+      retryAction.current = upload;
+      setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
+    }
   }
 
   async function backup() {
-    setError(""); setReceipt("");
+    clearFeedback();
     try {
       const saved = await request<{ filename: string; sha256: string }>("/backup", "POST", {}, "/api/filing");
       setArchive(saved.filename);
       setReceipt(`Sauvegarde ${saved.filename}. Empreinte ${saved.sha256}.`);
-    } catch (reason) { setError((reason as Error).message); }
+    } catch (reason) {
+      retryAction.current = backup;
+      setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
+    }
   }
 
   async function restore() {
-    setError(""); setReceipt("");
+    clearFeedback();
     if (!archive) {
       setError("Créez d’abord une sauvegarde, ou indiquez son nom.");
       return;
@@ -59,13 +75,22 @@ export default function ConservationPage() {
     try {
       const saved = await request<{ restored_to: string }>("/backup/restore", "POST", { filename: archive }, "/api/filing");
       setReceipt(`Copie contrôlée écrite dans ${saved.restored_to}. La base en service n’est pas remplacée.`);
-    } catch (reason) { setError((reason as Error).message); }
+    } catch (reason) {
+      retryAction.current = restore;
+      setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
+    }
   }
 
-  return <section className="ledger-page" aria-labelledby="conservation-title">
+  return <section className="ledger-page" aria-labelledby="conservation-title" data-screen-phase="idle">
     <h2 id="conservation-title">Justificatifs et sauvegarde</h2>
     <p>Déposez un PDF ou une photo. Une sauvegarde se crée ici. La restauration prépare une copie de contrôle : elle ne remplace pas les données en cours.</p>
     {error && <p role="alert">{error}</p>}
+    {apiError && (
+      <ApiErrorAlert
+        detail={apiError.detail}
+        onRetry={() => { void retryAction.current?.(); }}
+      />
+    )}
     {receipt && <p role="status">{receipt}</p>}
     <form onSubmit={(event) => { event.preventDefault(); void upload(); }}>
       <label>Justificatif PDF, JPEG ou PNG<input ref={fileRef} type="file" accept="application/pdf,image/jpeg,image/png" /></label>

@@ -259,4 +259,13 @@ describe("OperationsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /Emprunts/ }));
     expect(screen.getByText("Le compte 164 identifie l’emprunt et n’est pas modifiable.")).toBeInTheDocument();
   });
+
+  it("does not treat a failed load as an empty activity", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Hors ligne")));
+    renderOperations();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Hors ligne");
+    expect(screen.queryByText(/Chargement…/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Initialisez votre activité/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Réessayer" })).toBeInTheDocument();
+  });
 });

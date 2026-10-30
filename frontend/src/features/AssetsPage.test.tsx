@@ -75,6 +75,15 @@ test("closes the posting form and clears calculation feedback when switching yea
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });
 
+test("an initial failure is an error, not a missing activity", async () => {
+  vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Hors ligne"));
+  render(<AssetsPage />);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Hors ligne");
+  expect(screen.queryByText(/Initialisez d’abord/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Chargement des immobilisations/)).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Réessayer" })).toBeInTheDocument();
+});
+
 test("shows an error from the current calculation", async () => {
   mockApi(async (url) => url.endsWith("/calculate") ? response({ detail: { message: "Calcul refusé" } }, 409) : response([]));
   render(<AssetsPage />);

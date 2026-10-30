@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { amount, cents, request, type Account, type Setup, type Entry, RequestError } from "../api/ledger";
 import ApiErrorAlert from "./ApiErrorAlert";
+import ScreenStatus from "./ScreenStatus";
+import {
+  beginLoad, defer, failLoad, finishLoad, idleView, showsData, showsLoading, toApiError, type ScreenView,
+} from "./screenState";
 import { operationsRequest as api, type Property, type Bank, type Loan, type Operation, type BankTransaction, type ImportPreview, type OperationImportPreview, type LoanPaymentImportPreview, type Tenant } from "../api/operations";
 import {
   DEFAULT_OPERATIONS_TAB,
@@ -79,6 +83,8 @@ export default function OperationsPage() {
 
   const [error, setError] = useState("");
   const [apiError, setApiError] = useState<RequestError | null>(null);
+  const [bundleView, setBundleView] = useState<ScreenView<{ key: string }>>(() => beginLoad(idleView(), false));
+  const [bankView, setBankView] = useState<ScreenView<{ query: string }>>(idleView());
   const [message, setMessage] = useState("");
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -86,13 +92,15 @@ export default function OperationsPage() {
   const [bankOffset, setBankOffset] = useState(0);
   const [details, setDetails] = useState<Entry | null>(null);
   const [matchCandidates, setMatchCandidates] = useState<{ transaction: BankTransaction; lines: { id: number; label: string }[] } | null>(null);
-  const [loaded, setLoaded] = useState("");
-  const key = JSON.stringify([revision, offset]);
-  const [bankLoaded, setBankLoaded] = useState("");
-  const bankKey = JSON.stringify([revision, bankId, bankOffset]);
+  const bundleKey = String(offset);
+  const bankQuery = JSON.stringify([bankId, bankOffset]);
 
   useEffect(() => {
     let active = true;
+    defer(() => {
+      if (!active) return;
+      setBundleView((current) => beginLoad(current, current.data?.key === bundleKey));
+    });
     void Promise.all([
       request<Setup>("/setup"), request<Account[]>("/accounts"),
       api<Property[]>("/properties"), api<Bank[]>("/banks"), api<Loan[]>("/loans"),
@@ -110,19 +118,34 @@ export default function OperationsPage() {
       setOpPropertyId((current) => current || p[0]?.id || 0);
       setOpYearId((current) => current || s.years.find((year) => year.status === "OPEN")?.id || 0);
       setLoanImportId((current) => current || l[0]?.id || 0);
-      setLoaded(key);
-    }).catch((e: Error) => { if (active) setError(e.message); });
+      setBundleView(finishLoad({ key: bundleKey }));
+    }).catch((reason: unknown) => {
+      if (active) setBundleView((current) => failLoad(current, toApiError(reason), current.data?.key === bundleKey));
+    });
     return () => { active = false; };
-  }, [revision, offset, key]);
+  }, [revision, offset, bundleKey]);
 
   useEffect(() => {
-    if (!bankId) return;
     let active = true;
+    if (!bankId) {
+      defer(() => {
+        if (active) setBankView(idleView());
+      });
+      return () => { active = false; };
+    }
+    defer(() => {
+      if (!active) return;
+      setBankView((current) => beginLoad(current, current.data?.query === bankQuery));
+    });
     void api<BankTransaction[]>("/bank/transactions?bank_account_id=" + bankId + "&limit=50&offset=" + bankOffset).then((items) => {
-      if (active) { setTransactions(items); setBankLoaded(bankKey); }
-    }).catch((e: Error) => { if (active) setError(e.message); });
+      if (!active) return;
+      setTransactions(items);
+      setBankView(finishLoad({ query: bankQuery }, () => items.length === 0));
+    }).catch((reason: unknown) => {
+      if (active) setBankView((current) => failLoad(current, toApiError(reason), current.data?.query === bankQuery));
+    });
     return () => { active = false; };
-  }, [bankId, revision, bankOffset, bankKey]);
+  }, [bankId, revision, bankOffset, bankQuery]);
 
   const choices = (items: { id: number; name: string }[]): [string, string][] =>
     items.map((item) => [String(item.id), item.name]);
@@ -387,15 +410,21 @@ export default function OperationsPage() {
   }
   return <>
     {tabSlug && !resolvedTab && <Navigate to={operationsPath(DEFAULT_OPERATIONS_TAB)} replace />}
-    <section id="operations" className="ledger-page" aria-labelledby="operations-title">
+    <section id="operations" className="ledger-page" aria-labelledby="operations-title" data-screen-phase={bundleView.phase}>
     <h2 id="operations-title">Opérations et banque</h2>
     <p>Suivez l’ordre des onglets : bien, banque, emprunts, puis recettes et dépenses.</p>
     {apiError && <ApiErrorAlert detail={apiError.detail} />}
     {error && !apiError && <p role="alert" className="ledger-error">{error}</p>}
     {message && <p role="status">{message}</p>}
-    {!setup ? <p>Chargement…</p> : !setup.activity ? (
+    <ScreenStatus
+      state={bundleView}
+      onRetry={() => setRevision((value) => value + 1)}
+      loading={!setup ? <p>Chargement…</p> : null}
+    />
+    {bundleView.phase === "loaded" && setup && !setup.activity && (
       <p>Initialisez votre activité et votre exercice dans <strong>Comptabilité</strong> avant de saisir vos opérations.</p>
-    ) : <>
+    )}
+    {showsData(bundleView) && setup?.activity && <>
       <nav className="step-tabs" aria-label="Étapes des opérations">
         {OPERATIONS_TABS.map((name, index) => (
           <button
@@ -563,7 +592,13 @@ export default function OperationsPage() {
               }}>Confirmer l’import des mouvements</button>
             </>}
           </details>
-          {bankLoaded !== bankKey ? <p>Chargement du relevé…</p> : transactions.map((t) => (
+          <ScreenStatus
+            state={bankView}
+            onRetry={() => setRevision((value) => value + 1)}
+            loading={<p>Chargement du relevé…</p>}
+            empty={<p>Aucun mouvement sur ce compte.</p>}
+          />
+          {showsData(bankView) && transactions.map((t) => (
             <article key={t.id} className="entry-card">
               <h3>{t.label} · {t.amount} €</h3>
               <p>{t.date} · {t.external_reference} · {t.matched_entry_id ? "Rapproché avec l’écriture #" + t.matched_entry_id : "À rapprocher"}</p>
@@ -868,7 +903,9 @@ export default function OperationsPage() {
           <button type="button" disabled={!properties.length || !setup.years.some((y) => y.status === "OPEN")} onClick={() => newOperation("EXPENSE")}>Nouvelle dépense</button>
         </div>
         {!properties.length && <p>Ajoutez d’abord un bien dans l’onglet Biens.</p>}
-        {loaded !== key ? <p>Chargement des opérations…</p> : operations.map((row) => (
+        {showsLoading(bundleView) && <p>Chargement des opérations…</p>}
+        {bundleView.phase === "loaded" && operations.length === 0 && <p>Aucune opération enregistrée.</p>}
+        {showsData(bundleView) && operations.map((row) => (
           <article key={row.id} className="entry-card">
             <h3>{kindLabel[row.kind]} · {row.description} · {row.amount} €</h3>
             <p>{row.date} · {row.counterparty} · {row.status === "REVERSED" ? "Extournée" : "Comptabilisée"}{row.remaining_to_settle !== null && " · Reste à régler : " + row.remaining_to_settle + " €"}</p>

@@ -1,6 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { assetsRequest as api, type Asset, type DepreciationPeriod } from "../api/assets";
 import { request, type Account, type Setup } from "../api/ledger";
+import ScreenStatus from "./ScreenStatus";
+import {
+  beginLoad, defer, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
+} from "./screenState";
 import { operationsRequest, type Property } from "../api/operations";
 import {
   alignAssetDraft, assetAccountChoices, componentAssetChoices, DEFAULT_ASSET,
@@ -62,11 +66,18 @@ export default function AssetsPage() {
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [boot, setBoot] = useState<ScreenView<{ ready: true }>>(() => beginLoad(idleView(), false));
+  const [periodsView, setPeriodsView] = useState<ScreenView<{ yearId: number }>>(idleView());
+  const [periodsAttempt, setPeriodsAttempt] = useState(0);
   const periodRequest = useRef(0);
   const planRequest = useRef(0);
 
   useEffect(() => {
     let active = true;
+    defer(() => {
+      if (!active) return;
+      setBoot((current) => beginLoad(current, current.data !== null));
+    });
     void Promise.all([
       request<Setup>("/setup"), request<Account[]>("/accounts"),
       operationsRequest<Property[]>("/properties"), api<Asset[]>(""),
@@ -74,7 +85,10 @@ export default function AssetsPage() {
       if (!active) return;
       setSetup(s); setAccounts(a); setProperties(p); setAssets(rows);
       setYearId((value) => value || s.years.find((year) => year.status === "OPEN")?.id || 0);
-    }).catch((reason: Error) => { if (active) setError(reason.message); });
+      setBoot(finishLoad({ ready: true }));
+    }).catch((reason: unknown) => {
+      if (active) setBoot((current) => failLoad(current, toApiError(reason), current.data !== null));
+    });
     return () => { active = false; };
   }, [revision]);
   // Register the read before the user can calculate against this rendered year.
@@ -84,13 +98,22 @@ export default function AssetsPage() {
     let active = true;
     const requests = periodRequest;
     const requestId = ++requests.current;
-    void api<DepreciationPeriod[]>(`/years/${yearId}/periods`).then((rows) => {
-      if (active && requestId === periodRequest.current) setPeriods(rows);
-    }).catch((reason: Error) => {
-      if (active && requestId === periodRequest.current) setError(reason.message);
+    const selectedYear = yearId;
+    defer(() => {
+      if (!(active && requestId === periodRequest.current)) return;
+      setPeriodsView((current) => beginLoad(current, current.data?.yearId === selectedYear));
+    });
+    void api<DepreciationPeriod[]>(`/years/${selectedYear}/periods`).then((rows) => {
+      if (!(active && requestId === periodRequest.current)) return;
+      setPeriods(rows);
+      setPeriodsView(finishLoad({ yearId: selectedYear }, () => rows.length === 0));
+    }).catch((reason: unknown) => {
+      if (active && requestId === periodRequest.current) {
+        setPeriodsView((current) => failLoad(current, toApiError(reason), current.data?.yearId === selectedYear));
+      }
     });
     return () => { active = false; ++requests.current; };
-  }, [yearId, revision]);
+  }, [yearId, revision, periodsAttempt]);
 
   const property: Field = { name: "property_id", label: "Bien", choices: properties.map((row) => [String(row.id), row.name]) };
   function openAsset(land: boolean) {
@@ -360,18 +383,30 @@ export default function AssetsPage() {
     try {
       const rows = await api<DepreciationPeriod[]>(`/years/${yearId}/calculate`, "POST");
       if (requestId === periodRequest.current) {
-        setPeriods(rows); setMessage(`${rows.length} période(s) calculée(s). Vérifiez-les avant comptabilisation.`);
+        setPeriods(rows);
+        setPeriodsView(finishLoad({ yearId }, () => rows.length === 0));
+        setMessage(`${rows.length} période(s) calculée(s). Vérifiez-les avant comptabilisation.`);
       }
     } catch (reason) {
-      if (requestId === periodRequest.current) setError(reason instanceof Error ? reason.message : "Calcul impossible.");
+      if (requestId === periodRequest.current) {
+        setError(reason instanceof Error ? reason.message : "Calcul impossible.");
+        setPeriodsView((current) => (current.phase === "loading" ? idleView() : current));
+      }
     }
   }
 
-  return <section id="assets" className="ledger-page" aria-labelledby="assets-title">
+  const bootReady = boot.phase === "loaded" || showsData(boot);
+  return <section id="assets" className="ledger-page" aria-labelledby="assets-title" data-screen-phase={boot.phase}>
     <h2 id="assets-title">Immobilisations</h2>
     <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations. Le formulaire ne propose que les comptes de la catégorie. Un couple déjà enregistré et incohérent est signalé ; il n’est pas réécrit. Modifier une fiche demande un motif : tant qu’aucune dotation n’est comptabilisée, la valeur, la durée et les comptes peuvent être corrigés.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}{message && <p role="status">{message}</p>}
-    {!setup?.activity ? <p>Initialisez d’abord l’activité, l’exercice et le bien.</p> : <>
+    <ScreenStatus
+      state={boot}
+      onRetry={() => setRevision((value) => value + 1)}
+      loading={<p>Chargement des immobilisations…</p>}
+    />
+    {boot.phase === "loaded" && !setup?.activity && <p>Initialisez d’abord l’activité, l’exercice et le bien.</p>}
+    {bootReady && setup?.activity && <>
       <button disabled={!properties.length} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
       <button disabled={!properties.length} onClick={() => openAsset(true)}>Inscrire un terrain</button>
       <div className="toolbar">
@@ -451,6 +486,12 @@ export default function AssetsPage() {
       </div>
       <button disabled={!yearId} onClick={() => { void calculate(); }}>Calculer les périodes</button>
       <button type="button" disabled={!periods.some((row) => row.status !== "POSTED")} onClick={() => { void postAll(); }}>Comptabiliser toutes les dotations</button>
+      <ScreenStatus
+        state={periodsView}
+        onRetry={() => setPeriodsAttempt((value) => value + 1)}
+        loading={<p>Chargement des dotations…</p>}
+        empty={<p>Aucune dotation calculée pour cet exercice.</p>}
+      />
       <div className="ledger-table"><table><thead><tr><th>Actif / composant</th><th>Période</th><th>Jours</th><th>Dotation</th><th>Cumul</th><th>VNC de la base</th><th>État</th></tr></thead><tbody>
         {periods.map((row) => <tr key={row.id}><td>{row.target_label}</td><td>{row.period_start} → {row.period_end}</td><td>{row.days}</td><td>{row.amount} €</td><td>{row.accumulated} €</td><td>{row.net_book_value} €</td><td>{row.status === "POSTED" ? "Comptabilisée" : <button onClick={() => setEditor({ title: `Comptabiliser ${row.target_label}`, path: `/periods/${row.id}/post`, retry: true, fields: [{ name: "piece_reference", label: "Référence de la pièce d’inventaire" }] })}>Comptabiliser</button>}</td></tr>)}
       </tbody></table></div>

@@ -1,6 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { request, cents, amount, type Setup, type Account, type Journal, type Entry, type EntryInput, type Balance, type LedgerLine } from "../api/ledger";
+import ScreenStatus from "./ScreenStatus";
+import {
+  beginLoad, defer, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
+} from "./screenState";
 import {
   DEFAULT_LEDGER_TAB,
   ledgerPath,
@@ -32,13 +36,15 @@ export default function LedgerPage() {
   const [editing, setEditing] = useState<Entry | null>(null);
   const [confirmation, setConfirmation] = useState<{ action: "validate" | "delete" | "reverse"; entry: Entry } | null>(null);
   const [audit, setAudit] = useState<{ action: string; timestamp: string; details: unknown }[] | null>(null);
-  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [catalog, setCatalog] = useState<ScreenView<{ ready: true }>>(() => beginLoad(idleView(), false));
+  const [listView, setListView] = useState<ScreenView<{ queryKey: string }>>(idleView());
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
-  const viewKey = JSON.stringify([year, tab, filter, offset, account, revision]);
-  const [loadedKey, setLoadedKey] = useState("");
-  const viewReady = loadedKey === viewKey;
+  const queryKey = JSON.stringify([year, tab, filter, offset, account]);
+  const financialView = tab === "Balance" || tab === "Grand livre";
+  const listVisible = showsData(listView) && listView.data.queryKey === queryKey;
   const selectedYear = setup?.years.find((item) => item.id === year);
   const writable = selectedYear?.status === "OPEN";
   useUnsavedGuard(!!draft);
@@ -52,40 +58,73 @@ export default function LedgerPage() {
 
   useEffect(() => {
     let active = true;
+    defer(() => {
+      if (!active) return;
+      setCatalog((current) => beginLoad(current, current.data !== null));
+    });
     void Promise.all([request<Setup>("/setup"), request<Account[]>("/accounts"), request<Journal[]>("/journals")]).then(([s, a, j]) => {
       if (!active) return;
       setSetup(s); setAccounts(a); setJournals(j);
       setYear((current) => current || s.years[0]?.id || 0);
-    }).catch((e: Error) => { if (active) setError(e.message); });
+      setCatalog(finishLoad({ ready: true }));
+    }).catch((reason: unknown) => {
+      if (active) setCatalog((current) => failLoad(current, toApiError(reason), current.data !== null));
+    });
     return () => { active = false; };
   }, [revision]);
 
   useEffect(() => {
-    if (!year) return;
     let active = true;
+    if (!year) {
+      defer(() => {
+        if (active) setListView(idleView());
+      });
+      return () => { active = false; };
+    }
+    defer(() => {
+      if (!active) return;
+      setListView((current) => {
+        const same = !financialView && current.data?.queryKey === queryKey;
+        return beginLoad(same ? current : idleView(), same);
+      });
+    });
     const params = new URLSearchParams({ fiscal_year_id: String(year), limit: "25", offset: String(offset), status: tab === "Brouillons" ? "DRAFT" : "VALIDATED" });
     Object.entries(filter).forEach(([key, value]) => { if (value) params.set(key, value); });
     const load = async () => {
       if (tab === "Balance") {
         const result = await request<Balance>("/years/" + year + "/balance");
-        if (active) setBalance(result);
+        if (!active) return;
+        setBalance(result);
+        setListView(finishLoad({ queryKey }));
       } else if (tab === "Grand livre") {
         const result = await request<{ lines: LedgerLine[] }>("/years/" + year + "/general-ledger?account_number=" + account);
-        if (active) setLedger(result.lines);
+        if (!active) return;
+        setLedger(result.lines);
+        setListView(finishLoad({ queryKey }, () => result.lines.length === 0));
       } else {
         const result = await request<{ entries: Entry[]; count: number }>("/entries?" + params);
-        if (active) { setEntries(result.entries); setCount(result.count); }
+        if (!active) return;
+        setEntries(result.entries);
+        setCount(result.count);
+        const listed = tab === "Journal" || tab === "Brouillons";
+        setListView(finishLoad({ queryKey }, () => listed && result.count === 0));
       }
-      if (active) setLoadedKey(viewKey);
     };
-    void load().catch((e: Error) => { if (active) setError(e.message); });
+    void load().catch((reason: unknown) => {
+      if (!active) return;
+      setListView((current) => failLoad(
+        current,
+        toApiError(reason),
+        !financialView && current.data?.queryKey === queryKey,
+      ));
+    });
     return () => { active = false; };
-  }, [year, tab, filter, offset, account, revision, viewKey]);
+  }, [year, tab, filter, offset, account, revision, queryKey, financialView]);
 
   async function mutate(action: () => Promise<unknown>, success: string) {
-    setBusy(true); setError(""); setMessage("");
+    setBusy(true); setActionError(""); setMessage("");
     try { await action(); setMessage(success); setRevision((v) => v + 1); }
-    catch (e) { setError(e instanceof Error ? e.message : "Service indisponible."); }
+    catch (e) { setActionError(e instanceof Error ? e.message : "Service indisponible."); }
     finally { setBusy(false); }
   }
   function formData(event: FormEvent<HTMLFormElement>) {
@@ -115,12 +154,16 @@ export default function LedgerPage() {
 
   return <>
     {tabSlug && !resolvedTab && <Navigate to={ledgerPath(DEFAULT_LEDGER_TAB)} replace />}
-    <section id="comptabilite" className="ledger-page" aria-labelledby="ledger-title">
+    <section id="comptabilite" className="ledger-page" aria-labelledby="ledger-title" data-screen-phase={catalog.phase}>
     <h2 id="ledger-title">Votre comptabilité</h2>
     <p>Seules les écritures validées alimentent le journal, le grand livre et la balance. Leur validation est définitive.</p>
-    {error && <p role="alert" className="ledger-error">{error}</p>}
+    {actionError && <p role="alert" className="ledger-error">{actionError}</p>}
     {message && <p role="status">{message}</p>}
-    {!setup && <p>Chargement de la comptabilité…</p>}
+    <ScreenStatus
+      state={catalog}
+      onRetry={() => setRevision((value) => value + 1)}
+      loading={<p>Chargement de la comptabilité…</p>}
+    />
     {setup && !setup.activity && <form onSubmit={(e) => {
       const data = formData(e);
       void mutate(() => request("/activity", "POST", { activity_name: data.get("name"), activity_start_date: data.get("start") }), "Activité créée.");
@@ -203,8 +246,14 @@ export default function LedgerPage() {
             {Object.entries({ MANUAL: "Saisie manuelle", REVERSAL: "Extournes", REVENUE: "Recettes", EXPENSE: "Dépenses", SETTLEMENT: "Règlements", LOAN_PAYMENT: "Échéances d’emprunt", LOAN_FUNDING: "Déblocages d’emprunt", DEPRECIATION: "Dotations aux amortissements", OPENING: "À-nouveaux", INVENTORY: "Inventaire manuel" }).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select></label>
         </div></details>
-        <p>{viewReady ? count + " écriture(s)" : "Chargement…"} · {tab === "Journal" ? "validées uniquement" : "hors états comptables"}</p>
-        {viewReady && entries.map((entry) => <article className="entry-card" key={entry.id}>
+        <ScreenStatus
+          state={listView}
+          onRetry={() => setRevision((value) => value + 1)}
+          loading={<p>Chargement…</p>}
+          empty={<p>Aucune écriture pour cette vue. {tab === "Journal" ? "Validées uniquement." : "Hors états comptables."}</p>}
+        />
+        {listVisible && <p>{count} écriture(s) · {tab === "Journal" ? "validées uniquement" : "hors états comptables"}</p>}
+        {listVisible && entries.map((entry) => <article className="entry-card" key={entry.id}>
           <h3>{entry.entry_number || "Brouillon #" + entry.id} · {entry.label}</h3>
           <p>{entry.accounting_date} · {entry.journal_code} · Pièce {entry.piece_reference}</p>
           <div className="ledger-table"><table><thead><tr><th>Compte</th><th>Libellé</th><th>Débit €</th><th>Crédit €</th></tr></thead><tbody>{entry.lines.map((line, i) => <tr key={i}><td>{line.account_number}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>{entry.balanced ? "Équilibrée" : "Déséquilibrée"}</th><td>{entry.total_debit}</td><td>{entry.total_credit}</td></tr></tfoot></table></div>
@@ -213,7 +262,7 @@ export default function LedgerPage() {
             <button disabled={!writable || busy || !entry.balanced} onClick={() => setConfirmation({ action: "validate", entry })}>Valider</button>
             <button disabled={!writable || busy} onClick={() => setConfirmation({ action: "delete", entry })}>Supprimer</button>
           </> : <button disabled={!writable || busy || !!entry.reversal_of_id} onClick={() => setConfirmation({ action: "reverse", entry })}>Extourner</button>}
-          <button onClick={() => { void request<{ action: string; timestamp: string; details: unknown }[]>("/entries/" + entry.id + "/events").then(setAudit).catch((e: Error) => setError(e.message)); }}>Voir l’historique</button>
+          <button onClick={() => { void request<{ action: string; timestamp: string; details: unknown }[]>("/entries/" + entry.id + "/events").then(setAudit).catch((reason: unknown) => setActionError(toApiError(reason).message)); }}>Voir l’historique</button>
         </article>)}
         <button disabled={!offset} onClick={() => setOffset(offset - 25)}>Page précédente</button>
         <button disabled={offset + 25 >= count} onClick={() => setOffset(offset + 25)}>Page suivante</button>
@@ -237,10 +286,19 @@ export default function LedgerPage() {
         <button type="button" onClick={() => setConfirmation(null)}>Annuler</button>
       </form>}
       {audit && <details open><summary>Historique de l’écriture</summary>{audit.map((item, i) => <div key={i}><strong>{item.action} · {item.timestamp}</strong><pre>{JSON.stringify(item.details, null, 2)}</pre></div>)}<button onClick={() => setAudit(null)}>Fermer l’historique</button></details>}
-      {tab === "Balance" && viewReady && balance && <div className="ledger-table"><table><caption>Balance générale · écritures validées</caption><thead><tr><th>Compte</th><th>Libellé</th><th>Total débit</th><th>Total crédit</th><th>Solde débiteur</th><th>Solde créditeur</th></tr></thead><tbody>{balance.balance.map((row) => <tr key={row.account_number}><td>{row.account_number}</td><td>{row.label}</td><td>{row.total_debit}</td><td>{row.total_credit}</td><td>{row.debit_balance}</td><td>{row.credit_balance}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>{balance.balanced ? "Balance équilibrée" : "ERREUR : balance déséquilibrée"}</th><td>{balance.total_debit}</td><td>{balance.total_credit}</td><td colSpan={2}>EUR</td></tr></tfoot></table></div>}
+      {tab === "Balance" && <>
+        <ScreenStatus state={listView} onRetry={() => setRevision((value) => value + 1)} loading={<p>Chargement…</p>} />
+        {listVisible && balance && <div className="ledger-table"><table><caption>Balance générale · écritures validées</caption><thead><tr><th>Compte</th><th>Libellé</th><th>Total débit</th><th>Total crédit</th><th>Solde débiteur</th><th>Solde créditeur</th></tr></thead><tbody>{balance.balance.map((row) => <tr key={row.account_number}><td>{row.account_number}</td><td>{row.label}</td><td>{row.total_debit}</td><td>{row.total_credit}</td><td>{row.debit_balance}</td><td>{row.credit_balance}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>{balance.balanced ? "Balance équilibrée" : "ERREUR : balance déséquilibrée"}</th><td>{balance.total_debit}</td><td>{balance.total_credit}</td><td colSpan={2}>EUR</td></tr></tfoot></table></div>}
+      </>}
       {tab === "Grand livre" && <>
         <label>Compte du grand livre<select value={account} onChange={(e) => { setAccount(e.target.value); setLedger([]); }}>{accounts.map((a) => <option key={a.number} value={a.number}>{a.number} · {a.label}</option>)}</select></label>
-        <div className="ledger-table"><table><caption>Solde positif : débiteur · négatif : créditeur</caption><thead><tr><th>Date</th><th>Écriture</th><th>Libellé</th><th>Débit</th><th>Crédit</th><th>Solde</th></tr></thead><tbody>{viewReady && ledger.map((line, i) => <tr key={i}><td>{line.date}</td><td>{line.entry_number}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td><td>{line.balance}</td></tr>)}</tbody></table></div>
+        <ScreenStatus
+          state={listView}
+          onRetry={() => setRevision((value) => value + 1)}
+          loading={<p>Chargement…</p>}
+          empty={<p>Aucune ligne dans ce grand livre.</p>}
+        />
+        {listVisible && <div className="ledger-table"><table><caption>Solde positif : débiteur · négatif : créditeur</caption><thead><tr><th>Date</th><th>Écriture</th><th>Libellé</th><th>Débit</th><th>Crédit</th><th>Solde</th></tr></thead><tbody>{ledger.map((line, i) => <tr key={i}><td>{line.date}</td><td>{line.entry_number}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td><td>{line.balance}</td></tr>)}</tbody></table></div>}
       </>}
       {tab === "Plan comptable" && <>
         <p>Le plan initial est configurable. Les libellés des comptes utilisés par des écritures validées sont figés.</p>
