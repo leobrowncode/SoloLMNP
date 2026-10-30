@@ -54,6 +54,12 @@ reste dans la page, avec le lien d’action.
   et le FEC n’a pas d’erreur. Le FEC est un fichier comptable : sa posture
   Finale n’exige pas un millésime Déclarable.
 
+### Statut dossier
+
+Le bandeau affiche un statut métier, distinct du schéma SQLite. `app.domain.dossier.classify_dossier` le déduit de l’état de clôture (`OPEN`, `READY_TO_CLOSE`, `CLOSED`), du `output_status` fiscal et des postures d’export déjà calculées. `GET /api/status` le renvoie dans `dossier` pour l’exercice ouvert le plus récent, ou le dernier exercice si tous sont clôturés. Sans exercice, ou sans calcul fiscal, le statut est **Incomplet**. Une liasse ou un PDF **Bloquée** donne **Bloqué** ; un FEC bloqué avant la clôture ne compte pas, il est attendu. Après clôture, une sortie encore **Bloquée** laisse le dossier **Bloqué**, sinon **Clôturé**. Une feuille produite et non bloquée, exercice encore ouvert ou prêt à clôturer, est **Prêt à vérifier**.
+
+`dossier.vintage_status` reste `research_only`. Un `output_status` Déclarable ne crée pas de cinquième libellé : le dossier s’arrête à Prêt à vérifier ou Clôturé. **Stockage opérationnel** n’est affiché que dans le diagnostic technique de la vue d’ensemble, et seulement tant que la dernière lecture de `/api/status` a réussi. « Aucun envoi » reste à côté des sorties fiscales.
+
 ## Références consultées et portée de la vérification
 
 Les liens ci-dessous ont été ouverts et leurs titres et versions contrôlés le

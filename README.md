@@ -22,7 +22,7 @@ docker compose up --build --wait
 
 Sur Linux avec Docker, faire correspondre les UID/GID du backend au propriétaire de `data/` (voir [DEPLOYMENT.md](docs/DEPLOYMENT.md)). Le fichier `.env` est facultatif.
 
-Le backend applique les migrations avant de démarrer. L’interface affiche l’état réel du service et du schéma SQLite. Une base absente, illisible ou non migrée ne sera pas déclarée prête.
+Le backend applique les migrations avant de démarrer. L’interface affiche le statut dossier (incomplet, bloqué, prêt à vérifier, clôturé), calculé depuis la clôture et les postures fiscale et d’export. Les millésimes restent en recherche : ce statut ne présente rien comme déclarable. **Stockage opérationnel** n’apparaît que dans le diagnostic technique, et une lecture suivante en échec retire l’indicateur. Une base absente, illisible ou non migrée n’est pas annoncée comme opérationnelle.
 
 **Vérification locale :** `python scripts/check.py` (Ruff, mypy, pytest, ESLint, TypeScript, Vitest, build). Les rapports [P5](docs/PHASE5_REPORT.md) à [P12](docs/PHASE12_REPORT.md) décrivent le périmètre et les limites. La CI distante n’a pas été relancée.
 

@@ -17,6 +17,7 @@ def test_liveness_does_not_claim_readiness_or_migrate(settings: Settings) -> Non
         assert response.status_code == 503
         assert response.json()["database"]["schema_revision"] is None
         assert response.json()["fiscal"] == {"status": "research_only", "available_vintages": []}
+        assert response.json()["dossier"] is None
         assert response.headers["Cache-Control"] == "no-store"
 
 
@@ -31,6 +32,11 @@ def test_readiness_after_migration_and_application_restart(settings: Settings) -
                 "schema_revision": SCHEMA_REVISION,
                 "expected_revision": SCHEMA_REVISION,
             }
+            dossier = response.json()["dossier"]
+            assert dossier["status"] == "incomplet"
+            assert dossier["label"] == "Incomplet"
+            assert dossier["vintage_status"] == "research_only"
+            assert "Déclarable" not in dossier["label"]
 
 
 def test_unknown_schema_revision_is_not_ready(settings: Settings, database: Database) -> None:

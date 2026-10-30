@@ -31,11 +31,13 @@ votre écran. Une saisie non enregistrée demande confirmation avant de quitter.
 
 Si l’alerte « Stockage non sûr » apparaît, la base est dans OneDrive. Elle reste visible sur toutes les vues, même quand la base est prête. Copiez le projet hors de ce dossier synchronisé avant de saisir : la synchronisation peut corrompre SQLite.
 
-Si un écran affiche une erreur de chargement, **Réessayer** relance la lecture. Ce n’est pas un dossier vide. Quand c’est sans risque, les informations déjà affichées restent, marquées comme pouvant être périmées. Les totaux des états comptables disparaissent plutôt que de montrer un chiffre incertain.
+Si un écran affiche une erreur de chargement, **Réessayer** relance la lecture. Ce n’est pas un dossier vide. Quand c’est sans risque, les informations déjà affichées restent, marquées comme pouvant être périmées. Les totaux des états comptables disparaissent plutôt que de montrer un chiffre incertain. Le **statut dossier** et **Stockage opérationnel** disparaissent aussi : une lecture ratée ne laisse pas l’indicateur précédent.
+
+Le bandeau affiche le **statut dossier** : Incomplet, Bloqué, Prêt à vérifier ou Clôturé. Il est calculé sur l’exercice en cours (ou le dernier exercice s’ils sont tous clôturés) à partir de la clôture, du statut fiscal et de la posture des exports. Il ne dit jamais que le dossier est déclarable : les millésimes restent en recherche. **Stockage opérationnel** n’apparaît que dans **Diagnostic technique**, sur la vue d’ensemble. « Aucun envoi » est à côté des sorties fiscales (liasse, PDF, FEC), pas dans le bandeau.
 
 Alternative Docker : voir [DEPLOYMENT.md](DEPLOYMENT.md).
 
-Vérifier que l’écran « État de l’installation » affiche **Base SQLite : Prête**.
+Vérifier, sur la vue d’ensemble, que le statut dossier s’affiche et que **Diagnostic technique** dit **Stockage opérationnel**. Ce libellé n’est pas repris sur les autres pages.
 
 ---
 

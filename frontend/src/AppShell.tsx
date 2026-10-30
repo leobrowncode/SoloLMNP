@@ -3,6 +3,8 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { fetchStatus } from "./api/status";
 import { navItems, pageIdFromPathname, ROUTES, type PageId } from "./routing/paths";
 import { UnsavedChangesProvider } from "./routing/unsaved";
+import DossierStatus from "./features/DossierStatus";
+import { showsDossierIndicator, showsOperationalStorage } from "./features/dossierStatus";
 import ScreenStatus from "./features/ScreenStatus";
 import { showsLoading } from "./features/screenState";
 import { useScreenQuery } from "./features/useScreenQuery";
@@ -30,6 +32,9 @@ export default function AppShell() {
 
   const status = state.data;
   const serviceReady = status?.database.status === "ready";
+  const dossier = status?.dossier;
+  const liveDossier = showsDossierIndicator(state.phase, serviceReady, dossier) ? dossier : null;
+  const storageLive = showsOperationalStorage(state.phase, serviceReady);
   const showWorkspace = Boolean(serviceReady) && (
     state.phase === "loaded" || state.phase === "loading" || state.stale
   );
@@ -86,7 +91,7 @@ export default function AppShell() {
         <main id="main" tabIndex={-1}>
           <header className="topbar">
             <p className="topbar-title">{activeNav?.label}</p>
-            {showWorkspace && <p>Base prête. Vous recopiez la liasse vous-même. Aucun envoi n’est effectué.</p>}
+            {liveDossier && <DossierStatus dossier={liveDossier} />}
           </header>
           <div className="content">
             {status?.storage_warning && (
@@ -137,11 +142,13 @@ export default function AppShell() {
                     </li>
                   ))}
                 </ol>
-                <details className="install-details">
-                  <summary>Détail technique</summary>
-                  <p>Version {status?.application_version}. Schéma {status?.database.schema_revision}.</p>
-                  <button onClick={retry} type="button">Actualiser</button>
-                </details>
+                {storageLive && (
+                  <details className="install-details" data-diagnostic="storage">
+                    <summary>Diagnostic technique</summary>
+                    <p><strong>Stockage opérationnel</strong>. Version {status?.application_version}. Schéma {status?.database.schema_revision}.</p>
+                    <button onClick={retry} type="button">Actualiser</button>
+                  </details>
+                )}
               </>
             )}
           </div>
