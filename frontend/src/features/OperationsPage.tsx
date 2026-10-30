@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { amount, cents, request, type Account, type Setup, type Entry, RequestError } from "../api/ledger";
 import {
@@ -72,11 +72,16 @@ export default function OperationsPage() {
   const [opYearId, setOpYearId] = useState(0);
   const [loanImportId, setLoanImportId] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
+  const detailTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const detailTicket = useRef(0);
+  const restoreDetailFocus = useRef(false);
   useUnsavedGuard(!!editor);
 
   function openTab(next: OperationsTab) {
     navigate(operationsPath(next));
     setEditor(null);
+    detailTicket.current += 1;
+    restoreDetailFocus.current = false;
     setDetails(null);
   }
 
@@ -91,6 +96,32 @@ export default function OperationsPage() {
   const [bankOffset, setBankOffset] = useState(0);
   const [details, setDetails] = useState<Entry | null>(null);
   const [matchCandidates, setMatchCandidates] = useState<{ transaction: BankTransaction; lines: { id: number; label: string }[] } | null>(null);
+
+  function closeEntryDetail() {
+    detailTicket.current += 1;
+    restoreDetailFocus.current = true;
+    setDetails(null);
+  }
+
+  useEffect(() => {
+    if (details !== null || !restoreDetailFocus.current) return;
+    restoreDetailFocus.current = false;
+    const trigger = detailTriggerRef.current;
+    if (trigger?.isConnected) trigger.focus();
+  }, [details]);
+
+  useEffect(() => {
+    if (details === null) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      detailTicket.current += 1;
+      restoreDetailFocus.current = true;
+      setDetails(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [details]);
   const bundleKey = String(offset);
   const bankQuery = JSON.stringify([bankId, bankOffset]);
 
@@ -259,7 +290,10 @@ export default function OperationsPage() {
       const savedEditor = editor;
       const result = await api<Record<string, unknown>>(savedEditor.path, savedEditor.method ?? "POST", { ...data, ...savedEditor.fixed });
       const invalidation = readInvalidation(result.invalidation);
-      setEditor(null); setDetails(null);
+      setEditor(null);
+      detailTicket.current += 1;
+      restoreDetailFocus.current = false;
+      setDetails(null);
       show(operationSaveNotice({
         path: savedEditor.path,
         method: savedEditor.method,
@@ -963,7 +997,21 @@ export default function OperationsPage() {
             {row.kind === "LOAN_PAYMENT" && (
               <p>Capital {formatEuros(row.principal)} · Intérêts {formatEuros(row.interest)} · Assurance {formatEuros(row.insurance)} · Frais {formatEuros(row.other_costs)}</p>
             )}
-            <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void action(async () => setDetails(await request<Entry>("/entries/" + row.accounting_entry_id)), "Chargement de l’écriture…"); }}>Voir l’écriture</button>
+            <button
+              type="button"
+              disabled={busy}
+              aria-busy={busy || undefined}
+              onClick={(event) => {
+                const trigger = event.currentTarget;
+                detailTriggerRef.current = trigger;
+                const ticket = ++detailTicket.current;
+                void action(async () => {
+                  const entry = await request<Entry>("/entries/" + row.accounting_entry_id);
+                  if (ticket !== detailTicket.current) return;
+                  setDetails(entry);
+                }, "Chargement de l’écriture…");
+              }}
+            >Voir l’écriture</button>
             {row.status !== "REVERSED" && row.remaining_to_settle && row.remaining_to_settle !== "0.00" && (
               <button type="button" disabled={bankCauses.length > 0} aria-describedby={describedBy(bankCauseId, bankCauses)} onClick={() => setEditor({
                 title: "Régler : " + row.description,
@@ -997,8 +1045,11 @@ export default function OperationsPage() {
       </div>}
 
       {details && (
-        <div>
-          <h3>{details.entry_number} · {details.label}</h3>
+        <div className="entry-card entry-detail">
+          <div className="entry-detail-header">
+            <h3 id="entry-detail-title">{details.entry_number} · {details.label}</h3>
+            <button type="button" onClick={closeEntryDetail} aria-label="Fermer le détail de l’écriture">Fermer</button>
+          </div>
           <ResponsiveTable
             label="Lignes de l’écriture"
             columns={[

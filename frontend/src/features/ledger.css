@@ -15,6 +15,9 @@
 .ledger-page td, .ledger-page th { padding: .7rem; border-bottom: 1px solid var(--border-hairline); text-align: left; }
 .ledger-page caption { text-align: left; padding: .5rem 0; }
 .entry-card, .entry-editor { border: 1px solid var(--border-hairline); border-radius: 12px; padding: 1.25rem; margin: 1rem 0; background: var(--bg-surface-muted); }
+.entry-detail-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+.entry-detail-header h3 { margin: 0; min-width: 0; flex: 1 1 12rem; overflow-wrap: anywhere; }
+.entry-detail-header button { margin: 0; }
 .save-highlight {
   outline: 3px solid var(--focus-ring);
   outline-offset: 4px;
@@ -566,6 +569,7 @@
 .mobile-card [data-priority="primary"] .card-value { font-weight: 650; }
 .mobile-card-more { min-width: 0; }
 @media (max-width: 768px) {
+  .entry-detail-header button { flex: 1 1 100%; }
   .chart-accounts > li { grid-template-columns: minmax(0, 1fr); }
   .chart-id, .chart-accounts > li > button { grid-column: auto; max-width: 100%; white-space: normal; }
   .ledger-tabs { display: flex; flex-wrap: wrap; gap: .45rem; }
