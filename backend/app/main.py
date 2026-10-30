@@ -13,6 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.assets import build_assets_router
+from app.api.dashboard import build_dashboard_router
 from app.api.filing import build_filing_router
 from app.api.fiscal import build_fiscal_router
 from app.api.ledger import build_ledger_router
@@ -126,6 +127,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["Cache-Control"] = "no-store"
         return response
 
+    application.include_router(build_dashboard_router(database))
     application.include_router(build_ledger_router(database))
     application.include_router(build_operations_router(database))
     application.include_router(build_assets_router(database))

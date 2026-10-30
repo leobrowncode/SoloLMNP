@@ -6,6 +6,7 @@ import { navItems, pageIdFromPathname, ROUTES, type PageId } from "./routing/pat
 import { UnsavedChangesProvider } from "./routing/unsaved";
 import DossierStatus from "./features/DossierStatus";
 import GlossaryTip from "./features/GlossaryTip";
+import OverviewDashboard from "./features/OverviewDashboard";
 import { showsDossierIndicator, showsOperationalStorage } from "./features/dossierStatus";
 import ScreenStatus from "./features/ScreenStatus";
 import { showsLoading } from "./features/screenState";
@@ -121,7 +122,7 @@ export default function AppShell() {
             {page === "overview" && showWorkspace && (
               <section className="intro" aria-labelledby="welcome-title">
                 <h1 id="welcome-title">De l’écriture à la liasse que vous recopierez.</h1>
-                <p className="intro-description">LMNP au réel, location longue durée. Suivez les six étapes. SoloLMNP prépare la liasse et le FEC. Il n’envoie rien aux impôts.</p>
+                <p className="intro-description">LMNP au réel, location longue durée. Le menu sert à naviguer. Ici, chaque étape du dossier indique son état. SoloLMNP prépare la liasse et le FEC. Il n’envoie rien aux impôts.</p>
                 <div className="heading-with-help">
                   <GlossaryTip id="lmnp-reel" />
                   <GlossaryTip id="liasse" />
@@ -151,18 +152,12 @@ export default function AppShell() {
               </section>
             )}
 
+            {page === "overview" && showWorkspace && state.phase !== "error" && (
+              <OverviewDashboard />
+            )}
+
             {page === "overview" && showWorkspace && (
               <>
-                <ol className="path-list">
-                  {navItems.filter((item) => item.step).map((item) => (
-                    <li key={item.id}>
-                      <Link to={item.path} className="path-link" onClick={focusMain}>
-                        <span className="stage-number">{item.step}</span>
-                        <span className="stage-description"><strong>{item.label}</strong><span>{item.hint}</span></span>
-                      </Link>
-                    </li>
-                  ))}
-                </ol>
                 {storageLive && (
                   <details className="install-details" data-diagnostic="storage">
                     <summary>Diagnostic technique</summary>
