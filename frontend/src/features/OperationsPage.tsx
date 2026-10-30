@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { amount, cents, request, type Account, type Setup, type Entry, RequestError } from "../api/ledger";
 import {
-  activityCause, bankCause, csvPreviewCauses, describedBy, duplicatePostCauses, listed,
-  loanPostCauses, openYearCauses, operationEntryCauses, propertyCause, rentCauses,
+  activityCause, bankCause, describedBy, listed,
+  openYearCauses, operationEntryCauses, propertyCause, rentCauses,
 } from "./actionCauses";
+import CsvImportAssistant from "./CsvImportAssistant";
 import ApiErrorAlert from "./ApiErrorAlert";
 import GlossaryTip from "./GlossaryTip";
 import PrerequisiteList from "./PrerequisiteList";
@@ -12,7 +13,7 @@ import ScreenStatus from "./ScreenStatus";
 import {
   beginLoad, defer, failLoad, finishLoad, idleView, showsData, showsLoading, toApiError, type ScreenView,
 } from "./screenState";
-import { operationsRequest as api, type Property, type Bank, type Loan, type Operation, type BankTransaction, type ImportPreview, type OperationImportPreview, type LoanPaymentImportPreview, type Tenant } from "../api/operations";
+import { operationsRequest as api, type Property, type Bank, type Loan, type Operation, type BankTransaction, type Tenant } from "../api/operations";
 import {
   DEFAULT_OPERATIONS_TAB,
   OPERATIONS_TABS,
@@ -45,14 +46,6 @@ interface Editor {
   derive?: (draft: Record<string, string>, changed: string) => Partial<Record<string, string>>;
 }
 
-interface LoanImportPreviewState {
-  result: LoanPaymentImportPreview;
-  loanId: number;
-  yearId: number;
-  bankId: number;
-  content: string;
-}
-
 export default function OperationsPage() {
   const { tab: tabSlug } = useParams();
   const navigate = useNavigate();
@@ -67,16 +60,8 @@ export default function OperationsPage() {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [bankId, setBankId] = useState(0);
   const [transactions, setTransactions] = useState<BankTransaction[]>([]);
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [csv, setCsv] = useState("");
-  const [opCsv, setOpCsv] = useState("");
-  const [opPreview, setOpPreview] = useState<OperationImportPreview | null>(null);
   const [opPropertyId, setOpPropertyId] = useState(0);
   const [opYearId, setOpYearId] = useState(0);
-  const [loanCsv, setLoanCsv] = useState("");
-  const [loanPreview, setLoanPreview] = useState<LoanImportPreviewState | null>(null);
-  const [loanMappingConfirmed, setLoanMappingConfirmed] = useState(false);
-  const loanPreviewRequest = useRef(0);
   const [loanImportId, setLoanImportId] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
   useUnsavedGuard(!!editor);
@@ -306,12 +291,6 @@ export default function OperationsPage() {
     setMatchCandidates({ transaction, lines });
   }
 
-  function clearLoanPaymentPreview() {
-    loanPreviewRequest.current += 1;
-    setLoanPreview(null);
-    setLoanMappingConfirmed(false);
-  }
-
   const years = setup?.years ?? [];
   const openYears = years.filter((year) => year.status === "OPEN");
   const entryCauses = operationEntryCauses(properties.length, years);
@@ -321,38 +300,7 @@ export default function OperationsPage() {
   const loanCauses = listed(propertyCause(properties.length));
   const loanCauseId = "loan-create-causes";
   const activityCauses = listed(activityCause(Boolean(setup?.activity)));
-  const bankPreviewCauses = csvPreviewCauses({
-    hasContent: csv.trim() !== "",
-    anchor: "/operations/banque#import-releve",
-    missingProperty: false,
-    missingYear: false,
-    missingBank: !bankId,
-    missingLoan: false,
-  });
-  const operationPreviewCauses = csvPreviewCauses({
-    hasContent: opCsv.trim() !== "",
-    anchor: "/operations/transactions#import-operations",
-    missingProperty: !opPropertyId,
-    missingYear: !opYearId,
-    missingBank: false,
-    missingLoan: false,
-  });
-  const loanPreviewCauses = csvPreviewCauses({
-    hasContent: loanCsv.trim() !== "",
-    anchor: "/operations/emprunts#import-echeances",
-    missingProperty: false,
-    missingYear: !opYearId,
-    missingBank: !bankId,
-    missingLoan: !loanImportId,
-  });
-  const operationPostCauses = opPreview
-    ? duplicatePostCauses(opPreview.rows.every((row) => row.duplicate), "/operations/transactions#import-operations")
-    : [];
-  const loanImportPostCauses = loanPreview?.result
-    ? loanPostCauses(loanMappingConfirmed, loanPreview.result.rows.some((row) => !row.duplicate))
-    : [];
-  const loanPreviewData = loanPreview?.result ?? null;
-  const previewLoan = loans.find((loan) => loan.id === loanPreview?.loanId);
+  const loanForImport = loans.find((loan) => loan.id === loanImportId);
   function occupants(id: number) {
     const rows = tenants[id];
     return Array.isArray(rows) ? rows : [];
@@ -602,46 +550,29 @@ export default function OperationsPage() {
         {!!banks.length && <>
           <label className="toolbar-field">Banque sélectionnée
             <select value={bankId} onChange={(e) => {
-              setBankId(Number(e.target.value)); setBankOffset(0); setPreview(null); setEditor(null); setMatchCandidates(null);
+              setBankId(Number(e.target.value)); setBankOffset(0); setEditor(null); setMatchCandidates(null);
             }}>
               {banks.map((b) => <option key={b.id} value={b.id}>{b.name} · {b.account_number}</option>)}
             </select>
           </label>
-          <details>
-            <summary>Importer un relevé CSV</summary>
-            <p>UTF-8, séparateur point-virgule, en-tête exact : <code>date;label;amount;reference</code>. L’import seul ne comptabilise rien.</p>
-            <label>Fichier CSV (1 Mo maximum)<input type="file" accept=".csv,text/csv" onChange={(e) => {
-              const file = e.target.files?.[0]; setPreview(null);
-              if (file) void action(async () => {
-                if (file.size > 1_000_000) throw new Error("Fichier trop volumineux.");
-                setCsv(await file.text());
-              });
-            }} /></label>
-            <label>Contenu CSV<textarea id="import-releve" rows={6} value={csv} onChange={(e) => { setCsv(e.target.value); setPreview(null); }} /></label>
-            <button type="button" disabled={busy || bankPreviewCauses.length > 0} aria-describedby={describedBy("bank-preview-causes", bankPreviewCauses)} onClick={() => {
-              void action(async () => setPreview(await api<ImportPreview>("/bank/preview", "POST", { bank_account_id: bankId, content: csv })));
-            }}>Prévisualiser l’import</button>
-            <PrerequisiteList id="bank-preview-causes" causes={bankPreviewCauses} />
-            {preview && <>
-              <p>{preview.count} mouvement(s) · {preview.rows.filter((r) => r.duplicate).length} déjà importé(s)</p>
-              <div className="ledger-table"><table>
-                <thead><tr><th>Date</th><th>Libellé</th><th>Montant</th><th>Déjà importé</th><th>Compte suggéré</th></tr></thead>
-                <tbody>{preview.rows.map((row) => (
-                  <tr key={row.reference}>
-                    <td>{row.date}</td><td>{row.label}</td><td>{row.amount}</td>
-                    <td>{row.duplicate ? "Oui" : "Non"}</td><td>{row.suggested_account || "À choisir"}</td>
-                  </tr>
-                ))}</tbody>
-              </table></div>
-              <button type="button" disabled={busy} onClick={() => {
-                void action(async () => {
-                  const result = await api<ImportPreview>("/bank/import", "POST", { bank_account_id: bankId, content: csv });
-                  setMessage(result.imported + " mouvement(s) importé(s), en attente de rapprochement.");
-                  setPreview(null); setRevision((v) => v + 1);
-                });
-              }}>Confirmer l’import des mouvements</button>
-            </>}
-          </details>
+          <CsvImportAssistant
+            key={String(bankId)}
+            profile="bank"
+            summaryTitle="Importer un relevé CSV"
+            intro="Téléchargez le modèle (Date, Libellé, Montant, Référence) ou associez les colonnes de votre relevé. L’import seul ne comptabilise rien."
+            contentLabel="Contenu CSV"
+            textareaId="import-releve"
+            anchor="/operations/banque#import-releve"
+            causeId="bank-preview-causes"
+            postCauseId="bank-post-causes"
+            previewLabel="Prévisualiser l’import"
+            commitLabel="Confirmer l’import des mouvements"
+            busy={busy}
+            action={action}
+            missingBank={!bankId}
+            context={{ bank_account_id: bankId }}
+            onImported={(text) => { setMessage(text); setRevision((value) => value + 1); }}
+          />
           <ScreenStatus
             state={bankView}
             onRetry={() => setRevision((value) => value + 1)}
@@ -779,14 +710,9 @@ export default function OperationsPage() {
         {!!loans.length && !!banks.length && !openYears.length && (
           <PrerequisiteList id="loan-import-year" causes={openYearCauses(years)} intro="L’import des échéances est indisponible :" />
         )}
-        {!!loans.length && !!banks.length && !!openYears.length && <details>
-          <summary>Importer les échéances depuis Google Sheets ou un CSV</summary>
-          <p>Collez l’en-tête et les lignes d’un seul prêt. Colonnes reconnues : <code>Prêt;Rang;Date;Capital (€);Intérêts (€);Assurance banque (€);Assurance externe à compléter (€);Total banque (€)</code>. La colonne facultative <code>Date débit</code> permet d’utiliser la date réelle du relevé bancaire. Seules les échéances de l’exercice déjà arrivées à leur date seront proposées.</p>
-          <p>L’assurance externe prélevée séparément reste une dépense <code>ASS</code> : ne l’incluez pas dans le total banque.</p>
+        {!!loans.length && !!banks.length && !!openYears.length && <>
           <label className="toolbar-field">Emprunt
-            <select value={loanImportId} onChange={(e) => {
-              setLoanImportId(Number(e.target.value)); clearLoanPaymentPreview();
-            }}>
+            <select value={loanImportId} onChange={(e) => setLoanImportId(Number(e.target.value))}>
               {loans.map((loan) => (
                 <option key={loan.id} value={loan.id}>
                   {loan.lender} · {loan.initial_principal} € · {loan.principal_account}
@@ -795,171 +721,83 @@ export default function OperationsPage() {
             </select>
           </label>
           <label className="toolbar-field">Exercice
-            <select value={opYearId} onChange={(e) => {
-              setOpYearId(Number(e.target.value)); clearLoanPaymentPreview();
-            }}>
+            <select value={opYearId} onChange={(e) => setOpYearId(Number(e.target.value))}>
               {openYears.map((year) => (
                 <option key={year.id} value={year.id}>{year.year}</option>
               ))}
             </select>
           </label>
           <label className="toolbar-field">Compte bancaire
-            <select value={bankId} onChange={(e) => {
-              setBankId(Number(e.target.value)); setBankOffset(0); clearLoanPaymentPreview();
-            }}>
+            <select value={bankId} onChange={(e) => { setBankId(Number(e.target.value)); setBankOffset(0); }}>
               {banks.map((bank) => (
                 <option key={bank.id} value={bank.id}>{bank.name} · {bank.account_number}</option>
               ))}
             </select>
           </label>
-          <label>Fichier CSV Google Sheets ou à point-virgule (1 Mo maximum)<input type="file" accept=".csv,text/csv" onChange={(e) => {
-            const file = e.target.files?.[0]; clearLoanPaymentPreview();
-            if (file) void action(async () => {
-              if (file.size > 1_000_000) throw new Error("Fichier trop volumineux.");
-              setLoanCsv(await file.text());
-            });
-          }} /></label>
-          <label>Lignes du tableau d’amortissement<textarea id="import-echeances" rows={8} value={loanCsv} onChange={(e) => {
-            setLoanCsv(e.target.value); clearLoanPaymentPreview();
-          }} /></label>
-          <button type="button" disabled={busy || loanPreviewCauses.length > 0} aria-describedby={describedBy("loan-preview-causes", loanPreviewCauses)} onClick={() => {
-            const requestId = ++loanPreviewRequest.current;
-            const context = {
-              loanId: loanImportId, yearId: opYearId, bankId, content: loanCsv,
-            };
-            void action(async () => {
-              const result = await api<LoanPaymentImportPreview>(
-                "/loans/" + context.loanId + "/payments/import/preview",
-                "POST",
-                {
-                  fiscal_year_id: context.yearId,
-                  bank_account_id: context.bankId,
-                  content: context.content,
-                },
-              );
-              if (loanPreviewRequest.current !== requestId) return;
-              setLoanPreview({ result, ...context });
-              setLoanMappingConfirmed(false);
-            });
-          }}>Prévisualiser les échéances</button>
-          <PrerequisiteList id="loan-preview-causes" causes={loanPreviewCauses} />
-          {loanPreviewData && loanPreview && <>
-            <p>
-              {loanPreviewData.count} échéance(s) retenue(s) sur {loanPreviewData.source_count}
-              {" · "}{loanPreviewData.outside_year} hors exercice
-              {" · "}{loanPreviewData.future} future(s)
-              {" · "}{loanPreviewData.rows.filter((row) => row.duplicate).length} déjà comptabilisée(s)
-              {" · prêt source "}{loanPreviewData.loan_reference}
-            </p>
-            {loanPreviewData.rows.length ? <div className="ledger-table"><table>
-              <thead><tr><th>Échéance</th><th>Date comptable</th><th>Rang</th><th>Capital</th><th>Intérêts</th><th>Assurance banque</th><th>Autres frais</th><th>Total banque</th><th>État</th></tr></thead>
-              <tbody>{loanPreviewData.rows.map((row) => (
-                <tr key={row.due_date + "-" + row.date}>
-                  <td>{row.due_date}</td><td>{row.date}</td><td>{row.rank || "—"}</td><td>{row.principal} €</td>
-                  <td>{row.interest} €</td><td>{row.insurance} €</td>
-                  <td>{row.other_costs} €</td><td>{row.amount} €</td>
-                  <td>{row.duplicate ? "Déjà comptabilisée" : "À comptabiliser"}</td>
-                </tr>
-              ))}</tbody>
-            </table></div> : <p>Aucune échéance arrivée à sa date pour cet exercice.</p>}
-            {loanPreviewData.rows.some((row) => !row.duplicate) && <label id="confirmer-pret" tabIndex={-1}>
-              <input
-                type="checkbox"
-                checked={loanMappingConfirmed}
-                onChange={(event) => setLoanMappingConfirmed(event.target.checked)}
-              />
-              Je confirme que le prêt source {loanPreviewData.loan_reference} correspond à
-              {" "}{previewLoan?.lender} · {previewLoan?.initial_principal} € · {previewLoan?.principal_account}.
-            </label>}
-            <button type="button" disabled={busy || loanImportPostCauses.length > 0} aria-describedby={describedBy("loan-post-causes", loanImportPostCauses)} onClick={() => {
-              void action(async () => {
-                const result = await api<LoanPaymentImportPreview>(
-                  "/loans/" + loanPreview.loanId + "/payments/import",
-                  "POST",
-                  {
-                    fiscal_year_id: loanPreview.yearId,
-                    bank_account_id: loanPreview.bankId,
-                    content: loanPreview.content,
-                    preview_token: loanPreviewData.preview_token,
-                    confirmed_loan_reference: loanPreviewData.loan_reference,
-                  },
-                );
-                setMessage(result.imported + " échéance(s) comptabilisée(s). Rapprochez ensuite le relevé bancaire.");
-                clearLoanPaymentPreview(); setRevision((value) => value + 1);
-              });
-            }}>Comptabiliser les échéances</button>
-            <PrerequisiteList id="loan-post-causes" causes={loanImportPostCauses} />
-          </>}
-        </details>}
+          <CsvImportAssistant
+            key={`${loanImportId}-${opYearId}-${bankId}`}
+            profile="loan_payments"
+            summaryTitle="Importer les échéances depuis Google Sheets ou un CSV"
+            intro="Collez l’en-tête et les lignes d’un seul prêt, ou téléchargez le modèle : Prêt, Rang, Date, Date de débit, Capital, Intérêts, Assurance banque, Assurance externe, Autres frais, Total banque. L’en-tête de feuille « Assurance externe à compléter » est reconnu. L’assurance externe prélevée séparément reste une dépense ASS : ne l’incluez pas dans le total banque. Seules les échéances de l’exercice déjà arrivées à leur date seront comptabilisées."
+            contentLabel="Lignes du tableau d’amortissement"
+            textareaId="import-echeances"
+            anchor="/operations/emprunts#import-echeances"
+            causeId="loan-preview-causes"
+            postCauseId="loan-post-causes"
+            previewLabel="Prévisualiser les échéances"
+            commitLabel="Comptabiliser les échéances"
+            busy={busy}
+            action={action}
+            missingYear={!opYearId}
+            missingBank={!bankId}
+            missingLoan={!loanImportId}
+            context={{ bank_account_id: bankId, fiscal_year_id: opYearId, loan_id: loanImportId }}
+            loanLabel={loanForImport ? `${loanForImport.lender} · ${loanForImport.initial_principal} € · ${loanForImport.principal_account}` : ""}
+            onImported={(text) => { setMessage(text); setRevision((value) => value + 1); }}
+          />
+        </>}
       </>}
 
       {tab === "Transactions" && <>
         <p className="form-help">Enregistrez les loyers et charges. La part déductible ne change pas l’écriture : elle est proposée ensuite dans les réintégrations de la liasse. Ne saisissez pas les intérêts déjà ventilés dans une échéance d’emprunt.</p>
-        <details>
-          <summary>Importer depuis Google Sheets ou un CSV</summary>
-          <p>Copiez les lignes du Google Sheet de saisie (en-tête compris) et collez-les ci-dessous, ou chargez un CSV à point-virgule. Colonnes : <code>kind date piece_date type counterparty amount description piece_reference source_file</code>, plus <code>paid</code> facultative. <code>kind</code> : Recette ou Dépense ; dates JJ/MM/AAAA ou AAAA-MM-JJ ; <code>paid</code> = oui pour une ligne déjà payée sur le compte choisi, sinon elle reste à régler. Le traitement fiscal reste à vérifier. Une référence déjà comptabilisée est ignorée ; la même référence avec un autre montant est refusée.</p>
-          {!!properties.length && !!openYears.length && <>
-            <label className="toolbar-field">Bien
-              <select value={opPropertyId} onChange={(e) => { setOpPropertyId(Number(e.target.value)); setOpPreview(null); }}>
-                {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
-              </select>
-            </label>
-            <label className="toolbar-field">Exercice
-              <select value={opYearId} onChange={(e) => { setOpYearId(Number(e.target.value)); setOpPreview(null); }}>
-                {openYears.map((year) => (
-                  <option key={year.id} value={year.id}>{year.year}</option>
-                ))}
-              </select>
-            </label>
-            {!!banks.length && <label className="toolbar-field">Compte des lignes payées
-              <select value={bankId} onChange={(e) => { setBankId(Number(e.target.value)); setOpPreview(null); }}>
-                {banks.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.account_number})</option>)}
-              </select>
-            </label>}
-          </>}
-          <label>Fichier CSV (1 Mo maximum)<input type="file" accept=".csv,text/csv" onChange={(e) => {
-            const file = e.target.files?.[0]; setOpPreview(null);
-            if (file) void action(async () => {
-              if (file.size > 1_000_000) throw new Error("Fichier trop volumineux.");
-              setOpCsv(await file.text());
-            });
-          }} /></label>
-          <label>Lignes collées ou contenu CSV<textarea id="import-operations" rows={6} value={opCsv} onChange={(e) => { setOpCsv(e.target.value); setOpPreview(null); }} /></label>
-          <button type="button" disabled={busy || operationPreviewCauses.length > 0} aria-describedby={describedBy("operation-preview-causes", operationPreviewCauses)} onClick={() => {
-            void action(async () => setOpPreview(await api<OperationImportPreview>("/import/preview", "POST", {
-              property_id: opPropertyId, fiscal_year_id: opYearId, content: opCsv, bank_account_id: bankId || null,
-            })));
-          }}>Prévisualiser les justificatifs</button>
-          <PrerequisiteList id="operation-preview-causes" causes={operationPreviewCauses} />
-          {opPreview && <>
-            <p>{opPreview.count} opération(s) · {opPreview.rows.filter((row) => row.duplicate).length} déjà importée(s)</p>
-            <div className="ledger-table"><table>
-              <thead><tr><th>Date</th><th>Nature</th><th>Tiers</th><th>Montant</th><th>Payée</th><th>Référence</th><th>Fichier</th><th>Déjà importée</th></tr></thead>
-              <tbody>{opPreview.rows.map((row) => (
-                <tr key={row.piece_reference}>
-                  <td>{row.date}</td>
-                  <td>{kindLabel[row.kind] || row.kind} · {row.type} · {row.accounting_account}</td>
-                  <td>{row.counterparty}</td>
-                  <td>{row.amount}</td>
-                  <td>{row.paid ? "Oui" : "À régler"}</td>
-                  <td>{row.piece_reference}</td>
-                  <td>{row.source_file || "—"}</td>
-                  <td>{row.duplicate ? "Oui" : "Non"}</td>
-                </tr>
-              ))}</tbody>
-            </table></div>
-            <button type="button" disabled={busy || operationPostCauses.length > 0} aria-describedby={describedBy("operation-post-causes", operationPostCauses)} onClick={() => {
-              void action(async () => {
-                const result = await api<OperationImportPreview>("/import", "POST", {
-                  property_id: opPropertyId, fiscal_year_id: opYearId, content: opCsv, bank_account_id: bankId || null,
-                });
-                setMessage(result.imported + " opération(s) comptabilisée(s). Lignes non payées à régler ; traitement fiscal à vérifier.");
-                setOpPreview(null); setRevision((value) => value + 1);
-              });
-            }}>Comptabiliser les justificatifs</button>
-            <PrerequisiteList id="operation-post-causes" causes={operationPostCauses} />
-          </>}
-        </details>
+        {!!properties.length && !!openYears.length && <>
+          <label className="toolbar-field">Bien
+            <select value={opPropertyId} onChange={(e) => setOpPropertyId(Number(e.target.value))}>
+              {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
+            </select>
+          </label>
+          <label className="toolbar-field">Exercice
+            <select value={opYearId} onChange={(e) => setOpYearId(Number(e.target.value))}>
+              {openYears.map((year) => (
+                <option key={year.id} value={year.id}>{year.year}</option>
+              ))}
+            </select>
+          </label>
+          {!!banks.length && <label className="toolbar-field">Compte des lignes payées
+            <select value={bankId} onChange={(e) => setBankId(Number(e.target.value))}>
+              {banks.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.account_number})</option>)}
+            </select>
+          </label>}
+        </>}
+        <CsvImportAssistant
+          key={`${opPropertyId}-${opYearId}-${bankId}`}
+          profile="operations"
+          summaryTitle="Importer depuis Google Sheets ou un CSV"
+          intro="Téléchargez le modèle ou collez votre feuille. Colonnes : Nature, Date, Date de la pièce, Type, Tiers, Montant, Libellé, Référence de pièce, Justificatif, et Déjà payée. Nature : Recette ou Dépense. Une ligne déjà payée (oui) est réglée sur le compte choisi, sinon elle reste à régler. Le traitement fiscal reste à vérifier."
+          contentLabel="Lignes collées ou contenu CSV"
+          textareaId="import-operations"
+          anchor="/operations/transactions#import-operations"
+          causeId="operation-preview-causes"
+          postCauseId="operation-post-causes"
+          previewLabel="Prévisualiser les justificatifs"
+          commitLabel="Comptabiliser les justificatifs"
+          busy={busy}
+          action={action}
+          missingProperty={!opPropertyId}
+          missingYear={!opYearId}
+          context={{ property_id: opPropertyId, fiscal_year_id: opYearId, bank_account_id: bankId || null }}
+          onImported={(text) => { setMessage(text); setRevision((value) => value + 1); }}
+        />
         <div className="form-actions">
           <button type="button" disabled={entryCauses.length > 0} aria-describedby={describedBy(entryCauseId, entryCauses)} onClick={() => newOperation("REVENUE")}>Nouvelle recette</button>
           <button type="button" disabled={entryCauses.length > 0} aria-describedby={describedBy(entryCauseId, entryCauses)} onClick={() => newOperation("EXPENSE")}>Nouvelle dépense</button>

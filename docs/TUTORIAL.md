@@ -81,32 +81,16 @@ Pour chaque opération : date, bien, exercice, montant, compte 6xx/7xx.
 Si le règlement a lieu le même jour → lier la banque ; sinon choisir « Non réglé »,
 puis **Enregistrer un règlement** plus tard.
 
-**Import CSV banque** (onglet Banque) :
+**Import CSV** (Banque, Emprunts, Transactions) :
 
-- Format UTF-8, séparateur `;`, en-tête exact : `date;label;amount;reference`
-- Prévisualiser → Confirmer → **rapprocher** chaque mouvement
-
-**Import depuis Google Sheets ou CSV** (onglet Transactions, « Importer depuis Google Sheets ou un CSV ») :
-
-- Copier les lignes du Google Sheet de saisie (en-tête compris) et les coller, ou charger un CSV à point-virgule
-- Colonnes : `kind;date;piece_date;type;counterparty;amount;description;piece_reference;source_file`, plus `paid` facultative
-- `kind` : Recette / Dépense (ou REVENUE / EXPENSE) ; dates JJ/MM/AAAA ou AAAA-MM-JJ ; montants « 1 200,00 € » acceptés
-- Mise en forme du Sheet (listes déroulantes Recette/Dépense, types filtrés selon la nature, dates, montants en €, `paid` oui/non, référence de pièce proposée, doublons en rouge) : coller `scripts/gsheet/format_saisie.gs` dans Extensions > Apps Script du Sheet, puis exécuter `setup` une fois
-- Choisir le bien, l’exercice et le compte des lignes payées → Prévisualiser → Comptabiliser
-- `paid` = oui : opération réglée directement sur ce compte ; sinon elle reste **à régler**. Traitement fiscal à vérifier
-- Une référence déjà comptabilisée est ignorée ; un montant différent pour la même référence est refusé
-- **Import des échéances** (onglet Emprunts) : choisissez un emprunt, l’exercice et
-  la banque, puis collez les lignes d’un seul prêt depuis Google Sheets. Les colonnes
-  `Prêt`, `Rang`, `Date`, `Capital`, `Intérêts`, `Assurance banque`,
-  `Assurance externe à compléter` et `Total banque` du modèle sont reconnues.
-- Vérifiez puis confirmez explicitement la correspondance entre la référence `Prêt`
-  du tableau et l’emprunt SoloLMNP sélectionné. Ajoutez si nécessaire une colonne
-  `Date débit` pour reprendre la date comptable exacte du relevé bancaire.
-- La prévisualisation conserve seulement les échéances de l’exercice déjà arrivées à
-  leur date. Elle ignore les doublons identiques et refuse une ventilation différente
-  pour une date déjà comptabilisée. Le capital restant dû ou le déblocage doit exister.
-- Une assurance externe prélevée séparément ne fait pas partie de l’échéance bancaire :
-  importez-la dans Transactions comme dépense `ASS`.
+- **Télécharger le modèle CSV** : en-têtes en français, deux lignes d’exemple, UTF-8 avec BOM, séparateur `;`, montants avec virgule (`800,00`), dates `JJ/MM/AAAA`.
+- Banque : Date, Libellé, Montant, Référence. Transactions : Nature, Date, Date de la pièce, Type, Tiers, Montant, Libellé, Référence de pièce, Justificatif, Déjà payée. Emprunts : Prêt, Rang, Date, Date de débit, Capital, Intérêts, Assurance banque, Assurance externe, Autres frais, Total banque.
+- Collez votre fichier ou chargez-le. Un export avec virgule, une tabulation (Google Sheets) ou des dates `AAAA-MM-JJ` sont lus aussi. Associez chaque colonne de votre fichier au champ attendu si les noms diffèrent.
+- La prévisualisation distingue les lignes **valides**, les **doublons**, les **avertissements** et les **erreurs** avant toute écriture. Un rejet indique la ligne, la colonne, la valeur lue et la correction attendue. **Télécharger les lignes à corriger** produit un CSV à réparer puis à recharger.
+- Seules les lignes valides, et les avertissements qui peuvent l’être, sont enregistrées. Une écriture déjà validée n’est pas réécrite : une référence identique avec un autre contenu est refusée.
+- Banque : prévisualiser puis confirmer, puis **rapprocher** chaque mouvement. L’import seul ne comptabilise rien.
+- Transactions : choisir le bien, l’exercice et le compte des lignes payées. Nature : Recette ou Dépense. Déjà payée = oui : opération réglée sur ce compte ; sinon elle reste **à régler**. Traitement fiscal à vérifier. Mise en forme du Sheet (listes déroulantes, dates, montants en €, doublons en rouge) : coller `scripts/gsheet/format_saisie.gs` dans Extensions > Apps Script, puis exécuter `setup` une fois. Les anciens en-têtes techniques (`kind`, `piece_date`, `counterparty`, `source_file`, …) restent reconnus.
+- Emprunts : un seul prêt par fichier. Confirmez que la référence Prêt correspond à l’emprunt choisi. L’en-tête « Assurance externe à compléter » est reconnu. Une assurance externe non nulle n’entre pas dans le total banque : importez-la dans Transactions comme dépense `ASS`. Seules les échéances de l’exercice déjà arrivées à leur date sont comptabilisées. Le capital restant dû ou le déblocage doit exister.
 
 ---
 

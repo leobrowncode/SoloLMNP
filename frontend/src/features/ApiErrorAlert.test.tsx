@@ -39,6 +39,29 @@ describe("error to help links", () => {
     expect(screen.queryByRole("button", { name: /^Aide :/ })).not.toBeInTheDocument();
   });
 
+  test("names the row, column, value and expected correction of an import rejection", () => {
+    renderAlert({
+      code: "CSV_INVALID",
+      message: "Un rejet est à corriger.",
+      help: "import-csv",
+      location: "import",
+      issues: [{
+        code: "CSV_AMOUNT",
+        message: "Montant illisible.",
+        line: 4,
+        column: "Montant",
+        value: "abc",
+        correction: "Écrivez un montant au centime, par exemple 800,00.",
+        help: "import-csv",
+        location: "import",
+      }],
+    });
+    expect(screen.getByRole("listitem")).toHaveTextContent(
+      "Ligne 4, colonne Montant : Montant illisible. Valeur « abc ». Correction attendue : Écrivez un montant au centime, par exemple 800,00.",
+    );
+    expect(screen.getAllByRole("button", { name: "Aide : Import CSV" }).length).toBeGreaterThan(0);
+  });
+
   test("shows a different help id on an issue line", async () => {
     const user = userEvent.setup();
     renderAlert({

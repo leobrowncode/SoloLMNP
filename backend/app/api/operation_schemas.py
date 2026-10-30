@@ -148,6 +148,28 @@ class OperationsCSVInput(Input):
     bank_account_id: int | None = Field(default=None, gt=0)
 
 
+class CsvInspectInput(Input):
+    content: Annotated[str, Field(min_length=1, max_length=1_000_000)]
+
+
+class CsvAssistInput(Input):
+    content: Annotated[str, Field(min_length=1, max_length=1_000_000)]
+    mapping: dict[str, Annotated[str, Field(max_length=300)]] = Field(default_factory=dict)
+    bank_account_id: int | None = Field(default=None, gt=0)
+    property_id: int | None = Field(default=None, gt=0)
+    fiscal_year_id: int | None = Field(default=None, gt=0)
+    loan_id: int | None = Field(default=None, gt=0)
+    confirmed_loan_reference: Annotated[str, Field(max_length=200)] | None = None
+
+    @model_validator(mode="after")
+    def bounded_mapping(self) -> "CsvAssistInput":
+        if len(self.mapping) > 30:
+            raise ValueError("Trop de colonnes associées.")
+        if self.confirmed_loan_reference == "":
+            self.confirmed_loan_reference = None
+        return self
+
+
 class LoanPaymentsCSVInput(Input):
     fiscal_year_id: int = Field(gt=0)
     bank_account_id: int = Field(gt=0)

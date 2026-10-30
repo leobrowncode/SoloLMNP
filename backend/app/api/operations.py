@@ -2,9 +2,10 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
 from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
@@ -12,7 +13,9 @@ from app.api.ledger_schemas import ReversalInput
 from app.api.operation_schemas import (
     BankCorrectionInput,
     BankInput,
+    CsvAssistInput,
     CSVInput,
+    CsvInspectInput,
     FundingInput,
     LoanCorrectionInput,
     LoanInput,
@@ -32,6 +35,15 @@ from app.api.operation_schemas import (
 from app.api.sessions import dependencies
 from app.core.database import Database
 from app.core.money import to_cents
+from app.domain.csv_assistant import (
+    PROFILES,
+    TEMPLATE_NAMES,
+    CsvReadError,
+    Profile,
+    inspect_content,
+    is_profile,
+    template_csv,
+)
 from app.models import AccountingEntryLine, Property, RentalActivity
 from app.models.operations import (
     BankAccount,
@@ -41,6 +53,7 @@ from app.models.operations import (
     Loan,
     Tenant,
 )
+from app.services import csv_assistant as assistant
 from app.services import operations as service
 from app.services import structuring
 from app.services.ledger import entry_json, event, fail, money
@@ -293,5 +306,57 @@ def build_operations_router(database: Database) -> APIRouter:
     def unmatch(transaction_id: int, data: ReasonInput, session: Write) -> dict[str, bool]:
         service.unmatch(session, transaction_id, data.reason)
         return {"unmatched": True}
+
+    @router.get("/imports/{profile}/template")
+    def csv_template(profile: str) -> Response:
+        if not is_profile(profile):
+            fail("CSV_PROFILE", "Import inconnu.", 404)
+        name = TEMPLATE_NAMES[cast(Profile, profile)]
+        return Response(
+            content=template_csv(profile).encode("utf-8"),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        )
+
+    @router.post("/imports/inspect")
+    def csv_inspect(data: CsvInspectInput) -> dict[str, Any]:
+        try:
+            return inspect_content(data.content)
+        except CsvReadError as exc:
+            fail(exc.code, exc.message, 422, issues=exc.issues)
+
+    def _assist(profile: str, data: CsvAssistInput) -> tuple[str, dict[str, str] | None]:
+        if profile not in PROFILES:
+            fail("CSV_PROFILE", "Import inconnu.", 404)
+        return profile, data.mapping or None
+
+    @router.post("/imports/{profile}/preview")
+    def csv_preview(profile: str, data: CsvAssistInput, session: Read) -> dict[str, Any]:
+        chosen, mapping = _assist(profile, data)
+        return assistant.preview_import(
+            session,
+            chosen,
+            data.content,
+            mapping,
+            bank_account_id=data.bank_account_id,
+            property_id=data.property_id,
+            fiscal_year_id=data.fiscal_year_id,
+            loan_id=data.loan_id,
+        )
+
+    @router.post("/imports/{profile}/commit")
+    def csv_commit(profile: str, data: CsvAssistInput, session: Write) -> dict[str, Any]:
+        chosen, mapping = _assist(profile, data)
+        return assistant.commit_import(
+            session,
+            chosen,
+            data.content,
+            mapping,
+            bank_account_id=data.bank_account_id,
+            property_id=data.property_id,
+            fiscal_year_id=data.fiscal_year_id,
+            loan_id=data.loan_id,
+            confirmed_loan_reference=data.confirmed_loan_reference,
+        )
 
     return router

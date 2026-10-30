@@ -11,9 +11,12 @@ Les réponses d’échec JSON exposent un objet `detail` structuré, identique p
 | `field` | Chemin de champ (validation ou refus métier ciblé) |
 | `location` | `body`, `query` ou `import` |
 | `line` | Numéro de ligne CSV / tableau (imports) |
+| `column` | Libellé de la colonne du fichier (rejet d’import) |
+| `value` | Valeur lue, tronquée (rejet d’import). Chaîne vide si la cellule est vide. |
+| `correction` | Correction attendue, en français (rejet d’import) |
 | `action` | `{ "label", "href" }` lien interne de résolution |
-| `help` | Identifiant optionnel du glossaire (`fec`, `extourne`, `a-nouveaux`, …). Absent si le code n’a pas d’entrée. Une valeur inconnue est ignorée par l’interface. |
-| `issues` | Liste d’erreurs de validation (champ + message, et `help` optionnel) |
+| `help` | Identifiant optionnel du glossaire (`fec`, `extourne`, `a-nouveaux`, `import-csv`, …). Absent si le code n’a pas d’entrée. Une valeur inconnue est ignorée par l’interface. |
+| `issues` | Liste d’erreurs de validation ou de rejet d’import (champ, message, et le cas échéant `line`, `column`, `value`, `correction`, `help`) |
 
 Les erreurs Pydantic (`422`) sont normalisées en `VALIDATION_ERROR` avec `issues`. Les refus métier (`fail()`) renvoient `code`, `message` et, le cas échéant, `field`, `line`, `action`, `help` ou `issues`.
 
@@ -25,7 +28,9 @@ Un téléchargement de liasse, de PDF, de FEC ou de dossier de contrôle refusé
 
 - **Champ** : message sous le contrôle, relié par `aria-describedby`.
 - **Métier** : bandeau avec message, pastille d’aide lorsque `help` (ou le code) désigne une entrée du glossaire, et lien `action` (ex. ouvrir Comptabilité).
-- **Import** : liste « Ligne n : … » lorsque `line` est présent.
+- **Import** : liste « Ligne n, colonne Col : message. Valeur « … ». Correction attendue : … » lorsque `line` est présent. `column`, `value` et `correction` sont omis s’ils ne s’appliquent pas.
+
+L’assistant d’import (`POST /api/operations/imports/{profil}/preview` et `/commit`, profils `bank`, `operations`, `loan_payments`) renvoie ces rejets dans `issues` et sur chaque ligne en erreur, avec `location: "import"`. Le fichier des rejets reprend les mêmes colonnes françaises et une colonne `Correction`. Les anciens points `POST /api/operations/bank/import`, `/import` et `/loans/{id}/payments/import` restent inchangés : un refus y arrête tout le fichier.
 - **Chargement** : chaque écran distingue `idle`, `loading`, `error`, `empty` et `loaded`. Une erreur de lecture affiche ce `detail` (`ApiErrorAlert`) et un bouton **Réessayer**. L’indicateur de chargement disparaît. `empty` n’apparaît qu’après une réponse réussie sans donnée : une panne n’est pas un dossier vide.
 
 Lorsqu’un rafraîchissement échoue et que les données précédentes ne sont pas des montants calculés (états comptables, balance, grand livre, à-nouveaux), elles restent visibles avec la mention « Ces informations peuvent être périmées ». Les totaux et la prévisualisation des à-nouveaux sont retirés. Les cartes de posture (Provisoire, Bloquée, Finale) restent affichées dans ce cas : le serveur refuse toujours un téléchargement bloqué.

@@ -45,10 +45,10 @@ function mockApi(options: {
     if (url === "/api/operations/properties") return response(properties);
     if (url === "/api/operations/banks") return response(banks);
     if (url === "/api/operations/loans") return response(options.loans ?? []);
-    if (url === "/api/operations/loans/1/payments/import/preview") {
+    if (url === "/api/operations/imports/loan_payments/preview") {
       return options.loanPreviewResponse ?? response(options.loanPreview ?? {});
     }
-    if (url === "/api/operations/loans/1/payments/import") {
+    if (url === "/api/operations/imports/loan_payments/commit") {
       return response({ ...((options.loanPreview ?? {}) as object), imported: 1 });
     }
     if (url.startsWith("/api/operations?")) return response([{
@@ -82,7 +82,8 @@ describe("OperationsPage", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Transactions/ }));
     await userEvent.click(await screen.findByText("Importer depuis Google Sheets ou un CSV"));
     expect(screen.getByText(/sinon elle reste à régler/)).toBeInTheDocument();
-    expect(screen.getByText(/kind date piece_date type counterparty amount description piece_reference source_file/)).toBeInTheDocument();
+    expect(screen.getByText(/Nature, Date, Date de la pièce/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Télécharger le modèle CSV" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Prévisualiser les justificatifs" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Prévisualiser les justificatifs" })).toHaveAttribute("aria-describedby", "operation-preview-causes");
     expect(document.getElementById("operation-preview-causes")).toHaveTextContent("Collez ou chargez un fichier");
@@ -120,14 +121,29 @@ describe("OperationsPage", () => {
         interest_rate_basis_points: 150,
       }],
       loanPreview: {
-        count: 1, source_count: 2, imported: 0, outside_year: 1, future: 0,
-        loan_reference: "085644F", preview_token: "a".repeat(64),
+        ready: true,
+        headers: ["Prêt", "Date", "Capital", "Total banque"],
+        fields: [
+          { key: "loan_reference", label: "Prêt", required: true, help: "emprunt" },
+          { key: "due_date", label: "Date", required: true, help: "emprunt" },
+          { key: "principal", label: "Capital", required: true, help: "compte-164" },
+          { key: "amount", label: "Total banque", required: true, help: "emprunt" },
+        ],
+        mapping: {},
+        issues: [],
+        loan_reference: "085644F",
+        rejects_csv: "",
+        imported: 0,
+        summary: { valid: 1, duplicate: 0, warning: 1, error: 0, count: 2, importable: 1 },
         rows: [{
-          loan_reference: "085644F", rank: "1", due_date: "2025-03-05",
-          date: "2025-03-05",
-          principal: "100.00", interest: "20.00", insurance: "5.00",
-          other_costs: "0.00", amount: "125.00", duplicate: false,
-          piece_reference: "ECH-164000-2025-03-05",
+          line: 2, status: "valid", importable: true, duplicate: false, suggested_account: null,
+          display: { loan_reference: "085644F", due_date: "05/03/2025", principal: "100,00", amount: "125,00" },
+          issues: [], warnings: [],
+        }, {
+          line: 3, status: "warning", importable: false, duplicate: false, suggested_account: null,
+          display: { loan_reference: "085644F", due_date: "05/01/2024", principal: "80,00", amount: "90,00" },
+          issues: [],
+          warnings: [{ code: "DATE_OUTSIDE_YEAR", message: "Échéance hors exercice.", line: 3 }],
         }],
       },
     });
@@ -143,10 +159,11 @@ describe("OperationsPage", () => {
       },
     });
     await userEvent.click(screen.getByRole("button", { name: "Prévisualiser les échéances" }));
-    expect(await screen.findByText(/1 échéance\(s\) retenue\(s\) sur 2/)).toBeInTheDocument();
-    expect(screen.getByText("100.00 €")).toBeInTheDocument();
-    expect(screen.getByText("20.00 €")).toBeInTheDocument();
-    expect(screen.getByText("5.00 €")).toBeInTheDocument();
+    expect(await screen.findByText(/1 valide\(s\)/)).toBeInTheDocument();
+    expect(screen.getByText(/1 avertissement\(s\)/)).toBeInTheDocument();
+    expect(screen.getByText("100,00")).toBeInTheDocument();
+    expect(screen.getByText("Valide")).toBeInTheDocument();
+    expect(screen.getByText("Avertissement")).toBeInTheDocument();
     const importButton = screen.getByRole("button", { name: "Comptabiliser les échéances" });
     expect(importButton).toBeDisabled();
     await userEvent.click(screen.getByRole("checkbox", { name: /prêt source 085644F/ }));
@@ -154,11 +171,11 @@ describe("OperationsPage", () => {
     await userEvent.click(importButton);
     expect(await screen.findByText(/1 échéance\(s\) comptabilisée\(s\)/)).toBeInTheDocument();
     const importCall = fetcher.mock.calls.find(([url]) =>
-      url === "/api/operations/loans/1/payments/import"
+      url === "/api/operations/imports/loan_payments/commit"
     );
     const importedBody = JSON.parse(String(importCall?.[1]?.body)) as Record<string, unknown>;
-    expect(importedBody.preview_token).toBe("a".repeat(64));
     expect(importedBody.confirmed_loan_reference).toBe("085644F");
+    expect(importedBody.loan_id).toBe(1);
   });
 
   it("discards a late loan preview after the pasted content changes", async () => {
@@ -187,7 +204,7 @@ describe("OperationsPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Prévisualiser les échéances" })).toBeEnabled();
     });
-    expect(screen.queryByText(/échéance\(s\) retenue\(s\)/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/valide\(s\)/)).not.toBeInTheDocument();
   });
 
   it("prefills loyer type and an automatic piece reference on new revenue", async () => {

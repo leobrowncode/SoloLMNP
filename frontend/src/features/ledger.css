@@ -26,6 +26,11 @@
 .field-hint { font-size: .82rem; color: #5b7466; line-height: 1.35; }
 .field-error { font-size: .82rem; color: #852800; line-height: 1.35; }
 .import-error-lines { margin: .35rem 0 0; padding-left: 1.2rem; }
+.import-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .75rem; }
+.import-row-valid { background: #f3faf4; }
+.import-row-duplicate { background: #f4f6f4; }
+.import-row-warning { background: #fff9ef; }
+.import-row-error { background: #fff0eb; }
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
