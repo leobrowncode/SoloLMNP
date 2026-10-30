@@ -1,5 +1,6 @@
 import { outputLabel, outputTrust, readyToCopy } from "./outputStatus";
 import GlossaryTip from "./GlossaryTip";
+import { enumLabel, formatAmount, formatEuros, formatIsoDate } from "../lib/format";
 
 interface Field {
   code: string;
@@ -58,15 +59,9 @@ export interface Worksheet {
   };
 }
 
-const LEVEL_LABELS: Record<string, string> = {
-  info: "Information",
-  warning: "Avertissement",
-  error: "Erreur",
-};
-
 function levelLabel(level?: string): string {
-  if (!level) return "Avertissement";
-  return LEVEL_LABELS[level] ?? level;
+  if (!level) return enumLabel("worksheetLevel", "warning");
+  return enumLabel("worksheetLevel", level);
 }
 
 const FORMS: [string, string][] = [
@@ -80,8 +75,8 @@ const FORMS: [string, string][] = [
 
 function frDate(value?: string): string {
   if (!value) return "—";
-  const [y, m, d] = value.split("-");
-  return `${d}/${m}/${y}`;
+  const shown = formatIsoDate(value);
+  return shown === value.trim() ? value : shown;
 }
 
 export default function LiasseSheet({ worksheet }: { worksheet: Worksheet }) {
@@ -168,7 +163,7 @@ export default function LiasseSheet({ worksheet }: { worksheet: Worksheet }) {
                   <tr key={field.code}>
                     <td>{field.official_case ?? "—"}</td>
                     <td>{field.label}</td>
-                    <td>{field.value}</td>
+                    <td>{formatAmount(field.value)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -182,18 +177,18 @@ export default function LiasseSheet({ worksheet }: { worksheet: Worksheet }) {
           <table>
             <caption>État de suivi des amortissements non déduits (art. 39 C) — à conserver avec la liasse</caption>
             <tbody>
-              <tr><td>Dotation comptable de l’exercice</td><td>{tracking.accounting_depreciation} €</td></tr>
-              <tr><td>Plafond (loyers − autres charges)</td><td>{tracking.capacity} €</td></tr>
-              <tr><td>Dotation déduite cette année</td><td>{tracking.deducted_current} €</td></tr>
-              <tr><td>Non déduite, réintégrée ligne 318</td><td>{tracking.deferred_current} €</td></tr>
-              <tr><td>Reprise d’années antérieures, déduite ligne 350</td><td>{tracking.prior_used} €</td></tr>
+              <tr><td>Dotation comptable de l’exercice</td><td>{formatEuros(tracking.accounting_depreciation)}</td></tr>
+              <tr><td>Plafond (loyers − autres charges)</td><td>{formatEuros(tracking.capacity)}</td></tr>
+              <tr><td>Dotation déduite cette année</td><td>{formatEuros(tracking.deducted_current)}</td></tr>
+              <tr><td>Non déduite, réintégrée ligne 318</td><td>{formatEuros(tracking.deferred_current)}</td></tr>
+              <tr><td>Reprise d’années antérieures, déduite ligne 350</td><td>{formatEuros(tracking.prior_used)}</td></tr>
               {tracking.prior.map((row) => (
                 <tr key={row.origin_year}>
-                  <td>Stock {row.origin_year} : {row.opening} €, repris {row.used} €</td>
-                  <td>reste {row.remaining} €</td>
+                  <td>Stock {row.origin_year} : {formatEuros(row.opening)}, repris {formatEuros(row.used)}</td>
+                  <td>reste {formatEuros(row.remaining)}</td>
                 </tr>
               ))}
-              <tr><td><strong>Stock total reporté</strong></td><td><strong>{tracking.remaining_total} €</strong></td></tr>
+              <tr><td><strong>Stock total reporté</strong></td><td><strong>{formatEuros(tracking.remaining_total)}</strong></td></tr>
             </tbody>
           </table>
         </div>
@@ -209,14 +204,14 @@ export default function LiasseSheet({ worksheet }: { worksheet: Worksheet }) {
                 <tr key={line.case}>
                   <td>{line.case} <span className="field-hint">(déclarant 2 : {line.case_declarant_2})</span></td>
                   <td>{line.label}</td>
-                  <td>{line.amount}</td>
+                  <td>{formatAmount(line.amount)}</td>
                 </tr>
               ))}
               {personal.prior_deficits?.map((row) => (
                 <tr key={row.origin_year}>
                   <td>{row.case ?? "à vérifier"}</td>
                   <td>Déficit LMNP {row.origin_year} non encore imputé</td>
-                  <td>{row.amount}</td>
+                  <td>{formatAmount(row.amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -233,7 +228,7 @@ export default function LiasseSheet({ worksheet }: { worksheet: Worksheet }) {
             <tbody>
               {worksheet.by_property?.map((row) => (
                 <tr key={row.property_id}>
-                  <td>{row.name}</td><td>{row.rents}</td><td>{row.expenses}</td><td>{row.depreciation}</td>
+                  <td>{row.name}</td><td>{formatAmount(row.rents)}</td><td>{formatAmount(row.expenses)}</td><td>{formatAmount(row.depreciation)}</td>
                 </tr>
               ))}
             </tbody>

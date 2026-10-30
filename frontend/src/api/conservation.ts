@@ -1,3 +1,5 @@
+import { formatTimestamp } from "../lib/format";
+
 export interface EntryChoice {
   entry_number: string | null;
   accounting_date: string;
@@ -43,11 +45,7 @@ export interface RestorePreview {
 }
 
 export function frStamp(value: string): string {
-  const day = value.slice(0, 10);
-  const [year, month, date] = day.split("-");
-  if (!year || !month || !date) return value;
-  const time = value.length >= 16 ? value.slice(11, 16) : "";
-  return time ? `${date}/${month}/${year} ${time}` : `${date}/${month}/${year}`;
+  return formatTimestamp(value);
 }
 
 export function octets(size: number): string {

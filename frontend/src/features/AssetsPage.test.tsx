@@ -32,10 +32,10 @@ test.each([200, 409])("keeps calculated periods when the initial read finishes l
   expect(await screen.findByText("Terrain protégé : aucun plan d’amortissement")).toBeInTheDocument();
   // Click as soon as the control is rendered; do not wait for the initial read.
   fireEvent.click(screen.getByRole("button", { name: "Calculer les périodes" }));
-  expect(await screen.findAllByText("120.92 €")).toHaveLength(2);
+  expect(await screen.findAllByText("120,92 €")).toHaveLength(2);
   expect(screen.getByText("184")).toBeInTheDocument();
   await act(async () => { initial.resolve(response(status === 200 ? [] : { detail: { message: "Ancienne erreur" } }, status)); });
-  expect(screen.getAllByText("120.92 €")).toHaveLength(2);
+  expect(screen.getAllByText("120,92 €")).toHaveLength(2);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(fetch).toHaveBeenCalledWith("/api/assets/years/1/calculate", expect.objectContaining({ method: "POST" }));
 });
@@ -49,7 +49,7 @@ test.each([200, 409])("ignores a calculation from the previous year (%s)", async
     return response([period]);
   });
   render(<AssetsPage />);
-  expect(await screen.findAllByText("120.92 €")).toHaveLength(2);
+  expect(await screen.findAllByText("120,92 €")).toHaveLength(2);
   fireEvent.click(screen.getByRole("button", { name: "Calculer les périodes" }));
   fireEvent.change(screen.getByLabelText("Exercice"), { target: { value: "2" } });
   expect(screen.queryByText("Mobilier")).not.toBeInTheDocument();
@@ -57,8 +57,8 @@ test.each([200, 409])("ignores a calculation from the previous year (%s)", async
   await act(async () => { nextYear.resolve(response([{ ...period, id: 3, target_label: "Mobilier 2026", amount: "240.00", accumulated: "360.92" }])); });
   await act(async () => { calculation.resolve(response(status === 200 ? [period] : { detail: { message: "Ancienne erreur" } }, status)); });
   expect(screen.getByText("Mobilier 2026")).toBeInTheDocument();
-  expect(screen.getByText("240.00 €")).toBeInTheDocument();
-  expect(screen.queryByText("120.92 €")).not.toBeInTheDocument();
+  expect(screen.getByText("240,00 €")).toBeInTheDocument();
+  expect(screen.queryByText("120,92 €")).not.toBeInTheDocument();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });
@@ -141,12 +141,12 @@ test("previews a dwelling plan, cancels it, then confirms without duplicating", 
   expect(screen.getByText("Terrain — Bien fictif")).toBeInTheDocument();
   expect(screen.getByText("Construction — Bien fictif")).toBeInTheDocument();
   expect(screen.getByText("Gros œuvre")).toBeInTheDocument();
-  expect(screen.getByText("20000.00 €")).toBeInTheDocument();
+  expect(screen.getByText("20 000,00 €")).toBeInTheDocument();
   expect(screen.getByText("211000")).toBeInTheDocument();
   expect(screen.getAllByText("281300")).toHaveLength(2);
   expect(screen.getAllByText("213000")).toHaveLength(2);
   expect(screen.getAllByText("480 mois")).toHaveLength(2);
-  expect(screen.getAllByText("2025-01-01").length).toBeGreaterThanOrEqual(3);
+  expect(screen.getAllByText("01/01/2025").length).toBeGreaterThanOrEqual(3);
   fireEvent.click(screen.getByRole("button", { name: "Annuler l’aperçu" }));
   expect(screen.queryByText("Gros œuvre")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Créer les immobilisations affichées" })).not.toBeInTheDocument();

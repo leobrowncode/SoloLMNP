@@ -36,7 +36,7 @@ describe("manual inventory", () => {
     expect(screen.queryByRole("option", { name: "401000 · Inactif" })).not.toBeInTheDocument();
     await fill();
     expect(fetcher).not.toHaveBeenCalled();
-    expect(screen.getByRole("table")).toHaveTextContent("123.45");
+    expect(screen.getByRole("table")).toHaveTextContent("123,45");
     await userEvent.click(screen.getByRole("button", { name: "Confirmer la comptabilisation" }));
     expect(await screen.findByRole("status")).toHaveTextContent("2025-000010");
     const [url, init] = fetcher.mock.calls[0]!;

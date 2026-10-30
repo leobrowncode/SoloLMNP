@@ -15,6 +15,8 @@ import { useMutation } from "./useMutation";
 import {
   beginLoad, defer, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
 } from "./screenState";
+import FrenchFileInput from "../lib/FrenchFileInput";
+import FrenchForm from "../lib/FrenchForm";
 
 const TYPES: Record<string, string> = {
   "application/pdf": "application/pdf",
@@ -330,13 +332,15 @@ export default function ConservationPage() {
         <PrerequisiteList id="link-causes" causes={linkBlocked} />
       )}
       <EntryPicker selected={choice} onSelect={setChoice} />
-      <form onSubmit={(event) => { event.preventDefault(); void upload(); }}>
-        <label>
-          Justificatif PDF, JPEG ou PNG
-          <input ref={fileRef} type="file" accept="application/pdf,image/jpeg,image/png" disabled={busy} />
-        </label>
+      <FrenchForm onSubmit={(event) => { event.preventDefault(); void upload(); }}>
+        <FrenchFileInput
+          label="Justificatif PDF, JPEG ou PNG"
+          accept="application/pdf,image/jpeg,image/png"
+          inputRef={fileRef}
+          disabled={busy}
+        />
         <button type="submit" disabled={busy} aria-busy={busy || undefined}>Déposer le justificatif</button>
-      </form>
+      </FrenchForm>
 
       <h3 id="sauvegardes">Sauvegardes</h3>
       <div className="toolbar">

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { request, type Account, type Entry, type Journal } from "../api/ledger";
+import { amount, cents, request, type Account, type Entry, type Journal } from "../api/ledger";
 import { centralizationCauses, describedBy } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
+import { formatAmount, formatEuros } from "../lib/format";
+import FrenchForm from "../lib/FrenchForm";
 
 interface PreviewLine { account_number: string; label: string; debit: string; credit: string }
 interface ProposedAccount { number: string; label: string; account_type: string }
@@ -78,11 +80,20 @@ export default function ResultClosing({ year }: { year: number }) {
     const createAccounts = centralizing ? (preview.proposed_accounts ?? []).filter((account) => (
       account.number === resultAccount && !accounts.some((row) => row.number === account.number)
     )) : [];
+    let expectedAmount = "";
+    if (preview.already_posted) {
+      try {
+        expectedAmount = amount(cents(String(fields.get("amount") ?? "")));
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Montant invalide.");
+        return;
+      }
+    }
     const next: Saved = preview.already_posted ? {
       kind: "appropriation", request_id: saved?.kind === "appropriation" ? saved.request_id : crypto.randomUUID(),
       journal_code: journal, piece_reference: piece, justification,
       result_account: null, create_accounts: [], source_account: String(fields.get("source")),
-      target_account: String(fields.get("target")), expected_amount: String(fields.get("amount")),
+      target_account: String(fields.get("target")), expected_amount: expectedAmount,
     } : {
       kind: "centralization", request_id: saved?.kind === "centralization" ? saved.request_id : crypto.randomUUID(),
       journal_code: journal, piece_reference: piece, justification,
@@ -160,11 +171,11 @@ export default function ResultClosing({ year }: { year: number }) {
     <MutationStatus step={step} />
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
     {receipt && <p role="status">{receipt}</p>}
-    {preview && !preview.already_posted && <form onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(event.currentTarget); }}>
-      <p>Résultat à centraliser : {preview.result} €. Brouillons exclus : {preview.excluded_draft_count}.</p>
+    {preview && !preview.already_posted && <FrenchForm onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(event.currentTarget); }}>
+      <p>Résultat à centraliser : {formatEuros(preview.result)}. Brouillons exclus : {preview.excluded_draft_count}.</p>
       <table><caption>Écriture de centralisation proposée</caption>
         <thead><tr><th>Compte</th><th>Libellé</th><th>Débit</th><th>Crédit</th></tr></thead>
-        <tbody>{shownLines.map((line) => <tr key={`${line.account_number}-${line.label}`}><td>{line.account_number || "À confirmer"}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td></tr>)}</tbody>
+        <tbody>{shownLines.map((line) => <tr key={`${line.account_number}-${line.label}`}><td>{line.account_number || "À confirmer"}</td><td>{line.label}</td><td>{formatAmount(line.debit)}</td><td>{formatAmount(line.credit)}</td></tr>)}</tbody>
       </table>
       {!!proposed.length && <div>
         <p>Comptes absents, création proposée à la confirmation :</p>
@@ -181,8 +192,8 @@ export default function ResultClosing({ year }: { year: number }) {
       <button type="submit" disabled={busy || centralCauses.length > 0} aria-busy={busy || undefined} aria-describedby={describedBy(centralCauseId, centralCauses)}>{review ? "Confirmer la centralisation" : "Vérifier la centralisation"}</button>
       <PrerequisiteList id={centralCauseId} causes={centralCauses} />
       {review && <button type="button" disabled={busy} onClick={() => setReview(false)}>Corriger</button>}
-    </form>}
-    {preview?.already_posted && appropriation && !appropriation.already_posted && <form onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(event.currentTarget); }}>
+    </FrenchForm>}
+    {preview?.already_posted && appropriation && !appropriation.already_posted && <FrenchForm onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(event.currentTarget); }}>
       <p>La centralisation est déjà comptabilisée. Choisissez l’affectation du solde restant.</p>
       {!appropriation.proposals.length && <p>Aucun solde 120 ou 129 à affecter.</p>}
       {!!appropriation.proposals.length && <>
@@ -191,8 +202,8 @@ export default function ResultClosing({ year }: { year: number }) {
             const chosen = appropriation.proposals.find((item) => item.source_account === event.target.value);
             const amount = event.currentTarget.form?.elements.namedItem("amount");
             if (chosen && amount instanceof HTMLInputElement) amount.value = chosen.amount;
-          }}>{appropriation.proposals.map((item) => <option key={item.source_account} value={item.source_account}>{item.source_account} · {item.amount} €</option>)}</select></label>
-          <label>Montant confirmé<input name="amount" required defaultValue={appropriation.proposals[0]?.amount ?? ""} /></label>
+          }}>{appropriation.proposals.map((item) => <option key={item.source_account} value={item.source_account}>{item.source_account} · {formatEuros(item.amount)}</option>)}</select></label>
+          <label>Montant confirmé<input name="amount" required data-money="true" lang="fr" placeholder="1 234,56" inputMode="decimal" defaultValue={appropriation.proposals[0]?.amount ?? ""} /></label>
           <label>Compte d’affectation<select name="target" required>{accounts.filter((account) => account.active && account.account_type === "EQUITY" && !account.number.startsWith("120") && !account.number.startsWith("129")).map((account) => <option key={account.number} value={account.number}>{account.number} · {account.label}</option>)}</select></label>
           <label>Journal<select name="journal" required>{general.map((journal) => <option key={journal.code} value={journal.code}>{journal.code}</option>)}</select></label>
           <label>Référence de pièce<input name="piece" required maxLength={200} /></label>
@@ -201,7 +212,7 @@ export default function ResultClosing({ year }: { year: number }) {
         {review && <p>Vérifiez le compte destinataire avant de valider l’affectation.</p>}
         <button type="submit" disabled={busy} aria-busy={busy || undefined}>{review ? "Confirmer l’affectation" : "Vérifier l’affectation"}</button>
       </>}
-    </form>}
+    </FrenchForm>}
     {appropriation?.already_posted && <p>L’affectation de cet exercice est déjà comptabilisée.</p>}
   </section>;
 }

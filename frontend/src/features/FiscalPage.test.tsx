@@ -181,7 +181,7 @@ test("shows a simple LMNP charges dashboard with help tips and EFI disclaimer", 
   expect(screen.getByRole("slider", { name: /Dotation de l’année/ })).toBeInTheDocument();
   const resultRow = screen.getByText("Résultat fiscal").closest("li");
   expect(resultRow).toBeTruthy();
-  expect(within(resultRow as HTMLElement).getByText("0.00 €")).toBeInTheDocument();
+  expect(within(resultRow as HTMLElement).getByText("0,00 €")).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Liasse à recopier" }));
   const sheet = await screen.findByText((_, node) => (
@@ -278,7 +278,7 @@ test("closing reloads the exercise status, the dashboard and the frozen exports"
 
   render(<FiscalPage />);
   expect(await screen.findByRole("option", { name: "2025 · ouvert" })).toBeInTheDocument();
-  expect(await screen.findByText("-200.00 €")).toBeInTheDocument();
+  expect(await screen.findByText("-200,00 €")).toBeInTheDocument();
   expect(await screen.findByText(/exigent un exercice clôturé/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Télécharger le FEC" })).toBeDisabled();
 
@@ -300,8 +300,8 @@ test("closing reloads the exercise status, the dashboard and the frozen exports"
   expect(screen.getByRole("button", { name: "Télécharger le dossier de contrôle" })).toBeEnabled();
   expect(screen.getAllByText("Finale").length).toBeGreaterThan(0);
   expect(document.querySelector('a[href*="/api/filing"]')).toBeNull();
-  expect(screen.getByText("60.00 €")).toBeInTheDocument();
-  expect(screen.queryByText("-200.00 €")).not.toBeInTheDocument();
+  expect(screen.getByText("60,00 €")).toBeInTheDocument();
+  expect(screen.queryByText("-200,00 €")).not.toBeInTheDocument();
   expect(screen.getByText(/Exercice clôturé/)).toBeInTheDocument();
 });
 
@@ -476,7 +476,7 @@ test("reloads the last calculation with its date and ledger fingerprint", async 
     isFiscalRead(url, method) ? response(storedComputation()) : null
   ));
   render(<FiscalPage />);
-  expect(await screen.findByText("12.34 €")).toBeInTheDocument();
+  expect(await screen.findByText("12,34 €")).toBeInTheDocument();
   expect(document.querySelector("time")).toHaveAttribute("datetime", "2026-03-02T08:15:00Z");
   expect(screen.getByText(/Calcul du/)).toBeInTheDocument();
   expect(screen.getByText(`Empreinte ${STORED}`)).toBeInTheDocument();
@@ -493,7 +493,7 @@ test("marks an invalidated calculation obsolete even when the fingerprints still
   ));
   render(<FiscalPage />);
   expect(await screen.findByText("Obsolète")).toBeInTheDocument();
-  expect(screen.getByText("12.34 €")).toBeInTheDocument();
+  expect(screen.getByText("12,34 €")).toBeInTheDocument();
   expect(screen.queryByText("Correspond au ledger")).not.toBeInTheDocument();
 });
 
@@ -509,7 +509,7 @@ test("marks a stored result obsolete when the structuring fingerprint differs", 
   ));
   render(<FiscalPage />);
   expect(await screen.findByText("Obsolète")).toBeInTheDocument();
-  expect(screen.getByText("12.34 €")).toBeInTheDocument();
+  expect(screen.getByText("12,34 €")).toBeInTheDocument();
   expect(screen.queryByText("Correspond au ledger")).not.toBeInTheDocument();
 });
 
@@ -519,7 +519,7 @@ test("marks a stored result obsolete as soon as the ledger fingerprint differs",
   ));
   render(<FiscalPage />);
   expect(await screen.findByText("Obsolète")).toBeInTheDocument();
-  expect(screen.getByText("12.34 €")).toBeInTheDocument();
+  expect(screen.getByText("12,34 €")).toBeInTheDocument();
   expect(screen.getByText(`Empreinte ${STORED}`)).toBeInTheDocument();
   expect(screen.queryByText("Correspond au ledger")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Calculer le résultat fiscal" })).toBeEnabled();
@@ -539,14 +539,14 @@ test("a failed recalculation drops the previous result and a later success repla
     return null;
   });
   render(<FiscalPage />);
-  expect(await screen.findByText("12.34 €")).toBeInTheDocument();
+  expect(await screen.findByText("12,34 €")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Calculer le résultat fiscal" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("La réintégration dépasse la charge.");
-  expect(screen.queryByText("12.34 €")).not.toBeInTheDocument();
+  expect(screen.queryByText("12,34 €")).not.toBeInTheDocument();
   expect(screen.queryByText("Correspond au ledger")).not.toBeInTheDocument();
   expect(screen.queryByText("Obsolète")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Calculer le résultat fiscal" }));
-  expect(await screen.findByText("56.78 €")).toBeInTheDocument();
+  expect(await screen.findByText("56,78 €")).toBeInTheDocument();
   expect(screen.getByText("Correspond au ledger")).toBeInTheDocument();
   expect(screen.queryByText("Obsolète")).not.toBeInTheDocument();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();

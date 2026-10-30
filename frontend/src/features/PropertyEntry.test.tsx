@@ -38,7 +38,7 @@ test("previews then posts the property entry with loans and pre-start costs", as
   fireEvent.change(screen.getByLabelText(/Intérêts d’emprunt payés avant/), { target: { value: "1200" } });
   expect(screen.getByRole("button", { name: "Comptabiliser" })).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "Prévisualiser l’écriture" }));
-  expect(await screen.findByText(/apport de l’exploitant 1078.00 €/)).toBeInTheDocument();
+  expect(await screen.findByText(/apport de l’exploitant/)).toHaveTextContent("apport de l’exploitant 1 078,00 €");
   expect(bodies[0]).toMatchObject({
     confirm: false,
     loans: [{ loan_id: 1, outstanding: "14884.00" }],

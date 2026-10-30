@@ -24,6 +24,7 @@ import GlossaryTip from "./GlossaryTip";
 import ReviewForm, { type Field } from "./ReviewForm";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
+import { ENUM_LABELS, enumLabel, formatEuros, formatIsoDate } from "../lib/format";
 import "./ledger.css";
 
 interface Editor {
@@ -32,10 +33,8 @@ interface Editor {
   help?: string;
   derive?: ((draft: Record<string, string>, changed: string) => Partial<Record<string, string>>) | undefined;
 }
-const categories: [string, string][] = [
-  ["BUILDING", "Construction"], ["FURNITURE", "Mobilier"], ["EQUIPMENT", "Équipement"],
-  ["IMPROVEMENT", "Travaux immobilisés"], ["OTHER", "Autre immobilisation"],
-];
+const categories = (Object.entries(ENUM_LABELS.assetCategory) as [string, string][])
+  .filter(([code]) => code !== "LAND");
 interface PlanItem {
   kind: "LAND" | "BUILDING" | "COMPONENT";
   label: string;
@@ -55,9 +54,7 @@ interface DwellingPlan {
   created: boolean;
 }
 function planKind(kind: PlanItem["kind"]): string {
-  if (kind === "LAND") return "Terrain";
-  if (kind === "BUILDING") return "Construction";
-  return "Composant";
+  return enumLabel("planKind", kind);
 }
 
 export default function AssetsPage() {
@@ -135,7 +132,7 @@ export default function AssetsPage() {
     );
     const fields: Field[] = [
       property,
-      { name: "category", label: "Catégorie", choices: land ? [["LAND", "Terrain — jamais amorti"]] : categories },
+      { name: "category", label: "Catégorie", choices: land ? [["LAND", `${enumLabel("assetCategory", "LAND")} — jamais amorti`]] : categories },
       { name: "label", label: "Libellé" },
       { name: "acquisition_date", label: "Date d’acquisition", type: "date" },
       { name: "service_start_date", label: "Date de mise en service", type: "date" },
@@ -143,7 +140,7 @@ export default function AssetsPage() {
       { name: "depreciable_value", label: "Valeur amortissable (€)", money: true, value: land ? "0.00" : undefined },
       { name: "non_depreciable_value", label: "Valeur non amortissable (€)", money: true, value: land ? undefined : "0.00" },
       { name: "residual_value", label: "Valeur résiduelle (€)", money: true, value: "0.00" },
-      { name: "method", label: "Méthode", choices: land ? [["NONE", "Aucune — terrain"]] : [["LINEAR", "Linéaire"]] },
+      { name: "method", label: "Méthode", choices: land ? [["NONE", `${enumLabel("depreciationMethod", "NONE")} — terrain`]] : [["LINEAR", enumLabel("depreciationMethod", "LINEAR")]] },
       { name: "useful_life_months", label: "Durée d’utilisation en mois", type: "number", optional: land },
       {
         name: "asset_account", label: "Compte d’immobilisation", value: assetAccount,
@@ -494,18 +491,18 @@ export default function AssetsPage() {
         <div className="ledger-table">
           <table>
             <caption>
-              Aperçu non enregistré · base amortissable {visiblePlan.depreciable_base} € · frais inclus {visiblePlan.acquisition_costs_included} €
+              Aperçu non enregistré · base amortissable {formatEuros(visiblePlan.depreciable_base)} · frais inclus {formatEuros(visiblePlan.acquisition_costs_included)}
             </caption>
             <thead><tr><th>Élément</th><th>Libellé</th><th>Montant</th><th>Compte</th><th>Amortissement</th><th>Durée</th><th>Mise en service</th></tr></thead>
             <tbody>
               {visiblePlan.items.map((item) => <tr key={`${item.kind}-${item.label}`}>
                 <td>{planKind(item.kind)}</td>
                 <td>{item.label}</td>
-                <td>{item.amount} €</td>
+                <td>{formatEuros(item.amount)}</td>
                 <td>{item.asset_account}</td>
                 <td>{item.depreciation_account ?? "—"}</td>
                 <td>{item.useful_life_months === null ? "Non amortissable" : `${item.useful_life_months} mois`}</td>
-                <td>{item.service_start_date}</td>
+                <td>{formatIsoDate(item.service_start_date)}</td>
               </tr>)}
             </tbody>
           </table>
@@ -523,8 +520,8 @@ export default function AssetsPage() {
       />
       {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} help={editor.help} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} derive={editor.derive} locked={busy} />}
       {assets.map((row) => <article className="entry-card" key={row.id}><h3>{row.label}</h3>
-        <p>{row.category} · Valeur {row.acquisition_value} € · Base {row.depreciable_value} € · Non amortissable {row.non_depreciable_value} €</p>
-        <p>{row.category === "LAND" ? "Terrain protégé : aucun plan d’amortissement" : `Linéaire sur ${row.useful_life_months} mois · ${row.asset_account} / ${row.depreciation_account}`}</p>
+        <p>{enumLabel("assetCategory", row.category)} · Valeur {formatEuros(row.acquisition_value)} · Base {formatEuros(row.depreciable_value)} · Non amortissable {formatEuros(row.non_depreciable_value)}</p>
+        <p>{row.category === "LAND" ? "Terrain protégé : aucun plan d’amortissement" : `${enumLabel("depreciationMethod", row.method ?? "LINEAR")} sur ${row.useful_life_months} mois · ${row.asset_account} / ${row.depreciation_account}`}</p>
         {row.account_warning && <p role="alert" className="ledger-error">{row.account_warning}</p>}
         {row.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
         {(row.correction?.calculated_periods ?? 0) > 0 && !locked(row.correction, "value") && (
@@ -536,7 +533,7 @@ export default function AssetsPage() {
         </div>
         {row.category === "BUILDING" && <p>Ajoutez tous les composants avant le premier calcul ; leur total doit couvrir exactement la base.</p>}
         {row.components.map((part) => <div key={part.id}>
-          <p>↳ {part.label} · {part.value} € · {part.useful_life_months} mois</p>
+          <p>↳ {part.label} · {formatEuros(part.value)} · {part.useful_life_months} mois</p>
           {part.account_warning && <p role="alert" className="ledger-error">{part.account_warning}</p>}
           {part.correction?.locks.map((lock) => <p className="form-help" key={`${part.id}-${lock.code}`}>{lock.message}</p>)}
           <div className="entry-actions">
@@ -562,7 +559,7 @@ export default function AssetsPage() {
         empty={<p>Aucune dotation calculée pour cet exercice.</p>}
       />
       <div className="ledger-table"><table><thead><tr><th>Actif / composant</th><th>Période</th><th>Jours</th><th>Dotation</th><th>Cumul</th><th>VNC de la base <GlossaryTip id="vnc" /></th><th>État</th></tr></thead><tbody>
-        {periods.map((row) => <tr key={row.id}><td>{row.target_label}</td><td>{row.period_start} → {row.period_end}</td><td>{row.days}</td><td>{row.amount} €</td><td>{row.accumulated} €</td><td>{row.net_book_value} €</td><td>{row.status === "POSTED" ? "Comptabilisée" : <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => setEditor({ title: `Comptabiliser ${row.target_label}`, path: `/periods/${row.id}/post`, retry: true, fields: [{ name: "piece_reference", label: "Référence de la pièce d’inventaire" }] })}>Comptabiliser</button>}</td></tr>)}
+        {periods.map((row) => <tr key={row.id}><td>{row.target_label}</td><td>{formatIsoDate(row.period_start)} → {formatIsoDate(row.period_end)}</td><td>{row.days}</td><td>{formatEuros(row.amount)}</td><td>{formatEuros(row.accumulated)}</td><td>{formatEuros(row.net_book_value)}</td><td>{row.status === "POSTED" ? enumLabel("periodStatus", row.status) : <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => setEditor({ title: `Comptabiliser ${row.target_label}`, path: `/periods/${row.id}/post`, retry: true, fields: [{ name: "piece_reference", label: "Référence de la pièce d’inventaire" }] })}>Comptabiliser</button>}</td></tr>)}
       </tbody></table></div>
     </>}
   </section>;

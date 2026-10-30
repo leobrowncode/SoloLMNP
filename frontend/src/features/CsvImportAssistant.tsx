@@ -17,13 +17,8 @@ import {
 import ApiErrorAlert from "./ApiErrorAlert";
 import GlossaryTip from "./GlossaryTip";
 import PrerequisiteList from "./PrerequisiteList";
-
-const STATUS_LABEL = {
-  valid: "Valide",
-  duplicate: "Doublon",
-  warning: "Avertissement",
-  error: "Erreur",
-} as const;
+import FrenchFileInput from "../lib/FrenchFileInput";
+import { enumLabel } from "../lib/format";
 
 const REJECT_FILE = {
   bank: "rejets-releve-bancaire.csv",
@@ -150,14 +145,19 @@ export default function CsvImportAssistant({
         UTF-8, séparateur point-virgule, décimales avec une virgule, dates JJ/MM/AAAA.
         Un fichier exporté avec une virgule ou collé depuis un tableur (tabulations) est lu aussi.
       </p>
-      <label>Fichier CSV (1 Mo maximum)<input type="file" accept=".csv,text/csv" disabled={busy} onChange={(event) => {
-        const file = event.target.files?.[0];
-        if (!file || busy) return;
-        void action(async () => {
-          if (file.size > 1_000_000) throw new Error("Fichier trop volumineux.");
-          updateContent(await file.text());
-        }, "Lecture du fichier…");
-      }} /></label>
+      <FrenchFileInput
+        label="Fichier CSV (1 Mo maximum)"
+        accept=".csv,text/csv"
+        disabled={busy}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (!file || busy) return;
+          void action(async () => {
+            if (file.size > 1_000_000) throw new Error("Fichier trop volumineux.");
+            updateContent(await file.text());
+          }, "Lecture du fichier…");
+        }}
+      />
       <label>{contentLabel}
         <textarea id={textareaId} rows={6} value={content} disabled={busy} onChange={(event) => updateContent(event.target.value)} />
       </label>
@@ -227,7 +227,7 @@ export default function CsvImportAssistant({
                   {preview.rows.map((row) => (
                     <tr key={row.line} className={`import-row-${row.status}`}>
                       <td>{row.line}</td>
-                      <td>{STATUS_LABEL[row.status]}</td>
+                      <td>{enumLabel("importStatus", row.status)}</td>
                       {preview.fields.map((field) => (
                         <td key={field.key}>{row.display[field.key] || "—"}</td>
                       ))}
