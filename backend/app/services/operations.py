@@ -617,9 +617,15 @@ def parse_csv(content: str) -> list[dict[str, Any]]:
         fail("CSV_INVALID", "CSV invalide : dates ISO et montants au centime requis.", 422)
 
 
-def import_csv(session: Session, bank_id: int, content: str, commit: bool) -> dict[str, Any]:
+def import_csv(
+    session: Session,
+    bank_id: int,
+    content: str,
+    commit: bool,
+    parsed_rows: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     bank(session, bank_id)
-    rows = parse_csv(content)
+    rows = parse_csv(content) if parsed_rows is None else parsed_rows
     result = []
     imported = 0
     for data in rows:
@@ -940,10 +946,11 @@ def import_operations_csv(
     content: str,
     commit: bool,
     bank_account_id: int | None = None,
+    parsed_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     property_exists(session, property_id)
     year = get_year(session, year_id, writable=True)
-    rows = parse_operations_csv(content)
+    rows = parse_operations_csv(content) if parsed_rows is None else parsed_rows
     if any(row["paid"] for row in rows):
         if bank_account_id is None:
             fail(
@@ -1268,13 +1275,21 @@ def import_loan_payments_csv(
     commit: bool,
     preview_token: str | None = None,
     confirmed_loan_reference: str | None = None,
+    prepared_rows: list[dict[str, str]] | None = None,
+    require_preview_token: bool = True,
 ) -> dict[str, Any]:
     loan = session.get(Loan, loan_id)
     if loan is None:
         fail("LOAN_NOT_FOUND", "Emprunt introuvable.", 404)
     year = get_year(session, year_id, writable=True)
     bank(session, bank_id)
-    source_rows = parse_loan_payments_csv(content)
+    source_rows = (
+        parse_loan_payments_csv(content)
+        if prepared_rows is None
+        else sorted(prepared_rows, key=lambda row: row["date"])
+    )
+    if not source_rows:
+        fail("LOAN_CSV_EMPTY", "Le tableau ne contient aucune échéance.", 422)
     loan_reference = source_rows[0]["loan_reference"]
     expected_preview_token = digest(
         {
@@ -1284,8 +1299,10 @@ def import_loan_payments_csv(
             "content_sha256": hashlib.sha256(content.encode()).hexdigest(),
         }
     )
-    if commit and (
-        preview_token != expected_preview_token or confirmed_loan_reference != loan_reference
+    if (
+        require_preview_token
+        and commit
+        and (preview_token != expected_preview_token or confirmed_loan_reference != loan_reference)
     ):
         fail(
             "LOAN_PREVIEW_REQUIRED",

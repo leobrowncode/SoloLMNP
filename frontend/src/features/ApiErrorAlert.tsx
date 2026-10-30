@@ -1,9 +1,18 @@
 import { useEffect, type Ref } from "react";
 import { Link } from "react-router-dom";
-import type { ApiErrorDetail, ApiErrorIssue } from "../api/errors";
-import { helpForError, importIssueLines, knownHelp } from "../api/errors";
+import { helpForError, importIssueLines, knownHelp, type ApiErrorDetail, type ApiErrorIssue } from "../api/errors";
 import GlossaryTip from "./GlossaryTip";
 import type { GlossaryId } from "./glossary";
+
+function rejectionLabel(issue: ApiErrorIssue): string {
+  if (issue.line === undefined) return issue.message;
+  const place = issue.column
+    ? `Ligne ${issue.line}, colonne ${issue.column}`
+    : `Ligne ${issue.line}`;
+  const value = issue.value ? ` Valeur « ${issue.value} ».` : issue.value === "" ? " Valeur vide." : "";
+  const correction = issue.correction ? ` Correction attendue : ${issue.correction}` : "";
+  return `${place} : ${issue.message}${value}${correction}`;
+}
 
 function issueHelp(issue: ApiErrorIssue, banner: GlossaryId | null): GlossaryId | null {
   const help = knownHelp(issue.help);
@@ -56,7 +65,7 @@ export default function ApiErrorAlert({
             const help = issueHelp(issue, bannerHelp);
             return (
               <li key={`${issue.code}-${issue.line}-${issue.message}`}>
-                Ligne {issue.line} : {issue.message}
+                {rejectionLabel(issue)}
                 {help && <GlossaryTip id={help} />}
               </li>
             );
