@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
 import { closeConfirmCauses, closePrepareCauses, describedBy, precheckAction } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
+import GlossaryTip from "./GlossaryTip";
 import ReopenYear from "./ReopenYear";
 
 interface Notice {
@@ -135,7 +136,11 @@ export default function CloseYear({
   }
 
   return <section aria-labelledby="close-title">
-    <h3 id="close-title" tabIndex={-1}>Pré-contrôle et clôture</h3>
+    <div className="heading-with-help">
+      <h3 id="close-title" tabIndex={-1}>Pré-contrôle et clôture</h3>
+      <GlossaryTip id="pre-controle" />
+      <GlossaryTip id="cloture" />
+    </div>
     <p>Le pré-contrôle vient après le calcul fiscal. Il bloque sur une erreur. Chaque avertissement affiché doit être accusé ; un nouveau pré-contrôle efface les cases précédentes. La réouverture ultérieure exige un motif et invalide les exports.</p>
     <button type="button" onClick={() => { void load(); }}>Lancer le pré-contrôle</button>
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}

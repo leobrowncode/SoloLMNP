@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
 import { describedBy, reopenCauses } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
+import GlossaryTip from "./GlossaryTip";
 
 const INVALIDATED = [
   "Les calculs fiscaux enregistrés pour cet exercice sont invalidés.",
@@ -61,7 +62,10 @@ export default function ReopenYear({
 
   return (
     <div className="reopen-year" aria-labelledby="reopen-title">
-      <h4 id="reopen-title" tabIndex={-1}>Réouvrir l’exercice</h4>
+      <div className="heading-with-help">
+        <h4 id="reopen-title" tabIndex={-1}>Réouvrir l’exercice</h4>
+        <GlossaryTip id="reouverture" />
+      </div>
       <p>Réservé à une correction justifiée. L’action est tracée dans l’audit.</p>
       <ul aria-label="Effets de la réouverture">
         {INVALIDATED.map((item) => <li key={item}>{item}</li>)}

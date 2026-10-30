@@ -18,6 +18,7 @@ import {
 } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
 import PropertyEntry from "./PropertyEntry";
+import GlossaryTip from "./GlossaryTip";
 import ReviewForm, { type Field } from "./ReviewForm";
 import "./ledger.css";
 
@@ -411,7 +412,13 @@ export default function AssetsPage() {
   const postCauseId = "asset-post-causes";
   const postDescribed = yearId ? describedBy(postCauseId, postCauses) : describedBy(periodCauseId, periodCauses);
   return <section id="assets" className="ledger-page" aria-labelledby="assets-title" data-screen-phase={boot.phase}>
-    <h2 id="assets-title">Immobilisations</h2>
+    <div className="heading-with-help">
+      <h2 id="assets-title">Immobilisations</h2>
+      <GlossaryTip id="immobilisation" />
+      <GlossaryTip id="amortissement" />
+      <GlossaryTip id="terrain" />
+      <GlossaryTip id="composant" />
+    </div>
     <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations. Le formulaire ne propose que les comptes de la catégorie. Un couple déjà enregistré et incohérent est signalé ; il n’est pas réécrit. Modifier une fiche demande un motif : tant qu’aucune dotation n’est comptabilisée, la valeur, la durée et les comptes peuvent être corrigés.</p>
     {error && <p role="alert" className="ledger-error">{error}</p>}{message && <p role="status">{message}</p>}
     <ScreenStatus
@@ -495,7 +502,7 @@ export default function AssetsPage() {
           </div>
         </div>)}
       </article>)}
-      <div className="section-heading" id="dotations" tabIndex={-1}><div><h3>Dotations comptables</h3><p>Le calcul en jours calendaires ne modifie jamais la couche fiscale.</p></div>
+      <div className="section-heading" id="dotations" tabIndex={-1}><div><div className="heading-with-help"><h3>Dotations comptables</h3><GlossaryTip id="dotation" /><GlossaryTip id="compte-681" /></div><p>Le calcul en jours calendaires ne modifie jamais la couche fiscale.</p></div>
         <label>Exercice<select value={yearId} onChange={(event) => {
           ++periodRequest.current;
           setPeriods([]); setError(""); setMessage(""); setEditor(null);
@@ -512,7 +519,7 @@ export default function AssetsPage() {
         loading={<p>Chargement des dotations…</p>}
         empty={<p>Aucune dotation calculée pour cet exercice.</p>}
       />
-      <div className="ledger-table"><table><thead><tr><th>Actif / composant</th><th>Période</th><th>Jours</th><th>Dotation</th><th>Cumul</th><th>VNC de la base</th><th>État</th></tr></thead><tbody>
+      <div className="ledger-table"><table><thead><tr><th>Actif / composant</th><th>Période</th><th>Jours</th><th>Dotation</th><th>Cumul</th><th>VNC de la base <GlossaryTip id="vnc" /></th><th>État</th></tr></thead><tbody>
         {periods.map((row) => <tr key={row.id}><td>{row.target_label}</td><td>{row.period_start} → {row.period_end}</td><td>{row.days}</td><td>{row.amount} €</td><td>{row.accumulated} €</td><td>{row.net_book_value} €</td><td>{row.status === "POSTED" ? "Comptabilisée" : <button onClick={() => setEditor({ title: `Comptabiliser ${row.target_label}`, path: `/periods/${row.id}/post`, retry: true, fields: [{ name: "piece_reference", label: "Référence de la pièce d’inventaire" }] })}>Comptabiliser</button>}</td></tr>)}
       </tbody></table></div>
     </>}

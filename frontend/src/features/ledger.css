@@ -390,6 +390,31 @@
 .help-tip-panel[hidden] {
   display: none !important;
 }
+.glossary-body {
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+  text-align: left;
+}
+.glossary-k {
+  display: block;
+  margin-bottom: .12rem;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #b7dcc6;
+}
+.heading-with-help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem .5rem;
+  margin-bottom: .8rem;
+}
+.heading-with-help > :is(h1, h2, h3, h4) {
+  margin-block: 0;
+}
 @media (max-width: 700px) {
   .fiscal-waterfall li { flex-direction: column; align-items: flex-start; gap: .25rem; }
   .fiscal-dashboard .ledger-table table { table-layout: fixed; width: 100%; }

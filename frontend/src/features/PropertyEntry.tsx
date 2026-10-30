@@ -6,6 +6,7 @@ import {
   describedBy, propertyEntryPostCauses, propertyEntryPreviewCauses, propertyEntryStartCauses,
 } from "./actionCauses";
 import ApiErrorAlert from "./ApiErrorAlert";
+import GlossaryTip from "./GlossaryTip";
 import PrerequisiteList from "./PrerequisiteList";
 import { idleView, toApiError, type ScreenView } from "./screenState";
 
@@ -150,6 +151,10 @@ export default function PropertyEntry({
         À faire une fois, après avoir créé les immobilisations du logement : inscrit au bilan le terrain, le bâtiment,
         les emprunts et les frais payés avant le début de l’exercice. L’écart va au compte de l’exploitant (108).
       </p>
+      <div className="heading-with-help">
+        <GlossaryTip id="compte-108" />
+        <GlossaryTip id="extourne" />
+      </div>
       {loadState.phase === "loading" && <p role="status">Chargement des emprunts et des comptes…</p>}
       {loadState.phase === "error" && loadState.error && (
         <ApiErrorAlert detail={loadState.error} onRetry={() => { void start(); }} />

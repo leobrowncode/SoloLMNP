@@ -16,6 +16,7 @@ import {
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import "./ledger.css";
 import InventoryForm from "./InventoryForm";
+import GlossaryTip from "./GlossaryTip";
 
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
 export default function LedgerPage() {
@@ -160,7 +161,14 @@ export default function LedgerPage() {
   return <>
     {tabSlug && !resolvedTab && <Navigate to={ledgerPath(DEFAULT_LEDGER_TAB)} replace />}
     <section id="comptabilite" className="ledger-page" aria-labelledby="ledger-title" data-screen-phase={catalog.phase}>
-    <h2 id="ledger-title">Votre comptabilité</h2>
+    <div className="heading-with-help">
+      <h2 id="ledger-title">Votre comptabilité</h2>
+      <GlossaryTip id="journal" />
+      <GlossaryTip id="brouillon" />
+      <GlossaryTip id="extourne" />
+      <GlossaryTip id="balance" />
+      <GlossaryTip id="grand-livre" />
+    </div>
     <p>Seules les écritures validées alimentent le journal, le grand livre et la balance. Leur validation est définitive.</p>
     {actionError && <p role="alert" className="ledger-error">{actionError}</p>}
     {message && <p role="status">{message}</p>}
@@ -175,6 +183,7 @@ export default function LedgerPage() {
     }}>
       <h3>Initialiser votre activité</h3>
       <p>Pour une activité déjà existante, les soldes antérieurs devront être repris par des écritures d’à-nouveaux justifiées. La création de cet espace ne reconstitue pas votre historique.</p>
+      <GlossaryTip id="a-nouveaux" />
       <label>Nom de l’activité<input name="name" required maxLength={200} /></label>
       <label>Date réelle de début<input name="start" type="date" required /></label>
       <button disabled={busy}>Créer l’activité</button>
@@ -186,7 +195,11 @@ export default function LedgerPage() {
         siret: String(data.get("siret") ?? ""),
       }), "Identité enregistrée. Elle apparaîtra en tête de la liasse.");
     }}>
-      <h3 id="identite-liasse" tabIndex={-1}>Identité pour la liasse</h3>
+      <div className="heading-with-help">
+        <h3 id="identite-liasse" tabIndex={-1}>Identité pour la liasse</h3>
+        <GlossaryTip id="liasse" />
+        <GlossaryTip id="siren" />
+      </div>
       <p>Le SIRET figure sur la 2031. Laissez vide si vous ne l’avez pas encore.</p>
       <label>SIREN<input name="siren" inputMode="numeric" maxLength={9} defaultValue={setup.activity.siren ?? ""} /></label>
       <label>SIRET<input name="siret" inputMode="numeric" maxLength={14} defaultValue={setup.activity.siret ?? ""} /></label>
@@ -204,6 +217,8 @@ export default function LedgerPage() {
         <label>Début de l’exercice<input name="start" type="date" required /></label>
         <label>Fin de l’exercice<input name="end" type="date" required /></label>
         <label>Millésime fiscal<input name="vintage" pattern="[0-9]{4}" required placeholder="2026" /></label>
+        <GlossaryTip id="millesime" />
+        <GlossaryTip id="exercice" />
         <button disabled={busy}>Créer l’exercice</button>
       </form>
     </details>}

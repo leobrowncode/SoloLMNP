@@ -6,6 +6,7 @@ import {
   loanPostCauses, openYearCauses, operationEntryCauses, propertyCause, rentCauses,
 } from "./actionCauses";
 import ApiErrorAlert from "./ApiErrorAlert";
+import GlossaryTip from "./GlossaryTip";
 import PrerequisiteList from "./PrerequisiteList";
 import ScreenStatus from "./ScreenStatus";
 import {
@@ -577,6 +578,10 @@ export default function OperationsPage() {
 
       {tab === "Banque" && <>
         <p className="form-help">Créez d’abord le compte bancaire, puis importez éventuellement un relevé CSV pour rapprocher.</p>
+        <div className="heading-with-help">
+          <GlossaryTip id="compte-512" />
+          <GlossaryTip id="rapprochement" />
+        </div>
         <button id="ajouter-banque" type="button" onClick={() => setEditor({
           title: "Ajouter un compte bancaire", path: "/banks",
           fields: [
@@ -687,6 +692,10 @@ export default function OperationsPage() {
 
       {tab === "Emprunts" && <>
         <p className="form-help">Chaque ligne de crédit = un emprunt SoloLMNP avec son propre compte 164. Exemple : 15&nbsp;000 € et 195&nbsp;000 € → deux emprunts. Un compte 164 libre est attribué automatiquement si besoin.</p>
+        <div className="heading-with-help">
+          <GlossaryTip id="emprunt" />
+          <GlossaryTip id="compte-164" />
+        </div>
         <button id="ajouter-emprunt" type="button" disabled={loanCauses.length > 0} aria-describedby={describedBy(loanCauseId, loanCauses)} onClick={() => {
           const used = new Set(loans.map((loan) => loan.principal_account));
           const free164 = accounts

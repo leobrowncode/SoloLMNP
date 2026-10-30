@@ -3,6 +3,7 @@ import { amount, cents, request, type Account, type Entry, type EntryInput, type
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import { describedBy, inventoryVerifyCauses } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
+import GlossaryTip from "./GlossaryTip";
 
 type InventoryInput = EntryInput & { justification: string; request_id: string };
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
@@ -105,12 +106,15 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
     } catch (reason) { setError((reason as Error).message); }
     finally { pending.current = false; setBusy(false); }
   }
-  if (receipt) return <section><h3>Inventaire comptabilisé</h3><p role="status">Écriture {receipt.entry_number} · {receipt.label}. Consultez le journal et son historique pour retrouver la justification ou effectuer une extourne motivée.</p>
+  if (receipt) return <section><div className="heading-with-help"><h3>Inventaire comptabilisé</h3><GlossaryTip id="extourne" /></div><p role="status">Écriture {receipt.entry_number} · {receipt.label}. Consultez le journal et son historique pour retrouver la justification ou effectuer une extourne motivée.</p>
     {cleanupError && <><p role="alert">{cleanupError}</p><button type="button" onClick={clearConfirmedRequest}>Effacer la demande locale confirmée</button></>}
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>L’écriture est comptabilisée, mais l’actualisation a échoué : {error}. Actualisez le journal.</p>}
   </section>;
   return <form className="entry-editor" onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(); }}>
-    <h3>Inventaire manuel · exercice {year.year}</h3>
+    <div className="heading-with-help">
+      <h3>Inventaire manuel · exercice {year.year}</h3>
+      <GlossaryTip id="inventaire" />
+    </div>
     <p>Choisissez les comptes et montants après vérification du traitement et du calcul. La confirmation valide définitivement l’écriture. La référence et la justification ne constituent pas un archivage de pièce.</p>
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
     {!review && <fieldset disabled={year.status !== "OPEN" || !!recovery.error}>

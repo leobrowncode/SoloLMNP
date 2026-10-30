@@ -58,7 +58,7 @@ data/         Données locales ignorées par Git
 
 Flux métier prévu : événements → comptabilité en partie double → états comptables → retraitements fiscaux versionnés → formulaires → saisie EFI manuelle. Le ledger sera l'unique source du journal, grand livre, balance, bilan, résultat et FEC.
 
-Les erreurs API partagent un contrat structuré (`detail` avec code, message, champ, ligne d’import et action corrective) documenté dans [docs/API_ERRORS.md](docs/API_ERRORS.md).
+Les erreurs API partagent un contrat structuré (`detail` avec code, message, champ, ligne d’import, action corrective et `help` optionnel vers le glossaire) documenté dans [docs/API_ERRORS.md](docs/API_ERRORS.md).
 
 Les montants Python utilisent `Decimal`, avec stockage en centimes entiers SQLite. Toute valeur flottante, non finie ou fraction de centime est refusée à la frontière de stockage. Les couches fiscales ne doivent jamais altérer les écritures pour atteindre un résultat fiscal.
 

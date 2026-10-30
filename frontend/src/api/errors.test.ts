@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseApiErrorDetail, formFieldName, issuesForForm, importIssueLines } from "./errors";
+import { helpForError, parseApiErrorDetail, formFieldName, issuesForForm, importIssueLines } from "./errors";
 
 describe("parseApiErrorDetail", () => {
   it("preserves business error metadata", () => {
@@ -39,5 +39,33 @@ describe("parseApiErrorDetail", () => {
       new Set(["accounting_account"]),
     );
     expect(issues).toHaveLength(1);
+  });
+
+  it("keeps a known help id and drops an unknown one", () => {
+    const kept = parseApiErrorDetail({
+      code: "EXPORT_BLOCKED",
+      message: "Téléchargement refusé.",
+      help: "liasse",
+      issues: [{ code: "FEC_INVALID", message: "En-tête FEC absent.", help: "pas-une-entree" }],
+    });
+    expect(kept.help).toBe("liasse");
+    expect(kept.issues?.[0]?.help).toBeUndefined();
+  });
+
+  it("points a code at the glossary when help is omitted, and lets an explicit id win", () => {
+    expect(helpForError(parseApiErrorDetail({
+      code: "FEC_INVALID",
+      message: "Le FEC contient des erreurs.",
+    }))).toBe("fec");
+    expect(helpForError(parseApiErrorDetail({
+      code: "FEC_INVALID",
+      message: "Le FEC contient des erreurs.",
+      help: "extourne",
+    }))).toBe("extourne");
+    expect(helpForError(parseApiErrorDetail({
+      code: "ACTIVITY_REQUIRED",
+      message: "Créez l’activité.",
+      help: "inconnu",
+    }))).toBeNull();
   });
 });

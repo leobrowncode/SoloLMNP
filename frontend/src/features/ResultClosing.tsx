@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { request, type Account, type Entry, type Journal } from "../api/ledger";
 import { centralizationCauses, describedBy } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
+import GlossaryTip from "./GlossaryTip";
 
 interface PreviewLine { account_number: string; label: string; debit: string; credit: string }
 interface ProposedAccount { number: string; label: string; account_type: string }
@@ -141,7 +142,12 @@ export default function ResultClosing({ year }: { year: number }) {
     : [];
   const centralCauseId = "centralization-causes";
   return <section aria-labelledby="result-title">
-    <h3 id="result-title" tabIndex={-1}>Centraliser et affecter le résultat</h3>
+    <div className="heading-with-help">
+      <h3 id="result-title" tabIndex={-1}>Centraliser et affecter le résultat</h3>
+      <GlossaryTip id="centralisation" />
+      <GlossaryTip id="affectation" />
+      <GlossaryTip id="compte-120-129" />
+    </div>
     <p>Le serveur recalcule les montants. Confirmez le compte et la justification avant validation. Préparer, corriger ou quitter ne modifie pas le plan comptable. Cette étape ne clôture pas l’exercice. Ensuite, dans Fiscalité LMNP : calcul fiscal, pré-contrôle, puis clôture.</p>
     <button type="button" onClick={() => { void load(); }}>Préparer la centralisation</button>
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}

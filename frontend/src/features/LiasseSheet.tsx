@@ -1,4 +1,5 @@
 import { outputLabel, outputTrust, readyToCopy } from "./outputStatus";
+import GlossaryTip from "./GlossaryTip";
 
 interface Field {
   code: string;
@@ -94,7 +95,13 @@ export default function LiasseSheet({ worksheet }: { worksheet: Worksheet }) {
   const tone = trust === "declarable" ? "good" : trust === "provisoire" ? "warn" : "recherche";
   return (
     <div className="fiscal-panel liasse-sheet" aria-live="polite">
-      <h3>Liasse à recopier</h3>
+      <div className="heading-with-help">
+        <h3>Liasse à recopier</h3>
+        <GlossaryTip id="liasse" />
+        <GlossaryTip id="efi" />
+        <GlossaryTip id="declaration-foyer" />
+        <GlossaryTip id="report-amortissement" />
+      </div>
       <p className={`fiscal-goal fiscal-goal-${tone}`} data-output-status={trust}>
         <strong>
           {ready ? `${outputLabel(worksheet)} — Prête à recopier` : outputLabel(worksheet)}
