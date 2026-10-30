@@ -24,7 +24,7 @@ Sur Linux avec Docker, faire correspondre les UID/GID du backend au propriétair
 
 Le backend applique les migrations avant de démarrer. L’interface affiche le statut dossier (incomplet, bloqué, prêt à vérifier, clôturé), calculé depuis la clôture et les postures fiscale et d’export, et la progression du dossier (décompte des étapes, prochaine action) tirée des mêmes données persistées. Les millésimes restent en recherche : rien n’est présenté comme déclarable. **Stockage opérationnel** n’apparaît que dans le diagnostic technique, et une lecture suivante en échec retire l’indicateur. Une base absente, illisible ou non migrée n’est pas annoncée comme opérationnelle.
 
-**Vérification locale :** `python scripts/check.py` (Ruff, mypy, pytest, ESLint, TypeScript, Vitest, build). Les rapports [P5](docs/PHASE5_REPORT.md) à [P12](docs/PHASE12_REPORT.md) décrivent le périmètre et les limites. La CI distante n’a pas été relancée.
+**Vérification locale :** `python scripts/check.py` (Ruff, mypy, pytest, ESLint, TypeScript, Vitest, build). Les couleurs d’interface sont les jetons de `frontend/src/tokens.css`. Le test Vitest `contrast.test.ts` vérifie le contraste WCAG AA (texte normal 4,5:1, grand texte et composants non textuels 3:1) des paires réellement utilisées. Les rapports [P5](docs/PHASE5_REPORT.md) à [P12](docs/PHASE12_REPORT.md) décrivent le périmètre et les limites. La CI distante n’a pas été relancée.
 
 **Historique P1 :** tests natifs sous Windows et [CI complète réussie](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132) : backend Linux/Windows, frontend et test Docker de construction, démarrage et persistance.
 
