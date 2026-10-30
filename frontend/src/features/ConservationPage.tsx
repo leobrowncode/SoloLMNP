@@ -5,6 +5,8 @@ import {
 } from "../api/conservation";
 import { RequestError, request } from "../api/ledger";
 import ApiErrorAlert from "./ApiErrorAlert";
+import { BrowsableList } from "./BrowsableList";
+import { EmptyState } from "./EmptyState";
 import { describedBy, linkCauses, restoreCauses } from "./actionCauses";
 import EntryPicker from "./EntryPicker";
 import GlossaryTip from "./GlossaryTip";
@@ -331,9 +333,24 @@ export default function ConservationPage() {
         state={documentsView}
         onRetry={reload}
         loading={<p role="status">Chargement des justificatifs…</p>}
-        empty={<p>Aucun justificatif déposé.</p>}
+        empty={<EmptyState title="Aucun justificatif déposé." reason="Déposez un PDF, un JPEG ou un PNG, puis reliez-le à une écriture par son numéro, sa date et sa pièce." action={{ label: "Choisir un justificatif", href: "#depot-justificatif" }} />}
       />
       {documents && documents.length > 0 && (
+        <BrowsableList
+          items={documents}
+          searchLabel="Rechercher un justificatif"
+          text={(document) => `${document.original_name} ${document.media_label} ${entryLabel(document.entry)}`}
+          statusOf={(document) => (document.entry ? "linked" : "open")}
+          categoryOf={(document) => document.media_type}
+          statusChoices={[["linked", "Liée à une écriture"], ["open", "Sans écriture"]]}
+          categoryChoices={[["application/pdf", "PDF"], ["image/jpeg", "JPEG"], ["image/png", "PNG"]]}
+          statusLabel="Filtrer par liaison"
+          categoryLabel="Filtrer par type"
+          emptyTitle="Aucun justificatif déposé."
+          emptyReason="Déposez un PDF, un JPEG ou un PNG."
+          noResultsReason="Aucun justificatif ne correspond à la recherche ou aux filtres."
+        >
+        {(rows) => (
         <ResponsiveTable
           label="Justificatifs"
           caption="Inventaire des justificatifs"
@@ -346,7 +363,7 @@ export default function ConservationPage() {
             { key: "entry", label: "Écriture liée" },
             { key: "link", label: "Liaison" },
           ]}
-          rows={documents.map((document) => ({
+          rows={rows.map((document) => ({
             key: String(document.id),
             cells: [
               <span id={`justificatif-${document.id}`} key="name">{document.original_name}</span>,
@@ -368,6 +385,8 @@ export default function ConservationPage() {
             ],
           }))}
         />
+        )}
+        </BrowsableList>
       )}
       {documents && documents.length > 0 && (
         <PrerequisiteList id="link-causes" causes={linkBlocked} />
@@ -385,7 +404,7 @@ export default function ConservationPage() {
       </FrenchForm>
       </MobileSection>
 
-      <MobileSection id="sauvegardes" title="Sauvegardes">
+      <MobileSection id="sauvegardes" title="Sauvegardes" open={!backups || backups.length === 0}>
       <h3>Sauvegardes</h3>
       <div className="toolbar" id="creer-sauvegarde">
         <SaveNoticeHost place="creer-sauvegarde" notice={notice} onDismiss={dismiss} />
@@ -396,9 +415,21 @@ export default function ConservationPage() {
         state={backupsView}
         onRetry={reload}
         loading={<p role="status">Chargement des sauvegardes…</p>}
-        empty={<p>Aucune sauvegarde enregistrée.</p>}
+        empty={<EmptyState title="Aucune sauvegarde enregistrée." reason="Une sauvegarde fige la base. Créez-en une avant une restauration." action={{ label: "Créer la première sauvegarde", href: "#creer-sauvegarde" }} />}
       />
       {backups && backups.length > 0 && (
+        <BrowsableList
+          items={backups}
+          searchLabel="Rechercher une sauvegarde"
+          text={(archive) => `${archive.filename} ${archive.application_version ?? ""} ${integrityLabel(archive.integrity)}`}
+          statusOf={(archive) => archive.integrity.status}
+          statusChoices={[["unchecked", "Non contrôlée"], ["ok", "Contrôle réussi"], ["failed", "Contrôle refusé"]]}
+          statusLabel="Filtrer par contrôle"
+          emptyTitle="Aucune sauvegarde enregistrée."
+          emptyReason="Une sauvegarde fige la base."
+          noResultsReason="Aucune sauvegarde ne correspond à la recherche ou au contrôle."
+        >
+        {(rows) => (
         <ResponsiveTable
           label="Sauvegardes"
           caption="Inventaire des sauvegardes"
@@ -411,7 +442,7 @@ export default function ConservationPage() {
             { key: "check", label: "Dernier contrôle", priority: "secondary" },
             { key: "action", label: "Action" },
           ]}
-          rows={backups.map((archive) => {
+          rows={rows.map((archive) => {
             const when = frStamp(archive.created_at);
             return {
               key: archive.filename,
@@ -447,6 +478,8 @@ export default function ConservationPage() {
             };
           })}
         />
+        )}
+        </BrowsableList>
       )}
       </MobileSection>
 

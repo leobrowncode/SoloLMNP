@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { downloadFiling } from "../api/download";
 import { RequestError, request, type Setup } from "../api/ledger";
 import ApiErrorAlert from "./ApiErrorAlert";
+import { EmptyState } from "./EmptyState";
 import OpeningPreview from "./OpeningPreview";
 import ResultClosing from "./ResultClosing";
 import ScreenStatus from "./ScreenStatus";
@@ -10,6 +11,7 @@ import {
   beginLoad, defer, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
 } from "./screenState";
 import { formatAmount, formatEuros, formatIsoDate } from "../lib/format";
+import { ledgerPath } from "../routing/paths";
 import { MobileSection, PageAnchors } from "../lib/PageSection";
 import { ResponsiveTable } from "../lib/ResponsiveTable";
 import "./ledger.css";
@@ -25,6 +27,16 @@ export interface Statements {
 }
 
 function Accounts({ title, rows, total }: { title: string; rows: Row[]; total: string }) {
+  if (rows.length === 0) {
+    return <section><h3>{title}</h3>
+      <EmptyState
+        title={`Aucun compte dans ${title}.`}
+        reason="Cette liste reste vide tant qu’aucune écriture validée ne l’alimente."
+        action={{ label: "Saisir une écriture", href: ledgerPath("Brouillons") }}
+      />
+      <p>Total {title.toLowerCase()} : {formatAmount(total)}</p>
+    </section>;
+  }
   return <section><h3>{title}</h3>
     <ResponsiveTable
       label={title}
@@ -115,7 +127,7 @@ export default function StatementsPage() {
       state={setupView}
       onRetry={() => setSetupAttempt((value) => value + 1)}
       loading={<p role="status">Chargement des états…</p>}
-      empty={<p>Créez un exercice dans Comptabilité pour consulter ses états.</p>}
+      empty={<EmptyState title="Aucun exercice." reason="Créez un exercice dans Comptabilité pour consulter ses états." action={{ label: "Ouvrir la comptabilité", href: ledgerPath() }} />}
     />
     {setup && setup.years.length > 0 && <div className="toolbar">
       <label>Exercice <FitSelect value={year} onChange={(event) => refresh(Number(event.target.value))}>{setup.years.map((item) => <option key={item.id} value={item.id}>{item.year}</option>)}</FitSelect></label>

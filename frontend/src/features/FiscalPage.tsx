@@ -3,6 +3,7 @@ import { RequestError, request } from "../api/ledger";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import { describedBy, fiscalActionCauses } from "./actionCauses";
 import CloseYear from "./CloseYear";
+import { EmptyState } from "./EmptyState";
 import GlossaryTip from "./GlossaryTip";
 import { GLOSSARY, type GlossaryId } from "./glossary";
 import { SaveNoticeHost } from "./LocalFeedback";
@@ -684,7 +685,7 @@ export default function FiscalPage() {
       <ScreenStatus
         state={resultView}
         onRetry={() => setResultAttempt((value) => value + 1)}
-        empty={<p>Aucun calcul fiscal n’est enregistré pour cet exercice.</p>}
+        empty={<EmptyState title="Aucun calcul fiscal n’est enregistré pour cet exercice." reason="Le calcul lit les écritures validées et prépare le résultat fiscal. Il n’envoie rien." action={{ label: "Calculer le résultat fiscal", href: "#calcul-fiscal" }} />}
       />
 
       <div id="calcul-fiscal-zone" className="toolbar fiscal-toolbar">
@@ -773,7 +774,13 @@ export default function FiscalPage() {
                   </tr>
                 ))}
                 {statements.income_statement.expenses.length === 0 && (
-                  <tr><td colSpan={4}>Aucune charge validée pour cet exercice.</td></tr>
+                  <tr><td colSpan={4}>
+                    <EmptyState
+                      title="Aucune charge validée pour cet exercice."
+                      reason="Les charges du compte de résultat apparaissent après validation des écritures."
+                      action={{ label: "Saisir une dépense", href: "/operations/transactions" }}
+                    />
+                  </td></tr>
                 )}
               </tbody>
             </table>
@@ -1034,7 +1041,9 @@ export default function FiscalPage() {
       <details className="fiscal-panel">
         <summary>Millésimes chargés (technique)</summary>
         <ul>
-          {boot.phase === "loaded" && vintages.length === 0 && <li>Aucun millésime chargé.</li>}
+          {boot.phase === "loaded" && vintages.length === 0 && (
+            <li><EmptyState title="Aucun millésime chargé." reason="Les millésimes restent en recherche. Cette liste se remplit depuis le serveur, pas depuis le navigateur." action={{ label: "Revenir au calcul", href: "#calcul-fiscal" }} /></li>
+          )}
           {vintages.map((item) => (
             <li key={item.vintage}>
               Millésime {item.vintage} · {item.output_label ?? "Recherche"} · périmètre LMNP

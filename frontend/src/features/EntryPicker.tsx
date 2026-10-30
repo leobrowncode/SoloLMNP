@@ -4,6 +4,7 @@ import { useMutation } from "./useMutation";
 import { entryLabel, frStamp, type EntryChoice } from "../api/conservation";
 import { RequestError, request } from "../api/ledger";
 import ApiErrorAlert from "./ApiErrorAlert";
+import { NoResults } from "./EmptyState";
 import GlossaryTip from "./GlossaryTip";
 import { toApiError } from "./screenState";
 import { DATE_HINT } from "../lib/format";
@@ -23,6 +24,16 @@ export default function EntryPicker({
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<RequestError | null>(null);
   const { busy, step, run } = useMutation();
+
+  function resetSearch() {
+    setNumber("");
+    setEntryDate("");
+    setPiece("");
+    setResults([]);
+    setSearched(false);
+    setError(null);
+    onSelect(null);
+  }
 
   async function search() {
     setError(null);
@@ -94,7 +105,9 @@ export default function EntryPicker({
       </button>
       <MutationStatus step={step} />
       {error && <ApiErrorAlert detail={error.detail} onRetry={() => { void search(); }} />}
-      {searched && results.length === 0 && <p>Aucune écriture ne correspond.</p>}
+      {searched && !error && results.length === 0 && (
+        <NoResults reason="Aucune écriture ne correspond." onReset={resetSearch} />
+      )}
       {results.length > 0 && (
         <div className="picker-results" role="radiogroup" aria-label="Écritures trouvées">
           {results.map((entry) => {

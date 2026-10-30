@@ -3,6 +3,8 @@ import {
   assetsRequest as api, type Asset, type DepreciationBatchResult, type DepreciationPeriod,
 } from "../api/assets";
 import { request, type Account, type Setup } from "../api/ledger";
+import { BrowsableList } from "./BrowsableList";
+import { EmptyState } from "./EmptyState";
 import ScreenStatus from "./ScreenStatus";
 import {
   beginLoad, defer, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
@@ -27,7 +29,7 @@ import { useSaveNotice } from "./localFeedback";
 import ReviewForm, { type Field } from "./ReviewForm";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
-import { ENUM_LABELS, enumLabel, formatEuros, formatIsoDate } from "../lib/format";
+import { ENUM_LABELS, enumChoices, enumLabel, formatEuros, formatIsoDate } from "../lib/format";
 import "./ledger.css";
 import FitSelect from "../lib/FitSelect";
 import { MobileSection, PageAnchors } from "../lib/PageSection";
@@ -592,8 +594,24 @@ export default function AssetsPage() {
         onDone={() => { setError(""); setRevision((value) => value + 1); }}
       />
       {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} help={editor.help} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} derive={editor.derive} locked={busy} />}
-      <MobileSection id="registre-immobilisations" title="Registre des immobilisations" open={assets.length > 0}>
-      {assets.map((row) => <article className="entry-card" id={`asset-${row.id}`} key={row.id}><h3>{row.label}</h3>
+      <MobileSection id="registre-immobilisations" title="Registre des immobilisations" open>
+      <BrowsableList
+        items={assets}
+        searchLabel="Rechercher une immobilisation"
+        text={(row) => `${row.label} ${row.asset_account} ${row.depreciation_account ?? ""} ${enumLabel("assetCategory", row.category)}`}
+        statusOf={(row) => row.method || "NONE"}
+        categoryOf={(row) => row.category}
+        statusChoices={enumChoices("depreciationMethod")}
+        categoryChoices={enumChoices("assetCategory").filter(([code]) => assets.some((row) => row.category === code))}
+        statusLabel="Filtrer par mode"
+        emptyTitle="Aucune immobilisation."
+        emptyReason="Le registre est vide : inscrivez le terrain à part, puis le bâtiment et le mobilier. Le terrain ne s’amortit pas."
+        emptyAction={{ label: "Inscrire une immobilisation", href: "#nouvelle-immobilisation" }}
+        noResultsReason="Aucune immobilisation ne correspond à la recherche, au mode ou à la catégorie."
+        groupBy={(row) => row.category}
+        groupTitle={(key) => enumLabel("assetCategory", key)}
+      >
+      {(listed) => listed.map((row) => <article className="entry-card" id={`asset-${row.id}`} key={row.id}><h3>{row.label}</h3>
         <p>{enumLabel("assetCategory", row.category)} · Valeur {formatEuros(row.acquisition_value)} · Base {formatEuros(row.depreciable_value)} · Non amortissable {formatEuros(row.non_depreciable_value)}</p>
         <p>{row.category === "LAND" ? "Terrain protégé : aucun plan d’amortissement" : `${enumLabel("depreciationMethod", row.method ?? "LINEAR")} sur ${row.useful_life_months} mois · ${row.asset_account} / ${row.depreciation_account}`}</p>
         {row.account_warning && <p role="alert" className="ledger-error">{row.account_warning}</p>}
@@ -616,6 +634,7 @@ export default function AssetsPage() {
         </div>)}
         <SaveNoticeHost place={`asset-${row.id}`} notice={notice} onDismiss={dismiss} />
       </article>)}
+      </BrowsableList>
       </MobileSection>
       <div className="section-heading" id="dotations" tabIndex={-1}><div><div className="heading-with-help"><h3>Dotations comptables</h3><GlossaryTip id="dotation" /><GlossaryTip id="compte-681" /></div><p>Le calcul en jours calendaires ne modifie jamais la couche fiscale.</p></div>
         <label>Exercice<FitSelect value={yearId} onChange={(event) => {
@@ -633,9 +652,24 @@ export default function AssetsPage() {
         state={periodsView}
         onRetry={() => setPeriodsAttempt((value) => value + 1)}
         loading={<p>Chargement des dotations…</p>}
-        empty={<p>Aucune dotation calculée pour cet exercice.</p>}
+        empty={<EmptyState title="Aucune dotation calculée pour cet exercice." reason="Le calcul crée les périodes à comptabiliser. Il ne modifie pas la fiscalité." action={{ label: "Calculer les périodes de cet exercice", href: "#calculer-periodes" }} />}
       />
-      <ResponsiveTable
+      {showsData(periodsView) && periods.length > 0 && (
+      <BrowsableList
+        items={periods}
+        searchLabel="Rechercher une dotation"
+        text={(row) => `${row.target_label} ${enumLabel("periodStatus", row.status)}`}
+        statusOf={(row) => row.status}
+        categoryOf={(row) => row.target_type}
+        statusChoices={enumChoices("periodStatus")}
+        categoryChoices={[["ASSET", "Immobilisation"], ["COMPONENT", "Composant"]]}
+        emptyTitle="Aucune dotation calculée pour cet exercice."
+        emptyReason="Le calcul crée les périodes à comptabiliser."
+        noResultsReason="Aucune dotation ne correspond à la recherche, au statut ou à la catégorie."
+        groupBy={(row) => row.status}
+        groupTitle={(key) => enumLabel("periodStatus", key)}
+      >
+      {(rows) => <ResponsiveTable
         label="Dotations"
         columns={[
           { key: "target", label: "Actif / composant" },
@@ -646,7 +680,7 @@ export default function AssetsPage() {
           { key: "vnc", label: "VNC de la base", header: <>VNC de la base <GlossaryTip id="vnc" /></>, priority: "secondary" },
           { key: "status", label: "État" },
         ]}
-        rows={periods.map((row) => ({
+        rows={rows.map((row) => ({
           key: String(row.id),
           cells: [
             row.target_label,
@@ -660,7 +694,9 @@ export default function AssetsPage() {
               : <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => setEditor({ title: `Comptabiliser ${row.target_label}`, path: `/periods/${row.id}/post`, retry: true, fields: [{ name: "piece_reference", label: "Référence de la pièce d’inventaire" }] })}>Comptabiliser</button>,
           ],
         }))}
-      />
+      />}
+      </BrowsableList>
+      )}
     </>}
   </section>;
 }

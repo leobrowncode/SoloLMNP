@@ -510,7 +510,7 @@ test("a partial batch error reloads the periods the server actually kept", async
   expect(await screen.findByText("Mobilier")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Comptabiliser toutes les dotations" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Cette période n’appartient pas à l’exercice du lot.");
-  expect(await screen.findByText("Comptabilisée")).toBeInTheDocument();
+  expect(await screen.findByRole("cell", { name: "Comptabilisée" })).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Comptabiliser" })).toHaveLength(2);
   expect(reads).toBeGreaterThan(1);
 });

@@ -15,13 +15,15 @@ import {
   type ActionCause,
 } from "./actionCauses";
 import ApiErrorAlert from "./ApiErrorAlert";
+import { BrowsableList } from "./BrowsableList";
+import { EmptyState } from "./EmptyState";
 import GlossaryTip from "./GlossaryTip";
 import { GLOSSARY } from "./glossary";
 import { SaveNoticeHost } from "./LocalFeedback";
 import { useSaveNotice } from "./localFeedback";
 import PrerequisiteList from "./PrerequisiteList";
 import FrenchFileInput from "../lib/FrenchFileInput";
-import { enumLabel } from "../lib/format";
+import { enumChoices, enumLabel } from "../lib/format";
 import { ResponsiveTable } from "../lib/ResponsiveTable";
 import FitSelect from "../lib/FitSelect";
 
@@ -218,7 +220,26 @@ export default function CsvImportAssistant({
             {preview.summary.duplicate} doublon(s), {preview.summary.warning} avertissement(s),{" "}
             {preview.summary.error} erreur(s).
           </p>
-          {preview.rows.length > 0 && (
+          {preview.rows.length === 0 ? (
+            <EmptyState
+              title="Aucune ligne dans cet import."
+              reason="Le fichier ne contient pas de ligne de données. Vérifiez l’en-tête et les lignes, puis relancez la prévisualisation."
+              action={{ label: "Revenir au fichier", href: `#${textareaId}` }}
+            />
+          ) : (
+            <BrowsableList
+              items={preview.rows}
+              searchLabel="Rechercher une ligne"
+              text={(row) => `${row.line} ${Object.values(row.display).join(" ")} ${enumLabel("importStatus", row.status)}`}
+              statusOf={(row) => row.status}
+              statusChoices={enumChoices("importStatus")}
+              emptyTitle="Aucune ligne dans cet import."
+              emptyReason="Le fichier ne contient pas de ligne de données."
+              noResultsReason="Aucune ligne ne correspond à la recherche ou au statut."
+              groupBy={(row) => row.status}
+              groupTitle={(key) => enumLabel("importStatus", key)}
+            >
+            {(rows) => (
             <ResponsiveTable
               label="Aperçu de l’import"
               caption="Aperçu de l’import"
@@ -233,7 +254,7 @@ export default function CsvImportAssistant({
                 ...(profile === "bank" ? [{ key: "suggested", label: "Compte suggéré", priority: "secondary" as const }] : []),
                 { key: "detail", label: "Détail" },
               ]}
-              rows={preview.rows.map((row) => ({
+              rows={rows.map((row) => ({
                 key: String(row.line),
                 className: `import-row-${row.status}`,
                 cells: [
@@ -245,6 +266,8 @@ export default function CsvImportAssistant({
                 ],
               }))}
             />
+            )}
+            </BrowsableList>
           )}
           {preview.rejects_csv && (
             <button type="button" disabled={busy} onClick={() => downloadRejects(REJECT_FILE[profile], preview.rejects_csv)}>

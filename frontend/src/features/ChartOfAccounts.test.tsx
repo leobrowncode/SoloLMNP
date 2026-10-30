@@ -1,9 +1,10 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ledgerPath } from "../routing/paths";
 import { renderWithRouter } from "../routing/testPage";
 import { ACCOUNT_NATURES, ACCOUNT_TYPES } from "./accountNature";
+import ChartOfAccounts from "./ChartOfAccounts";
 import LedgerPage from "./LedgerPage";
 
 const accounts = [
@@ -123,6 +124,31 @@ describe("chart of accounts", () => {
     expect(status).toHaveTextContent(/Compte “164100 Second emprunt” créé à \d{2}:\d{2}/);
     expect(status).not.toHaveFocus();
     expect(document.getElementById("ajouter-compte")).toHaveClass("save-highlight");
+  });
+
+  it("explains an empty chart and resets a search that matches nothing", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ChartOfAccounts accounts={[]} busy={false} notice={null} onDismiss={() => undefined} onCreate={() => undefined} onToggle={() => undefined} />,
+    );
+    expect(screen.getByText("Aucun compte dans le plan.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Renseigner le formulaire" })).toHaveAttribute("href", "#ajouter-compte");
+    expect(screen.queryByText("Aucun compte pour cette nature ou cette utilisation.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Réinitialiser les filtres" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Plan comptable" })).not.toBeInTheDocument();
+
+    rerender(
+      <ChartOfAccounts accounts={accounts} busy={false} notice={null} onDismiss={() => undefined} onCreate={() => undefined} onToggle={() => undefined} />,
+    );
+    expect(screen.getByRole("list", { name: "Plan comptable" })).toBeInTheDocument();
+    expect(screen.getAllByText("Actif").length).toBeGreaterThan(0);
+    await user.type(screen.getByLabelText("Rechercher un compte"), "zzzz");
+    expect(screen.getByText("Aucun résultat")).toBeInTheDocument();
+    expect(screen.getByText("Aucun compte ne correspond à cette recherche.")).toBeInTheDocument();
+    expect(screen.queryByText("Aucun compte dans le plan.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Réinitialiser les filtres" }));
+    expect(screen.getByRole("listitem", { name: /164000/ })).toBeInTheDocument();
+    expect(screen.queryByText("Aucun résultat")).not.toBeInTheDocument();
   });
 
   it("opens the nature glossary from the chart", async () => {

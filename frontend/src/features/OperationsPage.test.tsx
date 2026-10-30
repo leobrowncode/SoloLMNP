@@ -162,8 +162,8 @@ describe("OperationsPage", () => {
     expect(await screen.findByText(/1 valide\(s\)/)).toBeInTheDocument();
     expect(screen.getByText(/1 avertissement\(s\)/)).toBeInTheDocument();
     expect(screen.getByText("100,00")).toBeInTheDocument();
-    expect(screen.getByText("Valide")).toBeInTheDocument();
-    expect(screen.getByText("Avertissement")).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "Valide" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "Avertissement" })).toBeInTheDocument();
     const importButton = screen.getByRole("button", { name: "Comptabiliser les échéances" });
     expect(importButton).toBeDisabled();
     await userEvent.click(screen.getByRole("checkbox", { name: /prêt source 085644F/ }));

@@ -5,13 +5,15 @@ import {
   activityCause, bankCause, describedBy, listed,
   openYearCauses, operationEntryCauses, propertyCause, rentCauses,
 } from "./actionCauses";
+import { BrowsableList } from "./BrowsableList";
 import CsvImportAssistant from "./CsvImportAssistant";
+import { EmptyState } from "./EmptyState";
 import ApiErrorAlert from "./ApiErrorAlert";
 import GlossaryTip from "./GlossaryTip";
 import PrerequisiteList from "./PrerequisiteList";
 import ScreenStatus from "./ScreenStatus";
 import {
-  beginLoad, defer, failLoad, finishLoad, idleView, showsData, showsLoading, toApiError, type ScreenView,
+  beginLoad, defer, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
 } from "./screenState";
 import { operationsRequest as api, type Property, type Bank, type Loan, type Operation, type BankTransaction, type Tenant } from "../api/operations";
 import {
@@ -517,7 +519,21 @@ export default function OperationsPage() {
             { name: "building_value", label: "Valeur du bâtiment (€)", money: true, group: "Valeurs" },
           ],
         })}>Ajouter un bien</button>
-        {properties.map((p) => (
+        {properties.length === 0 ? (
+          <EmptyState
+            title="Aucun bien."
+            reason="Les loyers, la banque et les emprunts partent d’un logement. Ajoutez-le avant le reste."
+            action={{ label: "Renseigner le formulaire du bien", href: "#ajouter-bien" }}
+          />
+        ) : (
+          <BrowsableList
+            items={properties}
+            searchLabel="Rechercher un bien"
+            text={(property) => `${property.name} ${property.address ?? ""}`}
+            emptyTitle="Aucun bien."
+            emptyReason="Ajoutez un logement avant les loyers."
+          >
+          {(rows) => rows.map((p) => (
           <article key={p.id} id={`bien-${p.id}`} className="entry-card">
             <h3>{p.name}</h3>
             <p>Acquisition : {formatEuros(p.acquisition_price)} · Terrain : {formatEuros(p.land_value)} · Bâtiment : {formatEuros(p.building_value)}</p>
@@ -540,7 +556,13 @@ export default function OperationsPage() {
                 </li>
               ))}
             </ul>
-            {occupants(p.id).length === 0 && <p>Aucun colocataire. Chaque locataire a son loyer.</p>}
+            {occupants(p.id).length === 0 && (
+              <EmptyState
+                title="Aucun colocataire."
+                reason="Chaque locataire a son loyer. Ajoutez-en un pour préparer les quittances de l’exercice."
+                action={{ label: "Ajouter le premier colocataire", href: `#ajouter-colocataire-${p.id}` }}
+              />
+            )}
             <button type="button" onClick={() => setEditor({
               title: "Colocataire — " + p.name,
               path: "/properties/" + p.id + "/tenants",
@@ -551,7 +573,7 @@ export default function OperationsPage() {
                 { name: "entry_date", label: "Entrée dans les lieux", type: "date" },
                 { name: "exit_date", label: "Sortie, si elle est connue", type: "date", optional: true },
               ],
-            })}>Ajouter un colocataire</button>
+            })} id={`ajouter-colocataire-${p.id}`}>Ajouter un colocataire</button>
             <button type="button" disabled={rentCauses(p.id, occupants(p.id).length, years).length > 0} aria-describedby={describedBy(`rents-${p.id}`, rentCauses(p.id, occupants(p.id).length, years))} onClick={() => {
               void action(async () => {
                 const result = await api<{ created: number; already: number }>("/properties/" + p.id + "/rents", "POST", { fiscal_year_id: opYearId });
@@ -570,6 +592,8 @@ export default function OperationsPage() {
             <PrerequisiteList id={`rents-${p.id}`} causes={rentCauses(p.id, occupants(p.id).length, years)} />
           </article>
         ))}
+          </BrowsableList>
+        )}
       </div>}
 
       {tab === "Banque" && <div id="banque-saisie">
@@ -586,7 +610,21 @@ export default function OperationsPage() {
             accountField("account_number", "Compte comptable dédié", "512", undefined, "Banque"),
           ],
         })}>Ajouter un compte bancaire</button>
-        {banks.map((row) => (
+        {banks.length === 0 ? (
+          <EmptyState
+            title="Aucun compte bancaire."
+            reason="Le rapprochement et les règlements ont besoin d’un compte 512. Ajoutez-le avant d’importer un relevé."
+            action={{ label: "Renseigner le compte bancaire", href: "#ajouter-banque" }}
+          />
+        ) : (
+          <BrowsableList
+            items={banks}
+            searchLabel="Rechercher une banque"
+            text={(row) => `${row.name} ${row.account_number}`}
+            emptyTitle="Aucun compte bancaire."
+            emptyReason="Ajoutez un compte 512 avant d’importer un relevé."
+          >
+          {(rows) => rows.map((row) => (
           <article key={row.id} id={`banque-${row.id}`} className="entry-card">
             <h3>{row.name}</h3>
             <p>Compte {row.account_number}</p>
@@ -596,6 +634,8 @@ export default function OperationsPage() {
             </div>
           </article>
         ))}
+          </BrowsableList>
+        )}
         {!!banks.length && <>
           <label className="toolbar-field">Banque sélectionnée
             <FitSelect value={bankId} onChange={(e) => {
@@ -626,10 +666,22 @@ export default function OperationsPage() {
             state={bankView}
             onRetry={() => setRevision((value) => value + 1)}
             loading={<p>Chargement du relevé…</p>}
-            empty={<p>Aucun mouvement sur ce compte.</p>}
+            empty={<EmptyState title="Aucun mouvement sur ce compte." reason="Importez un relevé ou saisissez les règlements. Rien n’est comptabilisé par le seul import." action={{ label: "Prévisualiser un relevé", href: "#import-releve" }} />}
           />
           {entryCauses.length > 0 && <PrerequisiteList id={entryCauseId} causes={entryCauses} />}
-          {showsData(bankView) && transactions.map((t) => (
+          {showsData(bankView) && transactions.length > 0 && (
+          <BrowsableList
+            items={transactions}
+            searchLabel="Rechercher un mouvement"
+            text={(transaction) => `${transaction.label} ${transaction.external_reference} ${transaction.amount} ${formatIsoDate(transaction.date)}`}
+            statusOf={(transaction) => (transaction.matched_entry_id ? "matched" : "open")}
+            statusChoices={[["matched", "Rapproché"], ["open", "À rapprocher"]]}
+            statusLabel="Filtrer par rapprochement"
+            emptyTitle="Aucun mouvement sur ce compte."
+            emptyReason="Importez un relevé pour rapprocher."
+            noResultsReason="Aucun mouvement ne correspond à la recherche ou au rapprochement."
+          >
+          {(rows) => rows.map((t) => (
             <article key={t.id} id={`mouvement-${t.id}`} className="entry-card">
               <h3>{t.label} · {formatEuros(t.amount)}</h3>
               <p>{formatIsoDate(t.date)} · {t.external_reference} · {t.matched_entry_id ? "Rapproché avec l’écriture #" + t.matched_entry_id : "À rapprocher"}</p>
@@ -644,6 +696,8 @@ export default function OperationsPage() {
               )}
             </article>
           ))}
+          </BrowsableList>
+          )}
           <div className="form-actions">
             <button type="button" disabled={!bankOffset} onClick={() => setBankOffset(bankOffset - 50)}>Mouvements précédents</button>
             <button type="button" disabled={transactions.length < 50} onClick={() => setBankOffset(bankOffset + 50)}>Mouvements suivants</button>
@@ -719,7 +773,21 @@ export default function OperationsPage() {
         }}>Ajouter un emprunt</button>
         <PrerequisiteList id={loanCauseId} causes={loanCauses} />
         <PrerequisiteList id={bankCauseId} causes={bankCauses} intro="Déblocage et échéance indisponibles :" />
-        {loans.map((l) => (
+        {loans.length === 0 ? (
+          <EmptyState
+            title="Aucun emprunt."
+            reason="Chaque ligne de crédit est un emprunt, avec son compte 164. Ajoutez-le seulement s’il y a un crédit."
+            action={{ label: "Renseigner un emprunt", href: "#ajouter-emprunt" }}
+          />
+        ) : (
+          <BrowsableList
+            items={loans}
+            searchLabel="Rechercher un emprunt"
+            text={(loan) => `${loan.lender} ${loan.principal_account} ${loan.initial_principal}`}
+            emptyTitle="Aucun emprunt."
+            emptyReason="Ajoutez une ligne de crédit s’il y a un emprunt."
+          >
+          {(rows) => rows.map((l) => (
           <article className="entry-card" id={`emprunt-${l.id}`} key={l.id}>
             <h3>{l.lender}</h3>
             <p>Capital initial : {formatEuros(l.initial_principal)} · Solde comptable : {formatEuros(l.remaining_principal)} · Mensualité : {formatEuros(l.monthly_payment)} + assurance {formatEuros(l.monthly_insurance)} · Compte {l.principal_account}</p>
@@ -766,6 +834,8 @@ export default function OperationsPage() {
             }}>Saisir une échéance</button>
           </article>
         ))}
+          </BrowsableList>
+        )}
         {!!loans.length && !!banks.length && !openYears.length && (
           <PrerequisiteList id="loan-import-year" causes={openYearCauses(years)} intro="L’import des échéances est indisponible :" />
         )}
@@ -864,9 +934,29 @@ export default function OperationsPage() {
         </div>
         <PrerequisiteList id={entryCauseId} causes={entryCauses} />
         <PrerequisiteList id={bankCauseId} causes={bankCauses} intro="Le règlement reste indisponible :" />
-        {showsLoading(bundleView) && <p>Chargement des opérations…</p>}
-        {bundleView.phase === "loaded" && operations.length === 0 && <p>Aucune opération enregistrée.</p>}
-        {showsData(bundleView) && operations.map((row) => (
+        {bundleView.phase === "loaded" && operations.length === 0 && (
+          <EmptyState
+            title="Aucune opération enregistrée."
+            reason="Les recettes et les dépenses apparaissent ici après la saisie ou l’import. Le traitement fiscal reste à vérifier."
+            action={{ label: "Saisir une recette", onClick: () => newOperation("REVENUE") }}
+          />
+        )}
+        {showsData(bundleView) && operations.length > 0 && (
+          <BrowsableList
+            items={operations}
+            searchLabel="Rechercher une opération"
+            text={(row) => `${row.description} ${row.counterparty} ${row.amount} ${enumLabel("operationKind", row.kind)} ${enumLabel("operationStatus", row.status)}`}
+            statusOf={(row) => row.status}
+            categoryOf={(row) => row.kind}
+            statusChoices={enumChoices("operationStatus")}
+            categoryChoices={enumChoices("operationKind")}
+            emptyTitle="Aucune opération enregistrée."
+            emptyReason="Saisissez une recette ou une dépense."
+            noResultsReason="Aucune opération ne correspond à la recherche, au statut ou à la catégorie."
+            groupBy={(row) => row.kind}
+            groupTitle={(key) => enumLabel("operationKind", key)}
+          >
+          {(rows) => rows.map((row) => (
           <article key={row.id} id={`operation-${row.id}`} className="entry-card">
             <h3>{enumLabel("operationKind", row.kind)} · {row.description} · {formatEuros(row.amount)}</h3>
             <p>{formatIsoDate(row.date)} · {row.counterparty} · {enumLabel("operationStatus", row.status)}{row.remaining_to_settle !== null && " · Reste à régler : " + formatEuros(row.remaining_to_settle)}</p>
@@ -898,6 +988,8 @@ export default function OperationsPage() {
             )}
           </article>
         ))}
+          </BrowsableList>
+        )}
         <div className="form-actions">
           <button type="button" disabled={!offset} onClick={() => setOffset(offset - 50)}>Opérations précédentes</button>
           <button type="button" disabled={operations.length < 50} onClick={() => setOffset(offset + 50)}>Opérations suivantes</button>

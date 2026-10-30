@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
 import { formatAmount, formatIsoDate } from "../lib/format";
+import { ledgerPath } from "../routing/paths";
+import { EmptyState } from "./EmptyState";
 import OpeningPosting from "./OpeningPosting";
 import GlossaryTip from "./GlossaryTip";
 import ScreenStatus from "./ScreenStatus";
@@ -51,7 +53,7 @@ export default function OpeningPreview({ year }: { year: number }) {
       state={view}
       onRetry={() => { void load(); }}
       loading={<p id="opening-loading" role="status">Chargement des soldes à reprendre…</p>}
-      empty={<p>Aucun solde à reprendre.</p>}
+      empty={<EmptyState title="Aucun solde à reprendre." reason="L’exercice précédent n’a pas de solde validé à reporter. Vérifiez sa clôture avant de préparer les à-nouveaux." action={{ label: "Ouvrir le journal", href: ledgerPath("Journal") }} />}
     />
     {data && <div aria-live="polite">
       <p>Soldes au {formatIsoDate(data.source_end_date)} pour l’ouverture du {formatIsoDate(data.opening_date)}. Brouillons exclus : {data.excluded_draft_count}.</p>

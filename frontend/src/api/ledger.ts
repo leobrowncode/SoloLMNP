@@ -25,6 +25,7 @@ export interface Entry extends Omit<EntryInput, "lines"> {
   lines: EntryLine[];
   id: number; version: number; status: string; entry_number: string | null;
   total_debit: string; total_credit: string; balanced: boolean; reversal_of_id: number | null;
+  source_type?: string;
 }
 export interface BalanceRow { account_number: string; label: string; total_debit: string; total_credit: string; debit_balance: string; credit_balance: string }
 export interface Balance { balance: BalanceRow[]; total_debit: string; total_credit: string; balanced: boolean }

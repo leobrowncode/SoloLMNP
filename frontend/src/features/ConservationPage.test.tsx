@@ -123,7 +123,7 @@ test("lists a justificatif and links it from the entry picker", async () => {
   });
   renderPage();
   expect(await screen.findByText("quittance.pdf")).toBeInTheDocument();
-  expect(screen.getByText("PDF")).toBeInTheDocument();
+  expect(screen.getByRole("cell", { name: "PDF" })).toBeInTheDocument();
   expect(screen.getByText(/octets/)).toHaveTextContent(/2.048 octets/);
   expect(screen.getByText(HASH)).toBeInTheDocument();
   expect(screen.getByText("Aucune")).toBeInTheDocument();
