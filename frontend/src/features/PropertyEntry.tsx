@@ -2,6 +2,8 @@ import { useState } from "react";
 import { assetsRequest as api } from "../api/assets";
 import { operationsRequest, type Bank, type Loan, type Property } from "../api/operations";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
+import ApiErrorAlert from "./ApiErrorAlert";
+import { idleView, toApiError, type ScreenView } from "./screenState";
 
 interface YearOption { id: number; year: number; start_date?: string }
 interface EntryLine { account_number: string; label: string; debit: string; credit: string }
@@ -45,6 +47,7 @@ export default function PropertyEntry({
   const [piece, setPiece] = useState("Acte d’acquisition");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
+  const [loadState, setLoadState] = useState<ScreenView<{ ready: true }>>(idleView());
   const [busy, setBusy] = useState(false);
   const entryDirty = open && (
     preview !== null
@@ -60,6 +63,7 @@ export default function PropertyEntry({
 
   async function start() {
     setError("");
+    setLoadState({ phase: "loading", data: null, error: null, stale: false });
     try {
       const [loadedLoans, loadedBanks] = await Promise.all([
         operationsRequest<Loan[]>("/loans"), operationsRequest<Bank[]>("/banks"),
@@ -70,9 +74,10 @@ export default function PropertyEntry({
       setPropertyId(properties[0]?.id ?? 0);
       setYearId(years[0]?.id ?? 0);
       setBankId(loadedBanks[0]?.id ?? 0);
+      setLoadState({ phase: "loaded", data: { ready: true }, error: null, stale: false });
       setOpen(true);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Chargement impossible.");
+      setLoadState({ phase: "error", data: null, error: toApiError(reason), stale: false });
     }
   }
 
@@ -131,6 +136,10 @@ export default function PropertyEntry({
         À faire une fois, après avoir créé les immobilisations du logement : inscrit au bilan le terrain, le bâtiment,
         les emprunts et les frais payés avant le début de l’exercice. L’écart va au compte de l’exploitant (108).
       </p>
+      {loadState.phase === "loading" && <p role="status">Chargement des emprunts et des comptes…</p>}
+      {loadState.phase === "error" && loadState.error && (
+        <ApiErrorAlert detail={loadState.error} onRetry={() => { void start(); }} />
+      )}
       {error && <p role="alert" className="ledger-error">{error}</p>}
     </div>;
   }

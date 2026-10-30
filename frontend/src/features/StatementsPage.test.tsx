@@ -93,6 +93,23 @@ test("a refused FEC stays on the statements page with a corrective link", async 
   expect(screen.queryByRole("link", { name: "Télécharger le FEC" })).not.toBeInTheDocument();
 });
 
+test("a setup failure is not an empty exercise and can be retried", async () => {
+  let failed = true;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+    if (failed) return response({ detail: { code: "OFFLINE", message: "Service indisponible" } }, 503);
+    return response({ activity: null, years: [] });
+  });
+  render(<StatementsPage />);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Service indisponible");
+  expect(screen.queryByText(/Créez un exercice/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Chargement des états/)).not.toBeInTheDocument();
+  failed = false;
+  fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+  expect(await screen.findByText(/Créez un exercice/)).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+});
+
 test("explains how to start without an exercise", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(response({ activity: null, years: [] }));
   render(<StatementsPage />);

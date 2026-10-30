@@ -25,6 +25,8 @@ test("loads on demand, shows loss and warnings, clears totals on failure", async
   fireEvent.click(screen.getByRole("button", { name: "Prévisualiser les à-nouveaux" }));
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
   expect(await screen.findByRole("alert")).toHaveTextContent("Exercice précédent absent");
+  expect(screen.queryByText(/Chargement des soldes/)).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Réessayer" })).toBeEnabled();
 });
 
 test.each([false, true])("year change discards late preview (error=%s)", async (failed) => {

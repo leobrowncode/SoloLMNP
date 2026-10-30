@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
 import OpeningPosting from "./OpeningPosting";
+import ScreenStatus from "./ScreenStatus";
+import {
+  beginLoad, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
+} from "./screenState";
 
 interface OpeningLine { account_number: string | null; label: string; debit: string; credit: string }
 export interface Opening {
@@ -13,29 +17,32 @@ export interface Opening {
 
 // The parent keys this component by exercise and refresh attempt.
 export default function OpeningPreview({ year }: { year: number }) {
-  const [data, setData] = useState<Opening | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<ScreenView<Opening>>(idleView());
+  const data = showsData(view) ? view.data : null;
   const requestId = useRef(0);
   useEffect(() => () => { requestId.current += 1; }, []);
   async function load() {
     const id = ++requestId.current;
-    setData(null); setError(""); setLoading(true);
+    setView((current) => beginLoad(current, false));
     try {
       const value = await request<Opening>(`/years/${year}/opening-preview`);
-      if (id === requestId.current) setData(value);
+      if (id === requestId.current) {
+        setView(finishLoad(value, (opening) => opening.lines.length === 0 && opening.result_line === null));
+      }
     } catch (reason) {
-      if (id === requestId.current) setError((reason as Error).message);
-    } finally {
-      if (id === requestId.current) setLoading(false);
+      if (id === requestId.current) setView((current) => failLoad(current, toApiError(reason), false));
     }
   }
-  return <section aria-labelledby="opening-title">
+  return <section aria-labelledby="opening-title" data-screen-phase={view.phase}>
     <h3 id="opening-title">Préparer les à-nouveaux de cet exercice</h3>
     <p>La prévisualisation depuis l’exercice précédent ne crée aucune écriture. Vérifiez les soldes avant de demander leur comptabilisation.</p>
-    <button type="button" onClick={() => { void load(); }} disabled={loading}>Prévisualiser les à-nouveaux</button>
-    {loading && <p role="status">Chargement des soldes à reprendre…</p>}
-    {error && <p role="alert">{error}</p>}
+    <button type="button" onClick={() => { void load(); }} disabled={view.phase === "loading"}>Prévisualiser les à-nouveaux</button>
+    <ScreenStatus
+      state={view}
+      onRetry={() => { void load(); }}
+      loading={<p role="status">Chargement des soldes à reprendre…</p>}
+      empty={<p>Aucun solde à reprendre.</p>}
+    />
     {data && <div aria-live="polite">
       <p>Soldes au {data.source_end_date} pour l’ouverture du {data.opening_date}. Brouillons exclus : {data.excluded_draft_count}.</p>
       <ul>{data.warnings.map((warning) => <li key={warning.code}>{warning.message}</li>)}</ul>

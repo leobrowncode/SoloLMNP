@@ -62,6 +62,24 @@ describe("Foundation status", () => {
     expect(screen.queryByText(/Base prête/)).not.toBeInTheDocument();
   });
 
+  it("keeps the last ready screen when a later status check fails", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce(reply())
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(reply());
+    vi.stubGlobal("fetch", request);
+    renderApp();
+    expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Actualiser" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Connexion au service indisponible");
+    expect(screen.getByText(/peuvent être périmées/)).toBeInTheDocument();
+    expect(screen.getByText(/Base prête/)).toBeInTheDocument();
+    expect(screen.queryByText(/Connexion au service et vérification/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+    expect(await screen.findByText(/Base prête/)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("allows retry after a network failure", async () => {
     const request = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(reply());
     vi.stubGlobal("fetch", request);

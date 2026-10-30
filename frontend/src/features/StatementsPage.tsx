@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { downloadFiling } from "../api/download";
 import { RequestError, request, type Setup } from "../api/ledger";
 import ApiErrorAlert from "./ApiErrorAlert";
 import OpeningPreview from "./OpeningPreview";
 import ResultClosing from "./ResultClosing";
+import ScreenStatus from "./ScreenStatus";
+import {
+  beginLoad, defer, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
+} from "./screenState";
 import "./ledger.css";
 
 interface Row { account_number: string; label: string; amount: string }
@@ -24,36 +28,64 @@ function Accounts({ title, rows, total }: { title: string; rows: Row[]; total: s
 }
 
 export default function StatementsPage() {
-  const [setup, setSetup] = useState<Setup | null>(null);
+  const [setupView, setSetupView] = useState<ScreenView<Setup>>(() => beginLoad(idleView<Setup>(), false));
   const [year, setYear] = useState(0);
-  const [data, setData] = useState<Statements | null>(null);
-  const [error, setError] = useState("");
+  const [report, setReport] = useState<ScreenView<Statements>>(idleView());
   const [downloadError, setDownloadError] = useState<RequestError | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const errorRef = useRef<HTMLParagraphElement>(null);
-  useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
+  const [setupAttempt, setSetupAttempt] = useState(0);
+  const setup = showsData(setupView) ? setupView.data : null;
+  const data = showsData(report) ? report.data : null;
   useEffect(() => {
-    let current = true;
+    const controller = new AbortController();
+    defer(() => {
+      if (controller.signal.aborted) return;
+      setSetupView((current) => beginLoad(current, current.data !== null));
+    });
     void request<Setup>("/setup").then((value) => {
-      if (current) { setSetup(value); setYear(value.years[0]?.id ?? 0); }
-    }, (reason: Error) => { if (current) setError(reason.message); });
-    return () => { current = false; };
-  }, []);
+      if (controller.signal.aborted) return;
+      setSetupView(finishLoad(value, (loaded) => loaded.years.length === 0));
+      if (value.years.length > 0) setYear((current) => current || value.years[0]?.id || 0);
+    }, (reason: unknown) => {
+      if (!controller.signal.aborted) {
+        setSetupView((current) => failLoad(current, toApiError(reason), current.data !== null));
+      }
+    });
+    return () => controller.abort();
+  }, [setupAttempt]);
   useEffect(() => {
-    if (!year) return;
     let current = true;
+    if (!year || setupView.phase !== "loaded") {
+      defer(() => {
+        if (current) setReport(idleView());
+      });
+      return () => { current = false; };
+    }
+    defer(() => {
+      if (!current) return;
+      setReport((previous) => beginLoad(previous, false));
+    });
     void request<Statements>(`/years/${year}/statements`).then((value) => {
-      if (current) setData(value);
-    }, (reason: Error) => { if (current) setError(reason.message); });
+      if (current) setReport(finishLoad(value));
+    }, (reason: unknown) => {
+      if (current) setReport((previous) => failLoad(previous, toApiError(reason), false));
+    });
     return () => { current = false; };
-  }, [year, attempt]);
+  }, [year, attempt, setupView.phase]);
   function refresh(nextYear = year) {
-    setData(null); setError(""); setYear(nextYear); setAttempt((value) => value + 1);
+    setReport((previous) => beginLoad(previous, false));
+    setYear(nextYear);
+    setAttempt((value) => value + 1);
   }
-  return <section className="ledger-page" aria-labelledby="statements-title">
+  return <section className="ledger-page" aria-labelledby="statements-title" data-screen-phase={setupView.phase === "loaded" ? report.phase : setupView.phase}>
     <h2 id="statements-title">États comptables</h2>
     <p>Calculés sur les écritures validées. Centralisez le résultat ici. Le calcul fiscal, le pré-contrôle et la clôture sont dans Fiscalité LMNP.</p>
-    {setup && setup.years.length === 0 && <p>Créez un exercice dans Comptabilité pour consulter ses états.</p>}
+    <ScreenStatus
+      state={setupView}
+      onRetry={() => setSetupAttempt((value) => value + 1)}
+      loading={<p role="status">Chargement des états…</p>}
+      empty={<p>Créez un exercice dans Comptabilité pour consulter ses états.</p>}
+    />
     {setup && setup.years.length > 0 && <div className="toolbar">
       <label>Exercice <select value={year} onChange={(event) => refresh(Number(event.target.value))}>{setup.years.map((item) => <option key={item.id} value={item.id}>{item.year}</option>)}</select></label>
       <button type="button" onClick={() => refresh()}>Actualiser les états</button>
@@ -71,8 +103,14 @@ export default function StatementsPage() {
     {downloadError && <ApiErrorAlert detail={downloadError.detail} />}
     {year !== 0 && <OpeningPreview key={`${year}-${attempt}`} year={year} />}
     {year !== 0 && <ResultClosing key={`result-${year}-${attempt}`} year={year} />}
-    {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
-    {!error && (!setup || (year !== 0 && !data)) && <p role="status">Chargement des états…</p>}
+    {year !== 0 && (
+      <ScreenStatus
+        state={report}
+        onRetry={() => refresh()}
+        loading={<p role="status">Chargement des états…</p>}
+        focusError
+      />
+    )}
     {data && <div aria-live="polite">
       <p>Période : {data.start_date} — {data.end_date}. Brouillons exclus : {data.excluded_draft_count}.</p>
       <h3>Compte de résultat</h3>

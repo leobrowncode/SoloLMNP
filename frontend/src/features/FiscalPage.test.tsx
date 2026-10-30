@@ -545,3 +545,54 @@ test("a failed recalculation drops the previous result and a later success repla
   expect(screen.queryByText("Obsolète")).not.toBeInTheDocument();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
+
+test("a failed export read can be retried and a later failure keeps the posture cards", async () => {
+  let exportsFailed = true;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    if (isFiscalRead(url, method)) return notComputed();
+    if (url.endsWith("/vintages")) {
+      return response({ vintages: [{ vintage: "2025", status: "research_only", blocked: [], executable: [] }] });
+    }
+    if (url.endsWith("/setup")) return response({ years: [{ id: 1, year: 2025, status: "OPEN" }] });
+    if (url.endsWith("/statements")) {
+      return response({
+        income_statement: { income: [], expenses: [], total_income: "0.00", total_expenses: "0.00", result: "0.00" },
+      });
+    }
+    if (url.endsWith("/exports")) {
+      if (exportsFailed) {
+        return response({ detail: { code: "EXPORTS_UNAVAILABLE", message: "Les sorties n’ont pas pu être lues." } }, 503);
+      }
+      return response(exportBody(false, "bloquee"));
+    }
+    if (url.includes("/api/fiscal/years/1") && method === "POST") {
+      exportsFailed = true;
+      return response({
+        status: "computed", declarable: false, accounting_result: "0.00", fiscal_result: "0.00",
+        deductible_depreciation: "0.00", unused_depreciation: "0.00", tax_loss: "0.00", non_deductible: "0.00",
+      });
+    }
+    throw new Error(`unexpected ${method} ${url}`);
+  });
+  render(<FiscalPage />);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Les sorties n’ont pas pu être lues.");
+  expect(screen.queryByText(/Chargement des sorties/)).not.toBeInTheDocument();
+  expect(screen.queryByText("Bloquée")).not.toBeInTheDocument();
+  exportsFailed = false;
+  fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+  expect(await screen.findAllByText("Bloquée")).not.toHaveLength(0);
+  expect(document.querySelector("[data-posture='bloquee']")).not.toBeNull();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+  exportsFailed = true;
+  fireEvent.click(screen.getByRole("button", { name: "Calculer le résultat fiscal" }));
+  expect(await screen.findByText(/peuvent être périmées/)).toBeInTheDocument();
+  expect(screen.getAllByText("Bloquée").length).toBeGreaterThan(0);
+  expect(screen.queryByText(/Chargement des sorties/)).not.toBeInTheDocument();
+  exportsFailed = false;
+  fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+  expect(await screen.findByText(/exigent un exercice clôturé/)).toBeInTheDocument();
+  expect(screen.queryByText(/peuvent être périmées/)).not.toBeInTheDocument();
+});
