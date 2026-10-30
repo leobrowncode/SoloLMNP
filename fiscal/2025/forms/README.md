@@ -14,4 +14,4 @@ Règles dures avant une feuille complète :
 - refuser toute case déclarable avec `official_case = null` ou `verification = case_not_verified` ;
 - ne pas copier les identifiants d’un autre millésime ;
 - 2033-F / 2033-G : non applicables aux entreprises individuelles (notice) ;
-- 2042-C-PRO : produit séparé, hors archive de ce lot.
+- 2042-C-PRO : produit séparé, CERFA 11222*28 lu le 30 octobre 2026. 5NA / 5NY publiées pour les revenus 2025. 5NK et 5NZ bloquées. Le foyer et les cotisations sociales ne sont pas remplis.

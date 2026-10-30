@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.domain.filing.declaration import WORK_MARKER, build_declaration
 from app.domain.filing.fec import render_fec
 from app.domain.filing.mappings import BLOCKING_WARNINGS, compile_package
 from app.domain.fiscal.output_status import align_controlled_exports, apply_output_status
@@ -111,9 +112,14 @@ def efi_worksheet(session: Session, year_id: int) -> dict[str, Any]:
             "separated_from_liasse": True,
             "lines": [],
             "prior_deficits": [],
+            "deficit_usage": [],
+            "blocked_cases": [],
             "note": "",
         },
+        "work_marker": WORK_MARKER,
+        "manual_only": True,
     }
+    body["declaration"] = build_declaration(session, year, package)
     rendered = render_fec(session, year.id)
     body["exports"] = align_controlled_exports(
         body.get("exports") or {},
@@ -141,6 +147,7 @@ def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
     exercise = worksheet.get("exercise") or {}
     declarant = worksheet.get("declarant") or {}
     status = str(worksheet.get("output_headline") or worksheet.get("output_label") or "Recherche")
+    lines.append((WORK_MARKER, True))
     lines.append(
         (
             "SoloLMNP — liasse LMNP à recopier — exercice du "
@@ -148,6 +155,7 @@ def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
             True,
         )
     )
+    text("Saisie et envoi manuels uniquement. Pas de scraping, pas d’EDI, pas de télétransmission.")
     if worksheet.get("declarable"):
         text(f"Statut : {status}. Aucune transmission : à recopier soi-même en mode EFI.")
     else:
@@ -176,16 +184,32 @@ def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
         title("Consignes de saisie")
         for item in worksheet["instructions"]:
             text(f"- {item}")
-    fields = worksheet["liasse"]["fields"]
+    declaration = worksheet.get("declaration") or {}
+    published = declaration.get("efi_rows")
+    fields = (
+        published if isinstance(published, list) and published else worksheet["liasse"]["fields"]
+    )
     for form in FORM_ORDER:
-        rows = [field for field in fields if field.get("form_ref") == form]
+        rows = [field for field in fields if field.get("form_ref", field.get("form")) == form]
         if not rows:
             continue
         title(FORM_TITLES[form])
         for field in rows:
-            case = field.get("official_case")
-            prefix = f"Case {case} — " if case else ""
-            text(f"{prefix}{field['label']} : {_euros(field['value'])}")
+            amount = field.get("value", field.get("amount"))
+            text(f"{_case_prefix(field)}{field['label']} : {_euros(amount)}")
+    explanations = declaration.get("explanations") or []
+    if explanations:
+        title("Calculs — formules et règles")
+        for item in explanations:
+            if not isinstance(item, dict) or item.get("amount") is None:
+                continue
+            rule_ids = ", ".join(
+                str(rule.get("id"))
+                for rule in item.get("rules") or []
+                if isinstance(rule, dict) and rule.get("id")
+            )
+            suffix = f" [{rule_ids}]" if rule_ids else ""
+            text(f"{item['label']} : {_euros(item['amount'])} — {item['formula']}{suffix}")
     tracking = worksheet.get("depreciation_tracking")
     if tracking:
         title("État de suivi des amortissements non déduits (art. 39 C II du CGI)")
@@ -205,15 +229,34 @@ def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
     if personal.get("lines"):
         title("2042-C-PRO — déclaration de revenus du foyer (à part de la liasse)")
         for line in personal["lines"]:
-            text(
-                f"Case {line['case']} (déclarant 2 : {line['case_declarant_2']}) — "
-                f"{line['label']} : {_euros(line['amount'])}"
-            )
+            case = line.get("case")
+            if line.get("case_status") == "blocked" or not case:
+                prefix = "Case bloquée — ne pas recopier — "
+            else:
+                other = line.get("case_declarant_2")
+                extra = f" (déclarant 2 : {other}, non rempli)" if other else ""
+                prefix = f"Case {case}{extra} — "
+            served = "" if line.get("served", True) else " — ne pas servir cette ligne"
+            text(f"{prefix}{line['label']} : {_euros(line['amount'])}{served}")
         for row in personal.get("prior_deficits", []):
-            case = row.get("case") or "case à vérifier"
+            case = row.get("case")
+            if case:
+                text(
+                    f"Case {case} — déficit LMNP {row['origin_year']} encore ouvert : "
+                    f"{_euros(row['amount'])}"
+                )
+            else:
+                text(
+                    f"Case bloquée — déficit LMNP {row['origin_year']} encore ouvert : "
+                    f"{_euros(row['amount'])}"
+                )
+        for row in personal.get("deficit_usage", []):
             text(
-                f"Case {case} — déficit LMNP {row['origin_year']} restant : {_euros(row['amount'])}"
+                f"Registre déficits {row['origin_year']} : ouverture {_euros(row['opening'])}, "
+                f"imputé {_euros(row['used'])}, reste {_euros(row['remaining_after'])}"
             )
+        for row in personal.get("blocked_cases", []):
+            text(f"Ne pas utiliser la case {row['case']} : {row['reason']}")
         if personal.get("note"):
             text(str(personal["note"]))
     properties = worksheet.get("by_property") or []
@@ -225,6 +268,16 @@ def worksheet_pdf(worksheet: dict[str, Any]) -> bytes:
             f"dotations {_euros(row['depreciation'])}"
         )
     return _plain_pdf(lines)
+
+
+def _case_prefix(field: dict[str, Any]) -> str:
+    status = field.get("case_status")
+    case = field.get("case") or field.get("official_case")
+    if status == "blocked":
+        return "Case bloquée — ne pas recopier — "
+    if status == "unnumbered" or not case:
+        return "Ligne non numérotée — "
+    return f"Case {case} — "
 
 
 def _with_level(item: dict[str, Any]) -> dict[str, Any]:

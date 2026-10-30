@@ -38,8 +38,9 @@ def test_cases_registry_refuses_unverified_declarable_path() -> None:
     for case in registry["cases"]:
         if case["form"] == "2042-C-PRO":
             assert case["official_case"] in {"5NA", "5NY", "5GA-5GJ"}
-            assert case["verification"] == "verified_by_cross_reference"
-            assert case["consulted_at"] == "2026-10-23"
+            assert case["verification"] == "verified"
+            assert case["source_document"] == "2042-C-PRO-2026"
+            assert case["consulted_at"] == "2026-10-30"
             continue
         if case["form"].startswith("2033"):
             assert case["official_case"] is not None
@@ -68,6 +69,13 @@ def test_cases_registry_refuses_unverified_declarable_path() -> None:
     )
     assert constructions["official_case"] == "430"
     assert all(case.get("official_case") != "410" for case in registry["cases"])
+    blocked = {
+        (item["form"], item.get("official_case"))
+        for item in registry["blocked_cases"]
+        if item.get("official_case")
+    }
+    assert ("2042-C-PRO", "5NK") in blocked
+    assert ("2042-C-PRO", "5NZ") in blocked
 
 
 def test_work_mapping_carries_verified_official_cases() -> None:

@@ -56,6 +56,8 @@ test("before calculation every output is blocked and lists what is missing", () 
   }
   expect(screen.getAllByText("Bloquée").length).toBe(4);
   expect(screen.getByRole("button", { name: "Télécharger le PDF de recopie" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Télécharger la feuille CSV" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Télécharger la feuille JSON" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Télécharger le FEC" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Télécharger le dossier de contrôle" })).toBeDisabled();
   expect(screen.getAllByText(/Calculez le résultat fiscal/).length).toBeGreaterThan(0);
@@ -82,6 +84,8 @@ test("before closure the liasse stays provisional and the final FEC stays blocke
   expect(screen.getAllByText("Provisoire").length).toBeGreaterThan(0);
   expect(screen.getAllByText(/pas une sortie finale/).length).toBeGreaterThan(0);
   expect(screen.getByRole("button", { name: "Télécharger le PDF de recopie" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Télécharger la feuille CSV" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Télécharger la feuille JSON" })).toBeEnabled();
   expect(screen.getByRole("button", { name: "Télécharger le FEC" })).toBeDisabled();
   expect(document.querySelector('[data-export="archive"]')).toHaveAttribute("data-posture", "bloquee");
 });
@@ -111,6 +115,8 @@ test("a blocked liasse shows the missing prerequisite instead of a file link", (
     "/comptabilite/brouillons#identite-liasse",
   );
   expect(screen.getByRole("button", { name: "Télécharger le PDF de recopie" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Télécharger la feuille CSV" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Télécharger la feuille JSON" })).toBeDisabled();
 });
 
 test("a final FEC and control file can be downloaded, and a refusal stays on the page", async () => {

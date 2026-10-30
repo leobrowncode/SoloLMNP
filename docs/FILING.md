@@ -53,11 +53,13 @@ Relu sur le PDF archivé le 23 octobre 2026 :
 
 - Ligne 360 du 2033-B (déficits antérieurs) : réservée à l’IS. Les cases 370/372 reprennent donc 352/354.
 - 2033-D cadre II (déficits reportables, cases 860, 870, 982) : servi par les seules entreprises à l’IS. Il n’est plus émis.
-- Les déficits LMNP antérieurs s’imputent sur la déclaration de revenus du foyer : 2042-C-PRO, cases 5GA à 5GJ (une par année d’origine, 5GJ = année précédente).
+- Les déficits LMNP antérieurs s’imputent sur la déclaration de revenus du foyer, pas sur la liasse. Sur le CERFA 11222*28 (2042-C-PRO, millésime 2026, revenus 2025), 5GA = 2015 et 5GJ = 2024. L’origine 2025 n’a pas de case sur ce formulaire. Ce n’est pas une fenêtre glissante « année − 10 ».
 - Amortissement non déduit de l’exercice (art. 39 C) : réintégré ligne 318. Reprise d’années antérieures : déduite ligne 350 « divers », détaillée sur l’état de suivi joint à la feuille.
 - 2033-B : case 018 « déposé au titre de l’IR » à cocher.
 - 2031 cadre C : ligne 1 (370/372), ligne 4, ligne 7 « dont BIC non professionnels ». 2031-bis cadre I : « Autres locations meublées non professionnelles ».
-- 2042-C-PRO : 5NA (bénéfice ou 0) / 5NY (déficit), déclarant 2 : 5OA / 5OY. Relevé par recoupement de sources secondaires concordantes ; le PDF officiel n’était pas téléchargeable (site en maintenance).
+- 2042-C-PRO, revenus 2025 : bénéfice ou 0 en 5NA, déficit en 5NY (cas général, déclarant 1). 5OA / 5PA / 5OY / 5PY existent et ne sont pas remplies : le déclarant du foyer n’est pas connu. 5NK est le micro-BIC (meublés de tourisme non classés), 5NZ n’est pas sur le formulaire : les deux sont bloquées. Source : CERFA 11222*28 archivé le 30/10/2026 (`fiscal/2025/sources/official/2042-c-pro_2026.pdf`, empreinte `293de292…993b`). Le montant servi est le résultat fiscal avant imputation des déficits antérieurs. Le registre (`carry_forward_event`) montre l’ouverture, l’imputé et le reste.
+- Exercice 2026 : le formulaire 2042-C-PRO millésime 2027 n’est pas publié. Aucune case 5NA, 5NY, 5NK, 5NZ ou 5GA n’est reconduite. Les montants restent affichés, la case est bloquée.
+- Exports d’archive : `GET /api/filing/years/{id}/efi.json` et `efi.csv`, même porte que le PDF (Provisoire, Bloquée, Finale). En-tête `X-Content-SHA256`. Le JSON et le CSV portent le marqueur « document de travail, à vérifier », le millésime, les empreintes de règles et de formulaires, et `declarable: false`. Ils entrent dans le zip du dossier de contrôle. Saisie manuelle uniquement : pas de scraping, pas d’EDI, pas de télétransmission.
 
 Le calcul fiscal interne garde une imputation FIFO des déficits antérieurs : c’est une estimation au niveau du foyer, pas une ligne de la liasse.
 
@@ -69,7 +71,7 @@ Un bien acheté avant le début de l’exercice entre en comptabilité par une �
 
 - 2033-F et 2033-G : non applicables aux entreprises individuelles.
 - 2033-D cadre II : réservé à l’IS.
-- Millésime 2026 : formulaires de 2027 non publiés ; numéros repris du registre 2025, à vérifier en ligne.
+- Millésime 2026 : formulaires de 2027 non publiés. Les numéros 2033 et 2042 ne sont pas présentés comme officiels (`case_publication: blocked`, `case_not_verified`).
 - Cession, TVA, plus-values : la présence de ces opérations empêche la feuille d’être complète. Un millésime non validé reste Recherche même si la feuille est complète.
 - La cotisation CVAE n’est pas calculée. La case 117 reste une base, nulle jusqu’à 152 500 € de chiffre d’affaires.
 - L’accès à l’espace professionnel du contribuable n’est pas testé ici.

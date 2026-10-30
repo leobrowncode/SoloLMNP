@@ -3,7 +3,8 @@
   "vintage": "2026",
   "version": "research-4",
   "status": "research_only",
-  "source": "Même structure que la liasse 2025 archivée. Les formulaires 2026 ne sont pas encore archivés : vérifier les numéros de cases sur le millésime ouvert dans l’espace professionnel.",
+  "source": "Même structure que la liasse 2025 archivée. Les formulaires du millésime 2027 ne sont pas publiés : les numéros repris de 2025 ne sont pas une case officielle de ce millésime.",
+  "case_publication": "blocked",
   "fields": [
     {
       "code": "SERVICES_VENDUS",

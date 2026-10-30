@@ -9,12 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_cents
+from app.domain.filing.declaration import explanation_inputs, personal_return
 from app.models import AccountingEntry, Asset, FiscalYear, Property
 from app.models.assets import AssetComponent, DepreciationPeriod, DepreciationSchedule
 from app.models.foundation import RentalActivity
 from app.models.operations import BusinessOperation
 from app.services.assets import gross_pieces
-from app.services.fiscal import _operating, _prior_remaining
+from app.services.fiscal import _operating
 from app.services.ledger import money
 from app.services.statements import statements
 
@@ -44,8 +45,8 @@ def extend_package(
         )
     note = (
         "Exercice 2026 : les formulaires du millésime 2027 ne sont pas encore publiés. "
-        "Les numéros de cases sont ceux des formulaires 2025 archivés, stables d’une année "
-        "sur l’autre. Vérifiez-les sur le formulaire en ligne au moment de déclarer."
+        "Les numéros de cases ne sont pas recopiés depuis 2025 : ils restent bloqués. "
+        "Vérifiez-les sur le formulaire en ligne au moment de déclarer."
         if year.fiscal_vintage == "2026"
         else "Cases lues sur les PDF 2031 et 2033 archivés."
     )
@@ -65,7 +66,8 @@ def extend_package(
         "instructions": _instructions(year),
         "depreciation_tracking": _depreciation_tracking(year, fiscal),
     }
-    package["personal_return"] = _personal_return(session, year, fiscal)
+    package["personal_return"] = personal_return(session, year, fiscal)
+    package["explanation_inputs"] = explanation_inputs(fiscal)
     _detail_warning(package)
 
 
@@ -722,54 +724,6 @@ def _depreciation_tracking(year: FiscalYear, fiscal: dict[str, Any]) -> dict[str
         "prior": prior,
         "current_year": year.year,
         "remaining_total": money(remaining_total),
-    }
-
-
-def _personal_return(session: Session, year: FiscalYear, fiscal: dict[str, Any]) -> dict[str, Any]:
-    result = _fiscal_before(fiscal)
-    first_origin = year.year - 10
-    letters = "ABCDEFGHIJ"
-    prior = []
-    for stock in _prior_remaining(session, year, "tax_loss", min_origin_year=first_origin):
-        index = stock["origin_year"] - first_origin
-        prior.append(
-            {
-                "origin_year": stock["origin_year"],
-                "case": f"5G{letters[index]}" if 0 <= index < len(letters) else None,
-                "amount": money(stock["remaining"]),
-            }
-        )
-    return {
-        "form": "2042-C-PRO",
-        "status": "verified_by_cross_reference",
-        "separated_from_liasse": True,
-        "lines": [
-            {
-                "case": "5NA",
-                "case_declarant_2": "5OA",
-                "label": (
-                    "Locations meublées non professionnelles, régime réel — "
-                    "bénéfice ou résultat nul"
-                ),
-                "amount": money(max(0, result)),
-            },
-            {
-                "case": "5NY",
-                "case_declarant_2": "5OY",
-                "label": (
-                    "Locations meublées non professionnelles, régime réel — déficit, sans signe"
-                ),
-                "amount": money(max(0, -result)),
-            },
-        ],
-        "prior_deficits": prior,
-        "note": (
-            "Une seule des deux lignes porte un montant ; un résultat nul se déclare 0 en 5NA. "
-            "Les déficits LMNP antérieurs encore reportables vont en 5GA à 5GJ, une case par "
-            "année d’origine (5GJ = année précédente). Ils sont souvent préremplis : "
-            "vérifiez-les. Correspondance relevée sur le formulaire 2042-C-PRO 2026, "
-            "à contrôler sur celui de votre déclaration."
-        ),
     }
 
 

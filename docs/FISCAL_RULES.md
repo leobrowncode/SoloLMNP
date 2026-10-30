@@ -123,4 +123,4 @@ cession/cessation ; TVA/parahôtellerie ; plus-values ; frais d'acquisition ;
 ventilation automatique terrain/bâtiment ; durées et composants ; CFE.
 Les notices/formulaires 2031/2033 millésime 2025 sont archivés dans
 `fiscal/2025/sources/` et les cases MVP listées dans `forms/cases.yaml`.
-Le millésime 2026 et la 2042-C-PRO restent hors archive déclarable.
+Le millésime 2026 ne publie pas de numéro de case : les formulaires 2027 ne sont pas archivés. La 2042-C-PRO des revenus 2025 est lue sur le CERFA 11222*28 (5NA / 5NY, reports 5GA à 5GJ). Elle reste un document de travail, `research_only`. Voir [PHASE10_REPORT.md](PHASE10_REPORT.md).

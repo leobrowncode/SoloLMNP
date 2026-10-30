@@ -36,8 +36,8 @@ export const GLOSSARY = {
   millesime: {
     label: "Millésime",
     what: "Année des formulaires utilisée pour les numéros de cases. Les millésimes chargés restent en recherche : ce ne sont pas une attestation, et les cases se contrôlent sur le formulaire en ligne au moment de déclarer.",
-    why: "Un exercice 2026 peut s’appuyer sur les formulaires 2025 archivés tant que le millésime suivant n’est pas publié. Le statut Recherche rappelle de vérifier.",
-    example: "Exercice 2026, millésime 2026 dans l’écran Comptabilité. Les cases affichées viennent des formulaires connus ; vous les revoyez sur impots.gouv.fr en 2027.",
+    why: "Le millésime de l’exercice et celui du formulaire ne coïncident pas toujours. Un formulaire non publié ne donne aucun numéro de case. Le statut Recherche rappelle de vérifier.",
+    example: "Revenus 2025 : liasse 2031/2033 de 2025 et 2042-C-PRO de 2026 (CERFA 11222*28). Exercice 2026 : formulaires 2027 non publiés, cases bloquées, à revoir sur impots.gouv.fr.",
     mistake: "Recopier les cases d’un millésime en recherche sans ouvrir le formulaire de l’année, ou changer le millésime pour « débloquer » un envoi que l’application ne fait pas.",
   },
   siren: {
@@ -56,7 +56,7 @@ export const GLOSSARY = {
   },
   efi: {
     label: "EFI",
-    what: "Échange de formulaires informatisé : le mode « Déclarer résultat » sur impots.gouv.fr, où vous saisissez vous-même la liasse. SoloLMNP n’envoie rien et ne télétransmet pas.",
+    what: "Échange de formulaires informatisé : le mode « Déclarer résultat » sur impots.gouv.fr, où vous saisissez vous-même la liasse. SoloLMNP n’envoie rien et ne télétransmet pas. Le PDF, le CSV et le JSON sont un document de travail, à vérifier.",
     why: "La feuille et le PDF servent de brouillon de recopie. Le dépôt, la validation et l’accusé restent dans votre espace professionnel.",
     example: "Exercice clôturé, PDF de recopie ouvert à côté de la téléprocédure EFI. Vous reportez les cases, vous contrôlez, puis vous conservez l’accusé avec le dossier de contrôle.",
     mistake: "Déposer le PDF comme s’il avait été transmis, ou croire qu’un statut Recherche autorise l’envoi.",
@@ -70,17 +70,17 @@ export const GLOSSARY = {
   },
   "dossier-controle": {
     label: "Dossier de contrôle",
-    what: "Archive zip à conserver : FEC, description réglementaire, liasse PDF et JSON, empreintes SHA-256. Elle se télécharge après clôture. SoloLMNP n’envoie rien aux impôts.",
+    what: "Archive zip à conserver : FEC, description réglementaire, liasse PDF et JSON, feuille de travail CSV et JSON, empreintes SHA-256. Elle se télécharge après clôture. SoloLMNP n’envoie rien aux impôts.",
     why: "En cas de contrôle, ce paquet rassemble les pièces que l’application a figées. Une réouverture invalide le snapshot courant ; les anciennes preuves restent consultables.",
     example: "Après clôture, sortie Finale « Dossier de contrôle ». Vous le rangez avec les justificatifs et, plus tard, l’accusé de dépôt EFI.",
     mistake: "Le prendre pour un envoi déjà fait, ou le générer avant la clôture et le calcul fiscal.",
   },
   "declaration-foyer": {
     label: "2042-C-PRO",
-    what: "Déclaration de revenus du foyer, à part de la liasse professionnelle. Le résultat BIC de la location se reporte en 5NA (bénéfice ou 0) ou 5NY (déficit). Les déficits LMNP antérieurs vont en 5GA à 5GJ.",
-    why: "La liasse ne remplace pas la déclaration du foyer. Ces cases sont un rappel à contrôler : le PDF officiel n’est pas archivé ici.",
-    example: "Résultat fiscal 0 € : case 5NA à 0. Déficit de l’activité : 5NY. Un déficit LMNP de 2024 encore ouvert se suit vers 5GA–5GJ, après vérification sur votre déclaration.",
-    mistake: "Recopier ces montants sans ouvrir la 2042-C-PRO de l’année, ou les confondre avec les cases de la 2033.",
+    what: "Déclaration de revenus du foyer, à part de la liasse professionnelle. Pour les revenus 2025, formulaire 2026 CERFA 11222*28, le résultat BIC au réel se reporte en 5NA (bénéfice ou 0) ou 5NY (déficit). Les déficits LMNP de 2015 à 2024 vont en 5GA à 5GJ. Un millésime sans formulaire publié ne montre aucun numéro.",
+    why: "La liasse ne remplace pas la déclaration du foyer. 5NK est une case de micro-BIC, pas le résultat au réel. 5NZ n’est pas sur ce formulaire. Le millésime reste en recherche : vous recopiez à la main après contrôle.",
+    example: "Résultat avant imputation des déficits antérieurs de 920 € : 5NA à 920, 5NY non servie. Un déficit 2024 encore ouvert se suit vers 5GJ, après lecture de votre déclaration.",
+    mistake: "Mettre le résultat réel en 5NK, inventer une case 5NZ, ou recopier un numéro bloqué quand le formulaire de l’année n’est pas publié.",
   },
   extourne: {
     label: "Extourne",
