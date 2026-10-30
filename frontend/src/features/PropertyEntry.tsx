@@ -2,10 +2,14 @@ import { useState } from "react";
 import { assetsRequest as api } from "../api/assets";
 import { operationsRequest, type Bank, type Loan, type Property } from "../api/operations";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
+import {
+  describedBy, propertyEntryPostCauses, propertyEntryPreviewCauses, propertyEntryStartCauses,
+} from "./actionCauses";
 import ApiErrorAlert from "./ApiErrorAlert";
+import PrerequisiteList from "./PrerequisiteList";
 import { idleView, toApiError, type ScreenView } from "./screenState";
 
-interface YearOption { id: number; year: number; start_date?: string }
+interface YearOption { id: number; year: number; start_date?: string; status?: string }
 interface EntryLine { account_number: string; label: string; debit: string; credit: string }
 interface Preview {
   accounting_date: string;
@@ -127,11 +131,21 @@ export default function PropertyEntry({
     }
   }
 
+  const openYears = years.filter((year) => year.status === undefined || year.status === "OPEN");
+  const startCauses = propertyEntryStartCauses(properties.length, years);
+  const startCauseId = "property-entry-causes";
   if (!open) {
     return <div className="property-entry">
-      <button type="button" disabled={!properties.length || !years.length} onClick={() => { void start(); }}>
+      <button
+        id="entree-bien"
+        type="button"
+        disabled={startCauses.length > 0}
+        aria-describedby={describedBy(startCauseId, startCauses)}
+        onClick={() => { void start(); }}
+      >
         Faire entrer le bien en comptabilité
       </button>
+      <PrerequisiteList id={startCauseId} causes={startCauses} />
       <p className="form-help">
         À faire une fois, après avoir créé les immobilisations du logement : inscrit au bilan le terrain, le bâtiment,
         les emprunts et les frais payés avant le début de l’exercice. L’écart va au compte de l’exploitant (108).
@@ -145,6 +159,10 @@ export default function PropertyEntry({
   }
 
   const propertyLoans = loans.filter((row) => row.property_id === propertyId);
+  const previewCauses = propertyEntryPreviewCauses(propertyId, yearId);
+  const postCauses = propertyEntryPostCauses(preview !== null);
+  const previewCauseId = "property-entry-preview-causes";
+  const postCauseId = "property-entry-post-causes";
   return <section className="review-form property-entry" aria-labelledby="property-entry-title">
     <h3 id="property-entry-title">Entrée du bien en comptabilité</h3>
     <p className="form-help">
@@ -160,7 +178,7 @@ export default function PropertyEntry({
       </label>
       <label>Exercice
         <select value={yearId} onChange={(event) => { setYearId(Number(event.target.value)); setPreview(null); }}>
-          {years.map((row) => <option key={row.id} value={row.id}>{row.year}</option>)}
+          {openYears.map((row) => <option key={row.id} value={row.id}>{row.year}</option>)}
         </select>
       </label>
       {propertyLoans.map((row) => <label key={row.id} className="field-money">
@@ -188,8 +206,10 @@ export default function PropertyEntry({
       </label>
     </div>
     <div className="form-actions">
-      <button type="button" disabled={busy || !propertyId || !yearId} onClick={() => { void submit(false); }}>Prévisualiser l’écriture</button>
-      <button type="button" disabled={busy || !preview} onClick={() => { void submit(true); }}>Comptabiliser</button>
+      <button id="property-entry-preview" type="button" disabled={busy || previewCauses.length > 0} aria-describedby={describedBy(previewCauseId, previewCauses)} onClick={() => { void submit(false); }}>Prévisualiser l’écriture</button>
+      <PrerequisiteList id={previewCauseId} causes={previewCauses} />
+      <button type="button" disabled={busy || postCauses.length > 0} aria-describedby={describedBy(postCauseId, postCauses)} onClick={() => { void submit(true); }}>Comptabiliser</button>
+      <PrerequisiteList id={postCauseId} causes={postCauses} />
       <button type="button" onClick={() => { setOpen(false); setPreview(null); }}>Annuler</button>
     </div>
     {preview?.owner_contribution.startsWith("-") && <p className="field-hint">

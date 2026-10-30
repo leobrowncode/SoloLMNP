@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { amount, cents, request, type Account, type Entry, type EntryInput, type Journal, type Year } from "../api/ledger";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
+import { describedBy, inventoryVerifyCauses } from "./actionCauses";
+import PrerequisiteList from "./PrerequisiteList";
 
 type InventoryInput = EntryInput & { justification: string; request_id: string };
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
@@ -35,6 +37,13 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
   const [justification, setJustification] = useState("");
   const [review, setReview] = useState<InventoryInput | null>(recovery.value);
   const [attempted, setAttempted] = useState(!!recovery.value);
+  const verifyCauses = inventoryVerifyCauses({
+    yearStatus: year.status,
+    generalJournalCount: general.length,
+    recoveryError: recovery.error,
+    attempted,
+  });
+  const verifyCauseId = "inventory-causes";
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const [error, setError] = useState(recovery.error);
@@ -107,7 +116,6 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
     {!review && <fieldset disabled={year.status !== "OPEN" || !!recovery.error}>
       <legend>Saisie justifiée</legend>
       <label>Journal d’inventaire<select required value={draft.journal_code} onChange={(e) => setDraft({ ...draft, journal_code: e.target.value })}><option value="">Choisir un journal</option>{general.map((j) => <option key={j.code} value={j.code}>{j.code} · {j.label}</option>)}</select></label>
-      {!general.length && <p>Aucun journal actif d’opérations diverses disponible.</p>}
       <label>Date comptable<input type="date" required min={year.start_date} max={year.end_date} value={draft.accounting_date} onChange={(e) => setDraft({ ...draft, accounting_date: e.target.value })} /></label>
       <label>Date de la pièce<input type="date" required value={draft.piece_date} onChange={(e) => setDraft({ ...draft, piece_date: e.target.value })} /></label>
       <label>Référence de la pièce<input required maxLength={200} value={draft.piece_reference} onChange={(e) => setDraft({ ...draft, piece_reference: e.target.value })} /></label>
@@ -134,7 +142,7 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
         }}>Abandonner après vérification</button></>}
     </>}
     <p aria-live="polite">{totals}</p>
-    {year.status !== "OPEN" && !attempted && <p>Un exercice ouvert est requis.</p>}
-    <button disabled={busy || !!recovery.error || (!attempted && (year.status !== "OPEN" || !general.length))}>{busy ? "Comptabilisation…" : review ? attempted ? "Réessayer la même demande" : "Confirmer la comptabilisation" : "Vérifier l’inventaire"}</button>
+    <button disabled={busy || verifyCauses.length > 0} aria-describedby={describedBy(verifyCauseId, verifyCauses)}>{busy ? "Comptabilisation…" : review ? attempted ? "Réessayer la même demande" : "Confirmer la comptabilisation" : "Vérifier l’inventaire"}</button>
+    <PrerequisiteList id={verifyCauseId} causes={verifyCauses} />
   </form>;
 }

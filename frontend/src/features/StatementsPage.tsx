@@ -78,7 +78,7 @@ export default function StatementsPage() {
     setAttempt((value) => value + 1);
   }
   return <section className="ledger-page" aria-labelledby="statements-title" data-screen-phase={setupView.phase === "loaded" ? report.phase : setupView.phase}>
-    <h2 id="statements-title">États comptables</h2>
+    <h2 id="statements-title" tabIndex={-1}>États comptables</h2>
     <p>Calculés sur les écritures validées. Centralisez le résultat ici. Le calcul fiscal, le pré-contrôle et la clôture sont dans Fiscalité LMNP.</p>
     <ScreenStatus
       state={setupView}

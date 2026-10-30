@@ -8,6 +8,13 @@ const response = (body: unknown, status = 200) => new Response(JSON.stringify(bo
 
 const validReason = "Correction d’une dotation comptabilisée par erreur sur l’exercice.";
 
+test("lists both reopen prerequisites before anything is typed", () => {
+  render(<ReopenYear year={1} />);
+  const causes = document.getElementById("reopen-causes");
+  expect(causes).toHaveTextContent("au moins 10 caractères");
+  expect(causes).toHaveTextContent("exactement ROUVRIR");
+});
+
 test("blocks reopen with a wrong confirmation label", () => {
   vi.spyOn(globalThis, "fetch");
   render(<ReopenYear year={1} />);
@@ -17,7 +24,11 @@ test("blocks reopen with a wrong confirmation label", () => {
   fireEvent.change(screen.getByLabelText(/Confirmation/), {
     target: { value: "ROUVRIRX" },
   });
-  expect(screen.getByRole("button", { name: "Réouvrir l’exercice" })).toBeDisabled();
+  const button = screen.getByRole("button", { name: "Réouvrir l’exercice" });
+  expect(button).toBeDisabled();
+  expect(button).toHaveAttribute("aria-describedby", "reopen-causes");
+  expect(document.getElementById("reopen-causes")).toHaveTextContent("exactement ROUVRIR");
+  expect(document.querySelector('a[href="/fiscalite#reopen-confirmation"]')).toBeTruthy();
 });
 
 test("blocks reopen when the reason is missing or too short", () => {
@@ -27,10 +38,13 @@ test("blocks reopen when the reason is missing or too short", () => {
     target: { value: "ROUVRIR" },
   });
   expect(screen.getByRole("button", { name: "Réouvrir l’exercice" })).toBeDisabled();
+  expect(document.getElementById("reopen-causes")).toHaveTextContent("au moins 10 caractères");
+  expect(document.querySelector('a[href="/fiscalite#reopen-motif"]')).toBeTruthy();
   fireEvent.change(screen.getByLabelText(/Motif de la réouverture/), {
     target: { value: "   " },
   });
   expect(screen.getByRole("button", { name: "Réouvrir l’exercice" })).toBeDisabled();
+  expect(document.getElementById("reopen-causes")).toHaveTextContent("au moins 10 caractères");
 });
 
 test("reopens a closed exercise and refreshes the parent view", async () => {

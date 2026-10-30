@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
+import { describedBy, reopenCauses } from "./actionCauses";
+import PrerequisiteList from "./PrerequisiteList";
 
 const INVALIDATED = [
   "Les calculs fiscaux enregistrés pour cet exercice sont invalidés.",
@@ -23,9 +25,9 @@ export default function ReopenYear({
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
 
   const trimmedReason = reason.trim();
-  const canSubmit = !busy
-    && confirmation === "ROUVRIR"
-    && trimmedReason.length >= 10;
+  const causes = busy ? [] : reopenCauses(confirmation, reason);
+  const causeId = "reopen-causes";
+  const canSubmit = !busy && causes.length === 0;
 
   async function reopen() {
     if (!canSubmit) {
@@ -59,13 +61,13 @@ export default function ReopenYear({
 
   return (
     <div className="reopen-year" aria-labelledby="reopen-title">
-      <h4 id="reopen-title">Réouvrir l’exercice</h4>
+      <h4 id="reopen-title" tabIndex={-1}>Réouvrir l’exercice</h4>
       <p>Réservé à une correction justifiée. L’action est tracée dans l’audit.</p>
       <ul aria-label="Effets de la réouverture">
         {INVALIDATED.map((item) => <li key={item}>{item}</li>)}
       </ul>
       <div className="form-grid">
-        <label>
+        <label id="reopen-motif" tabIndex={-1}>
           Motif de la réouverture
           <textarea
             value={reason}
@@ -74,7 +76,7 @@ export default function ReopenYear({
             placeholder="Décrivez la correction à apporter (minimum 10 caractères)."
           />
         </label>
-        <label>
+        <label id="reopen-confirmation" tabIndex={-1}>
           Confirmation — saisir ROUVRIR
           <input
             value={confirmation}
@@ -87,9 +89,10 @@ export default function ReopenYear({
       </div>
       {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
       {receipt && <p role="status">{receipt}</p>}
-      <button type="button" disabled={!canSubmit} onClick={() => { void reopen(); }}>
+      <button type="button" disabled={!canSubmit} aria-describedby={describedBy(causeId, causes)} onClick={() => { void reopen(); }}>
         {busy ? "Réouverture…" : "Réouvrir l’exercice"}
       </button>
+      <PrerequisiteList id={causeId} causes={causes} />
     </div>
   );
 }

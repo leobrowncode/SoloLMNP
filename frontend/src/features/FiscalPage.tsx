@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { RequestError, request } from "../api/ledger";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
+import { describedBy, fiscalActionCauses } from "./actionCauses";
 import CloseYear from "./CloseYear";
+import PrerequisiteList from "./PrerequisiteList";
 import ExportDownloads from "./ExportDownloads";
 import { asExportStatus, type ExportStatus } from "./exportStatus";
 import ScreenStatus from "./ScreenStatus";
@@ -607,6 +609,8 @@ export default function FiscalPage() {
   }
 
   const selectedYear = years.find((item) => item.id === year);
+  const fiscalCauses = fiscalActionCauses(year, years);
+  const fiscalCauseId = "fiscal-year-causes";
   const details = result?.details;
   const depUses = details?.prior_carry_forward_use?.depreciation ?? [];
   const lossUses = details?.prior_carry_forward_use?.tax_loss ?? [];
@@ -655,9 +659,10 @@ export default function FiscalPage() {
             ))}
           </select>
         </label>
-        <button id="calcul-fiscal" type="button" disabled={!year || busy} onClick={() => { void compute(); }}>
+        <button id="calcul-fiscal" type="button" disabled={!year || busy} aria-describedby={describedBy(fiscalCauseId, fiscalCauses)} onClick={() => { void compute(); }}>
           {busy ? "Calcul…" : "Calculer le résultat fiscal"}
         </button>
+        <PrerequisiteList id={fiscalCauseId} causes={fiscalCauses} />
       </div>
 
       <ul className="fiscal-rules-strip" aria-label="Règles LMNP utiles">
@@ -798,7 +803,7 @@ export default function FiscalPage() {
         </div>
         <div className="form-actions">
           <button type="button" onClick={addAdjustment}>Ajouter la réintégration</button>
-          <button type="button" disabled={!year || busy} onClick={() => { void loadSuggestions(); }}>
+          <button type="button" disabled={!year || busy} aria-describedby={describedBy(fiscalCauseId, fiscalCauses)} onClick={() => { void loadSuggestions(); }}>
             Reprendre les parts non déductibles saisies
           </button>
         </div>
@@ -984,7 +989,7 @@ export default function FiscalPage() {
           Une sortie bloquée liste ses prérequis et ne se télécharge pas. Le refus reste sur cette page.
         </p>
         <div className="toolbar">
-          <button type="button" disabled={!year || busy} onClick={() => { void loadWorksheet(); }}>
+          <button type="button" disabled={!year || busy} aria-describedby={describedBy(fiscalCauseId, fiscalCauses)} onClick={() => { void loadWorksheet(); }}>
             Liasse à recopier
           </button>
         </div>

@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { request, cents, amount, type Setup, type Account, type Journal, type Entry, type EntryInput, type Balance, type LedgerLine } from "../api/ledger";
+import { describedBy, listed, reversalCause, selectedYearCauses, unbalancedCause } from "./actionCauses";
+import PrerequisiteList from "./PrerequisiteList";
 import ScreenStatus from "./ScreenStatus";
 import {
   beginLoad, defer, failLoad, finishLoad, idleView, showsData, toApiError, type ScreenView,
@@ -17,6 +19,7 @@ import InventoryForm from "./InventoryForm";
 
 const blankLine = () => ({ account_number: "", label: "", debit: "0.00", credit: "0.00" });
 export default function LedgerPage() {
+  const { hash } = useLocation();
   const { tab: tabSlug } = useParams();
   const navigate = useNavigate();
   const resolvedTab = ledgerTabFromSlug(tabSlug);
@@ -47,6 +50,8 @@ export default function LedgerPage() {
   const listVisible = showsData(listView) && listView.data.queryKey === queryKey;
   const selectedYear = setup?.years.find((item) => item.id === year);
   const writable = selectedYear?.status === "OPEN";
+  const yearCauses = selectedYearCauses(selectedYear?.status);
+  const yearCauseId = "ledger-year-causes";
   useUnsavedGuard(!!draft);
 
   function openTab(next: LedgerTab) {
@@ -164,7 +169,7 @@ export default function LedgerPage() {
       onRetry={() => setRevision((value) => value + 1)}
       loading={<p>Chargement de la comptabilité…</p>}
     />
-    {setup && !setup.activity && <form onSubmit={(e) => {
+    {setup && !setup.activity && <form id="creer-activite" tabIndex={-1} onSubmit={(e) => {
       const data = formData(e);
       void mutate(() => request("/activity", "POST", { activity_name: data.get("name"), activity_start_date: data.get("start") }), "Activité créée.");
     }}>
@@ -181,13 +186,13 @@ export default function LedgerPage() {
         siret: String(data.get("siret") ?? ""),
       }), "Identité enregistrée. Elle apparaîtra en tête de la liasse.");
     }}>
-      <h3 id="identite-liasse">Identité pour la liasse</h3>
+      <h3 id="identite-liasse" tabIndex={-1}>Identité pour la liasse</h3>
       <p>Le SIRET figure sur la 2031. Laissez vide si vous ne l’avez pas encore.</p>
       <label>SIREN<input name="siren" inputMode="numeric" maxLength={9} defaultValue={setup.activity.siren ?? ""} /></label>
       <label>SIRET<input name="siret" inputMode="numeric" maxLength={14} defaultValue={setup.activity.siret ?? ""} /></label>
       <button disabled={busy}>Enregistrer l’identité</button>
     </form>}
-    {setup?.activity && <details open={!setup.years.length}>
+    {setup?.activity && <details id="ajouter-exercice" tabIndex={-1} open={!setup.years.length || hash === "#ajouter-exercice"}>
       <summary>{setup.activity.activity_name} · Ajouter un exercice</summary>
       <form onSubmit={(e) => {
         const data = formData(e);
@@ -203,12 +208,13 @@ export default function LedgerPage() {
       </form>
     </details>}
     {!!setup?.years.length && <>
-      <label>Exercice<select value={year} onChange={(e) => { setYear(Number(e.target.value)); setDraft(null); setConfirmation(null); setOffset(0); setBalance(null); setLedger([]); setEntries([]); }}>
+      <PrerequisiteList id={yearCauseId} causes={yearCauses} intro="Saisie indisponible :" />
+      <label id="exercice" tabIndex={-1}>Exercice<select value={year} onChange={(e) => { setYear(Number(e.target.value)); setDraft(null); setConfirmation(null); setOffset(0); setBalance(null); setLedger([]); setEntries([]); }}>
         {setup.years.map((y) => <option key={y.id} value={y.id}>{y.year} · {y.status === "OPEN" ? "ouvert" : y.status === "CLOSED" ? "clôturé" : "prêt à clôturer"}</option>)}
       </select></label>
       <nav aria-label="Vues comptables" className="ledger-tabs">{(["Brouillons", "Journal", "Grand livre", "Balance", "Plan comptable", "Inventaire"] as LedgerTab[]).map((name) =>
         <button key={name} aria-pressed={tab === name} onClick={() => openTab(name)}>{name}</button>)}</nav>
-      {tab === "Brouillons" && <button disabled={!writable || busy} onClick={() => startDraft()}>Nouvelle écriture</button>}
+      {tab === "Brouillons" && <button id="nouvelle-ecriture" disabled={!writable || busy} aria-describedby={describedBy(yearCauseId, yearCauses)} onClick={() => startDraft()}>Nouvelle écriture</button>}
       {tab === "Inventaire" && selectedYear && <InventoryForm key={year} year={selectedYear} accounts={accounts} journals={journals} onPosted={() => setRevision((v) => v + 1)} />}
       {draft && <form className="entry-editor" onSubmit={(e) => {
         e.preventDefault();
@@ -253,17 +259,25 @@ export default function LedgerPage() {
           empty={<p>Aucune écriture pour cette vue. {tab === "Journal" ? "Validées uniquement." : "Hors états comptables."}</p>}
         />
         {listVisible && <p>{count} écriture(s) · {tab === "Journal" ? "validées uniquement" : "hors états comptables"}</p>}
-        {listVisible && entries.map((entry) => <article className="entry-card" key={entry.id}>
+        {listVisible && entries.map((entry) => {
+          const balanceId = `entry-${entry.id}-balance`;
+          const reversalId = `entry-${entry.id}-reversal`;
+          return <article className="entry-card" key={entry.id}>
           <h3>{entry.entry_number || "Brouillon #" + entry.id} · {entry.label}</h3>
           <p>{entry.accounting_date} · {entry.journal_code} · Pièce {entry.piece_reference}</p>
           <div className="ledger-table"><table><thead><tr><th>Compte</th><th>Libellé</th><th>Débit €</th><th>Crédit €</th></tr></thead><tbody>{entry.lines.map((line, i) => <tr key={i}><td>{line.account_number}</td><td>{line.label}</td><td>{line.debit}</td><td>{line.credit}</td></tr>)}</tbody><tfoot><tr><th colSpan={2}>{entry.balanced ? "Équilibrée" : "Déséquilibrée"}</th><td>{entry.total_debit}</td><td>{entry.total_credit}</td></tr></tfoot></table></div>
           {entry.status === "DRAFT" ? <>
-            <button disabled={!writable || busy} onClick={() => startDraft(entry)}>Modifier</button>
-            <button disabled={!writable || busy || !entry.balanced} onClick={() => setConfirmation({ action: "validate", entry })}>Valider</button>
-            <button disabled={!writable || busy} onClick={() => setConfirmation({ action: "delete", entry })}>Supprimer</button>
-          </> : <button disabled={!writable || busy || !!entry.reversal_of_id} onClick={() => setConfirmation({ action: "reverse", entry })}>Extourner</button>}
+            <button id={`ecriture-${entry.id}`} disabled={!writable || busy} aria-describedby={describedBy(yearCauseId, yearCauses)} onClick={() => startDraft(entry)}>Modifier</button>
+            <button disabled={!writable || busy || !entry.balanced} aria-describedby={describedBy(yearCauseId, yearCauses, !entry.balanced ? balanceId : undefined)} onClick={() => setConfirmation({ action: "validate", entry })}>Valider</button>
+            {!entry.balanced && <PrerequisiteList id={balanceId} causes={listed(unbalancedCause(entry.id))} />}
+            <button disabled={!writable || busy} aria-describedby={describedBy(yearCauseId, yearCauses)} onClick={() => setConfirmation({ action: "delete", entry })}>Supprimer</button>
+          </> : <>
+            <button disabled={!writable || busy || !!entry.reversal_of_id} aria-describedby={describedBy(yearCauseId, yearCauses, entry.reversal_of_id ? reversalId : undefined)} onClick={() => setConfirmation({ action: "reverse", entry })}>Extourner</button>
+            {!!entry.reversal_of_id && <PrerequisiteList id={reversalId} causes={listed(reversalCause())} />}
+          </>}
           <button onClick={() => { void request<{ action: string; timestamp: string; details: unknown }[]>("/entries/" + entry.id + "/events").then(setAudit).catch((reason: unknown) => setActionError(toApiError(reason).message)); }}>Voir l’historique</button>
-        </article>)}
+        </article>;
+        })}
         <button disabled={!offset} onClick={() => setOffset(offset - 25)}>Page précédente</button>
         <button disabled={offset + 25 >= count} onClick={() => setOffset(offset + 25)}>Page suivante</button>
       </>}

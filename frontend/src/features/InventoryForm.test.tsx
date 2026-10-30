@@ -133,8 +133,14 @@ describe("manual inventory", () => {
   });
   it("requires an open year and an active general journal for a new entry", () => {
     render(<InventoryForm {...props} year={{ ...year, status: "CLOSED" }} journals={[]} />);
-    expect(screen.getByRole("button", { name: "Vérifier l’inventaire" })).toBeDisabled();
-    expect(screen.getByText("Aucun journal actif d’opérations diverses disponible.")).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: "Vérifier l’inventaire" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-describedby", "inventory-causes");
+    const causes = document.getElementById("inventory-causes");
+    expect(causes).toHaveTextContent("Aucun journal actif d’opérations diverses disponible.");
+    expect(causes).toHaveTextContent("clôturé");
+    expect(causes?.querySelector('a[href="/fiscalite#reopen-title"]')).toBeTruthy();
+    expect(causes?.querySelector('a[href="/comptabilite/brouillons#nouvelle-ecriture"]')).toBeTruthy();
   });
   it.each(["{", "{}", JSON.stringify({ fiscal_year_id: 2 })])("fails closed for corrupt saved data: %s", (saved) => {
     sessionStorage.setItem("sololmnp.inventory.pending.1", saved);

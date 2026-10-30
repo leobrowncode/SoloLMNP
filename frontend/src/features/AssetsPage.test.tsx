@@ -358,3 +358,38 @@ test("hides frozen asset fields and patches the duration while it is still free"
   const sent = calls.find((call) => call.url === "/api/assets/5" && call.method === "PATCH");
   expect(sent?.body).toMatchObject({ useful_life_months: 84, reason: "Durée d’usage revue" });
 });
+
+test("names the missing property on every immobilisation action", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url === "/api/ledger/setup") return response({
+      activity: { id: 1 },
+      years: [{ id: 1, year: 2025, status: "CLOSED" }],
+    });
+    if (url === "/api/ledger/accounts") return response([]);
+    if (url === "/api/operations/properties") return response([]);
+    if (url === "/api/assets") return response([]);
+    return response([]);
+  });
+  render(<AssetsPage />);
+  const create = await screen.findByRole("button", { name: "Nouvelle immobilisation" });
+  const land = screen.getByRole("button", { name: "Inscrire un terrain" });
+  const plan = screen.getByRole("button", { name: "Prévisualiser l’amortissement du logement" });
+  const entry = screen.getByRole("button", { name: "Faire entrer le bien en comptabilité" });
+  const calculate = screen.getByRole("button", { name: "Calculer les périodes" });
+  for (const button of [create, land, plan, entry]) expect(button).toBeDisabled();
+  expect(create).toHaveAttribute("aria-describedby", "asset-create-causes");
+  expect(land).toHaveAttribute("aria-describedby", "asset-create-causes");
+  expect(document.getElementById("asset-create-causes")).toHaveTextContent("Aucun bien n’est enregistré.");
+  expect(document.getElementById("asset-plan-causes")).toHaveTextContent("Aucun bien n’est enregistré.");
+  const entryCauses = document.getElementById("property-entry-causes");
+  expect(entryCauses).toHaveTextContent("Aucun bien n’est enregistré.");
+  expect(entryCauses).toHaveTextContent("clôturé");
+  expect(entryCauses?.querySelector('a[href="/operations/biens#ajouter-bien"]')).toBeTruthy();
+  expect(entryCauses?.querySelector('a[href="/fiscalite#reopen-title"]')).toBeTruthy();
+  expect(calculate).toBeDisabled();
+  expect(document.getElementById("asset-period-causes")).toHaveTextContent("clôturé");
+  const post = screen.getByRole("button", { name: "Comptabiliser toutes les dotations" });
+  expect(post).toBeDisabled();
+  expect(post).toHaveAttribute("aria-describedby", expect.stringContaining("asset-period-causes"));
+});

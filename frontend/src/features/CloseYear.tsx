@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
+import { closeConfirmCauses, closePrepareCauses, describedBy, precheckAction } from "./actionCauses";
+import PrerequisiteList from "./PrerequisiteList";
 import ReopenYear from "./ReopenYear";
 
 interface Notice {
@@ -16,8 +18,6 @@ interface Check {
   warnings: Notice[];
   infos?: Notice[];
 }
-
-const FISCAL_FIX_CODES = new Set(["FISCAL_NOT_COMPUTED", "FISCAL_STALE"]);
 
 function acknowledgedExactly(warnings: Notice[], acks: string[]) {
   const expected = new Set(warnings.map((item) => item.code));
@@ -61,6 +61,14 @@ export default function CloseYear({
     && !check.blocking
     && !sealed
     && acknowledgedExactly(check.warnings, acks);
+  const prepareCauses = check ? closePrepareCauses({
+    sealed, blocking: check.blocking, errors: check.errors, warnings: check.warnings, acks,
+  }) : [];
+  const confirmCauses = check ? closeConfirmCauses({
+    prepared, sealed, blocking: Boolean(check.blocking), errors: check.errors,
+  }) : [];
+  const prepareCauseId = "close-prepare-causes";
+  const confirmCauseId = "close-confirm-causes";
 
   async function load() {
     setError("");
@@ -127,7 +135,7 @@ export default function CloseYear({
   }
 
   return <section aria-labelledby="close-title">
-    <h3 id="close-title">Pré-contrôle et clôture</h3>
+    <h3 id="close-title" tabIndex={-1}>Pré-contrôle et clôture</h3>
     <p>Le pré-contrôle vient après le calcul fiscal. Il bloque sur une erreur. Chaque avertissement affiché doit être accusé ; un nouveau pré-contrôle efface les cases précédentes. La réouverture ultérieure exige un motif et invalide les exports.</p>
     <button type="button" onClick={() => { void load(); }}>Lancer le pré-contrôle</button>
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
@@ -140,10 +148,15 @@ export default function CloseYear({
         </p>
       )}
       {(check.infos ?? []).map((item) => <p key={item.code}>{item.message}</p>)}
-      {check.errors.map((item) => <p key={`${item.code}-${item.message}`} role="alert">{item.message}{FISCAL_FIX_CODES.has(item.code) && <> <a href="#calcul-fiscal">Calculer le résultat fiscal</a></>}</p>)}
+      {check.errors.map((item) => {
+        const action = precheckAction(item.code);
+        return <p key={`${item.code}-${item.message}`} role="alert">{item.message} <a href={action.href}>{action.label}</a></p>;
+      })}
       {check.warnings.map((item) => <label key={item.code}><input type="checkbox" checked={acks.includes(item.code)} onChange={(event) => toggle(item.code, event.target.checked)} />{item.message}</label>)}
-      <button type="button" disabled={!canPrepare} onClick={() => { void ready(); }}>Accuser et préparer la clôture</button>
-      <button type="button" disabled={!prepared || Boolean(check.blocking) || sealed} onClick={() => { void closeYear(); }}>Confirmer la clôture</button>
+      <button id="close-prepare" type="button" disabled={!canPrepare} aria-describedby={describedBy(prepareCauseId, prepareCauses)} onClick={() => { void ready(); }}>Accuser et préparer la clôture</button>
+      <PrerequisiteList id={prepareCauseId} causes={prepareCauses} />
+      <button type="button" disabled={!prepared || Boolean(check.blocking) || sealed} aria-describedby={describedBy(confirmCauseId, confirmCauses)} onClick={() => { void closeYear(); }}>Confirmer la clôture</button>
+      <PrerequisiteList id={confirmCauseId} causes={confirmCauses} />
     </div>}
     {sealed && (
       <ReopenYear
