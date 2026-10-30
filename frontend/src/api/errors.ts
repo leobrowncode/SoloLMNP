@@ -117,6 +117,13 @@ export const ERROR_HELP = {
   ENTRY_SEARCH: "ecriture",
   INVALID_DOCUMENT: "justificatif",
   RESTORE_CONFIRMATION: "restauration",
+  BATCH_INTERRUPTED: "dotation",
+  IDEMPOTENCY_CONFLICT: "dotation",
+  IDEMPOTENCY_KEY_REQUIRED: "dotation",
+  IDEMPOTENCY_RECORD_INVALID: "dotation",
+  PERIOD_NOT_FOUND: "dotation",
+  PERIOD_YEAR_MISMATCH: "dotation",
+  ZERO_DEPRECIATION: "dotation",
 } as const satisfies Record<string, GlossaryId>;
 
 export function knownHelp(value: unknown): GlossaryId | undefined {

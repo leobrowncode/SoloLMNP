@@ -1,4 +1,6 @@
 import { useState } from "react";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 import { entryLabel, frStamp, type EntryChoice } from "../api/conservation";
 import { RequestError, request } from "../api/ledger";
 import ApiErrorAlert from "./ApiErrorAlert";
@@ -18,7 +20,7 @@ export default function EntryPicker({
   const [results, setResults] = useState<EntryChoice[]>([]);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<RequestError | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { busy, step, run } = useMutation();
 
   async function search() {
     setError(null);
@@ -36,22 +38,22 @@ export default function EntryPicker({
       setResults([]);
       return;
     }
-    setBusy(true);
-    try {
-      const found = await request<{ entries: EntryChoice[] }>(
-        `/entries?${params.toString()}`,
-        "GET",
-        undefined,
-        "/api/filing",
-      );
-      setResults(found.entries);
-      setSearched(true);
-    } catch (reason) {
-      setResults([]);
-      setError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
-    } finally {
-      setBusy(false);
-    }
+    await run(async (report) => {
+      report("Recherche de l’écriture…");
+      try {
+        const found = await request<{ entries: EntryChoice[] }>(
+          `/entries?${params.toString()}`,
+          "GET",
+          undefined,
+          "/api/filing",
+        );
+        setResults(found.entries);
+        setSearched(true);
+      } catch (reason) {
+        setResults([]);
+        setError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
+      }
+    });
   }
 
   return (
@@ -77,9 +79,10 @@ export default function EntryPicker({
           <input value={piece} onChange={(event) => setPiece(event.target.value)} autoComplete="off" />
         </label>
       </div>
-      <button type="button" onClick={() => { void search(); }} disabled={busy}>
+      <button type="button" onClick={() => { void search(); }} disabled={busy} aria-busy={busy || undefined}>
         {busy ? "Recherche…" : "Rechercher une écriture"}
       </button>
+      <MutationStatus step={step} />
       {error && <ApiErrorAlert detail={error.detail} onRetry={() => { void search(); }} />}
       {searched && results.length === 0 && <p>Aucune écriture ne correspond.</p>}
       {results.length > 0 && (

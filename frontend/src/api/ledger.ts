@@ -44,10 +44,24 @@ export class RequestError extends Error {
   }
 }
 
-export async function request<T>(path: string, method = "GET", body?: unknown, prefix = "/api/ledger"): Promise<T> {
+export interface RequestOptions {
+  headers?: Record<string, string>;
+}
+
+export async function request<T>(
+  path: string,
+  method = "GET",
+  body?: unknown,
+  prefix = "/api/ledger",
+  options?: RequestOptions,
+): Promise<T> {
   const response = await fetch(prefix + path, {
     method, cache: "no-store",
-    headers: { "Content-Type": "application/json", "X-SoloLMNP-Request": "1" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-SoloLMNP-Request": "1",
+      ...options?.headers,
+    },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const data = await response.json() as { detail?: unknown };

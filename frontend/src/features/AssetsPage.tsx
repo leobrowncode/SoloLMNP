@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { assetsRequest as api, type Asset, type DepreciationPeriod } from "../api/assets";
+import {
+  assetsRequest as api, type Asset, type DepreciationBatchResult, type DepreciationPeriod,
+} from "../api/assets";
 import { request, type Account, type Setup } from "../api/ledger";
 import ScreenStatus from "./ScreenStatus";
 import {
@@ -20,6 +22,8 @@ import PrerequisiteList from "./PrerequisiteList";
 import PropertyEntry from "./PropertyEntry";
 import GlossaryTip from "./GlossaryTip";
 import ReviewForm, { type Field } from "./ReviewForm";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 import "./ledger.css";
 
 interface Editor {
@@ -65,8 +69,9 @@ export default function AssetsPage() {
   const [yearId, setYearId] = useState(0);
   const [planProperty, setPlanProperty] = useState(0);
   const [plan, setPlan] = useState<{ propertyId: number; preview: DwellingPlan } | null>(null);
-  const [planBusy, setPlanBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const { busy, step, run } = useMutation();
+  const batchKey = useRef<string | null>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
@@ -189,12 +194,15 @@ export default function AssetsPage() {
     ] });
   }
   async function save(data: Record<string, unknown>) {
-    if (!editor) return;
-    const result = await api<Record<string, unknown>>(editor.path, editor.method ?? "POST", data);
-    const invalidation = readInvalidation(result.invalidation);
-    setEditor(null);
-    setMessage(invalidation ? correctionMessage(invalidation) : "Enregistrement effectué.");
-    setRevision((value) => value + 1);
+    await run(async (report) => {
+      if (!editor) return;
+      report("Enregistrement de l’immobilisation…");
+      const result = await api<Record<string, unknown>>(editor.path, editor.method ?? "POST", data);
+      const invalidation = readInvalidation(result.invalidation);
+      setEditor(null);
+      setMessage(invalidation ? correctionMessage(invalidation) : "Enregistrement effectué.");
+      setRevision((value) => value + 1);
+    });
   }
   function correctionOf(row: { correction?: CorrectionState }): CorrectionState | undefined {
     return row.correction;
@@ -319,85 +327,117 @@ export default function AssetsPage() {
   const visiblePlan = plan?.propertyId === selectedProperty ? plan.preview : null;
   async function previewPlan() {
     if (!selectedProperty) return;
-    const requestId = ++planRequest.current;
-    setError(""); setMessage(""); setConfirming(false); setPlanBusy(true);
-    try {
-      const result = await api<DwellingPlan>(`/properties/${selectedProperty}/plan`);
-      if (requestId === planRequest.current) setPlan({ propertyId: selectedProperty, preview: result });
-    } catch (reason) {
-      if (requestId === planRequest.current) {
-        setError(reason instanceof Error ? reason.message : "Aperçu impossible.");
+    await run(async (report) => {
+      const requestId = ++planRequest.current;
+      const propertyId = selectedProperty;
+      report("Prévisualisation du plan d’amortissement…");
+      setError(""); setMessage(""); setConfirming(false);
+      try {
+        const result = await api<DwellingPlan>(`/properties/${propertyId}/plan`);
+        if (requestId === planRequest.current) setPlan({ propertyId, preview: result });
+      } catch (reason) {
+        if (requestId === planRequest.current) {
+          setError(reason instanceof Error ? reason.message : "Aperçu impossible.");
+        }
       }
-    } finally {
-      if (requestId === planRequest.current) setPlanBusy(false);
-    }
+    });
   }
   async function confirmPlan() {
     if (!visiblePlan || !selectedProperty) return;
-    const requestId = ++planRequest.current;
-    setError(""); setMessage(""); setConfirming(true); setPlanBusy(true);
-    try {
-      const result = await api<DwellingPlan>(
-        `/properties/${selectedProperty}/plan`,
-        "POST",
-        { confirm: true, preview_token: visiblePlan.preview_token },
-      );
-      if (requestId !== planRequest.current) return;
-      setPlan(null);
-      setMessage(result.created
-        ? `Immobilisations créées : ${result.labels.join(", ")}. Calculez ensuite les périodes, puis comptabilisez-les.`
-        : "Ces immobilisations existent déjà. Aucun doublon n’a été créé.");
-      setRevision((value) => value + 1);
-    } catch (reason) {
-      if (requestId === planRequest.current) {
-        setError(reason instanceof Error ? reason.message : "Création impossible.");
+    const token = visiblePlan.preview_token;
+    const propertyId = selectedProperty;
+    await run(async (report) => {
+      const requestId = ++planRequest.current;
+      report("Création des immobilisations…");
+      setError(""); setMessage(""); setConfirming(true);
+      try {
+        const result = await api<DwellingPlan>(
+          `/properties/${propertyId}/plan`,
+          "POST",
+          { confirm: true, preview_token: token },
+        );
+        if (requestId !== planRequest.current) return;
+        setPlan(null);
+        setMessage(result.created
+          ? `Immobilisations créées : ${result.labels.join(", ")}. Calculez ensuite les périodes, puis comptabilisez-les.`
+          : "Ces immobilisations existent déjà. Aucun doublon n’a été créé.");
+        setRevision((value) => value + 1);
+      } catch (reason) {
+        if (requestId === planRequest.current) {
+          setError(reason instanceof Error ? reason.message : "Création impossible.");
+        }
+      } finally {
+        if (requestId === planRequest.current) setConfirming(false);
       }
-    } finally {
-      if (requestId === planRequest.current) {
-        setPlanBusy(false);
-        setConfirming(false);
-      }
-    }
+    });
   }
   function cancelPlan() {
-    if (confirming) return;
+    if (confirming || busy) return;
     ++planRequest.current;
     setPlan(null);
-    setPlanBusy(false);
     setError("");
   }
   async function postAll() {
     const pending = periods.filter((row) => row.status !== "POSTED");
-    setError(""); setMessage("");
-    try {
-      for (const row of pending) {
-        await api(`/periods/${row.id}/post`, "POST", {
-          request_id: `dotation-${row.id}-poste`,
-          piece_reference: `DOT-${row.id}`,
-        });
+    if (pending.length === 0 || !yearId) return;
+    await run(async (report) => {
+      report(`Comptabilisation de ${pending.length} dotation(s)…`);
+      setError("");
+      setMessage("");
+      batchKey.current ??= crypto.randomUUID();
+      const key = batchKey.current;
+      try {
+        const result = await api<DepreciationBatchResult>(
+          `/years/${yearId}/post`,
+          "POST",
+          {
+            items: pending.map((row) => ({
+              period_id: row.id,
+              request_id: `dotation-${row.id}-poste`,
+              piece_reference: `DOT-${row.id}`,
+            })),
+          },
+          { headers: { "Idempotency-Key": key } },
+        );
+        batchKey.current = null;
+        const failed = result.items.find((item) => item.status === "error");
+        if (failed) {
+          setError(
+            `${failed.message} L’écran recharge l’état enregistré : les dotations déjà passées restent comptabilisées.`,
+          );
+        } else {
+          setMessage(
+            result.replayed
+              ? `${result.posted_count} dotation(s) déjà comptabilisée(s). Aucun doublon.`
+              : `${result.posted_count} dotation(s) comptabilisée(s).`,
+          );
+        }
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Comptabilisation impossible.");
+      } finally {
+        setRevision((value) => value + 1);
       }
-      setMessage(`${pending.length} dotation(s) comptabilisée(s).`);
-      setRevision((value) => value + 1);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Comptabilisation impossible.");
-    }
+    });
   }
   async function calculate() {
-    setError(""); setMessage("");
-    const requestId = ++periodRequest.current;
-    try {
-      const rows = await api<DepreciationPeriod[]>(`/years/${yearId}/calculate`, "POST");
-      if (requestId === periodRequest.current) {
-        setPeriods(rows);
-        setPeriodsView(finishLoad({ yearId }, () => rows.length === 0));
-        setMessage(`${rows.length} période(s) calculée(s). Vérifiez-les avant comptabilisation.`);
+    await run(async (report) => {
+      const requestId = ++periodRequest.current;
+      report("Calcul des périodes…");
+      setError(""); setMessage("");
+      try {
+        const rows = await api<DepreciationPeriod[]>(`/years/${yearId}/calculate`, "POST");
+        if (requestId === periodRequest.current) {
+          setPeriods(rows);
+          setPeriodsView(finishLoad({ yearId }, () => rows.length === 0));
+          setMessage(`${rows.length} période(s) calculée(s). Vérifiez-les avant comptabilisation.`);
+        }
+      } catch (reason) {
+        if (requestId === periodRequest.current) {
+          setError(reason instanceof Error ? reason.message : "Calcul impossible.");
+          setPeriodsView((current) => (current.phase === "loading" ? idleView() : current));
+        }
       }
-    } catch (reason) {
-      if (requestId === periodRequest.current) {
-        setError(reason instanceof Error ? reason.message : "Calcul impossible.");
-        setPeriodsView((current) => (current.phase === "loading" ? idleView() : current));
-      }
-    }
+    });
   }
 
   const bootReady = boot.phase === "loaded" || showsData(boot);
@@ -420,7 +460,9 @@ export default function AssetsPage() {
       <GlossaryTip id="composant" />
     </div>
     <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations. Le formulaire ne propose que les comptes de la catégorie. Un couple déjà enregistré et incohérent est signalé ; il n’est pas réécrit. Modifier une fiche demande un motif : tant qu’aucune dotation n’est comptabilisée, la valeur, la durée et les comptes peuvent être corrigés.</p>
-    {error && <p role="alert" className="ledger-error">{error}</p>}{message && <p role="status">{message}</p>}
+    {error && <p role="alert" className="ledger-error">{error}</p>}
+    <MutationStatus step={step} />
+    {message && <p role="status">{message}</p>}
     <ScreenStatus
       state={boot}
       onRetry={() => setRevision((value) => value + 1)}
@@ -430,22 +472,21 @@ export default function AssetsPage() {
       <PrerequisiteList id="assets-activity" causes={listed(activityCause(false))} intro="Les immobilisations restent indisponibles :" />
     )}
     {bootReady && setup?.activity && <>
-      <button id="nouvelle-immobilisation" disabled={assetCauses.length > 0} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
-      <button disabled={assetCauses.length > 0} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(true)}>Inscrire un terrain</button>
+      <button id="nouvelle-immobilisation" disabled={assetCauses.length > 0 || busy} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
+      <button disabled={assetCauses.length > 0 || busy} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(true)}>Inscrire un terrain</button>
       <PrerequisiteList id={assetCauseId} causes={assetCauses} />
       <div className="toolbar">
         <label>Logement
-          <select value={selectedProperty} disabled={confirming} onChange={(event) => {
+          <select value={selectedProperty} disabled={confirming || busy} onChange={(event) => {
             if (confirming) return;
             ++planRequest.current;
             setPlan(null);
-            setPlanBusy(false);
             setPlanProperty(Number(event.target.value));
           }}>
             {properties.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
           </select>
         </label>
-        <button id="preview-amortissement" type="button" disabled={planCauses.length > 0 || planBusy} aria-describedby={describedBy(planCauseId, planCauses)} onClick={() => { void previewPlan(); }}>Prévisualiser l’amortissement du logement</button>
+        <button id="preview-amortissement" type="button" disabled={planCauses.length > 0 || busy} aria-busy={busy || undefined} aria-describedby={describedBy(planCauseId, planCauses)} onClick={() => { void previewPlan(); }}>Prévisualiser l’amortissement du logement</button>
         <PrerequisiteList id={planCauseId} causes={planCauses} />
       </div>
       <p className="form-help">La prévisualisation n’enregistre ni immobilisation ni compte. Après vérification, « Créer les immobilisations affichées » inscrit le terrain à part, ajoute les frais de notaire et d’agence à la base du bâtiment, puis crée six composants (gros œuvre, toiture, façade, électricité, plomberie, agencements). Les durées sont à confirmer : ce n’est pas un barème légal. Annuler laisse la base inchangée. Répéter la confirmation ne crée pas de doublon. Le mobilier reste à saisir à part.</p>
@@ -470,16 +511,17 @@ export default function AssetsPage() {
           </table>
         </div>
         <div className="form-actions">
-          <button type="button" disabled={planBusy || !visiblePlan.preview_token} onClick={() => { void confirmPlan(); }}>Créer les immobilisations affichées</button>
+          <button type="button" disabled={busy || !visiblePlan.preview_token} aria-busy={busy || undefined} onClick={() => { void confirmPlan(); }}>Créer les immobilisations affichées</button>
           <button type="button" disabled={confirming} onClick={cancelPlan}>Annuler l’aperçu</button>
         </div>
       </>}
       <PropertyEntry
         properties={properties}
         years={setup.years}
+        locked={busy}
         onDone={(text) => { setError(""); setMessage(text); setRevision((value) => value + 1); }}
       />
-      {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} help={editor.help} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} derive={editor.derive} />}
+      {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} help={editor.help} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} derive={editor.derive} locked={busy} />}
       {assets.map((row) => <article className="entry-card" key={row.id}><h3>{row.label}</h3>
         <p>{row.category} · Valeur {row.acquisition_value} € · Base {row.depreciable_value} € · Non amortissable {row.non_depreciable_value} €</p>
         <p>{row.category === "LAND" ? "Terrain protégé : aucun plan d’amortissement" : `Linéaire sur ${row.useful_life_months} mois · ${row.asset_account} / ${row.depreciation_account}`}</p>
@@ -489,8 +531,8 @@ export default function AssetsPage() {
           <p className="form-help">{row.correction?.calculated_periods} période(s) calculée(s) seront effacées si la valeur, la durée, les dates ou les comptes changent.</p>
         )}
         <div className="entry-actions">
-          {row.category === "BUILDING" && <button type="button" onClick={() => openComponent(row)}>Ajouter un composant</button>}
-          <button type="button" onClick={() => openAssetCorrection(row)}>{editTitle(row.label, row.correction, row.category === "LAND" ? ["value", "dates", "account"] : ["value", "life", "dates", "account"])}</button>
+          {row.category === "BUILDING" && <button type="button" disabled={busy} onClick={() => openComponent(row)}>Ajouter un composant</button>}
+          <button type="button" disabled={busy} onClick={() => openAssetCorrection(row)}>{editTitle(row.label, row.correction, row.category === "LAND" ? ["value", "dates", "account"] : ["value", "life", "dates", "account"])}</button>
         </div>
         {row.category === "BUILDING" && <p>Ajoutez tous les composants avant le premier calcul ; leur total doit couvrir exactement la base.</p>}
         {row.components.map((part) => <div key={part.id}>
@@ -498,7 +540,7 @@ export default function AssetsPage() {
           {part.account_warning && <p role="alert" className="ledger-error">{part.account_warning}</p>}
           {part.correction?.locks.map((lock) => <p className="form-help" key={`${part.id}-${lock.code}`}>{lock.message}</p>)}
           <div className="entry-actions">
-            <button type="button" onClick={() => openComponentCorrection(row, part)}>{editTitle(part.label, part.correction, ["value", "life", "dates", "account"])}</button>
+            <button type="button" disabled={busy} onClick={() => openComponentCorrection(row, part)}>{editTitle(part.label, part.correction, ["value", "life", "dates", "account"])}</button>
           </div>
         </div>)}
       </article>)}
@@ -509,9 +551,9 @@ export default function AssetsPage() {
           setYearId(Number(event.target.value));
         }}>{setup.years.filter((year) => year.status === "OPEN").map((year) => <option key={year.id} value={year.id}>{year.year}</option>)}</select></label>
       </div>
-      <button id="calculer-periodes" disabled={periodCauses.length > 0} aria-describedby={describedBy(periodCauseId, periodCauses)} onClick={() => { void calculate(); }}>Calculer les périodes</button>
+      <button id="calculer-periodes" disabled={periodCauses.length > 0 || busy} aria-busy={busy || undefined} aria-describedby={describedBy(periodCauseId, periodCauses)} onClick={() => { void calculate(); }}>Calculer les périodes</button>
       <PrerequisiteList id={periodCauseId} causes={periodCauses} />
-      <button type="button" disabled={yearId ? postCauses.length > 0 || !periodsSettled : periodCauses.length > 0} aria-describedby={postDescribed} onClick={() => { void postAll(); }}>Comptabiliser toutes les dotations</button>
+      <button type="button" disabled={busy || (yearId ? postCauses.length > 0 || !periodsSettled : periodCauses.length > 0)} aria-busy={busy || undefined} aria-describedby={postDescribed} onClick={() => { void postAll(); }}>Comptabiliser toutes les dotations</button>
       <PrerequisiteList id={postCauseId} causes={postCauses} />
       <ScreenStatus
         state={periodsView}
@@ -520,7 +562,7 @@ export default function AssetsPage() {
         empty={<p>Aucune dotation calculée pour cet exercice.</p>}
       />
       <div className="ledger-table"><table><thead><tr><th>Actif / composant</th><th>Période</th><th>Jours</th><th>Dotation</th><th>Cumul</th><th>VNC de la base <GlossaryTip id="vnc" /></th><th>État</th></tr></thead><tbody>
-        {periods.map((row) => <tr key={row.id}><td>{row.target_label}</td><td>{row.period_start} → {row.period_end}</td><td>{row.days}</td><td>{row.amount} €</td><td>{row.accumulated} €</td><td>{row.net_book_value} €</td><td>{row.status === "POSTED" ? "Comptabilisée" : <button onClick={() => setEditor({ title: `Comptabiliser ${row.target_label}`, path: `/periods/${row.id}/post`, retry: true, fields: [{ name: "piece_reference", label: "Référence de la pièce d’inventaire" }] })}>Comptabiliser</button>}</td></tr>)}
+        {periods.map((row) => <tr key={row.id}><td>{row.target_label}</td><td>{row.period_start} → {row.period_end}</td><td>{row.days}</td><td>{row.amount} €</td><td>{row.accumulated} €</td><td>{row.net_book_value} €</td><td>{row.status === "POSTED" ? "Comptabilisée" : <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => setEditor({ title: `Comptabiliser ${row.target_label}`, path: `/periods/${row.id}/post`, retry: true, fields: [{ name: "piece_reference", label: "Référence de la pièce d’inventaire" }] })}>Comptabiliser</button>}</td></tr>)}
       </tbody></table></div>
     </>}
   </section>;

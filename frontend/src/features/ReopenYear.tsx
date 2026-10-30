@@ -3,6 +3,8 @@ import { request } from "../api/ledger";
 import { describedBy, reopenCauses } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 
 const INVALIDATED = [
   "Les calculs fiscaux enregistrés pour cet exercice sont invalidés.",
@@ -13,22 +15,24 @@ const INVALIDATED = [
 export default function ReopenYear({
   year,
   onExerciseTransition,
+  locked = false,
 }: {
   year: number;
   onExerciseTransition?: () => void;
+  locked?: boolean;
 }) {
   const [confirmation, setConfirmation] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { busy, step, run } = useMutation();
   const errorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
 
   const trimmedReason = reason.trim();
-  const causes = busy ? [] : reopenCauses(confirmation, reason);
+  const causes = busy || locked ? [] : reopenCauses(confirmation, reason);
   const causeId = "reopen-causes";
-  const canSubmit = !busy && causes.length === 0;
+  const canSubmit = !busy && !locked && causes.length === 0;
 
   async function reopen() {
     if (!canSubmit) {
@@ -39,25 +43,25 @@ export default function ReopenYear({
       }
       return;
     }
-    setError("");
-    setReceipt("");
-    setBusy(true);
-    try {
-      await request(
-        `/years/${year}/reopen`,
-        "POST",
-        { confirmation: "ROUVRIR", reason: trimmedReason },
-        "/api/filing",
-      );
-      setReceipt("Exercice rouvert. Recalculez la fiscalité avant un nouveau pré-contrôle.");
-      setConfirmation("");
-      setReason("");
-      onExerciseTransition?.();
-    } catch (reasonError) {
-      setError((reasonError as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    await run(async (report) => {
+      report("Réouverture de l’exercice…");
+      setError("");
+      setReceipt("");
+      try {
+        await request(
+          `/years/${year}/reopen`,
+          "POST",
+          { confirmation: "ROUVRIR", reason: trimmedReason },
+          "/api/filing",
+        );
+        setReceipt("Exercice rouvert. Recalculez la fiscalité avant un nouveau pré-contrôle.");
+        setConfirmation("");
+        setReason("");
+        onExerciseTransition?.();
+      } catch (reasonError) {
+        setError((reasonError as Error).message);
+      }
+    });
   }
 
   return (
@@ -91,9 +95,10 @@ export default function ReopenYear({
           />
         </label>
       </div>
+      <MutationStatus step={step} />
       {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
       {receipt && <p role="status">{receipt}</p>}
-      <button type="button" disabled={!canSubmit} aria-describedby={describedBy(causeId, causes)} onClick={() => { void reopen(); }}>
+      <button type="button" disabled={!canSubmit} aria-busy={busy || undefined} aria-describedby={describedBy(causeId, causes)} onClick={() => { void reopen(); }}>
         {busy ? "Réouverture…" : "Réouvrir l’exercice"}
       </button>
       <PrerequisiteList id={causeId} causes={causes} />

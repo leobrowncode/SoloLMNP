@@ -15,6 +15,8 @@ import {
 } from "./screenState";
 import LiasseSheet, { type Worksheet } from "./LiasseSheet";
 import { calculationNotice, outputLabel, outputTrust } from "./outputStatus";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 import "./ledger.css";
 
 interface Vintage {
@@ -307,7 +309,7 @@ export default function FiscalPage() {
   const [resultView, setResultView] = useState<ScreenView<Computation>>(idleView());
   const [resultAttempt, setResultAttempt] = useState(0);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { busy, step, run } = useMutation();
   const [adjustments, setAdjustments] = useState<AdjustmentDraft[]>([]);
   const [draft, setDraft] = useState<AdjustmentDraft>({
     account_number: "", amount: "", justification: "",
@@ -440,51 +442,50 @@ export default function FiscalPage() {
 
   async function compute() {
     const epoch = ++resultEpoch.current;
-    setError("");
-    setBusy(true);
-    setWorksheet(null);
-    setResult(null);
-    setResultView((previous) => beginLoad(previous, false));
-    try {
-      const payload = {
-        adjustments: adjustments.map((item) => ({
-          account_number: item.account_number,
-          amount: item.amount.replace(",", "."),
-          justification: item.justification,
-        })),
-      };
-      const next = await request<Computation>(`/years/${year}`, "POST", payload, "/api/fiscal");
-      if (resultEpoch.current === epoch) {
-        setResult(next);
-        setResultView(finishLoad(next));
-      }
-      setExportTick((tick) => tick + 1);
-    } catch (reason) {
-      if (resultEpoch.current !== epoch) return;
+    await run(async (report) => {
+      report("Calcul du résultat fiscal…");
+      setError("");
+      setWorksheet(null);
       setResult(null);
-      setResultView(idleView());
-      setError(reason instanceof Error ? reason.message : "Calcul fiscal refusé.");
-    } finally {
-      if (resultEpoch.current === epoch) setBusy(false);
-    }
+      setResultView((previous) => beginLoad(previous, false));
+      try {
+        const payload = {
+          adjustments: adjustments.map((item) => ({
+            account_number: item.account_number,
+            amount: item.amount.replace(",", "."),
+            justification: item.justification,
+          })),
+        };
+        const next = await request<Computation>(`/years/${year}`, "POST", payload, "/api/fiscal");
+        if (resultEpoch.current === epoch) {
+          setResult(next);
+          setResultView(finishLoad(next));
+        }
+        setExportTick((tick) => tick + 1);
+      } catch (reason) {
+        if (resultEpoch.current !== epoch) return;
+        setResult(null);
+        setResultView(idleView());
+        setError(reason instanceof Error ? reason.message : "Calcul fiscal refusé.");
+      }
+    });
   }
 
   async function loadWorksheet() {
-    setError("");
-    setBusy(true);
-    try {
-      setWorksheet(await request<Worksheet>(`/years/${year}/efi`, "GET", undefined, "/api/filing"));
-    } catch (reason) {
-      setError((reason as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    await run(async (report) => {
+      report("Chargement de la feuille EFI…");
+      setError("");
+      try {
+        setWorksheet(await request<Worksheet>(`/years/${year}/efi`, "GET", undefined, "/api/filing"));
+      } catch (reason) {
+        setError((reason as Error).message);
+      }
+    });
   }
 
   function chooseYear(next: number) {
     refreshToken.current += 1;
     resultEpoch.current += 1;
-    setBusy(false);
     setYear(next);
     setAdjustments([]);
     setStatements(null);
@@ -552,28 +553,28 @@ export default function FiscalPage() {
   }
 
   async function loadSuggestions() {
-    setError("");
-    setBusy(true);
-    try {
-      const rows = await request<AdjustmentDraft[]>(
-        `/years/${year}/reintegrations`, "GET", undefined, "/api/fiscal",
-      );
-      if (rows.length === 0) {
-        setError("Aucune part non déductible n’est saisie sur les dépenses de cet exercice.");
-        return;
+    await run(async (report) => {
+      report("Recherche des réintégrations…");
+      setError("");
+      try {
+        const rows = await request<AdjustmentDraft[]>(
+          `/years/${year}/reintegrations`, "GET", undefined, "/api/fiscal",
+        );
+        if (rows.length === 0) {
+          setError("Aucune part non déductible n’est saisie sur les dépenses de cet exercice.");
+          return;
+        }
+        setAdjustments((current) => {
+          const known = new Set(current.map((item) => item.account_number));
+          return [
+            ...current,
+            ...rows.filter((item) => !known.has(item.account_number)),
+          ];
+        });
+      } catch (reason) {
+        setError((reason as Error).message);
       }
-      setAdjustments((current) => {
-        const known = new Set(current.map((item) => item.account_number));
-        return [
-          ...current,
-          ...rows.filter((item) => !known.has(item.account_number)),
-        ];
-      });
-    } catch (reason) {
-      setError((reason as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   function addAdjustment() {
@@ -656,9 +657,10 @@ export default function FiscalPage() {
             ))}
           </select>
         </label>
-        <button id="calcul-fiscal" type="button" disabled={!year || busy} aria-describedby={describedBy(fiscalCauseId, fiscalCauses)} onClick={() => { void compute(); }}>
+        <button id="calcul-fiscal" type="button" disabled={!year || busy} aria-busy={busy || undefined} aria-describedby={describedBy(fiscalCauseId, fiscalCauses)} onClick={() => { void compute(); }}>
           {busy ? "Calcul…" : "Calculer le résultat fiscal"}
         </button>
+        <MutationStatus step={step} />
         <PrerequisiteList id={fiscalCauseId} causes={fiscalCauses} />
       </div>
 
@@ -784,7 +786,7 @@ export default function FiscalPage() {
         </div>
         <div className="form-actions">
           <button type="button" onClick={addAdjustment}>Ajouter la réintégration</button>
-          <button type="button" disabled={!year || busy} aria-describedby={describedBy(fiscalCauseId, fiscalCauses)} onClick={() => { void loadSuggestions(); }}>
+          <button type="button" disabled={!year || busy} aria-busy={busy || undefined} aria-describedby={describedBy(fiscalCauseId, fiscalCauses)} onClick={() => { void loadSuggestions(); }}>
             Reprendre les parts non déductibles saisies
           </button>
         </div>
@@ -960,7 +962,7 @@ export default function FiscalPage() {
           Une sortie bloquée liste ses prérequis et ne se télécharge pas. Le refus reste sur cette page.
         </p>
         <div className="toolbar">
-          <button type="button" disabled={!year || busy} aria-describedby={describedBy(fiscalCauseId, fiscalCauses)} onClick={() => { void loadWorksheet(); }}>
+          <button type="button" disabled={!year || busy} aria-busy={busy || undefined} aria-describedby={describedBy(fiscalCauseId, fiscalCauses)} onClick={() => { void loadWorksheet(); }}>
             Liasse à recopier
           </button>
         </div>

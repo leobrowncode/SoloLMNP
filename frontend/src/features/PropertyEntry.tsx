@@ -1,4 +1,6 @@
 import { useState } from "react";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 import { assetsRequest as api } from "../api/assets";
 import { operationsRequest, type Bank, type Loan, type Property } from "../api/operations";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
@@ -34,11 +36,12 @@ function amount(value: string): string | null {
 }
 
 export default function PropertyEntry({
-  properties, years, onDone,
+  properties, years, onDone, locked = false,
 }: {
   properties: Property[];
   years: YearOption[];
   onDone: (message: string) => void;
+  locked?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -53,7 +56,7 @@ export default function PropertyEntry({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
   const [loadState, setLoadState] = useState<ScreenView<{ ready: true }>>(idleView());
-  const [busy, setBusy] = useState(false);
+  const { busy, step, run } = useMutation();
   const entryDirty = open && (
     preview !== null
     || bankAmount.trim() !== ""
@@ -109,27 +112,28 @@ export default function PropertyEntry({
   }
 
   async function submit(confirm: boolean) {
+    if (locked) return;
     setError("");
     const body = payload(confirm);
     if (!body) {
       setError("Montants attendus en euros, au centime près (ex. 14884,00).");
       return;
     }
-    setBusy(true);
-    try {
-      const result = await api<Preview>(`/properties/${propertyId}/entry`, "POST", body);
-      if (result.posted) {
-        setOpen(false);
-        setPreview(null);
-        onDone(`Bien entré en comptabilité (écriture ${result.entry_number ?? ""}).`);
-      } else {
-        setPreview(result);
+    await run(async (report) => {
+      report(confirm ? "Comptabilisation de l’entrée du bien…" : "Prévisualisation de l’entrée du bien…");
+      try {
+        const result = await api<Preview>(`/properties/${propertyId}/entry`, "POST", body);
+        if (result.posted) {
+          setOpen(false);
+          setPreview(null);
+          onDone(`Bien entré en comptabilité (écriture ${result.entry_number ?? ""}).`);
+        } else {
+          setPreview(result);
+        }
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Écriture refusée.");
       }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Écriture refusée.");
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const openYears = years.filter((year) => year.status === undefined || year.status === "OPEN");
@@ -140,7 +144,7 @@ export default function PropertyEntry({
       <button
         id="entree-bien"
         type="button"
-        disabled={startCauses.length > 0}
+        disabled={startCauses.length > 0 || locked || busy}
         aria-describedby={describedBy(startCauseId, startCauses)}
         onClick={() => { void start(); }}
       >
@@ -175,6 +179,7 @@ export default function PropertyEntry({
       de « déblocage » : saisissez ensuite seulement les échéances payées pendant l’exercice.
     </p>
     {error && <p role="alert" className="ledger-error">{error}</p>}
+    <MutationStatus step={step} />
     <div className="form-grid">
       <label>Bien
         <select value={propertyId} onChange={(event) => { setPropertyId(Number(event.target.value)); setPreview(null); }}>
@@ -211,11 +216,11 @@ export default function PropertyEntry({
       </label>
     </div>
     <div className="form-actions">
-      <button id="property-entry-preview" type="button" disabled={busy || previewCauses.length > 0} aria-describedby={describedBy(previewCauseId, previewCauses)} onClick={() => { void submit(false); }}>Prévisualiser l’écriture</button>
+      <button id="property-entry-preview" type="button" disabled={busy || locked || previewCauses.length > 0} aria-busy={busy || undefined} aria-describedby={describedBy(previewCauseId, previewCauses)} onClick={() => { void submit(false); }}>Prévisualiser l’écriture</button>
       <PrerequisiteList id={previewCauseId} causes={previewCauses} />
-      <button type="button" disabled={busy || postCauses.length > 0} aria-describedby={describedBy(postCauseId, postCauses)} onClick={() => { void submit(true); }}>Comptabiliser</button>
+      <button type="button" disabled={busy || locked || postCauses.length > 0} aria-busy={busy || undefined} aria-describedby={describedBy(postCauseId, postCauses)} onClick={() => { void submit(true); }}>Comptabiliser</button>
       <PrerequisiteList id={postCauseId} causes={postCauses} />
-      <button type="button" onClick={() => { setOpen(false); setPreview(null); }}>Annuler</button>
+      <button type="button" disabled={busy} onClick={() => { setOpen(false); setPreview(null); }}>Annuler</button>
     </div>
     {preview?.owner_contribution.startsWith("-") && <p className="field-hint">
       Les emprunts dépassent le terrain, le bâtiment et les frais repris : le solde passe en prélèvement

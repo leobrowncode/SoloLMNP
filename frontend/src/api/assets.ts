@@ -1,7 +1,11 @@
-import { request } from "./ledger";
+import { request, type RequestOptions } from "./ledger";
 
-export const assetsRequest = <T>(path: string, method = "GET", body?: unknown) =>
-  request<T>(path, method, body, "/api/assets");
+export const assetsRequest = <T>(
+  path: string,
+  method = "GET",
+  body?: unknown,
+  options?: RequestOptions,
+) => request<T>(path, method, body, "/api/assets", options);
 
 export interface Component {
   id: number; asset_id: number; category: string; label: string; value: string;
@@ -32,4 +36,20 @@ export interface DepreciationPeriod {
   period_start: string; period_end: string; days: number; amount: string;
   accumulated: string; net_book_value: string; status: string;
   accounting_entry_id: number | null; depreciation_account: string;
+}
+export interface DepreciationBatchItemResult {
+  period_id: number;
+  status: "posted" | "error" | "skipped";
+  entry_id?: number;
+  replayed?: boolean;
+  code?: string;
+  message?: string;
+}
+export interface DepreciationBatchResult {
+  idempotency_key: string;
+  replayed: boolean;
+  posted_count: number;
+  failed_count: number;
+  skipped_count: number;
+  items: DepreciationBatchItemResult[];
 }

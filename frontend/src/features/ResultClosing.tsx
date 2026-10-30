@@ -3,6 +3,8 @@ import { request, type Account, type Entry, type Journal } from "../api/ledger";
 import { centralizationCauses, describedBy } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
+import MutationStatus from "./MutationStatus";
+import { useMutation } from "./useMutation";
 
 interface PreviewLine { account_number: string; label: string; debit: string; credit: string }
 interface ProposedAccount { number: string; label: string; account_type: string }
@@ -37,22 +39,24 @@ export default function ResultClosing({ year }: { year: number }) {
   const [review, setReview] = useState(!!saved);
   const [receipt, setReceipt] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const pending = useRef(false);
+  const { busy, step, run } = useMutation();
   const errorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
 
   async function load() {
-    setError(""); setPreview(null); setAppropriation(null); setReceipt("");
-    try {
-      const [central, accountsValue, journalsValue] = await Promise.all([
-        request<CentralPreview>(`/years/${year}/centralization-preview`),
-        request<Account[]>("/accounts"),
-        request<Journal[]>("/journals"),
-      ]);
-      setPreview(central); setAccounts(accountsValue); setJournals(journalsValue);
-      if (central.already_posted) setAppropriation(await request<ApproPreview>(`/years/${year}/appropriation-preview`));
-    } catch (reason) { setError((reason as Error).message); }
+    await run(async (report) => {
+      report("Préparation de la centralisation…");
+      setError(""); setPreview(null); setAppropriation(null); setReceipt("");
+      try {
+        const [central, accountsValue, journalsValue] = await Promise.all([
+          request<CentralPreview>(`/years/${year}/centralization-preview`),
+          request<Account[]>("/accounts"),
+          request<Journal[]>("/journals"),
+        ]);
+        setPreview(central); setAccounts(accountsValue); setJournals(journalsValue);
+        if (central.already_posted) setAppropriation(await request<ApproPreview>(`/years/${year}/appropriation-preview`));
+      } catch (reason) { setError((reason as Error).message); }
+    });
   }
 
   function prepare(form: HTMLFormElement) {
@@ -88,34 +92,37 @@ export default function ResultClosing({ year }: { year: number }) {
   }
 
   async function post() {
-    if (!saved || pending.current) return;
-    pending.current = true; setBusy(true); setError("");
-    try {
-      sessionStorage.setItem(storageKey, JSON.stringify(saved));
-      const path = saved.kind === "centralization" ? `/years/${year}/centralization` : `/years/${year}/appropriation`;
-      const body = saved.kind === "centralization" ? {
-        request_id: saved.request_id, journal_code: saved.journal_code, piece_reference: saved.piece_reference,
-        justification: saved.justification, result_account: saved.result_account,
-        create_accounts: saved.create_accounts ?? [], expected_result: saved.expected_result,
-      } : {
-        request_id: saved.request_id, journal_code: saved.journal_code, piece_reference: saved.piece_reference,
-        justification: saved.justification, source_account: saved.source_account,
-        target_account: saved.target_account, expected_amount: saved.expected_amount,
-      };
-      const response = await request<{ created: boolean; entry: Entry }>(path, "POST", body);
-      const message = `Écriture ${response.entry.entry_number} ${response.created ? "validée" : "déjà enregistrée"}. Actualisez les états.`;
-      sessionStorage.removeItem(storageKey);
-      setSaved(null); setReview(false); setReceipt(message);
-      if (saved.kind === "centralization") {
-        const central = await request<CentralPreview>(`/years/${year}/centralization-preview`);
-        const accountsValue = await request<Account[]>("/accounts");
-        setPreview(central); setAccounts(accountsValue);
-        if (central.already_posted) {
-          setAppropriation(await request<ApproPreview>(`/years/${year}/appropriation-preview`));
+    if (!saved) return;
+    const requestBody = saved;
+    await run(async (report) => {
+      report(requestBody.kind === "centralization" ? "Centralisation du résultat…" : "Affectation du résultat…");
+      setError("");
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(requestBody));
+        const path = requestBody.kind === "centralization" ? `/years/${year}/centralization` : `/years/${year}/appropriation`;
+        const body = requestBody.kind === "centralization" ? {
+          request_id: requestBody.request_id, journal_code: requestBody.journal_code, piece_reference: requestBody.piece_reference,
+          justification: requestBody.justification, result_account: requestBody.result_account,
+          create_accounts: requestBody.create_accounts ?? [], expected_result: requestBody.expected_result,
+        } : {
+          request_id: requestBody.request_id, journal_code: requestBody.journal_code, piece_reference: requestBody.piece_reference,
+          justification: requestBody.justification, source_account: requestBody.source_account,
+          target_account: requestBody.target_account, expected_amount: requestBody.expected_amount,
+        };
+        const response = await request<{ created: boolean; entry: Entry }>(path, "POST", body);
+        const message = `Écriture ${response.entry.entry_number} ${response.created ? "validée" : "déjà enregistrée"}. Actualisez les états.`;
+        sessionStorage.removeItem(storageKey);
+        setSaved(null); setReview(false); setReceipt(message);
+        if (requestBody.kind === "centralization") {
+          const central = await request<CentralPreview>(`/years/${year}/centralization-preview`);
+          const accountsValue = await request<Account[]>("/accounts");
+          setPreview(central); setAccounts(accountsValue);
+          if (central.already_posted) {
+            setAppropriation(await request<ApproPreview>(`/years/${year}/appropriation-preview`));
+          }
         }
-      }
-    } catch (reason) { setError((reason as Error).message); }
-    finally { pending.current = false; setBusy(false); }
+      } catch (reason) { setError((reason as Error).message); }
+    });
   }
 
   const general = journals.filter((journal) => journal.active && journal.journal_type === "GENERAL");
@@ -149,7 +156,8 @@ export default function ResultClosing({ year }: { year: number }) {
       <GlossaryTip id="compte-120-129" />
     </div>
     <p>Le serveur recalcule les montants. Confirmez le compte et la justification avant validation. Préparer, corriger ou quitter ne modifie pas le plan comptable. Cette étape ne clôture pas l’exercice. Ensuite, dans Fiscalité LMNP : calcul fiscal, pré-contrôle, puis clôture.</p>
-    <button type="button" onClick={() => { void load(); }}>Préparer la centralisation</button>
+    <button type="button" disabled={busy} aria-busy={busy || undefined} onClick={() => { void load(); }}>Préparer la centralisation</button>
+    <MutationStatus step={step} />
     {error && <p role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
     {receipt && <p role="status">{receipt}</p>}
     {preview && !preview.already_posted && <form onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(event.currentTarget); }}>
@@ -170,9 +178,9 @@ export default function ResultClosing({ year }: { year: number }) {
       </>}
       {review && saved && <p>Demande {saved.request_id} conservée dans cet onglet. Réessayez la même demande si la réponse a été perdue.</p>}
       {review && !!saved?.create_accounts?.length && <p>La confirmation crée {saved.create_accounts.map((account) => `${account.number} · ${account.label}`).join(", ")} dans la même opération que la centralisation.</p>}
-      <button type="submit" disabled={busy || centralCauses.length > 0} aria-describedby={describedBy(centralCauseId, centralCauses)}>{review ? "Confirmer la centralisation" : "Vérifier la centralisation"}</button>
+      <button type="submit" disabled={busy || centralCauses.length > 0} aria-busy={busy || undefined} aria-describedby={describedBy(centralCauseId, centralCauses)}>{review ? "Confirmer la centralisation" : "Vérifier la centralisation"}</button>
       <PrerequisiteList id={centralCauseId} causes={centralCauses} />
-      {review && <button type="button" onClick={() => setReview(false)}>Corriger</button>}
+      {review && <button type="button" disabled={busy} onClick={() => setReview(false)}>Corriger</button>}
     </form>}
     {preview?.already_posted && appropriation && !appropriation.already_posted && <form onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(event.currentTarget); }}>
       <p>La centralisation est déjà comptabilisée. Choisissez l’affectation du solde restant.</p>
@@ -191,7 +199,7 @@ export default function ResultClosing({ year }: { year: number }) {
           <label>Justification<textarea name="justification" required minLength={10} maxLength={3000} /></label>
         </>}
         {review && <p>Vérifiez le compte destinataire avant de valider l’affectation.</p>}
-        <button type="submit" disabled={busy}>{review ? "Confirmer l’affectation" : "Vérifier l’affectation"}</button>
+        <button type="submit" disabled={busy} aria-busy={busy || undefined}>{review ? "Confirmer l’affectation" : "Vérifier l’affectation"}</button>
       </>}
     </form>}
     {appropriation?.already_posted && <p>L’affectation de cet exercice est déjà comptabilisée.</p>}

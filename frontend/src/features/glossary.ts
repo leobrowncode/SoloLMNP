@@ -255,7 +255,7 @@ export const GLOSSARY = {
     what: "Charge d’amortissement d’une période, calculée en jours calendaires sur la base du composant ou du bien. La comptabiliser crée l’écriture (souvent au 31/12). Le calcul des périodes n’écrit rien tant que vous ne comptabilisez pas.",
     why: "Sans dotation validée, le 681 reste vide et le résultat comptable ignore l’usure. Après comptabilisation, la valeur, la durée et les comptes de la fiche sont figés.",
     example: "Exercice 2026, Calculer les périodes, puis Comptabiliser la dotation au 31/12/2026 avec une pièce d’inventaire. L’écriture débite le 681 et crédite le 281.",
-    mistake: "Comptabiliser avant le 31/12 si la date de dotation n’est pas atteinte, ou modifier la durée après coup sans extourner.",
+    mistake: "Comptabiliser avant le 31/12 si la date de dotation n’est pas atteinte, modifier la durée après coup sans extourner, ou relancer un lot sans regarder quelles dotations sont déjà passées. Le bouton se verrouille le temps du traitement : un double clic ne crée pas une seconde écriture.",
   },
   "compte-681": {
     label: "Compte 681",

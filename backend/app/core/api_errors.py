@@ -89,6 +89,13 @@ HELP_IDS: dict[str, str] = {
     "ENTRY_SEARCH": "ecriture",
     "INVALID_DOCUMENT": "justificatif",
     "RESTORE_CONFIRMATION": "restauration",
+    "BATCH_INTERRUPTED": "dotation",
+    "IDEMPOTENCY_CONFLICT": "dotation",
+    "IDEMPOTENCY_KEY_REQUIRED": "dotation",
+    "IDEMPOTENCY_RECORD_INVALID": "dotation",
+    "PERIOD_NOT_FOUND": "dotation",
+    "PERIOD_YEAR_MISMATCH": "dotation",
+    "ZERO_DEPRECIATION": "dotation",
 }
 
 RESOLUTION_ACTIONS: dict[str, dict[str, str]] = {
@@ -126,6 +133,26 @@ RESOLUTION_ACTIONS: dict[str, dict[str, str]] = {
     "RESTORE_CONFIRMATION": {
         "label": "Saisir RESTAURER",
         "href": "/conservation#restore-confirmation",
+    },
+    "IDEMPOTENCY_CONFLICT": {
+        "label": "Revenir aux dotations",
+        "href": "/immobilisations#dotations",
+    },
+    "IDEMPOTENCY_KEY_REQUIRED": {
+        "label": "Revenir aux dotations",
+        "href": "/immobilisations#dotations",
+    },
+    "PERIOD_NOT_FOUND": {
+        "label": "Revenir aux dotations",
+        "href": "/immobilisations#dotations",
+    },
+    "PERIOD_YEAR_MISMATCH": {
+        "label": "Revenir aux dotations",
+        "href": "/immobilisations#dotations",
+    },
+    "ZERO_DEPRECIATION": {
+        "label": "Revenir aux dotations",
+        "href": "/immobilisations#dotations",
     },
 }
 

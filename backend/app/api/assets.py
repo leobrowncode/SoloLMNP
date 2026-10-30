@@ -1,8 +1,9 @@
 """Fixed-asset register, schedules and accounting depreciation API."""
 
+import re
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,7 @@ from app.api.asset_schemas import (
     AssetInput,
     ComponentCorrectionInput,
     ComponentInput,
+    DepreciationBatchInput,
     DepreciationPostInput,
     DwellingPlanConfirm,
     PropertyEntryInput,
@@ -21,6 +23,20 @@ from app.models import Asset, AssetComponent, DepreciationPeriod, DepreciationSc
 from app.services import assets as service
 from app.services import structuring
 from app.services.ledger import entry_json, fail
+
+_IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
+
+
+def _idempotency_key(value: str | None) -> str:
+    if value is None or _IDEMPOTENCY_KEY.fullmatch(value) is None:
+        fail(
+            "IDEMPOTENCY_KEY_REQUIRED",
+            "L’en-tête Idempotency-Key est requis : 8 à 80 caractères (lettres, chiffres, _ ou -).",
+            422,
+            field="Idempotency-Key",
+            location="header",
+        )
+    return value
 
 
 def build_assets_router(database: Database) -> APIRouter:
@@ -83,6 +99,17 @@ def build_assets_router(database: Database) -> APIRouter:
     @router.post("/years/{year_id}/calculate")
     def calculate(year_id: int, session: Write) -> list[dict[str, Any]]:
         return [period_json(session, row) for row in service.calculate_year(session, year_id)]
+
+    @router.post("/years/{year_id}/post")
+    def post_year(
+        year_id: int,
+        data: DepreciationBatchInput,
+        session: Write,
+        idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    ) -> dict[str, Any]:
+        return service.post_period_batch(
+            session, year_id, _idempotency_key(idempotency_key), data.items
+        )
 
     @router.get("/years/{year_id}/periods")
     def periods(year_id: int, session: Read) -> list[dict[str, Any]]:
