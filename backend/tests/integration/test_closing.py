@@ -229,7 +229,8 @@ def test_close_reopen_fec_efi_and_documents(client, settings):
     assert package["output_status"] == "recherche"
     assert package["copy_complete"] is True
     assert package["exports"]["liasse"]["posture"] == "provisoire"
-    assert package["exports"]["fec"]["posture"] == "finale"
+    assert package["exports"]["fec"]["posture"] == "provisoire"
+    assert package["exports"]["archive"]["label"] != "Finale"
     assert package["errors"] == []
     assert package["fields"][0]["entries"]
     reopened = client.post(

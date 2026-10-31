@@ -150,13 +150,17 @@ def _prerequisites(
         elif fec_errors:
             items.extend(_item("FEC_INVALID", row["message"], "fec") for row in fec_errors)
         else:
-            items.append(
-                _item(
-                    "EXPORT_BLOCKED",
-                    "Le FEC et le dossier de contrôle sont bloqués.",
-                    "fec",
+            liasse_reasons = [row for row in items if row["export"] == "liasse"]
+            if liasse_reasons:
+                items.extend(_item(row["code"], row["message"], "fec") for row in liasse_reasons)
+            else:
+                items.append(
+                    _item(
+                        "EXPORT_BLOCKED",
+                        "Le FEC suit la liasse. Il reste bloqué tant que la liasse l’est.",
+                        "fec",
+                    )
                 )
-            )
     return items
 
 

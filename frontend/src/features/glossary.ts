@@ -72,7 +72,7 @@ export const GLOSSARY = {
     label: "Dossier de contrôle",
     what: "Archive zip à conserver : FEC, description réglementaire, liasse PDF et JSON, feuille de travail CSV et JSON, empreintes SHA-256. Elle se télécharge après clôture. SoloLMNP n’envoie rien aux impôts.",
     why: "En cas de contrôle, ce paquet rassemble les pièces que l’application a figées. Une réouverture invalide le snapshot courant ; les anciennes preuves restent consultables.",
-    example: "Après clôture, sortie Finale « Dossier de contrôle ». Vous le rangez avec les justificatifs et, plus tard, l’accusé de dépôt EFI.",
+    example: "Après clôture, le dossier de contrôle suit la liasse. Tant que le millésime est en recherche, c’est un document de travail, à vérifier, pas une sortie finale.",
     mistake: "Le prendre pour un envoi déjà fait, ou le générer avant la clôture et le calcul fiscal.",
   },
   "declaration-foyer": {

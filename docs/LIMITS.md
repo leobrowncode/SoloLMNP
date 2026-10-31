@@ -21,4 +21,4 @@ Un résultat affiché, même équilibré, reste à contrôler sur le formulaire 
 
 Le propriétaire du fichier SQLite peut le modifier. L’audit n’est pas une piste inviolable. La restauration remplace toute la base après contrôle de l’archive et sauvegarde préalable. Elle ne réécrit pas une écriture validée en place.
 
-Le FEC suit le format légal et n’est pas réécrit pour neutraliser des formules de tableur. Les autres CSV produits par l’application le sont.
+Le FEC suit le format légal (tabulation, 18 zones, dates et montants inchangés). Ses zones de texte neutralisent une formule de tableur, comme les autres CSV produits par l’application.

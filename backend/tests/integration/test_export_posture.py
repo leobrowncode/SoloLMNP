@@ -1,13 +1,17 @@
 """Downloads follow exports.*.posture: before calculation, before close, blocked, final."""
 
+import io
 import json
+import zipfile
 from typing import Any
 
 import pytest
 
 from app.core.config import PROJECT_ROOT
+from app.domain.filing.fec import COLUMNS, render_fec
 from tests.integration.test_closing import centralize
 from tests.integration.test_ledger import client as seeded_client  # noqa: F401
+from tests.integration.test_ledger import draft, payload, post
 from tests.integration.test_statements import book
 
 
@@ -101,13 +105,15 @@ def test_blocked_liasse_lists_the_missing_siren_before_download(client):
     assert pdf.json()["detail"]["action"]["href"] == siren["action"]["href"]
 
 
-def test_closed_research_year_keeps_provisional_liasse_and_final_fec(client, monkeypatch):
+def test_closed_research_year_keeps_the_fec_on_the_liasse_status(client, monkeypatch):
     _close(client)
     status = client.get("/api/filing/years/1/exports").json()
     assert status["output_status"] == "recherche"
     assert status["exports"]["liasse"]["posture"] == "provisoire"
     assert status["exports"]["pdf"]["label"] == "Provisoire"
-    assert status["exports"]["fec"]["posture"] == "finale"
+    assert status["exports"]["fec"]["posture"] == "provisoire"
+    assert status["exports"]["fec"]["label"] != "Finale"
+    assert status["exports"]["archive"]["posture"] == status["exports"]["liasse"]["posture"]
     assert status["exports"]["archive"]["download"] is True
     stored = json.loads((PROJECT_ROOT / "fiscal" / "2025" / "validation.json").read_text())
     assert stored["status"] == "research_only"
@@ -115,10 +121,15 @@ def test_closed_research_year_keeps_provisional_liasse_and_final_fec(client, mon
 
     fec = client.get("/api/filing/years/1/fec")
     assert fec.status_code == 200, fec.text
-    assert fec.headers["x-export-posture"] == "finale"
+    assert fec.headers["x-export-posture"] == "provisoire"
+    assert fec.content.split(b"\r\n", 1)[0].split(b"\t") == [name.encode() for name in COLUMNS]
     archive = client.get("/api/filing/years/1/archive")
     assert archive.status_code == 200, archive.text
-    assert archive.headers["x-export-posture"] == "finale"
+    assert archive.headers["x-export-posture"] == "provisoire"
+    with zipfile.ZipFile(io.BytesIO(archive.content)) as bundle:
+        readme = bundle.read("LISEZMOI.txt").decode()
+    assert "document de travail, à vérifier" in readme
+    assert "pas une pièce finale" in readme
     pdf = client.get("/api/filing/years/1/efi.pdf")
     assert pdf.status_code == 200
     assert pdf.headers["x-export-posture"] == "provisoire"
@@ -139,6 +150,35 @@ def test_closed_research_year_keeps_provisional_liasse_and_final_fec(client, mon
     assert "Posture d’export : Finale.".encode("cp1252") in ready.content
     on_disk = json.loads((PROJECT_ROOT / "fiscal" / "2025" / "validation.json").read_text())
     assert on_disk["status"] == "research_only"
+
+
+def test_fec_text_zones_neutralize_formulas_without_splitting_columns(client):
+    data = payload()
+    data["piece_reference"] = "@piece"
+    data["lines"] = [
+        {
+            "account_number": "512000",
+            "label": "=HYPERLINK(1)\tcache",
+            "debit": "1.00",
+            "credit": "0.00",
+        },
+        {"account_number": "706000", "label": "+credit", "debit": "0.00", "credit": "1.00"},
+    ]
+    assert post(client, draft(client, data)).status_code == 200
+    session = client.app.state.database.sessions()
+    try:
+        rendered = render_fec(session, 1)
+    finally:
+        session.close()
+    text = rendered["content"].decode()
+    assert "'=HYPERLINK(1) cache" in text
+    assert "'+credit" in text
+    assert "'@piece" in text
+    rows = [line for line in text.split("\r\n") if line]
+    assert rows[0].split("\t") == list(COLUMNS)
+    assert all(len(line.split("\t")) == 18 for line in rows)
+    assert rendered["validation"]["valid"] is True
+    assert "\t1,00\t" in text
 
 
 def _identify(client) -> None:

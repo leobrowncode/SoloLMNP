@@ -3,7 +3,7 @@ import { downloadFiling } from "../api/download";
 import { RequestError } from "../api/ledger";
 import ApiErrorAlert from "./ApiErrorAlert";
 import PrerequisiteList from "./PrerequisiteList";
-import type { ExportSlot, ExportStatus } from "./exportStatus";
+import { sameStatusClaim, type ExportSlot, type ExportStatus } from "./exportStatus";
 import GlossaryTip from "./GlossaryTip";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
@@ -82,8 +82,17 @@ export default function ExportDownloads({ yearId, status }: { yearId: number; st
     });
   }
 
+  const claim = sameStatusClaim(status);
   return (
     <div className="export-board">
+      {status.output_label && (
+        <p className={`fiscal-output-status fiscal-output-${status.output_status ?? "recherche"}`}>
+          <strong>{status.output_label}</strong>
+          {claim && (
+            <span>Même statut pour le calcul, la liasse et les exports.</span>
+          )}
+        </p>
+      )}
       <MutationStatus step={step} />
       <div ref={errorRef}>
         {error && <ApiErrorAlert detail={error.detail} />}
@@ -108,11 +117,33 @@ export default function ExportDownloads({ yearId, status }: { yearId: number; st
                   {output.kind === "fec" && <GlossaryTip id="fec" />}
                   {output.kind === "archive" && <GlossaryTip id="dossier-controle" />}
                 </div>
-                <p className="export-posture">{slot.label}</p>
+                <p className="export-posture">{
+                  slot.posture === "provisoire" && status.output_status === "recherche" && status.output_label
+                    ? status.output_label
+                    : slot.label
+                }</p>
               </header>
               <div id={hintId}>
-                {slot.posture === "provisoire" && (
+                {slot.posture === "provisoire" && output.kind !== "fec" && output.kind !== "archive" && (
                   <p>Document provisoire : ce n’est pas une sortie finale.</p>
+                )}
+                {slot.posture === "provisoire" && output.kind === "fec" && (
+                  <p>
+                    Document de travail, à vérifier. {
+                      status.output_status === "provisoire"
+                        ? "La sortie est provisoire : ce FEC n’est pas une pièce finale."
+                        : "Le millésime est en recherche : ce FEC n’est pas une pièce finale."
+                    }
+                    {" "}
+                    <a href="/fiscalite#close-title">Voir le pré-contrôle</a>
+                  </p>
+                )}
+                {slot.posture === "provisoire" && output.kind === "archive" && (
+                  <p>
+                    Document de travail, à vérifier. Le dossier de contrôle suit le FEC : ce n’est pas une pièce finale.
+                    {" "}
+                    <a href="/fiscalite#close-title">Voir le pré-contrôle</a>
+                  </p>
                 )}
                 {slot.posture === "finale" && output.kind !== "liasse" && <p>Sortie finale.</p>}
                 {slot.posture === "bloquee" && output.kind === "liasse" && (

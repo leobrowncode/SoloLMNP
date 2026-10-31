@@ -26,7 +26,7 @@ Il n’y a pas d’authentification. C’est accepté tant que l’écoute reste
 
 Les justificatifs sont renommés en UUID, contrôlés par signature (PDF, JPEG, PNG) et plafonnés (`max_upload_bytes`, 10 Mio par défaut, 50 Mio au plus). L’import CSV est plafonné à 1 000 000 caractères.
 
-Les CSV d’archive de déclaration et les rejets d’import neutralisent une cellule qui commencerait par `=`, `+`, `@`, une tabulation ou un retour chariot. Un tiret n’est préfixé que s’il n’est pas un montant. Le FEC n’est pas modifié : son format est celui de l’article A47 A-1. L’ouvrir dans un tableur reste un risque résiduel. Le classeur XLSX écrit les cellules en `inlineStr`, pas en formules.
+Les CSV d’archive de déclaration, les rejets d’import et les zones de texte du FEC neutralisent une cellule qui commencerait par `=`, `+`, `@`, une tabulation ou un retour chariot. Un tiret n’est préfixé que s’il n’est pas un montant. Dans le FEC, la tabulation et le saut de ligne internes deviennent un espace, pour garder les 18 zones de l’article A47 A-1. Les dates, les numéros de compte et les montants ne sont pas réécrits. Le classeur XLSX écrit les cellules en `inlineStr`, pas en formules.
 
 ## Restauration
 
@@ -35,6 +35,6 @@ L’archive est refusée si un membre est vide, absolu, dupliqué, contient `..`
 ## Correctifs de cette relecture
 
 - Message de dates d’exercice : la fin antérieure au début est nommée, sans le préfixe anglais de Pydantic. L’année de clôture doit être celle de la date de fin. Le millésime n’est pas confondu avec ces dates.
-- Neutralisation des formules dans les CSV produits par l’application, hors FEC.
+- Neutralisation des formules dans les CSV produits par l’application et dans les zones de texte du FEC.
 - Contrôles d’archive supplémentaires (barre oblique inverse, NUL, lecteur Windows, lien, volume décompressé, fichier extrait hors du dossier temporaire).
 - Le lien d’accueil n’utilise plus un `aria-label` qui masquait le texte visible.

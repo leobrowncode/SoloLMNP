@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.domain.filing.declaration import archival_csv, archival_json
+from app.domain.filing.declaration import WORK_MARKER, archival_csv, archival_json
 from app.domain.filing.fec import export_fec, fec_description
 from app.services.efi import efi_worksheet, worksheet_pdf
 
@@ -50,6 +50,18 @@ def control_archive(session: Session, year_id: int) -> dict[str, Any]:
     }
 
 
+def _fec_notice(worksheet: dict[str, Any]) -> list[str]:
+    exports = worksheet.get("exports")
+    slot = exports.get("fec") if isinstance(exports, dict) else None
+    posture = slot.get("posture") if isinstance(slot, dict) else None
+    if posture == "finale":
+        return []
+    return [
+        f"{WORK_MARKER}. Le FEC et ce dossier suivent la liasse :",
+        "  ce n’est pas une pièce finale à transmettre.",
+    ]
+
+
 def _readme(rendered: dict[str, Any], worksheet: dict[str, Any]) -> str:
     status = str(worksheet.get("output_headline") or worksheet.get("output_label") or "Recherche")
     return "\r\n".join(
@@ -64,6 +76,7 @@ def _readme(rendered: dict[str, Any], worksheet: dict[str, Any]) -> str:
             "*_description.txt : description du FEC exigée par l’article A47 A-1 du LPF.",
             f"liasse-*.pdf et .json : feuille de recopie de la liasse ({status}),",
             "  figée à la clôture, avec l’état de suivi des amortissements non déduits.",
+            *_fec_notice(worksheet),
             "efi-*.json et efi-*.csv : export d’archivage, document de travail à vérifier,",
             "  avec le millésime et les versions de règles. Ce n’est pas un envoi.",
             "SHA256SUMS.txt : empreintes pour prouver que les fichiers n’ont pas changé.",

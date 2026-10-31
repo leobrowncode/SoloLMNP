@@ -147,6 +147,49 @@ test("returning the exercise to open clears the previous closing ceremony", asyn
   expect(screen.queryByRole("button", { name: "Confirmer la clôture" })).not.toBeInTheDocument();
 });
 
+test("the shared status sentence appears only when the FEC matches the liasse", async () => {
+  const shared = {
+    posture: "provisoire",
+    label: "Provisoire",
+    download: true,
+  };
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+    blocking: false,
+    output_status: "recherche",
+    output_label: "Recherche",
+    exports: { liasse: shared, pdf: shared, fec: shared, archive: shared },
+    errors: [],
+    warnings: [],
+  }));
+  render(<CloseYear year={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  expect(await screen.findByText("Même statut pour le calcul, la liasse et les exports.")).toBeInTheDocument();
+  expect(screen.queryByText("Finale")).not.toBeInTheDocument();
+});
+
+test("a final FEC label is not claimed while the liasse is blocked", async () => {
+  const blocked = { posture: "bloquee", label: "Bloquée", download: false };
+  const final = { posture: "finale", label: "Finale", download: true };
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+    blocking: true,
+    output_status: "recherche",
+    output_label: "Recherche",
+    exports: { liasse: blocked, pdf: blocked, fec: final, archive: final },
+    errors: [{ code: "IMMOBILISATIONS_ECART", message: "Le bien n’est pas au bilan." }],
+    warnings: [],
+  }));
+  render(<CloseYear year={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Le bien n’est pas au bilan.");
+  const links = screen.getAllByRole("link", { name: "Faire entrer le bien en comptabilité" });
+  expect(links.length).toBeGreaterThan(0);
+  for (const link of links) {
+    expect(link).toHaveAttribute("href", "/immobilisations#entree-bien");
+  }
+  expect(screen.queryByText("Même statut pour le calcul, la liasse et les exports.")).not.toBeInTheDocument();
+  expect(screen.getByText("Recherche")).toBeInTheDocument();
+});
+
 test("a failed precheck keeps the acknowledgements already on screen", async () => {
   vi.spyOn(globalThis, "fetch")
     .mockResolvedValueOnce(response({

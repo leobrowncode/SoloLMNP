@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
 import { closeConfirmCauses, closePrepareCauses, describedBy, precheckAction } from "./actionCauses";
+import { sameStatusClaim, type ExportStatus } from "./exportStatus";
 import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
 import { GLOSSARY } from "./glossary";
@@ -20,6 +21,7 @@ interface Check {
   year_status?: string;
   output_status?: string;
   output_label?: string;
+  exports?: ExportStatus["exports"];
   errors: Notice[];
   warnings: Notice[];
   infos?: Notice[];
@@ -183,7 +185,9 @@ export default function CloseYear({
       {check.output_label && (
         <p className={`fiscal-output-status fiscal-output-${check.output_status ?? "recherche"}`}>
           <strong>{check.output_label}</strong>
-          <span>Même statut pour le calcul, la liasse et les exports.</span>
+          {sameStatusClaim(check) && (
+            <span>Même statut pour le calcul, la liasse et les exports.</span>
+          )}
         </p>
       )}
       {(check.infos ?? []).map((item) => <p key={item.code}>{item.message}</p>)}
