@@ -549,6 +549,90 @@ describe("OperationsPage", () => {
     expect(screen.queryByRole("list", { name: "Lignes de l’écriture" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Transactions/ })).toHaveAttribute("aria-pressed", "true");
   });
+
+  it("saves a property without land area and reloads the recorded split", async () => {
+    const saved = {
+      id: 7,
+      name: "Studio fictif",
+      address: "1 rue des Scénarios",
+      acquisition_date: "2025-01-09",
+      rental_start_date: null,
+      acquisition_price: "100000.00",
+      acquisition_costs: "0.00",
+      land_value: "20000.00",
+      building_value: "80000.00",
+      notes: "",
+    };
+    let properties: unknown[] = [];
+    const fetcher = vi.fn((url: string, init?: RequestInit) => {
+      if (url === "/api/ledger/setup") return response({
+        activity: { activity_name: "Fictif" },
+        years: [{ id: 1, year: 2025, start_date: "2025-01-01", end_date: "2025-12-31", status: "OPEN" }],
+      });
+      if (url === "/api/ledger/accounts") return response([]);
+      if (url === "/api/operations/properties" && init?.method === "POST") {
+        properties = [saved];
+        return response(saved);
+      }
+      if (url === "/api/operations/properties") return response(properties);
+      if (url === "/api/operations/properties/7/tenants") return response([]);
+      if (url === "/api/operations/banks") return response([]);
+      if (url === "/api/operations/loans") return response([]);
+      if (url.startsWith("/api/operations?")) return response([]);
+      if (url.startsWith("/api/operations/bank/transactions")) return response([]);
+      return response({});
+    });
+    vi.stubGlobal("fetch", fetcher);
+    renderOperations("Biens");
+    await userEvent.click(await screen.findByRole("button", { name: "Ajouter un bien" }));
+    expect(screen.getByLabelText(/Surface du terrain/)).not.toBeRequired();
+    expect(screen.getByLabelText(/Prix constaté au m²/)).toHaveValue("");
+    expect(screen.getByLabelText(/Prix constaté au m²/)).not.toBeRequired();
+    expect(screen.getAllByText("JJ/MM/AAAA").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Date d’acquisition")).toHaveAttribute("lang", "fr");
+
+    fireEvent.change(screen.getByLabelText("Nom du bien"), { target: { value: "Studio fictif" } });
+    fireEvent.change(screen.getByLabelText("Adresse"), { target: { value: "1 rue des Scénarios" } });
+    fireEvent.change(screen.getByLabelText("Date d’acquisition"), { target: { value: "2025-01-09" } });
+    fireEvent.change(screen.getByLabelText("Prix d’acquisition (€)"), { target: { value: "100000,00" } });
+    fireEvent.change(screen.getByLabelText("Valeur du terrain (€)"), { target: { value: "20000,00" } });
+    fireEvent.change(screen.getByLabelText("Valeur du bâtiment (€)"), { target: { value: "70000,00" } });
+    expect(screen.getByRole("alert")).toHaveTextContent(/de moins que le prix d’acquisition/);
+    await userEvent.click(screen.getByRole("button", { name: "Vérifier avant enregistrement" }));
+    expect(screen.queryByText(/Vérifiez les informations/)).not.toBeInTheDocument();
+    expect(fetcher.mock.calls.some((call) => call[1]?.method === "POST")).toBe(false);
+
+    fireEvent.change(screen.getByLabelText("Valeur du bâtiment (€)"), { target: { value: "80000,00" } });
+    expect(screen.queryByText(/de moins que le prix d’acquisition/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Vérifier avant enregistrement" }));
+    expect(screen.queryByText(/Surface du terrain/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Prix constaté au m²/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Confirmer l’enregistrement" }));
+
+    expect(await screen.findByRole("heading", { name: "Studio fictif" })).toBeInTheDocument();
+    const post = fetcher.mock.calls.find((call) => call[0] === "/api/operations/properties" && call[1]?.method === "POST");
+    const body = JSON.parse(String(post?.[1]?.body));
+    expect(body).toEqual({
+      name: "Studio fictif",
+      address: "1 rue des Scénarios",
+      acquisition_date: "2025-01-09",
+      rental_start_date: null,
+      acquisition_price: "100000.00",
+      acquisition_costs: "0.00",
+      land_value: "20000.00",
+      building_value: "80000.00",
+    });
+    expect(body).not.toHaveProperty("lot_m2");
+    expect(body).not.toHaveProperty("price_m2");
+
+    await userEvent.click(screen.getByRole("button", { name: "Modifier Studio fictif" }));
+    expect(screen.getByLabelText("Prix d’acquisition (€)")).toHaveValue("100000.00");
+    expect(screen.getByLabelText("Valeur du terrain (€)")).toHaveValue("20000.00");
+    expect(screen.getByLabelText("Valeur du bâtiment (€)")).toHaveValue("80000.00");
+    expect(screen.getByLabelText("Date d’acquisition")).toHaveValue("2025-01-09");
+    expect(screen.queryByLabelText(/Surface du terrain/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Prix constaté au m²/)).not.toBeInTheDocument();
+  });
 });
 
 function entryFixture(id: number, entryNumber: string, label: string) {

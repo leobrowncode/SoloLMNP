@@ -37,6 +37,7 @@ import {
 } from "./correction";
 import { buildPieceReference, defaultType, findType, typesFor } from "./operationTypes";
 import { enumChoices, enumLabel, formatEuros, formatIsoDate } from "../lib/format";
+import { propertySplitGap, proposeLandFromArea } from "./propertySplit";
 import FrenchForm from "../lib/FrenchForm";
 import "./ledger.css";
 import FitSelect from "../lib/FitSelect";
@@ -53,6 +54,7 @@ interface Editor {
   help?: string;
   sumInto?: { target: string; sources: string[] };
   derive?: (draft: Record<string, string>, changed: string) => Partial<Record<string, string>>;
+  validate?: (draft: Record<string, string>) => string;
   /** Disables confirmation when the installment cannot be posted. */
   confirmBlocked?: string;
 }
@@ -442,6 +444,7 @@ export default function OperationsPage() {
       method: "PATCH",
       help: financial ? PLAN_HELP : RECORD_HELP,
       fields,
+      ...(financial ? { validate: propertySplitGap } : {}),
     });
   }
   function openTenant(tenant: Tenant) {
@@ -568,6 +571,7 @@ export default function OperationsPage() {
           help={editor.help}
           sumInto={editor.sumInto}
           derive={editor.derive}
+          validate={editor.validate}
           confirmBlocked={editor.confirmBlocked}
           onSave={save}
           onCancel={() => setEditor(null)}
@@ -582,21 +586,8 @@ export default function OperationsPage() {
         <button id="ajouter-bien" type="button" onClick={() => setEditor({
           title: "Ajouter un bien", path: "/properties",
           help: "Le terrain et le bâtiment doivent totaliser exactement le prix d’acquisition. Les frais restent à part.",
-          derive: (draft, changed) => {
-            if (!["lot_m2", "price_m2", "acquisition_price"].includes(changed)) return {};
-            const area = Number(String(draft.lot_m2 ?? "").replace(",", "."));
-            if (!Number.isFinite(area) || area <= 0) return {};
-            try {
-              const pricePerMeter = cents(draft.price_m2 || "0");
-              const price = cents(draft.acquisition_price || "0");
-              if (pricePerMeter <= 0n || price <= 0n) return {};
-              const land = BigInt(Math.round(area * Number(pricePerMeter)));
-              if (land <= 0n || land >= price) return {};
-              return { land_value: amount(land), building_value: amount(price - land) };
-            } catch {
-              return {};
-            }
-          },
+          derive: proposeLandFromArea,
+          validate: propertySplitGap,
           fields: [
             { name: "name", label: "Nom du bien", group: "Identification" },
             { name: "address", label: "Adresse", group: "Identification" },
@@ -604,8 +595,8 @@ export default function OperationsPage() {
             { name: "rental_start_date", label: "Début de location", type: "date", optional: true, group: "Dates" },
             { name: "acquisition_price", label: "Prix d’acquisition (€)", money: true, group: "Valeurs" },
             { name: "acquisition_costs", label: "Frais de notaire et d’agence (€)", money: true, group: "Valeurs", hint: "Ajoutés plus tard à la base amortissable, pas au prix." },
-            { name: "lot_m2", label: "Surface du terrain ou quote-part (m²)", local: true, group: "Terrain constaté", hint: "Pour un appartement, la quote-part de la parcelle." },
-            { name: "price_m2", label: "Prix constaté au m² (€)", money: true, local: true, group: "Terrain constaté" },
+            { name: "lot_m2", label: "Surface du terrain ou quote-part (m²)", local: true, optional: true, group: "Terrain constaté", hint: "Pour un appartement, la quote-part de la parcelle. Sert seulement à proposer le terrain." },
+            { name: "price_m2", label: "Prix constaté au m² (€)", money: true, local: true, optional: true, group: "Terrain constaté" },
             { name: "land_value", label: "Valeur du terrain (€)", money: true, group: "Valeurs", hint: "Non amortissable. Proposée si vous avez saisi une surface et un prix au m²." },
             { name: "building_value", label: "Valeur du bâtiment (€)", money: true, group: "Valeurs" },
           ],

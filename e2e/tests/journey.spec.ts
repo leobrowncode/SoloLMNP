@@ -59,16 +59,21 @@ test.describe.serial("parcours critique", () => {
 
     await page.goto("/operations/biens");
     await page.getByRole("button", { name: "Ajouter un bien" }).click();
+    await expect(page.locator(".date-placeholder").first()).toHaveText("JJ/MM/AAAA");
+    await expect(page.getByLabel(/Prix constaté au m²/)).toHaveValue("");
     await page.getByLabel("Nom du bien").fill("Studio fictif");
     await page.getByLabel("Adresse").fill("1 rue des Scénarios");
     await page.getByLabel(/Date d’acquisition/).fill("2025-01-01");
     await page.getByLabel(/Début de location/).fill("2025-02-01");
     await fillMoney(page, /Prix d’acquisition/, "100000,00");
     await fillMoney(page, /Frais de notaire/, "0,00");
-    await page.getByLabel(/Surface du terrain/).fill("10");
-    await fillMoney(page, /Prix constaté au m²/, "2000,00");
     await fillMoney(page, /Valeur du terrain/, "20000,00");
+    await fillMoney(page, /Valeur du bâtiment/, "70000,00");
+    await expect(page.getByText(/de moins que le prix d’acquisition/)).toBeVisible();
+    await page.getByRole("button", { name: "Vérifier avant enregistrement" }).click();
+    await expect(page.getByText("Vérifiez les informations avant de confirmer.")).toHaveCount(0);
     await fillMoney(page, /Valeur du bâtiment/, "80000,00");
+    await expect(page.getByText(/de moins que le prix d’acquisition/)).toHaveCount(0);
     await confirmReview(page);
     await expect(page.getByRole("heading", { name: "Studio fictif" })).toBeVisible();
 
