@@ -150,6 +150,23 @@ describe("ReviewForm", () => {
     expect(screen.queryByRole("option", { name: "211000 · Terrains" })).not.toBeInTheDocument();
   });
 
+  it("disables confirmation when the installment cannot be posted", async () => {
+    const save = vi.fn();
+    render(<ReviewForm
+      title="Échéance : Crédit Habitat 195k"
+      confirmBlocked="Aucun capital comptable à rembourser pour cet emprunt."
+      fields={[{ name: "principal", label: "Capital remboursé (€)", money: true, value: "0.00" }]}
+      onSave={save}
+      onCancel={() => undefined}
+    />);
+    expect(screen.getByRole("status")).toHaveTextContent("Aucun capital comptable à rembourser pour cet emprunt.");
+    await userEvent.click(screen.getByRole("button", { name: "Vérifier avant enregistrement" }));
+    const confirm = screen.getByRole("button", { name: "Confirmer l’enregistrement" });
+    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute("aria-describedby");
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it("shows a field validation message under the control", async () => {
     const save = vi.fn().mockRejectedValue(new RequestError({
       code: "VALIDATION_ERROR",

@@ -185,7 +185,10 @@ def test_accrual_and_partial_settlements(client, kind, control, number):
 
 
 def test_loan_funding_payment_and_principal_from_ledger(client):
-    assert loan(client)["remaining_principal"] == "0.00"
+    created = loan(client)
+    assert created["remaining_principal"] == "0.00"
+    assert created["on_balance_sheet"] is False
+    assert created["posting_path"] == "funding"
     response = client.post("/api/operations/loans/1/fund", json=settlement(amount="10000.00"))
     assert response.status_code == 201, response.text
     payment = settlement(
@@ -208,6 +211,111 @@ def test_loan_funding_payment_and_principal_from_ledger(client):
     assert client.post("/api/operations/1/reverse", json=reversal()).status_code == 409
     assert client.post("/api/operations/2/reverse", json=reversal()).status_code == 201
     assert client.get("/api/operations/loans").json()[0]["remaining_principal"] == "10000.00"
+
+
+def test_unposted_loan_is_not_reported_as_a_zero_balance(client):
+    loan(client)
+    row = client.get("/api/operations/loans").json()[0]
+    assert row["remaining_principal"] == "0.00"
+    assert row["on_balance_sheet"] is False
+    assert row["posting_path"] == "funding"
+    funded = client.post("/api/operations/loans/1/fund", json=settlement(amount="10000.00"))
+    assert funded.status_code == 201, funded.text
+    posted = client.get("/api/operations/loans").json()[0]
+    assert posted["on_balance_sheet"] is True
+    assert posted["posting_path"] is None
+    assert posted["remaining_principal"] == "10000.00"
+    repaid = settlement(
+        request_id="test-repay-all",
+        date="2025-02-03",
+        amount="10000.00",
+        principal="10000.00",
+        interest="0.00",
+        insurance="0.00",
+        other_costs="0.00",
+    )
+    assert client.post("/api/operations/loans/1/payments", json=repaid).status_code == 201
+    settled = client.get("/api/operations/loans").json()[0]
+    assert settled["remaining_principal"] == "0.00"
+    assert settled["on_balance_sheet"] is True
+    assert settled["posting_path"] is None
+
+
+def test_loan_from_before_the_exercise_is_not_drawn_down(client):
+    response = client.post(
+        "/api/operations/loans",
+        json={
+            "property_id": 1,
+            "lender": "Crédit antérieur",
+            "start_date": "2024-06-01",
+            "initial_principal": "10000.00",
+            "interest_rate": "3.50",
+            "duration_months": 120,
+            "principal_account": "164000",
+        },
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["on_balance_sheet"] is False
+    assert body["posting_path"] == "property_entry"
+    refused = client.post("/api/operations/loans/1/fund", json=settlement(amount="10000.00"))
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "LOAN_ENTRY_REQUIRED"
+    assert refused.json()["detail"]["action"]["href"] == "/immobilisations#entree-bien"
+    assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 0
+
+
+def test_in_year_loan_is_refused_as_opening_outstanding(client):
+    created = client.post(
+        "/api/operations/loans",
+        json={
+            "property_id": 1,
+            "lender": "Crédit de l’année",
+            "start_date": "2025-06-01",
+            "initial_principal": "10000.00",
+            "interest_rate": "3.50",
+            "duration_months": 120,
+        },
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["posting_path"] == "funding"
+    asset = client.post(
+        "/api/assets",
+        json={
+            "property_id": 1,
+            "category": "LAND",
+            "label": "Terrain fictif",
+            "acquisition_date": "2025-01-01",
+            "service_start_date": "2025-01-01",
+            "acquisition_value": "20000.00",
+            "depreciable_value": "0.00",
+            "non_depreciable_value": "20000.00",
+            "residual_value": "0.00",
+            "method": "NONE",
+            "asset_account": "211000",
+            "basis_reason": "Prix du terrain à l’acte",
+        },
+    )
+    assert asset.status_code == 201, asset.text
+    refused = client.post(
+        "/api/assets/properties/1/entry",
+        json={
+            "fiscal_year_id": 1,
+            "loans": [{"loan_id": created.json()["id"], "outstanding": "10000.00"}],
+            "bank_amount": "0.00",
+            "prior_charges": [],
+            "piece_reference": "ACTE-2025",
+            "confirm": False,
+        },
+    )
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"]["code"] == "LOAN_DRAWDOWN_REQUIRED"
+    assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 0
+    funded = client.post(
+        f"/api/operations/loans/{created.json()['id']}/fund",
+        json=settlement(amount="10000.00", date="2025-06-02"),
+    )
+    assert funded.status_code == 201, funded.text
 
 
 def test_second_loan_line_gets_its_own_164_account(client):

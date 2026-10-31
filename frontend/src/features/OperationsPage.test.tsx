@@ -369,19 +369,79 @@ describe("OperationsPage", () => {
       banks: null,
       loans: [{
         id: 1, lender: "Banque fictive", property_id: 1, initial_principal: "15000.00",
-        remaining_principal: "15000.00", monthly_payment: "62.58",
-        monthly_insurance: "4.53", principal_account: "164000",
+        remaining_principal: "0.00", on_balance_sheet: false, posting_path: "funding",
+        monthly_payment: "62.58", monthly_insurance: "4.53", principal_account: "164000",
         interest_rate_basis_points: 150,
       }],
     });
     renderOperations("Emprunts");
-    const fund = await screen.findByRole("button", { name: "Enregistrer le déblocage" });
-    const payment = screen.getByRole("button", { name: "Saisir une échéance" });
-    expect(fund).toBeDisabled();
-    expect(payment).toBeDisabled();
-    expect(fund).toHaveAttribute("aria-describedby", "operation-bank-causes");
+    expect(await screen.findByText(/Pas encore au bilan/)).toBeInTheDocument();
+    expect(screen.queryByText(/Solde comptable/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Enregistrer le déblocage" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Saisir une échéance" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Importer les échéances/)).not.toBeInTheDocument();
     expect(document.getElementById("operation-bank-causes")).toHaveTextContent("Aucun compte bancaire");
     expect(document.querySelector('a[href="/operations/banque#ajouter-banque"]')).toHaveTextContent("Ajouter un compte bancaire");
+  });
+
+  it("shows the contract capital and blocks an installment until the loan is posted", async () => {
+    mockApi({
+      loans: [{
+        id: 2, lender: "Crédit Habitat 195k", property_id: 1, initial_principal: "195000.00",
+        remaining_principal: "0.00", on_balance_sheet: false, posting_path: "funding",
+        monthly_payment: "0.00", monthly_insurance: "0.00", principal_account: "164001",
+        interest_rate_basis_points: 325, start_date: "2025-06-01",
+      }],
+    });
+    renderOperations("Emprunts");
+    expect(await screen.findByText(/Capital emprunté \(contrat\) : 195[\s\u00a0\u202f]000,00 €/)).toBeInTheDocument();
+    expect(screen.getByText(/Pas encore au bilan/)).toBeInTheDocument();
+    expect(screen.queryByText(/Solde comptable : 0,00 €/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enregistrer le déblocage" })).toBeEnabled();
+    expect(screen.queryByRole("link", { name: "Faire entrer le bien en comptabilité" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Importer les échéances/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Saisir une échéance" }));
+    expect(screen.getAllByText("Aucun capital comptable à rembourser pour cet emprunt.").length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText("Date comptable"), { target: { value: "2025-03-01" } });
+    fireEvent.change(screen.getByLabelText("Référence justificative"), { target: { value: "ECH-TEST" } });
+    fireEvent.change(screen.getByLabelText("Intérêts (€)"), { target: { value: "10,00" } });
+    await userEvent.click(screen.getByRole("button", { name: "Vérifier avant enregistrement" }));
+    const confirm = screen.getByRole("button", { name: "Confirmer l’enregistrement" });
+    expect(confirm).toBeDisabled();
+    expect(confirm).toHaveAttribute("aria-describedby");
+  });
+
+  it("offers only the property entry when the loan predates the exercise", async () => {
+    mockApi({
+      loans: [{
+        id: 3, lender: "Crédit ancien", property_id: 1, initial_principal: "15000.00",
+        remaining_principal: "0.00", on_balance_sheet: false, posting_path: "property_entry",
+        monthly_payment: "58.00", monthly_insurance: "0.00", principal_account: "164000",
+        start_date: "2024-06-01",
+      }],
+    });
+    renderOperations("Emprunts");
+    expect(await screen.findByRole("link", { name: "Faire entrer le bien en comptabilité" })).toHaveAttribute(
+      "href",
+      "/immobilisations#entree-bien",
+    );
+    expect(screen.queryByRole("button", { name: "Enregistrer le déblocage" })).not.toBeInTheDocument();
+    expect(screen.getByText(/sans déblocage/)).toBeInTheDocument();
+  });
+
+  it("keeps a repaid loan at a ledger balance of zero", async () => {
+    mockApi({
+      loans: [{
+        id: 4, lender: "Crédit soldé", property_id: 1, initial_principal: "15000.00",
+        remaining_principal: "0.00", on_balance_sheet: true, posting_path: null,
+        monthly_payment: "58.00", monthly_insurance: "0.00", principal_account: "164000",
+      }],
+    });
+    renderOperations("Emprunts");
+    expect(await screen.findByText(/Solde comptable : 0,00 €/)).toBeInTheDocument();
+    expect(screen.queryByText(/Pas encore au bilan/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Enregistrer le déblocage" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Importer les échéances/)).not.toBeInTheDocument();
   });
 
   it("opens, replaces and closes an entry detail from the keyboard", async () => {

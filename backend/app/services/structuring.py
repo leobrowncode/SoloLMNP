@@ -32,6 +32,7 @@ from app.api.operation_schemas import (
     TenantInput,
 )
 from app.core.money import from_cents, to_cents
+from app.domain.loans.posting import choose_posting_path
 from app.models import (
     AccountingEntry,
     AccountingEntryLine,
@@ -41,6 +42,7 @@ from app.models import (
     BankTransaction,
     BusinessOperation,
     DepreciationSchedule,
+    FiscalYear,
     Loan,
     Property,
     Tenant,
@@ -75,7 +77,7 @@ from app.services.corrections import (
 )
 from app.services.ledger import fail, money
 from app.services.operations import account as require_prefixed_account
-from app.services.operations import principal_balance
+from app.services.operations import principal_balance, principal_on_balance_sheet
 
 ASSET_FIELDS = (
     "label",
@@ -297,9 +299,25 @@ def present_bank(session: Session, bank: BankAccount) -> dict[str, Any]:
 
 
 def present_loan(session: Session, loan: Loan) -> dict[str, Any]:
+    balance = principal_balance(session, loan)
+    booked = principal_on_balance_sheet(session, loan)
+    posting_path = None
+    if not booked:
+        exercise = session.scalar(
+            select(FiscalYear)
+            .where(FiscalYear.status == "OPEN")
+            .order_by(FiscalYear.start_date, FiscalYear.id)
+        )
+        posting_path = choose_posting_path(
+            start_date=loan.start_date,
+            exercise_start=exercise.start_date if exercise is not None else None,
+            property_booked=_live_property_entry(session, loan.property_id) is not None,
+        )
     return {
         **snapshot(loan),
-        "remaining_principal": money(principal_balance(session, loan)),
+        "remaining_principal": money(balance),
+        "on_balance_sheet": booked,
+        "posting_path": posting_path,
         "interest_rate": money(loan.interest_rate_basis_points),
         "correction": _view(_loan_locks(session, loan)),
     }

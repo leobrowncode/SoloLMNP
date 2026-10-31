@@ -255,4 +255,49 @@ test.describe.serial("parcours critique", () => {
       }
     }
   });
+
+  test("un emprunt non comptabilisé n’affiche pas un solde nul", async ({ page }) => {
+    await page.goto("/operations/emprunts");
+    await page.getByRole("button", { name: "Ajouter un emprunt" }).click();
+    await page.getByLabel("Prêteur").fill("Crédit Habitat fictif");
+    await page.getByLabel(/Début de l’emprunt/).fill("2026-01-01");
+    await fillMoney(page, /Capital de cette ligne/, "10000,00");
+    await fillMoney(page, /Taux annuel/, "3,50");
+    await page.getByLabel(/Durée en mois/).fill("120");
+    await confirmReview(page);
+
+    const card = page.locator("#emprunts-saisie article").filter({ hasText: "Crédit Habitat fictif" });
+    await expect(card).toContainText("Pas encore au bilan");
+    await expect(card).toContainText("Capital emprunté (contrat)");
+    await expect(card).not.toContainText("Solde comptable : 0,00");
+    const notice = page.getByRole("status").filter({ hasText: "Crédit Habitat fictif" });
+    await expect(notice).toContainText("compte 164");
+    await expect(notice).not.toContainText("Saisir une échéance");
+    await expect(page.getByRole("link", { name: "Enregistrer le déblocage" })).toBeVisible();
+    await expect(page.getByText("Importer les échéances depuis Google Sheets ou un CSV")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Saisir une échéance" }).click();
+    await page.getByLabel("Date comptable").fill("2026-02-01");
+    await page.getByLabel("Référence justificative").fill("ECH-FICTIF");
+    await fillMoney(page, "Intérêts (€)", "10,00");
+    await page.getByRole("button", { name: "Vérifier avant enregistrement" }).click();
+    await expect(page.getByRole("button", { name: "Confirmer l’enregistrement" })).toBeDisabled();
+    await expect(page.locator("form .ledger-error")).toContainText(
+      "Aucun capital comptable à rembourser pour cet emprunt.",
+    );
+    await page.getByRole("button", { name: "Annuler" }).click();
+
+    await page.getByRole("button", { name: "Enregistrer le déblocage" }).click();
+    await page.getByLabel("Date comptable").fill("2026-02-01");
+    await page.getByLabel("Référence justificative").fill("DEBLOC-FICTIF");
+    await confirmReview(page);
+    await expect(card).toContainText("Solde comptable");
+    await expect(card).not.toContainText("Pas encore au bilan");
+    await expect(page.getByText("Importer les échéances depuis Google Sheets ou un CSV")).toBeVisible();
+    await page.getByRole("button", { name: "Saisir une échéance" }).click();
+    await page.getByLabel("Date comptable").fill("2026-03-01");
+    await page.getByLabel("Référence justificative").fill("ECH-FICTIF-2");
+    await page.getByRole("button", { name: "Vérifier avant enregistrement" }).click();
+    await expect(page.getByRole("button", { name: "Confirmer l’enregistrement" })).toBeEnabled();
+  });
 });

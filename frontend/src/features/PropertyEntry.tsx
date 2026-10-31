@@ -16,6 +16,7 @@ import PrerequisiteList from "./PrerequisiteList";
 import { idleView, toApiError, type ScreenView } from "./screenState";
 import { centsToApiAmount, formatAmount, formatEuros, formatIsoDate, parseAmountToCents } from "../lib/format";
 import FitSelect from "../lib/FitSelect";
+import { splitLoansForEntry } from "./loanState";
 
 interface YearOption { id: number; year: number; start_date?: string; status?: string }
 interface EntryLine { account_number: string; label: string; debit: string; credit: string }
@@ -100,9 +101,13 @@ export default function PropertyEntry({
     }
   }
 
+  function loansForSelectedYear() {
+    const start = years.find((row) => row.id === yearId)?.start_date;
+    return splitLoansForEntry(loans.filter((row) => row.property_id === propertyId), start);
+  }
+
   function payload(confirm: boolean) {
-    const loanRows = loans
-      .filter((row) => row.property_id === propertyId)
+    const loanRows = loansForSelectedYear().entry
       .map((row) => ({ loan_id: row.id, outstanding: amount(outstanding[row.id] ?? "") }));
     const chargeRows = CHARGES.map(([key, account, label]) => ({
       account_number: account, label, amount: amount(charges[key] ?? ""),
@@ -189,7 +194,7 @@ export default function PropertyEntry({
     </div>;
   }
 
-  const propertyLoans = loans.filter((row) => row.property_id === propertyId);
+  const { entry: propertyLoans, drawdown: drawdownLoans } = loansForSelectedYear();
   const previewCauses = propertyEntryPreviewCauses(propertyId, yearId);
   const postCauses = propertyEntryPostCauses(preview !== null);
   const previewCauseId = "property-entry-preview-causes";
@@ -219,6 +224,11 @@ export default function PropertyEntry({
           setOutstanding({ ...outstanding, [row.id]: event.target.value }); setPreview(null);
         }} />
       </label>)}
+      {drawdownLoans.map((row) => (
+        <p key={row.id} className="form-help">
+          {row.lender} commence pendant l’exercice. Enregistrez son déblocage dans Opérations : il n’entre pas dans cette écriture.
+        </p>
+      ))}
       <label>Compte bancaire
         <FitSelect value={bankId} onChange={(event) => { setBankId(Number(event.target.value)); setPreview(null); }}>
           {banks.map((row) => <option key={row.id} value={row.id}>{row.name} ({row.account_number})</option>)}

@@ -53,6 +53,43 @@ test("previews then posts the property entry with loans and pre-start costs", as
   expect(bodies[1]).toMatchObject({ confirm: true });
 });
 
+test("keeps an in-year loan out of the property entry", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url === "/api/operations/loans") {
+      return response([
+        {
+          id: 1, lender: "Crédit ancien", property_id: 1, initial_principal: "15000.00",
+          remaining_principal: "0.00", monthly_payment: "0.00", monthly_insurance: "0.00",
+          principal_account: "164000", start_date: "2024-06-01",
+        },
+        {
+          id: 2, lender: "Crédit de l’année", property_id: 1, initial_principal: "195000.00",
+          remaining_principal: "0.00", monthly_payment: "0.00", monthly_insurance: "0.00",
+          principal_account: "164001", start_date: "2026-06-01",
+        },
+      ]);
+    }
+    if (url === "/api/operations/banks") return response([]);
+    if (url === "/api/assets/properties/1/entry") {
+      return response({
+        accounting_date: "2026-01-01", piece_date: "2026-01-01", owner_contribution: "0.00",
+        posted: false, lines: [],
+      });
+    }
+    throw new Error(url);
+  });
+  render(<PropertyEntry
+    properties={[{ id: 1, name: "Bien", acquisition_price: "1.00", land_value: "0.00", building_value: "1.00" }]}
+    years={[{ id: 1, year: 2026, start_date: "2026-01-01", status: "OPEN" }]}
+    onDone={vi.fn()}
+  />);
+  fireEvent.click(screen.getByRole("button", { name: "Faire entrer le bien en comptabilité" }));
+  expect(await screen.findByLabelText(/Crédit ancien/)).toBeInTheDocument();
+  expect(screen.queryByLabelText(/Crédit de l’année/)).not.toBeInTheDocument();
+  expect(screen.getByText(/Crédit de l’année commence pendant l’exercice/)).toBeInTheDocument();
+});
+
 test("explains a disabled property entry and the missing preview", () => {
   render(<PropertyEntry properties={[]} years={[]} onDone={vi.fn()} />);
   const start = screen.getByRole("button", { name: "Faire entrer le bien en comptabilité" });
