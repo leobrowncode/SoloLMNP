@@ -50,6 +50,8 @@ export const ERROR_HELP = {
   FISCAL_NOT_COMPUTED: "resultat-fiscal",
   FISCAL_RULE_BLOCKED: "cession",
   LOAN_ACCOUNT_EXHAUSTED: "compte-164",
+  LOAN_DRAWDOWN_REQUIRED: "emprunt",
+  LOAN_ENTRY_REQUIRED: "emprunt",
   LOAN_NOT_FUNDED: "compte-164",
   LOAN_OPENING_BALANCE: "emprunt",
   MAPPING_MISSING: "millesime",

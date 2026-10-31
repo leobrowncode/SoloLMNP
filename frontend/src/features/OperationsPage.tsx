@@ -28,6 +28,7 @@ import ReviewForm, { type Field } from "./ReviewForm";
 import { GLOSSARY } from "./glossary";
 import { SaveNoticeHost } from "./LocalFeedback";
 import { useSaveNotice } from "./localFeedback";
+import { loanCapitalToRepay, loanOnBalanceSheet, loanPostingPath } from "./loanState";
 import { operationSaveNotice } from "./operationSave";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
@@ -52,6 +53,8 @@ interface Editor {
   help?: string;
   sumInto?: { target: string; sources: string[] };
   derive?: (draft: Record<string, string>, changed: string) => Partial<Record<string, string>>;
+  /** Disables confirmation when the installment cannot be posted. */
+  confirmBlocked?: string;
 }
 
 export default function OperationsPage() {
@@ -147,7 +150,10 @@ export default function OperationsPage() {
       setBankId((current) => current || b[0]?.id || 0);
       setOpPropertyId((current) => current || p[0]?.id || 0);
       setOpYearId((current) => current || s.years.find((year) => year.status === "OPEN")?.id || 0);
-      setLoanImportId((current) => current || l[0]?.id || 0);
+      const fundedId = l.find((loan) => cents(loan.remaining_principal) > 0n)?.id ?? 0;
+      setLoanImportId((current) => (
+        l.some((loan) => loan.id === current && cents(loan.remaining_principal) > 0n) ? current : fundedId
+      ));
       setBundleView(finishLoad({ key: bundleKey }));
     }).catch((reason: unknown) => {
       if (active) setBundleView((current) => failLoad(current, toApiError(reason), current.data?.key === bundleKey));
@@ -202,6 +208,51 @@ export default function OperationsPage() {
   const settlementFields: Field[] = [
     yearField, ...dateFields, bankField,
   ];
+
+  function openFunding(loan: Loan) {
+    setEditor({
+      title: "Déblocage initial : " + loan.lender,
+      path: "/loans/" + loan.id + "/fund",
+      retry: true,
+      help: "Le montant doit égaler le capital initial. Un seul déblocage non extourné est autorisé.",
+      fields: [
+        ...settlementFields,
+        { name: "amount", label: "Montant débloqué (€)", money: true, value: loan.initial_principal, group: "Montant" },
+      ],
+    });
+  }
+
+  function openInstallment(loan: Loan) {
+    const rate = BigInt(loan.interest_rate_basis_points ?? 0);
+    const remaining = cents(loan.remaining_principal);
+    const interest = remaining * rate / 120000n;
+    const insurance = cents(loan.monthly_insurance || "0");
+    const payment = cents(loan.monthly_payment || "0");
+    let principal = payment > 0n ? payment - interest - insurance : 0n;
+    if (principal < 0n) principal = 0n;
+    if (principal > remaining) principal = remaining;
+    const repayable = loanCapitalToRepay(loan);
+    setEditor({
+      title: "Échéance : " + loan.lender,
+      path: "/loans/" + loan.id + "/payments",
+      retry: true,
+      help: "Intérêts proposés à partir du taux et du capital restant. Vérifiez-les sur l’échéancier de la banque. Ne ressaisissez pas ces intérêts comme une dépense.",
+      ...(repayable
+        ? {}
+        : { confirmBlocked: "Aucun capital comptable à rembourser pour cet emprunt." }),
+      sumInto: {
+        target: "amount",
+        sources: ["principal", "interest", "insurance", "other_costs"],
+      },
+      fields: [
+        ...settlementFields,
+        { name: "principal", label: "Capital remboursé (€)", money: true, value: amount(principal), group: "Ventilation de l’échéance", hint: "Ligne 1 — compte 164" },
+        { name: "interest", label: "Intérêts (€)", money: true, value: amount(interest), group: "Ventilation de l’échéance", hint: "Ligne 2 — compte 661" },
+        { name: "insurance", label: "Assurance (€)", money: true, value: amount(insurance), group: "Ventilation de l’échéance", hint: "Ligne 3 — compte 616" },
+        { name: "other_costs", label: "Autres frais (€)", money: true, group: "Ventilation de l’échéance", hint: "Ligne 4 — compte 627" },
+      ],
+    });
+  }
 
   function newOperation(kind: "REVENUE" | "EXPENSE", transaction?: BankTransaction) {
     const initial = defaultType(kind);
@@ -294,6 +345,7 @@ export default function OperationsPage() {
       detailTicket.current += 1;
       restoreDetailFocus.current = false;
       setDetails(null);
+      const openYearCount = (setup?.years ?? []).filter((year) => year.status === "OPEN").length;
       show(operationSaveNotice({
         path: savedEditor.path,
         method: savedEditor.method,
@@ -302,6 +354,8 @@ export default function OperationsPage() {
         data,
         result,
         detail: invalidation ? correctionMessage(invalidation) : undefined,
+        banks: banks.length,
+        openYears: openYearCount,
       }));
       setRevision((v) => v + 1);
     });
@@ -347,6 +401,8 @@ export default function OperationsPage() {
 
   const years = setup?.years ?? [];
   const openYears = years.filter((year) => year.status === "OPEN");
+  const repayableLoans = loans.filter((loan) => cents(loan.remaining_principal) > 0n);
+  const showLoanImport = repayableLoans.length > 0 && banks.length > 0 && openYears.length > 0;
   const entryCauses = operationEntryCauses(properties.length, years);
   const entryCauseId = "operation-entry-causes";
   const bankCauses = listed(bankCause(banks.length));
@@ -472,7 +528,7 @@ export default function OperationsPage() {
         ] : tab === "Emprunts" ? [
           { href: "#emprunts-saisie", label: "Emprunts" },
           { href: "#ajouter-emprunt", label: "Ajouter un emprunt" },
-          { href: "#import-import-echeances", label: "Import des échéances" },
+          ...(showLoanImport ? [{ href: "#import-import-echeances", label: "Import des échéances" }] : []),
         ] : [
           { href: "#transactions-saisie", label: "Transactions" },
           { href: "#import-import-operations", label: "Import CSV" },
@@ -512,6 +568,7 @@ export default function OperationsPage() {
           help={editor.help}
           sumInto={editor.sumInto}
           derive={editor.derive}
+          confirmBlocked={editor.confirmBlocked}
           onSave={save}
           onCancel={() => setEditor(null)}
           retryId={editor.retry}
@@ -821,62 +878,62 @@ export default function OperationsPage() {
             emptyTitle="Aucun emprunt."
             emptyReason="Ajoutez une ligne de crédit s’il y a un emprunt."
           >
-          {(rows) => rows.map((l) => (
+          {(rows) => rows.map((l) => {
+            const booked = loanOnBalanceSheet(l);
+            const repayable = loanCapitalToRepay(l);
+            const path = loanPostingPath(l);
+            const canPost = banks.length > 0 && openYears.length > 0;
+            const blockedId = `echeance-impossible-${l.id}`;
+            return (
           <article className="entry-card" id={`emprunt-${l.id}`} key={l.id}>
             <h3>{l.lender}</h3>
-            <p>Capital initial : {formatEuros(l.initial_principal)} · Solde comptable : {formatEuros(l.remaining_principal)} · Mensualité : {formatEuros(l.monthly_payment)} + assurance {formatEuros(l.monthly_insurance)} · Compte {l.principal_account}</p>
+            <p>
+              Capital emprunté (contrat) : {formatEuros(l.initial_principal)}
+              {" · "}
+              {booked ? <>Solde comptable : {formatEuros(l.remaining_principal)}</> : "Pas encore au bilan"}
+              {" · "}
+              Mensualité (contrat) : {formatEuros(l.monthly_payment)} + assurance (contrat) {formatEuros(l.monthly_insurance)}
+              {" · Compte "}{l.principal_account}
+            </p>
+            {!booked && path === "property_entry" && (
+              <p className="form-help">Cet emprunt existait avant l’exercice. Le capital restant dû du contrat se reprend à l’entrée du bien, sans déblocage.</p>
+            )}
+            {!booked && path === "funding" && (
+              <p className="form-help">Le capital restant dû du contrat n’est pas un solde comptable. Le déblocage l’inscrit au compte {l.principal_account}.</p>
+            )}
             {l.correction?.locks.map((lock) => <p className="form-help" key={lock.code}>{lock.message}</p>)}
             <div className="entry-actions">
               <button type="button" onClick={() => openLoan(l)}>Modifier {l.lender}</button>
+              {!booked && canPost && path === "property_entry" && (
+                <a href="/immobilisations#entree-bien">Faire entrer le bien en comptabilité</a>
+              )}
+              {!booked && canPost && path === "funding" && (
+                <button id={`deblocage-${l.id}`} type="button" onClick={() => openFunding(l)}>Enregistrer le déblocage</button>
+              )}
+              {canPost && (
+                <button
+                  id={`echeance-${l.id}`}
+                  type="button"
+                  aria-describedby={repayable ? undefined : blockedId}
+                  onClick={() => openInstallment(l)}
+                >Saisir une échéance</button>
+              )}
             </div>
-            <button type="button" disabled={bankCauses.length > 0} aria-describedby={describedBy(bankCauseId, bankCauses)} onClick={() => setEditor({
-              title: "Déblocage initial : " + l.lender,
-              path: "/loans/" + l.id + "/fund",
-              retry: true,
-              help: "Le montant doit égaler le capital initial. Un seul déblocage non extourné est autorisé.",
-              fields: [
-                ...settlementFields,
-                { name: "amount", label: "Montant débloqué (€)", money: true, value: l.initial_principal, group: "Montant" },
-              ],
-            })}>Enregistrer le déblocage</button>
-            <button type="button" disabled={bankCauses.length > 0} aria-describedby={describedBy(bankCauseId, bankCauses)} onClick={() => {
-              const rate = BigInt(l.interest_rate_basis_points ?? 0);
-              const remaining = cents(l.remaining_principal);
-              const interest = remaining * rate / 120000n;
-              const insurance = cents(l.monthly_insurance || "0");
-              const payment = cents(l.monthly_payment || "0");
-              let principal = payment > 0n ? payment - interest - insurance : 0n;
-              if (principal < 0n) principal = 0n;
-              if (principal > remaining) principal = remaining;
-              setEditor({
-              title: "Échéance : " + l.lender,
-              path: "/loans/" + l.id + "/payments",
-              retry: true,
-              help: "Intérêts proposés à partir du taux et du capital restant. Vérifiez-les sur l’échéancier de la banque. Ne ressaisissez pas ces intérêts comme une dépense.",
-              sumInto: {
-                target: "amount",
-                sources: ["principal", "interest", "insurance", "other_costs"],
-              },
-              fields: [
-                ...settlementFields,
-                { name: "principal", label: "Capital remboursé (€)", money: true, value: amount(principal), group: "Ventilation de l’échéance", hint: "Ligne 1 — compte 164" },
-                { name: "interest", label: "Intérêts (€)", money: true, value: amount(interest), group: "Ventilation de l’échéance", hint: "Ligne 2 — compte 661" },
-                { name: "insurance", label: "Assurance (€)", money: true, value: amount(insurance), group: "Ventilation de l’échéance", hint: "Ligne 3 — compte 616" },
-                { name: "other_costs", label: "Autres frais (€)", money: true, group: "Ventilation de l’échéance", hint: "Ligne 4 — compte 627" },
-              ],
-            });
-            }}>Saisir une échéance</button>
+            {canPost && !repayable && (
+              <p id={blockedId} className="form-help">Aucun capital comptable à rembourser pour cet emprunt.</p>
+            )}
           </article>
-        ))}
+            );
+          })}
           </BrowsableList>
         )}
-        {!!loans.length && !!banks.length && !openYears.length && (
+        {repayableLoans.length > 0 && !!banks.length && !openYears.length && (
           <PrerequisiteList id="loan-import-year" causes={openYearCauses(years)} intro="L’import des échéances est indisponible :" />
         )}
-        {!!loans.length && !!banks.length && !!openYears.length && <>
+        {showLoanImport && <>
           <label className="toolbar-field">Emprunt
             <FitSelect value={loanImportId} onChange={(e) => setLoanImportId(Number(e.target.value))}>
-              {loans.map((loan) => (
+              {repayableLoans.map((loan) => (
                 <option key={loan.id} value={loan.id}>
                   {loan.lender} · {formatEuros(loan.initial_principal)} · {loan.principal_account}
                 </option>

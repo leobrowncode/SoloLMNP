@@ -22,6 +22,8 @@ HELP_IDS: dict[str, str] = {
     "FISCAL_NOT_COMPUTED": "resultat-fiscal",
     "FISCAL_RULE_BLOCKED": "cession",
     "LOAN_ACCOUNT_EXHAUSTED": "compte-164",
+    "LOAN_DRAWDOWN_REQUIRED": "emprunt",
+    "LOAN_ENTRY_REQUIRED": "emprunt",
     "LOAN_NOT_FUNDED": "compte-164",
     "LOAN_OPENING_BALANCE": "emprunt",
     "MAPPING_MISSING": "millesime",
@@ -125,6 +127,14 @@ RESOLUTION_ACTIONS: dict[str, dict[str, str]] = {
     "INVENTORY_JOURNAL": {"label": "Plan comptable", "href": "/comptabilite/plan-comptable"},
     "RESULT_JOURNAL": {"label": "Plan comptable", "href": "/comptabilite/plan-comptable"},
     "BANK_REQUIRED": {"label": "Onglet Banque", "href": "/operations/banque"},
+    "LOAN_DRAWDOWN_REQUIRED": {
+        "label": "Enregistrer le déblocage",
+        "href": "/operations/emprunts",
+    },
+    "LOAN_ENTRY_REQUIRED": {
+        "label": "Faire entrer le bien en comptabilité",
+        "href": "/immobilisations#entree-bien",
+    },
     "LOAN_PREVIEW_REQUIRED": {"label": "Onglet Emprunts", "href": "/operations/emprunts"},
     "BACKUP_NOT_FOUND": {"label": "Voir les sauvegardes", "href": "/conservation#sauvegardes"},
     "BACKUP_REJECTED": {"label": "Contrôler la sauvegarde", "href": "/conservation#sauvegardes"},

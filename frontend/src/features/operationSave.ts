@@ -1,6 +1,62 @@
+import { cents } from "../api/ledger";
 import { GLOSSARY } from "./glossary";
+import type { LoanPostingPath } from "./loanState";
 import type { ShowSaveNotice } from "./localFeedback";
 import { operationsPath } from "../routing/paths";
+
+const INSTALLMENTS_WAIT = "Les échéances seront possibles une fois le capital au compte 164.";
+
+/** Next step after registering a loan. Only an action the screen can actually do. */
+export function loanFollowUp(input: {
+  banks: number;
+  openYears: number;
+  onBalanceSheet: boolean;
+  postingPath: LoanPostingPath | null;
+  remainingPrincipal: string;
+  loanId: number | null;
+}): { detail?: string; next?: { label: string; href: string } } {
+  const repayable = cents(input.remainingPrincipal) > 0n;
+  if (input.onBalanceSheet && repayable) {
+    if (input.banks === 0) {
+      return {
+        detail: `${INSTALLMENTS_WAIT} Ajoutez d’abord un compte bancaire.`,
+        next: { label: "Ajouter un compte bancaire", href: "/operations/banque#ajouter-banque" },
+      };
+    }
+    const href = input.loanId
+      ? `${operationsPath("Emprunts")}#echeance-${input.loanId}`
+      : operationsPath("Emprunts");
+    return { next: { label: "Saisir une échéance", href } };
+  }
+  if (input.onBalanceSheet) {
+    return { detail: "Aucun capital comptable à rembourser pour cet emprunt." };
+  }
+  if (input.openYears === 0) {
+    return {
+      detail: `${INSTALLMENTS_WAIT} Créez d’abord un exercice ouvert.`,
+      next: { label: "Créer un exercice", href: "/comptabilite/brouillons#ajouter-exercice" },
+    };
+  }
+  if (input.banks === 0) {
+    return {
+      detail: `${INSTALLMENTS_WAIT} Ajoutez d’abord un compte bancaire.`,
+      next: { label: "Ajouter un compte bancaire", href: "/operations/banque#ajouter-banque" },
+    };
+  }
+  if (input.postingPath === "property_entry") {
+    return {
+      detail: `${INSTALLMENTS_WAIT} Cet emprunt existait avant l’exercice : reprenez le capital restant dû à l’entrée du bien, sans déblocage.`,
+      next: { label: "Faire entrer le bien en comptabilité", href: "/immobilisations#entree-bien" },
+    };
+  }
+  const href = input.loanId
+    ? `${operationsPath("Emprunts")}#deblocage-${input.loanId}`
+    : operationsPath("Emprunts");
+  return {
+    detail: `${INSTALLMENTS_WAIT} Enregistrez le déblocage : il inscrit le capital emprunté au compte 164.`,
+    next: { label: "Enregistrer le déblocage", href },
+  };
+}
 
 const JOURNAL = "/comptabilite/journal";
 
@@ -24,6 +80,8 @@ export function operationSaveNotice(input: {
   data: Record<string, unknown>;
   result: Record<string, unknown>;
   detail?: string | undefined;
+  banks?: number;
+  openYears?: number;
 }): ShowSaveNotice {
   const { path, title, data, result } = input;
   const created = (input.method ?? "POST") === "POST";
@@ -72,14 +130,22 @@ export function operationSaveNotice(input: {
 
   if (path === "/loans" || /^\/loans\/\d+$/.test(path)) {
     const id = numericId(result, path.split("/")[2]);
+    const follow = loanFollowUp({
+      banks: input.banks ?? 0,
+      openYears: input.openYears ?? 0,
+      onBalanceSheet: result.on_balance_sheet === true,
+      postingPath: result.posting_path === "property_entry" ? "property_entry" : "funding",
+      remainingPrincipal: typeof result.remaining_principal === "string" ? result.remaining_principal : "0.00",
+      loanId: id,
+    });
     return {
       kind: GLOSSARY.emprunt.label,
       name: textName(data, "lender", title.replace(/^Modifier /, "")),
       action: created ? "créé" : "modifié",
       targetId: "emprunts-saisie",
       highlightId: id ? `emprunt-${id}` : undefined,
-      detail,
-      next: { label: "Saisir une échéance", href: operationsPath("Emprunts") },
+      detail: [detail, follow.detail].filter(Boolean).join(" ") || undefined,
+      next: follow.next,
     };
   }
 

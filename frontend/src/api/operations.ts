@@ -14,7 +14,13 @@ export interface Property {
 export interface Bank { id: number; name: string; account_number: string; correction?: CorrectionView }
 export interface Loan {
   id: number; lender: string; property_id: number; initial_principal: string;
-  remaining_principal: string; monthly_payment: string; monthly_insurance: string;
+  /** Ledger balance of account 164. Zero is a repaid loan only when on_balance_sheet is true. */
+  remaining_principal: string;
+  /** Live validated movement on the loan's 164. False means nothing has been posted. */
+  on_balance_sheet?: boolean;
+  /** The one way onto the books while on_balance_sheet is false. Null once posted. */
+  posting_path?: "property_entry" | "funding" | null;
+  monthly_payment: string; monthly_insurance: string;
   principal_account: string; interest_rate_basis_points?: number;
   interest_rate?: string; start_date?: string; duration_months?: number; notes?: string;
   correction?: CorrectionView;
