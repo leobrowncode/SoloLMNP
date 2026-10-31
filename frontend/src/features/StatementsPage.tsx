@@ -26,14 +26,21 @@ export interface Statements {
   presentation?: { reclassifications_applied: boolean; balance_rubrics: Rubric[]; income_rubrics: Rubric[]; warnings: { code: string; message: string }[] };
 }
 
-function Accounts({ title, rows, total }: { title: string; rows: Row[]; total: string }) {
+function Accounts({
+  title, rows, total, empty,
+}: {
+  title: string;
+  rows: Row[];
+  total: string;
+  empty?: { title: string; reason: string };
+}) {
   if (rows.length === 0) {
     return <section><h3>{title}</h3>
-      <EmptyState
+      {empty ? <EmptyState title={empty.title} reason={empty.reason} /> : <EmptyState
         title={`Aucun compte dans ${title}.`}
         reason="Cette liste reste vide tant qu’aucune écriture validée ne l’alimente."
         action={{ label: "Saisir une écriture", href: ledgerPath("Brouillons") }}
-      />
+      />}
       <p>Total {title.toLowerCase()} : {formatAmount(total)}</p>
     </section>;
   }
@@ -174,7 +181,15 @@ export default function StatementsPage() {
       <p>Soldes signés selon le classement du plan de comptes. Les amortissements diminuent l’actif.</p>
       <Accounts title="Actif net" rows={data.balance_sheet.assets} total={data.balance_sheet.total_assets} />
       <Accounts title="Dettes" rows={data.balance_sheet.liabilities} total={data.balance_sheet.total_liabilities} />
-      <Accounts title="Capitaux propres hors résultat" rows={data.balance_sheet.equity} total={data.balance_sheet.total_equity} />
+      <Accounts
+        title="Capitaux propres hors résultat"
+        rows={data.balance_sheet.equity}
+        total={data.balance_sheet.total_equity}
+        empty={{
+          title: "Aucun autre compte de capitaux propres.",
+          reason: "Le résultat de l’exercice est affiché à part. Les comptes 120 et 129 ne sont pas repris ici.",
+        }}
+      />
       <p>Résultat de l’exercice : {formatEuros(data.balance_sheet.current_result)}</p>
       <p><strong>Total passif et capitaux propres : {formatEuros(data.balance_sheet.total_liabilities_and_equity)}</strong></p>
       </MobileSection>

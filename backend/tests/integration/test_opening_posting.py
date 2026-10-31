@@ -110,8 +110,10 @@ def test_posting_and_second_year_continuity(client, database, loss):
     book(client, "615000", "401000", "1100.15" if loss else "100.15")
     book(client, "681100", "281840", "200.00")
     next_year(client)
-    before = report(client)
     close(database)
+    before = report(client)
+    assert before["status"] == "CLOSED"
+    assert before["presentation"]["status"] == "CLOSED"
     data = request(client, "129000" if loss else "120000")
     response = generate(client, data)
     assert response.status_code == 200, response.text

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Account, AccountingEntry, FiscalYear
 from app.services.ledger import fail, get_year, money
-from app.services.statements import statements
+from app.services.statements import carryforward_view
 
 
 def _report_cents(amount: str) -> int:
@@ -29,7 +29,7 @@ def opening_preview(session: Session, year_id: int) -> dict[str, Any]:
     if previous is None:
         fail("PREVIOUS_YEAR_REQUIRED", "Aucun exercice ne se termine la veille de cet exercice.")
     assert previous is not None  # noqa: S101
-    report = statements(session, previous.id)
+    report = carryforward_view(session, previous.id)
     balance = report["balance_sheet"]
     lines: list[dict[str, Any]] = []
     inactive: list[str] = []

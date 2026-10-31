@@ -109,10 +109,20 @@ def test_profit_rubrics_centralization_and_appropriation(client):
     assert posted.status_code == 200, posted.text
     assert posted.json()["created"] is True
     after = report(client)
-    assert after["income_statement"]["result"] == "0.00"
+    assert (
+        after["income_statement"]["result"] == after["balance_sheet"]["current_result"] == "800.00"
+    )
+    assert after["income_statement"]["total_income"] == "900.25"
     equity = {row["account_number"]: row["amount"] for row in after["balance_sheet"]["equity"]}
-    assert equity["120000"] == "800.00"
+    assert "120000" not in equity
     assert equity["108000"] == "2000.00"
+    natures = {row["code"]: row["total"] for row in after["presentation"]["income_rubrics"]}
+    assert natures["PRODUITS_EXPLOITATION"] == "900.25"
+    capitals = next(
+        row for row in after["presentation"]["balance_rubrics"] if row["code"] == "CAPITAUX"
+    )
+    assert capitals["total"] == "2000.00"
+    assert all(row["account_number"] != "120000" for row in capitals["accounts"])
     proposal = client.get("/api/ledger/years/1/appropriation-preview").json()["proposals"][0]
     assert proposal["amount"] == "800.00"
     affected = appropriate(client, "800.00")
@@ -120,7 +130,9 @@ def test_profit_rubrics_centralization_and_appropriation(client):
     final = report(client)
     equity = {row["account_number"]: row["amount"] for row in final["balance_sheet"]["equity"]}
     assert equity["108000"] == "2800.00"
-    assert equity.get("120000", "0.00") == "0.00"
+    assert "120000" not in equity
+    assert final["income_statement"]["result"] == "800.00"
+    assert final["balance_sheet"]["current_result"] == "0.00"
     assert final["balance_sheet"]["balanced"] is True
 
 
@@ -134,10 +146,9 @@ def test_loss_uses_129_and_cent_amounts(client):
     )
     posted = centralize(client, "-10.01", "129000")
     assert posted.status_code == 200, posted.text
-    equity = {
-        row["account_number"]: row["amount"] for row in report(client)["balance_sheet"]["equity"]
-    }
-    assert equity["129000"] == "-10.01"
+    body = report(client)
+    assert body["income_statement"]["result"] == body["balance_sheet"]["current_result"] == "-10.01"
+    assert all(row["account_number"] != "129000" for row in body["balance_sheet"]["equity"])
     affected = appropriate(client, "10.01", "129000", "108000")
     assert affected.status_code == 200, affected.text
     equity = {
@@ -277,11 +288,9 @@ def test_preview_does_not_change_chart_and_confirmation_creates_account(bare_cli
     numbers = [row["number"] for row in bare_client.get("/api/ledger/accounts").json()]
     assert numbers.count("120000") == 1
     assert "129000" not in numbers
-    equity = {
-        row["account_number"]: row["amount"]
-        for row in report(bare_client)["balance_sheet"]["equity"]
-    }
-    assert equity["120000"] == "50.00"
+    body = report(bare_client)
+    assert body["income_statement"]["result"] == body["balance_sheet"]["current_result"] == "50.00"
+    assert all(row["account_number"] != "120000" for row in body["balance_sheet"]["equity"])
     replay = centralize(bare_client, "50.00", request_id=request_id, create_accounts=[BENEFIT])
     assert replay.status_code == 200, replay.text
     assert replay.json()["created"] is False
@@ -402,3 +411,114 @@ def test_account_creation_rolls_back_with_failed_centralization(bare_client, dat
     assert response.status_code == 409
     assert response.json()["detail"]["code"] == "TEST_POST_FAILURE"
     assert chart_snapshot(bare_client, database) == before
+
+
+RESULT = "78.49"
+
+
+def _credit(client, number: str) -> str:
+    rows = client.get("/api/ledger/years/1/balance").json()["balance"]
+    row = next((item for item in rows if item["account_number"] == number), None)
+    if row is None:
+        return "0.00"
+    return str(row["credit_balance"])
+
+
+def _tax_forms(client) -> tuple[str, str]:
+    fiscal = client.post("/api/fiscal/years/1", json={"adjustments": []})
+    assert fiscal.status_code == 200, fiscal.text
+    sheet = client.get("/api/filing/years/1/efi").json()
+    benefit = next(
+        field["value"]
+        for field in sheet["liasse"]["fields"]
+        if field["form_ref"] == "2033-B-SD" and field["official_case"] == "312"
+    )
+    box_5na = next(
+        line["amount"] for line in sheet["personal_return"]["lines"] if line["case"] == "5NA"
+    )
+    return str(benefit), str(box_5na)
+
+
+def test_statements_120_2033b_and_5na_stay_aligned(client):
+    """The same file shows one result before centralization, and still after it.
+
+    Account 120 is zero until the result is centralised. Afterwards it carries
+    that result, and the statements no longer list it under other equity.
+    """
+    identity = client.post("/api/ledger/activity/identity", json={"siren": "123456789"})
+    assert identity.status_code == 200, identity.text
+    book(client, "512000", "706000", "100.00")
+    book(client, "615000", "401000", "21.51")
+
+    before = report(client)
+    benefit, box_5na = _tax_forms(client)
+    assert before["status"] == "PROVISIONAL"
+    assert before["income_statement"]["result"] == RESULT
+    assert before["balance_sheet"]["current_result"] == RESULT
+    assert benefit == RESULT
+    assert box_5na == RESULT
+    assert _credit(client, "120000") == "0.00"
+    equity_numbers = {row["account_number"] for row in before["balance_sheet"]["equity"]}
+    assert "120000" not in equity_numbers
+    assert "129000" not in equity_numbers
+    assert before["balance_sheet"]["balanced"] is True
+
+    posted = centralize(client, RESULT)
+    assert posted.status_code == 200, posted.text
+    after = report(client)
+    benefit, box_5na = _tax_forms(client)
+    assert after["income_statement"]["result"] == RESULT
+    assert after["balance_sheet"]["current_result"] == RESULT
+    assert after["income_statement"]["total_income"] == "100.00"
+    assert after["income_statement"]["total_expenses"] == "21.51"
+    assert {row["account_number"] for row in after["income_statement"]["income"]} == {"706000"}
+    assert {row["account_number"] for row in after["income_statement"]["expenses"]} == {"615000"}
+    assert _credit(client, "120000") == RESULT
+    assert benefit == RESULT
+    assert box_5na == RESULT
+    equity_numbers = {row["account_number"] for row in after["balance_sheet"]["equity"]}
+    assert "120000" not in equity_numbers
+    assert "129000" not in equity_numbers
+    assert (
+        after["balance_sheet"]["total_assets"]
+        == after["balance_sheet"]["total_liabilities_and_equity"]
+    )
+    assert after["balance_sheet"]["balanced"] is True
+    assert after["status"] == "PROVISIONAL"
+
+    precheck = client.get("/api/filing/years/1/precheck")
+    assert precheck.status_code == 200, precheck.text
+    assert precheck.json()["blocking"] is False, precheck.text
+    codes = [item["code"] for item in precheck.json()["warnings"]]
+    ready = client.post("/api/filing/years/1/ready", json={"acknowledged": codes})
+    assert ready.status_code == 200, ready.text
+    closed = client.post("/api/filing/years/1/close", json={"confirmation": "CLOTURER"})
+    assert closed.status_code == 200, closed.text
+    final = report(client)
+    assert final["status"] == "CLOSED"
+    assert final["presentation"]["status"] == "CLOSED"
+    assert final["income_statement"]["result"] == RESULT
+    assert final["balance_sheet"]["current_result"] == RESULT
+    assert _credit(client, "120000") == RESULT
+
+
+def test_reversing_centralization_restores_the_open_result(client):
+    book(client, "512000", "706000", "40.00")
+    posted = centralize(client, "40.00")
+    assert posted.status_code == 200, posted.text
+    reversal = client.post(
+        f"/api/ledger/entries/{posted.json()['entry']['id']}/reverse",
+        json={
+            "accounting_date": "2025-12-31",
+            "piece_reference": "EXT-CENT",
+            "reason": "Extourne de la centralisation de test.",
+        },
+    )
+    assert reversal.status_code == 201, reversal.text
+    body = report(client)
+    assert body["income_statement"]["result"] == "40.00"
+    assert body["balance_sheet"]["current_result"] == "40.00"
+    assert _credit(client, "120000") == "0.00"
+    preview = client.get("/api/ledger/years/1/centralization-preview").json()
+    assert preview["result"] == "40.00"
+    assert preview["recentralization_required"] is False

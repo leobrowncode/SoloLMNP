@@ -17,7 +17,7 @@ from app.core.money import to_cents
 from app.domain.accounting.centralization import STALE_ACTION, STALE_CODE, STALE_MESSAGE
 from app.models import Account, AccountingEntry, AccountingJournal, LedgerEvent
 from app.services.ledger import create_draft, entry_json, event, fail, get_year, money, post_entry
-from app.services.statements import statements
+from app.services.statements import equity_nets, ledger_income
 
 # Proposed only when no active account of the required prefix already exists.
 _CANONICAL_RESULT_ACCOUNTS: dict[str, tuple[str, str]] = {
@@ -32,8 +32,8 @@ def _cents(amount: str) -> int:
 
 def centralization_preview(session: Session, year_id: int) -> dict[str, Any]:
     year = get_year(session, year_id)
-    report = statements(session, year.id)
-    result = _cents(report["income_statement"]["result"])
+    report = ledger_income(session, year.id)
+    result = _cents(report["result"])
     lines = _closing_lines(report, result, None)
     if result:
         lines.append(
@@ -74,10 +74,10 @@ def post_centralization(
     year = get_year(session, year_id, writable=True)
     if _live(session, year.id, "CENTRALIZATION") is not None:
         fail("CENTRALIZATION_EXISTS", "Une centralisation non extournée existe déjà.")
-    report = statements(session, year.id)
+    report = ledger_income(session, year.id)
     if report["excluded_draft_count"]:
         fail("YEAR_DRAFTS", "Validez ou supprimez les brouillons avant la centralisation.")
-    result = _cents(report["income_statement"]["result"])
+    result = _cents(report["result"])
     if to_cents(data.expected_result) != result:
         fail("RESULT_CHANGED", "Le résultat a changé. Actualisez la prévisualisation.")
     if result == 0 and not _has_class_balance(report):
@@ -145,7 +145,7 @@ def post_appropriation(session: Session, year_id: int, data: AppropriationInput)
     year = get_year(session, year_id, writable=True)
     if _live(session, year.id, "CENTRALIZATION") is None:
         fail("CENTRALIZATION_REQUIRED", "Centralisez les charges et produits avant l’affectation.")
-    if _has_class_balance(statements(session, year.id)):
+    if _has_class_balance(ledger_income(session, year.id)):
         fail(STALE_CODE, STALE_MESSAGE, action=STALE_ACTION)
     if _live(session, year.id, "APPROPRIATION") is not None:
         fail("APPROPRIATION_EXISTS", "Une affectation non extournée existe déjà.")
@@ -346,21 +346,20 @@ def _check_result_account(session: Session, number: str | None, result: int) -> 
 
 
 def _has_class_balance(report: dict[str, Any]) -> bool:
-    income = report["income_statement"]
-    return any(_cents(row["amount"]) for row in income["income"] + income["expenses"])
+    return any(_cents(row["amount"]) for row in report["income"] + report["expenses"])
 
 
 def _closing_lines(
     report: dict[str, Any], result: int, result_account: str | None
 ) -> list[dict[str, str]]:
     lines: list[dict[str, str]] = []
-    for row in report["income_statement"]["expenses"]:
+    for row in report["expenses"]:
         cents = _cents(row["amount"])
         if cents > 0:
             lines.append(_line(row["account_number"], 0, cents))
         elif cents < 0:
             lines.append(_line(row["account_number"], -cents, 0))
-    for row in report["income_statement"]["income"]:
+    for row in report["income"]:
         cents = _cents(row["amount"])
         if cents > 0:
             lines.append(_line(row["account_number"], cents, 0))
@@ -383,14 +382,14 @@ def _line(number: str, debit: int, credit: int) -> dict[str, str]:
 
 
 def _equity_balances(session: Session, year_id: int) -> list[tuple[Account, int]]:
-    report = statements(session, year_id)
+    # Statements hide 120/129 from equity excluding the result. Appropriation
+    # still needs the ledger balance of those accounts. Net is debit-positive.
     found = []
-    for row in report["balance_sheet"]["equity"]:
-        account = session.get(Account, row["account_number"])
+    for number, net in equity_nets(session, year_id).items():
+        account = session.get(Account, number)
         if account is None:
             continue
-        # Equity display is credit-positive; a credit balance is a negative net.
-        found.append((account, -_cents(row["amount"])))
+        found.append((account, net))
     return found
 
 
