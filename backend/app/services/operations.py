@@ -371,6 +371,26 @@ def principal_balance(session: Session, loan: Loan) -> int:
     return sum(to_cents(credit) - to_cents(debit) for credit, debit in rows)
 
 
+def principal_on_balance_sheet(session: Session, loan: Loan) -> bool:
+    """True when a live validated movement remains on the loan's 164 account.
+
+    A zero ledger balance with no live movement is not a repaid loan: nothing
+    has been posted yet, or the drawdown was fully reversed. Openings are
+    ignored for the same reason as principal_balance.
+    """
+    entries = session.scalars(
+        select(AccountingEntry)
+        .join(AccountingEntryLine)
+        .where(
+            AccountingEntry.status == "VALIDATED",
+            AccountingEntry.source_type != "OPENING",
+            AccountingEntry.reversal_of_id.is_(None),
+            AccountingEntryLine.account_number == loan.principal_account,
+        )
+    ).unique()
+    return any(reversed_entry(session, entry.id) is None for entry in entries)
+
+
 def latest_active_principal_movement(session: Session, loan: Loan) -> date | None:
     """Ignore reversals and the entries they reverse when checking chronology."""
     entries = session.scalars(
@@ -439,6 +459,20 @@ def loan_post(
     amount = to_cents(data.amount)
     extra: dict[str, Any] = {}
     if funding:
+        from app.domain.loans.posting import funding_before_entry_refused
+        from app.services.assets import _live_property_entry
+
+        year = get_year(session, data.fiscal_year_id, writable=True)
+        if funding_before_entry_refused(
+            start_date=loan.start_date,
+            exercise_start=year.start_date,
+            property_booked=_live_property_entry(session, loan.property_id) is not None,
+        ):
+            fail(
+                "LOAN_ENTRY_REQUIRED",
+                "Cet emprunt existait avant l’exercice. Reprenez le capital restant dû "
+                "à l’entrée du bien, sans déblocage.",
+            )
         prior = session.scalars(
             select(BusinessOperation).where(BusinessOperation.loan_id == loan.id)
         ).all()

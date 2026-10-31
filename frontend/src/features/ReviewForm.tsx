@@ -52,6 +52,7 @@ export default function ReviewForm({
   sumInto,
   derive,
   locked = false,
+  confirmBlocked,
 }: {
   title: string;
   fields: Field[];
@@ -65,6 +66,8 @@ export default function ReviewForm({
   derive?: ((draft: Record<string, string>, changed: string) => Partial<Record<string, string>>) | undefined;
   /** Page-level lock: another mutation is already running. */
   locked?: boolean;
+  /** Shown before confirmation. Disables « Confirmer l’enregistrement » so the request is not sent. */
+  confirmBlocked?: string | undefined;
 }) {
   const [review, setReview] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
@@ -210,6 +213,7 @@ export default function ReviewForm({
           }
           return;
         }
+        if (confirmBlocked) return;
         void run(async (report) => {
           report("Enregistrement…");
           try {
@@ -222,6 +226,9 @@ export default function ReviewForm({
     >
       <h3>{title}</h3>
       {help && <p className="form-help">{help}</p>}
+      {confirmBlocked && (
+        <p id={`${formUid}-confirm-blocked`} role="status" className="ledger-error">{confirmBlocked}</p>
+      )}
       <MutationStatus step={step} />
       {error && <p role="alert" className="ledger-error">{error}</p>}
       {businessError && <ApiErrorAlert detail={businessError.detail} />}
@@ -333,7 +340,12 @@ export default function ReviewForm({
       )}
 
       <div className="form-actions">
-        <button disabled={busy || locked} aria-busy={busy || undefined} type="submit">
+        <button
+          disabled={busy || locked || (Boolean(review) && Boolean(confirmBlocked))}
+          aria-busy={busy || undefined}
+          aria-describedby={review && confirmBlocked ? `${formUid}-confirm-blocked` : undefined}
+          type="submit"
+        >
           {busy ? "Enregistrement…" : review ? "Confirmer l’enregistrement" : "Vérifier avant enregistrement"}
         </button>
         <button type="button" disabled={busy || locked} onClick={onCancel}>Annuler</button>

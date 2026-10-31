@@ -33,6 +33,7 @@ from app.domain.assets.posting_batch import (
     skipped_item,
     summarize,
 )
+from app.domain.loans.posting import entry_outstanding_allowed
 from app.models import (
     Account,
     AccountingEntry,
@@ -554,6 +555,14 @@ def property_entry(session: Session, property_id: int, data: PropertyEntryInput)
         if cents < 0 or cents > to_cents(loan.initial_principal):
             fail(
                 "LOAN_OUTSTANDING_INVALID", "Le capital restant dû dépasse le capital initial.", 422
+            )
+        if cents and not entry_outstanding_allowed(
+            start_date=loan.start_date, exercise_start=year.start_date
+        ):
+            fail(
+                "LOAN_DRAWDOWN_REQUIRED",
+                f"L’emprunt {loan.lender} commence pendant l’exercice. "
+                "Enregistrez son déblocage : il ne se reprend pas comme un capital restant dû.",
             )
         if session.scalar(
             select(AccountingEntryLine.id)

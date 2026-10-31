@@ -158,6 +158,9 @@ def test_first_exercise_from_purchase_to_liasse_and_fec(client):
     assert body["owner_contribution"] == "1078.00"
     posted = client.post("/api/assets/properties/1/entry", json={**entry, "confirm": True})
     assert posted.status_code == 200, posted.text
+    booked = client.get("/api/operations/loans").json()
+    assert [row["on_balance_sheet"] for row in booked] == [True, True]
+    assert [row["posting_path"] for row in booked] == [None, None]
     again = client.post("/api/assets/properties/1/entry", json={**entry, "confirm": True})
     assert again.status_code == 409
     funding = client.post(

@@ -196,7 +196,10 @@ def build_operations_router(database: Database) -> APIRouter:
             None,
             {**data.model_dump(mode="json"), "principal_account": principal_account},
         )
-        return {**record(row), "remaining_principal": money(balance)}
+        presented = structuring.present_loan(session, row)
+        if presented["remaining_principal"] != money(balance):
+            fail("LOAN_OPENING_BALANCE", "Solde comptable incompatible avec le capital initial.")
+        return presented
 
     @router.patch("/loans/{loan_id}")
     def loan_correct(loan_id: int, data: LoanCorrectionInput, session: Write) -> dict[str, Any]:
