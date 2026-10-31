@@ -19,6 +19,9 @@ test("shows provisional statements and removes stale totals on refresh failure",
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => String(input).endsWith("/setup") ? response(setup) : failed ? response({ detail: { message: "Ledger déséquilibré" } }, 409) : response(report(1)));
   render(<StatementsPage />);
   expect(await screen.findByText("Résultat comptable : -10,01 €")).toBeInTheDocument();
+  expect(screen.getByText("Résultat de l’exercice : -10,01 €")).toBeInTheDocument();
+  expect(screen.getByText("Aucun autre compte de capitaux propres.")).toBeInTheDocument();
+  expect(screen.queryByText("120000")).not.toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "Pré-contrôle et clôture" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Lancer le pré-contrôle" })).not.toBeInTheDocument();
   expect(screen.getByText(/Brouillons exclus : 1/)).toBeInTheDocument();

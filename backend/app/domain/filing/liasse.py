@@ -18,7 +18,7 @@ from app.models.operations import BusinessOperation
 from app.services.assets import gross_pieces
 from app.services.fiscal import _operating
 from app.services.ledger import money
-from app.services.statements import statements
+from app.services.statements import statements, unclosed_class_result
 
 
 def _amount(value: object) -> int:
@@ -76,7 +76,7 @@ def _sheets(
     session: Session, year: FiscalYear, fiscal: dict[str, Any]
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]], list[dict[str, str]]]:
     report = statements(session, year.id)
-    # Classes 6 and 7 before centralization: the closing entry zeroes them in the statements.
+    # Operating totals and the income statement both ignore the centralization entry.
     _income, _expenses, _depreciation, charges, products = _operating(session, year.id)
     activity = {
         "income": [
@@ -91,7 +91,7 @@ def _sheets(
     errors: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
     fields = [
-        *_bilan(report, errors, warnings),
+        *_bilan(report, errors, warnings, unclosed_class_result(session, year.id)),
         *_immobilisations(session, year, report, activity, errors, warnings),
         *_valeur_ajoutee(activity, warnings),
         *_result_2031(fiscal),
@@ -376,6 +376,7 @@ def _bilan(
     report: dict[str, Any],
     errors: list[dict[str, str]],
     warnings: list[dict[str, str]],
+    unclosed: int,
 ) -> list[dict[str, Any]]:
     corp_brut = corp_amort = other_fixed = other_amort = 0
     clients = bank = other_current = 0
@@ -426,8 +427,10 @@ def _bilan(
     for number, amount in _signed(report["income_statement"]["expenses"]):
         if number.startswith(("675", "775", "445")) and amount:
             errors.append(_out_of_scope(number))
-    result = _amount(report["income_statement"]["result"])
-    if result and result_equity:
+    # Box 136 is the unallocated result: open classes 6/7 plus what 120/129 still hold.
+    # A centralized result is no longer in the equity lines, so it is not added twice.
+    balance_result = _amount(report["balance_sheet"]["current_result"])
+    if unclosed and result_equity + (balance_result - unclosed):
         warnings.append(
             {
                 "code": "RESULTAT_MIXTE",
@@ -455,7 +458,7 @@ def _bilan(
     if negative_net is not None:
         errors.append(negative_net)
     assets_net = fixed_net + current
-    exercise_result = result + result_equity
+    exercise_result = balance_result + result_equity
     equity_total = capital + retained + other_equity + exercise_result
     debt_total = loans + suppliers + tax_debts + other_debts
     liabilities_total = equity_total + provisions + debt_total

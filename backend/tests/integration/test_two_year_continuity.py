@@ -141,7 +141,12 @@ def test_business_operations_assets_and_opening_across_two_years(client, databas
     assert second["balance_sheet"]["total_liabilities"] == "9900.00"
     assert second["balance_sheet"]["total_assets"] == "10533.81"
     assert second["balance_sheet"]["balanced"] is True
-    assert report(client) == before
+    closed_year = report(client)
+    assert closed_year["status"] == "CLOSED"
+    assert closed_year["presentation"]["status"] == "CLOSED"
+    closed_year["status"] = before["status"]
+    closed_year["presentation"]["status"] = before["presentation"]["status"]
+    assert closed_year == before
     assert continuity(client)["balances_match"] is True
     assert generate(client, data).json() == {"created": False, "entry": opening}
     for year, source, expected in (

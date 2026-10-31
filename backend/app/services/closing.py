@@ -26,7 +26,7 @@ from app.models.fiscal import FiscalComputation
 from app.services.fiscal import latest_fiscal, ledger_fingerprint
 from app.services.ledger import fail, get_year
 from app.services.result_closing import _live
-from app.services.statements import statements
+from app.services.statements import classes_open, statements
 
 
 def precheck(session: Session, year_id: int) -> dict[str, Any]:
@@ -41,7 +41,7 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
     if drafts:
         errors.append({"code": "YEAR_DRAFTS", "message": "Des brouillons sont encore ouverts."})
     report = _capture(lambda: statements(session, year.id), errors, "STATEMENTS")
-    if report is not None and _open_classes(report):
+    if report is not None and classes_open(session, year.id):
         if _live(session, year.id, "CENTRALIZATION") is None:
             errors.append(
                 {
@@ -233,11 +233,6 @@ def reopen_year(session: Session, year_id: int, confirmation: str, reason: str) 
     _audit(session, year, "REOPENED", before, "OPEN", reason)
     session.flush()
     return {"fiscal_year_id": year.id, "status": year.status}
-
-
-def _open_classes(report: dict[str, Any]) -> bool:
-    rows = report["income_statement"]["income"] + report["income_statement"]["expenses"]
-    return any(row["amount"] not in {"0.00", "-0.00"} for row in rows)
 
 
 def _capture(callback: Any, errors: list[dict[str, str]], code: str) -> Any:
