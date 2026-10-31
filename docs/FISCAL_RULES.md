@@ -37,7 +37,7 @@ pré-contrôle. L’écran ne fait que l’afficher. Le mot « Prête à recopie
 | Statut | Condition exacte |
 |---|---|
 | Recherche | `fiscal/<millésime>/validation.json` n’est pas une attestation effective. C’est le cas si le fichier manque, est illisible, ou si l’un de ces points manque : `status` = `validated`, `declarable` = `true`, `version` non vide, `rules_version` non vide, `official_source.reference` non vide, `official_source.url` en `https://`, `validated_on` au format `AAAA-MM-JJ`, `scope.activity`, `scope.regime`, et `scope.excluded` (liste non vide). Une feuille dont les contrôles de cases sont satisfaits reste Recherche. |
-| Provisoire | L’attestation est complète, mais elle ne couvre pas la sortie : `rules_version` diffère de `version` dans `fiscal/<millésime>/rules.yaml`, ou la liasse a une erreur, une case hors registre, ou un avertissement bloquant (`IMMOBILISATIONS_ECART`, `EFFECTIFS`, `RESULTAT_MIXTE`, `CLASSEMENT_INCOMPLET`, `SIREN_MANQUANT`). |
+| Provisoire | L’attestation est complète, mais elle ne couvre pas la sortie : `rules_version` diffère de `version` dans `fiscal/<millésime>/rules.yaml`, ou la liasse a une erreur (dont `IMMOBILISATIONS_ECART` et une case 030 négative), une case hors registre, ou un avertissement bloquant (`EFFECTIFS`, `RESULTAT_MIXTE`, `CLASSEMENT_INCOMPLET`, `SIREN_MANQUANT`). |
 | Déclarable | L’attestation est complète, `rules_version` est celui du fichier de règles, et la liasse n’a ni erreur ni avertissement bloquant. Seule cette sortie peut afficher « Prête à recopier ». |
 
 Le calcul stocké garde la colonne `status = research_only` (contrainte de base).

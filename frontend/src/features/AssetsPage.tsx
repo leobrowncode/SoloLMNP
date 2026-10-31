@@ -80,6 +80,7 @@ export default function AssetsPage() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
+  const [errorAction, setErrorAction] = useState<{ label: string; href: string } | null>(null);
   const { notice, show, dismiss } = useSaveNotice();
   const [boot, setBoot] = useState<ScreenView<{ ready: true }>>(() => beginLoad(idleView(), false));
   const [periodsView, setPeriodsView] = useState<ScreenView<{ yearId: number }>>(idleView());
@@ -424,6 +425,7 @@ export default function AssetsPage() {
     await run(async (report) => {
       report(`Comptabilisation de ${pending.length} dotation(s)…`);
       setError("");
+      setErrorAction(null);
       dismiss();
       batchKey.current ??= crypto.randomUUID();
       const key = batchKey.current;
@@ -443,6 +445,7 @@ export default function AssetsPage() {
         batchKey.current = null;
         const failed = result.items.find((item) => item.status === "error");
         if (failed) {
+          setErrorAction(failed.action ?? null);
           setError(
             `${failed.message} L’écran recharge l’état enregistré : les dotations déjà passées restent comptabilisées.`,
           );
@@ -460,6 +463,7 @@ export default function AssetsPage() {
           });
         }
       } catch (reason) {
+        setErrorAction(null);
         setError(reason instanceof Error ? reason.message : "Comptabilisation impossible.");
       } finally {
         setRevision((value) => value + 1);
@@ -524,7 +528,7 @@ export default function AssetsPage() {
         { href: "#dotations", label: "Dotations" },
       ]}
     />
-    {error && <p role="alert" className="ledger-error">{error}</p>}
+    {error && <p role="alert" className="ledger-error">{error}{errorAction && <> <a href={errorAction.href}>{errorAction.label}</a></>}</p>}
     <MutationStatus step={step} />
     <ScreenStatus
       state={boot}

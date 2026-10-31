@@ -394,6 +394,23 @@ test("names the missing property on every immobilisation action", async () => {
   expect(post).toHaveAttribute("aria-describedby", expect.stringContaining("asset-period-causes"));
 });
 
+test("disables depreciation posting until the asset is on the ledger", async () => {
+  mockApi(async (url) => {
+    if (url.endsWith("/periods")) {
+      return response([{ ...period, asset_on_ledger: false, booking: "entry" }]);
+    }
+    return response([]);
+  });
+  render(<AssetsPage />);
+  expect(await screen.findByText("Mobilier")).toBeInTheDocument();
+  const button = screen.getByRole("button", { name: "Comptabiliser toutes les dotations" });
+  expect(button).toBeDisabled();
+  expect(screen.getByRole("link", { name: "Faire entrer le bien en comptabilité" })).toHaveAttribute(
+    "href",
+    "/immobilisations#entree-bien",
+  );
+});
+
 const openPeriods = [
   { ...period, id: 2, target_label: "Mobilier" },
   { ...period, id: 3, target_label: "Cuisine", amount: "80.00" },

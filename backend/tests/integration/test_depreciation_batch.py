@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from tests.integration.test_statements import book
 
 
 @pytest.fixture
@@ -104,6 +105,7 @@ def test_batch_requires_an_idempotency_key_and_unique_periods(client):
 
 def test_lost_response_retry_does_not_double_post(client):
     assert client.post("/api/assets", json=_furniture("Mobilier fictif")).status_code == 201
+    book(client, "218400", "108000", "1200.00")
     periods = client.post("/api/assets/years/1/calculate").json()
     assert len(periods) == 1
     items = [_item(periods[0]["id"], "DOT-PERDU")]
@@ -120,7 +122,7 @@ def test_lost_response_retry_does_not_double_post(client):
     replay = second.json()
     assert replay["replayed"] is True
     assert replay["items"][0]["entry_id"] == entry_id
-    assert _entry_count(client) == 1
+    assert _entry_count(client) == 2
     entry = client.get(f"/api/ledger/entries/{entry_id}").json()
     assert entry["status"] == "VALIDATED"
     assert entry["piece_reference"] == "DOT-PERDU"
@@ -129,11 +131,12 @@ def test_lost_response_retry_does_not_double_post(client):
     assert conflict.status_code == 409
     assert conflict.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
     assert client.get(f"/api/ledger/entries/{entry_id}").json()["piece_reference"] == "DOT-PERDU"
-    assert _entry_count(client) == 1
+    assert _entry_count(client) == 2
 
 
 def test_natural_key_replays_an_already_posted_period(client):
     assert client.post("/api/assets", json=_furniture("Mobilier fictif")).status_code == 201
+    book(client, "218400", "108000", "1200.00")
     period = client.post("/api/assets/years/1/calculate").json()[0]
     posted = client.post(
         f"/api/assets/periods/{period['id']}/post",
@@ -148,12 +151,13 @@ def test_natural_key_replays_an_already_posted_period(client):
     assert item["entry_id"] == posted.json()["id"]
     stored = client.get(f"/api/ledger/entries/{item['entry_id']}").json()
     assert stored["piece_reference"] == "DOT-UNIT"
-    assert _entry_count(client) == 1
+    assert _entry_count(client) == 2
 
 
 def test_error_in_the_middle_keeps_earlier_items_and_skips_the_rest(client):
     assert client.post("/api/assets", json=_furniture("Premier meuble")).status_code == 201
     assert client.post("/api/assets", json=_furniture("Second meuble")).status_code == 201
+    book(client, "218400", "108000", "2400.00")
     assert client.post("/api/ledger/years", json=_year(2026)).status_code == 201
     first_year = client.post("/api/assets/years/1/calculate").json()
     second_year = client.post("/api/assets/years/2/calculate").json()
@@ -170,7 +174,7 @@ def test_error_in_the_middle_keeps_earlier_items_and_skips_the_rest(client):
     assert body["posted_count"] == 1
     assert body["failed_count"] == 1
     assert body["skipped_count"] == 1
-    assert _entry_count(client) == 1
+    assert _entry_count(client) == 2
     listed = client.get("/api/assets/years/1/periods").json()
     by_id = {row["id"]: row["status"] for row in listed}
     assert by_id[first_year[0]["id"]] == "POSTED"
@@ -183,17 +187,18 @@ def test_error_in_the_middle_keeps_earlier_items_and_skips_the_rest(client):
     listed = client.get("/api/assets/years/1/periods").json()
     replayed = {row["id"]: row["status"] for row in listed}
     assert replayed[first_year[1]["id"]] == "CALCULATED"
-    assert _entry_count(client) == 1
+    assert _entry_count(client) == 2
     # A new key posts only what is still open.
     follow = _post(client, [_item(first_year[1]["id"])], "batch-suite")
     assert follow.status_code == 200, follow.text
     assert follow.json()["posted_count"] == 1
     assert follow.json()["items"][0]["replayed"] is False
-    assert _entry_count(client) == 2
+    assert _entry_count(client) == 3
 
 
 def test_concurrent_same_key_posts_once(client):
     assert client.post("/api/assets", json=_furniture("Mobilier fictif")).status_code == 201
+    book(client, "218400", "108000", "1200.00")
     period = client.post("/api/assets/years/1/calculate").json()[0]
     items = [_item(period["id"])]
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -201,5 +206,5 @@ def test_concurrent_same_key_posts_once(client):
     assert [response.status_code for response in responses] == [200, 200]
     bodies = [response.json() for response in responses]
     assert {body["items"][0]["entry_id"] for body in bodies} == {bodies[0]["items"][0]["entry_id"]}
-    assert _entry_count(client) == 1
+    assert _entry_count(client) == 2
     assert sorted(body["replayed"] for body in bodies) == [False, True]

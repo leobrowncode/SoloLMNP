@@ -219,7 +219,10 @@ def test_first_exercise_from_purchase_to_liasse_and_fec(client):
     precheck = client.get("/api/filing/years/1/precheck").json()
     assert precheck["blocking"] is False, precheck
     codes = [item["code"] for item in precheck["warnings"]]
+    error_codes = [item["code"] for item in precheck["errors"]]
     assert "IMMOBILISATIONS_ECART" not in codes
+    assert "IMMOBILISATIONS_ECART" not in error_codes
+    assert "IMMOBILISATIONS_NETTES_NEGATIVES" not in error_codes
     ready = client.post("/api/filing/years/1/ready", json={"acknowledged": codes})
     assert ready.status_code == 200, ready.text
     closed = client.post("/api/filing/years/1/close", json={"confirmation": "CLOTURER"})

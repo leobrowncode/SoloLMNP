@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.api.ledger_schemas import AccountInput, AppropriationInput, CentralizationInput, EntryInput
 from app.core.money import to_cents
+from app.domain.accounting.centralization import STALE_ACTION, STALE_CODE, STALE_MESSAGE
 from app.models import Account, AccountingEntry, AccountingJournal, LedgerEvent
 from app.services.ledger import create_draft, entry_json, event, fail, get_year, money, post_entry
 from app.services.statements import statements
@@ -44,6 +45,7 @@ def centralization_preview(session: Session, year_id: int) -> dict[str, Any]:
             }
         )
     live = _live(session, year.id, "CENTRALIZATION")
+    stale = live is not None and _has_class_balance(report)
     return {
         "fiscal_year_id": year.id,
         "status": "PROVISIONAL",
@@ -56,6 +58,8 @@ def centralization_preview(session: Session, year_id: int) -> dict[str, Any]:
         "proposed_accounts": _proposed_result_accounts(session, result),
         "already_posted": live is not None,
         "existing_entry_id": live.id if live else None,
+        "recentralization_required": stale,
+        "recentralization_message": STALE_MESSAGE if stale else None,
     }
 
 
@@ -141,6 +145,8 @@ def post_appropriation(session: Session, year_id: int, data: AppropriationInput)
     year = get_year(session, year_id, writable=True)
     if _live(session, year.id, "CENTRALIZATION") is None:
         fail("CENTRALIZATION_REQUIRED", "Centralisez les charges et produits avant l’affectation.")
+    if _has_class_balance(statements(session, year.id)):
+        fail(STALE_CODE, STALE_MESSAGE, action=STALE_ACTION)
     if _live(session, year.id, "APPROPRIATION") is not None:
         fail("APPROPRIATION_EXISTS", "Une affectation non extournée existe déjà.")
     source = session.get(Account, data.source_account)

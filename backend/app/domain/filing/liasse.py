@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_cents
+from app.domain.assets.registration import gap_error, negative_net_error
 from app.domain.filing.declaration import explanation_inputs, personal_return
 from app.models import AccountingEntry, Asset, FiscalYear, Property
 from app.models.assets import AssetComponent, DepreciationPeriod, DepreciationSchedule
@@ -168,7 +169,7 @@ def _immobilisations(
     report: dict[str, Any],
     activity: dict[str, list[dict[str, str]]],
     errors: list[dict[str, str]],
-    warnings: list[dict[str, str]],
+    _warnings: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
     gross = {key: [0, 0, 0] for key in _GROSS}
     amort = {key: [0, 0, 0] for key in _AMORT}
@@ -346,16 +347,9 @@ def _immobilisations(
     )
     ledger_gross, ledger_amort, ledger_dotation = _ledger_immobilisations(report, activity)
     register_end = (totals[2], amort_totals[2], amort_totals[1])
-    if (ledger_gross, ledger_amort, ledger_dotation) != register_end:
-        warnings.append(
-            {
-                "code": "IMMOBILISATIONS_ECART",
-                "message": (
-                    "Le registre des immobilisations ne retrouve pas les comptes 21, 28 et 681. "
-                    "La feuille 2033-C n’est pas recopiable tant que cet écart demeure."
-                ),
-            }
-        )
+    ecart = gap_error(register_end, (ledger_gross, ledger_amort, ledger_dotation))
+    if ecart is not None:
+        errors.append(ecart)
     return fields
 
 
@@ -456,6 +450,10 @@ def _bilan(
     current = clients + bank + other_current
     fixed_brut = corp_brut + other_fixed
     fixed_net = fixed_brut - corp_amort - other_amort
+    corp_net = corp_brut - corp_amort
+    negative_net = negative_net_error(corp_net)
+    if negative_net is not None:
+        errors.append(negative_net)
     assets_net = fixed_net + current
     exercise_result = result + result_equity
     equity_total = capital + retained + other_equity + exercise_result
@@ -470,7 +468,7 @@ def _bilan(
         )
     rows = [
         ("CORPORELLES_BRUT", "028", "Immobilisations corporelles — brut", corp_brut),
-        ("CORPORELLES_NET", "030", "Immobilisations corporelles — net", corp_brut - corp_amort),
+        ("CORPORELLES_NET", "030", "Immobilisations corporelles — net", corp_net),
         ("ACTIF_IMMOBILISE_BRUT", "044", "Total I actif — brut", fixed_brut),
         ("ACTIF_IMMOBILISE_NET", "048", "Total I actif — net", fixed_net),
         ("CLIENTS_BRUT", "068", "Clients et comptes rattachés — brut", clients),

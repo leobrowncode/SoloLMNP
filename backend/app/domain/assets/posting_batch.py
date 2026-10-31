@@ -30,8 +30,21 @@ def posted_item(period_id: int, entry_id: int, *, replayed: bool) -> dict[str, A
     }
 
 
-def error_item(period_id: int, code: str, message: str) -> dict[str, Any]:
-    return {"period_id": period_id, "status": "error", "code": code, "message": message}
+def error_item(
+    period_id: int,
+    code: str,
+    message: str,
+    action: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    item: dict[str, Any] = {
+        "period_id": period_id,
+        "status": "error",
+        "code": code,
+        "message": message,
+    }
+    if action is not None:
+        item["action"] = action
+    return item
 
 
 def skipped_item(period_id: int) -> dict[str, Any]:

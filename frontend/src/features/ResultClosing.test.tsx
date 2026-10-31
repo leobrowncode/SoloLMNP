@@ -153,6 +153,23 @@ test("an unusable result account blocks confirmation without writing", async () 
   expect(calls.every((call) => call.method === "GET")).toBe(true);
 });
 
+test("a later entry asks to reverse the centralization and post it again", async () => {
+  install([exploitant], preview({
+    already_posted: true,
+    recentralization_required: true,
+    recentralization_message: "Des écritures ont modifié le résultat après la centralisation. Extournez la centralisation dans le journal, puis recentralisez.",
+  }));
+  render(<ResultClosing year={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Préparer la centralisation" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("recentralisez");
+  expect(screen.getByRole("link", { name: "Ouvrir le journal pour extourner" })).toHaveAttribute(
+    "href",
+    "/comptabilite/journal",
+  );
+  expect(screen.queryByText(/Choisissez l’affectation/)).not.toBeInTheDocument();
+});
+
 test("a zero result confirms without a result account", async () => {
   const calls = install([exploitant], preview({
     result: "0.00", result_account_prefix: null, proposed_accounts: [],

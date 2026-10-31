@@ -308,12 +308,15 @@ def post_period(session: Session, period_id: int, data: DepreciationPostInput) -
         if entry is None:
             fail("ENTRY_NOT_FOUND", "Écriture de dotation introuvable.", 500)
         return entry
-    get_year(session, period.fiscal_year_id, writable=True)
+    year = get_year(session, period.fiscal_year_id, writable=True)
     if to_cents(period.amount) <= 0:
         fail("ZERO_DEPRECIATION", "Une dotation nulle ne peut pas être comptabilisée.", 422)
     schedule = session.get(DepreciationSchedule, period.schedule_id)
     if schedule is None:
         fail("SCHEDULE_NOT_FOUND", "Plan d’amortissement introuvable.", 500)
+    from app.services.asset_registration import require_schedule_booked
+
+    require_schedule_booked(session, schedule, year)
     label = "Dotation aux amortissements"
     entry_input = EntryInput(
         fiscal_year_id=period.fiscal_year_id,
@@ -342,6 +345,16 @@ def post_period(session: Session, period_id: int, data: DepreciationPostInput) -
     period.status = "POSTED"
     session.flush()
     return entry
+
+
+def _action_link(value: object) -> dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    label = value.get("label")
+    href = value.get("href")
+    if isinstance(label, str) and isinstance(href, str) and href.startswith("/"):
+        return {"label": label, "href": href}
+    return None
 
 
 def _annotate(item: dict[str, Any]) -> dict[str, Any]:
@@ -398,10 +411,13 @@ def _post_one(session: Session, year_id: int, item: DepreciationBatchItem) -> di
         detail: dict[str, Any] = raw if isinstance(raw, dict) else {}
         code = detail.get("code")
         message = detail.get("message")
+        action = detail.get("action")
+        link = action if _action_link(action) else None
         return error_item(
             item.period_id,
             code if isinstance(code, str) else "POSTING_REJECTED",
             message if isinstance(message, str) else "Comptabilisation refusée.",
+            link,
         )
     return posted
 

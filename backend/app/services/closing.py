@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.domain.accounting.centralization import STALE_CODE, STALE_MESSAGE
 from app.domain.filing.fec import render_fec
 from app.domain.filing.mappings import compile_package
 from app.domain.fiscal.output_status import (
@@ -40,14 +41,16 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
     if drafts:
         errors.append({"code": "YEAR_DRAFTS", "message": "Des brouillons sont encore ouverts."})
     report = _capture(lambda: statements(session, year.id), errors, "STATEMENTS")
-    if (
-        report is not None
-        and _open_classes(report)
-        and _live(session, year.id, "CENTRALIZATION") is None
-    ):
-        errors.append(
-            {"code": "CENTRALIZATION_REQUIRED", "message": "Centralisez les charges et produits."}
-        )
+    if report is not None and _open_classes(report):
+        if _live(session, year.id, "CENTRALIZATION") is None:
+            errors.append(
+                {
+                    "code": "CENTRALIZATION_REQUIRED",
+                    "message": "Centralisez les charges et produits.",
+                }
+            )
+        else:
+            errors.append({"code": STALE_CODE, "message": STALE_MESSAGE})
     pending = session.scalar(
         select(func.count())
         .select_from(DepreciationPeriod)

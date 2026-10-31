@@ -60,6 +60,7 @@ def _facts(**overrides: Any) -> DashboardFacts:
         "calculated_period_count": 0,
         "posted_period_count": 0,
         "posted_depreciation_cents": 0,
+        "asset_booking": "ok",
         "has_previous_year": False,
         "previous_year_closed": False,
         "opening_posted": False,
@@ -349,6 +350,78 @@ def test_unposted_depreciation_blocks_the_asset_step() -> None:
     assert assets["status"] == "bloque"
     assert assets["prerequisites"][0]["action"]["href"] == "/immobilisations#dotations"
     assert payload["continue"]["href"] == "/immobilisations#dotations"
+
+
+def test_posted_dotations_without_the_asset_on_the_ledger_are_not_done() -> None:
+    common: dict[str, Any] = {
+        "activity_present": True,
+        "siren_present": True,
+        "year_id": 1,
+        "year": 2026,
+        "year_status": "OPEN",
+        "property_count": 1,
+        "asset_count": 1,
+        "depreciable_asset_count": 1,
+        "posted_period_count": 1,
+        "posted_depreciation_cents": 12092,
+        "dossier": _dossier(year_status="OPEN", year=2026, fiscal_year_id=1),
+    }
+    missing = _board(_facts(**common, asset_booking="entry"))
+    assets = _step(missing, "assets")
+    assert assets["status_label"] != "Terminé"
+    assert assets["status"] == "en_cours"
+    assert assets["prerequisites"][0]["code"] == "ASSET_NOT_BOOKED"
+    assert assets["prerequisites"][0]["action"]["href"] == "/immobilisations#entree-bien"
+    purchase = _step(_board(_facts(**common, asset_booking="journal")), "assets")
+    assert purchase["status_label"] != "Terminé"
+    journal = "/comptabilite/brouillons#nouvelle-ecriture"
+    assert purchase["prerequisites"][0]["action"]["href"] == journal
+    blocked = _board(
+        _facts(
+            **common,
+            asset_booking="entry",
+            close_errors=(
+                (
+                    "IMMOBILISATIONS_ECART",
+                    "Le registre des immobilisations ne retrouve pas les comptes 21, 28 et 681.",
+                ),
+            ),
+        )
+    )
+    assert _step(blocked, "assets")["status"] == "bloque"
+    done = _step(_board(_facts(**common, asset_booking="ok")), "assets")
+    assert done["status"] == "fait"
+    assert done["status_label"] == "Terminé"
+
+
+def test_negative_net_assets_keep_the_step_blocked_after_booking() -> None:
+    payload = _board(
+        _facts(
+            activity_present=True,
+            siren_present=True,
+            year_id=1,
+            year=2026,
+            year_status="OPEN",
+            property_count=1,
+            asset_count=1,
+            depreciable_asset_count=1,
+            posted_period_count=1,
+            posted_depreciation_cents=10000,
+            asset_booking="ok",
+            close_errors=(
+                (
+                    "IMMOBILISATIONS_NETTES_NEGATIVES",
+                    "La case 030 du 2033-A (immobilisations corporelles nettes) est négative.",
+                ),
+            ),
+            dossier=_dossier(year_status="OPEN", year=2026, fiscal_year_id=1),
+        )
+    )
+    assets = _step(payload, "assets")
+    assert assets["status"] == "bloque"
+    assert assets["status_label"] != "Terminé"
+    assert assets["prerequisites"][0]["code"] == "IMMOBILISATIONS_NETTES_NEGATIVES"
+    assert assets["prerequisites"][0]["action"]["href"] == "/immobilisations#entree-bien"
 
 
 def test_closed_research_year_with_a_final_fec_is_done() -> None:

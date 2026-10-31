@@ -159,6 +159,26 @@ RESOLUTION_ACTIONS: dict[str, dict[str, str]] = {
         "label": "Revenir aux dotations",
         "href": "/immobilisations#dotations",
     },
+    "ASSET_NOT_BOOKED": {
+        "label": "Faire entrer le bien en comptabilité",
+        "href": "/immobilisations#entree-bien",
+    },
+    "ASSET_PURCHASE_UNBOOKED": {
+        "label": "Inscrire l’immobilisation au journal",
+        "href": "/comptabilite/brouillons#nouvelle-ecriture",
+    },
+    "IMMOBILISATIONS_ECART": {
+        "label": "Faire entrer le bien en comptabilité",
+        "href": "/immobilisations#entree-bien",
+    },
+    "IMMOBILISATIONS_NETTES_NEGATIVES": {
+        "label": "Faire entrer le bien en comptabilité",
+        "href": "/immobilisations#entree-bien",
+    },
+    "CENTRALIZATION_STALE": {
+        "label": "Revoir la centralisation",
+        "href": "/etats-comptables#result-title",
+    },
 }
 
 

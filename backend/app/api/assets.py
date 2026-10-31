@@ -23,6 +23,7 @@ from app.models import Asset, AssetComponent, DepreciationPeriod, DepreciationSc
 from app.services import assets as service
 from app.services import structuring
 from app.services.asset_read_cache import prime_asset_reads
+from app.services.asset_registration import RegistrationSnapshot, load_registration
 from app.services.ledger import entry_json, fail
 
 _IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
@@ -98,7 +99,9 @@ def build_assets_router(database: Database) -> APIRouter:
 
     @router.post("/years/{year_id}/calculate")
     def calculate(year_id: int, session: Write) -> list[dict[str, Any]]:
-        return [period_json(session, row) for row in service.calculate_year(session, year_id)]
+        rows = service.calculate_year(session, year_id)
+        snapshot = load_registration(session, year_id)
+        return [period_json(session, row, snapshot) for row in rows]
 
     @router.post("/years/{year_id}/post")
     def post_year(
@@ -118,7 +121,8 @@ def build_assets_router(database: Database) -> APIRouter:
             .where(DepreciationPeriod.fiscal_year_id == year_id)
             .order_by(DepreciationPeriod.id)
         )
-        return [period_json(session, row) for row in rows]
+        snapshot = load_registration(session, year_id)
+        return [period_json(session, row, snapshot) for row in rows]
 
     @router.post("/periods/{period_id}/post", status_code=201)
     def post(period_id: int, data: DepreciationPostInput, session: Write) -> dict[str, Any]:
@@ -127,7 +131,11 @@ def build_assets_router(database: Database) -> APIRouter:
     return router
 
 
-def period_json(session: Session, period: DepreciationPeriod) -> dict[str, Any]:
+def period_json(
+    session: Session,
+    period: DepreciationPeriod,
+    snapshot: RegistrationSnapshot | None = None,
+) -> dict[str, Any]:
     schedule = session.get(DepreciationSchedule, period.schedule_id)
     if schedule is None:
         fail("SCHEDULE_NOT_FOUND", "Plan d’amortissement introuvable.", 500)
@@ -143,6 +151,8 @@ def period_json(session: Session, period: DepreciationPeriod) -> dict[str, Any]:
         target_type = "COMPONENT"
     if target_id is None or target_label is None:
         fail("DEPRECIATION_TARGET_NOT_FOUND", "Cible d’amortissement introuvable.", 500)
+    registration = snapshot or load_registration(session, period.fiscal_year_id)
+    booked, booking = registration.booking_of(schedule.asset_account)
     return {
         **service.row_json(period),
         "target_type": target_type,
@@ -150,4 +160,6 @@ def period_json(session: Session, period: DepreciationPeriod) -> dict[str, Any]:
         "target_label": target_label,
         "base": service.row_json(schedule)["base"],
         "depreciation_account": schedule.depreciation_account,
+        "asset_on_ledger": booked,
+        "booking": booking,
     }

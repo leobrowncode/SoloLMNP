@@ -36,6 +36,8 @@ export interface DepreciationPeriod {
   period_start: string; period_end: string; days: number; amount: string;
   accumulated: string; net_book_value: string; status: string;
   accounting_entry_id: number | null; depreciation_account: string;
+  asset_on_ledger?: boolean;
+  booking?: "ok" | "entry" | "journal";
 }
 export interface DepreciationBatchItemResult {
   period_id: number;
@@ -44,6 +46,7 @@ export interface DepreciationBatchItemResult {
   replayed?: boolean;
   code?: string;
   message?: string;
+  action?: { label: string; href: string };
 }
 export interface DepreciationBatchResult {
   idempotency_key: string;
