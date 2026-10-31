@@ -937,7 +937,7 @@ export default function OperationsPage() {
               ))}
             </FitSelect>
           </label>
-          {!!banks.length && <label className="toolbar-field">Compte des lignes payées
+          {!!banks.length && <label className="toolbar-field" id="compte-lignes-payees">Compte des lignes payées
             <FitSelect value={bankId} onChange={(e) => setBankId(Number(e.target.value))}>
               {banks.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.account_number})</option>)}
             </FitSelect>
@@ -959,6 +959,7 @@ export default function OperationsPage() {
           action={action}
           missingProperty={!opPropertyId}
           missingYear={!opYearId}
+          missingBank={!bankId}
           context={{ property_id: opPropertyId, fiscal_year_id: opYearId, bank_account_id: bankId || null }}
           onImported={() => setRevision((value) => value + 1)}
         />

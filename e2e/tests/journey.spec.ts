@@ -72,6 +72,13 @@ test.describe.serial("parcours critique", () => {
     await confirmReview(page);
     await expect(page.getByRole("heading", { name: "Studio fictif" })).toBeVisible();
 
+    await page.goto("/operations/transactions");
+    await page.getByText("Importer depuis Google Sheets ou un CSV").click();
+    await page.locator("#import-operations").fill(CSV);
+    await expect(page.getByText("Choisissez le compte bancaire des lignes déjà payées.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Prévisualiser les justificatifs" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Comptabiliser les justificatifs" })).toHaveCount(0);
+
     await page.goto("/operations/banque");
     await page.getByRole("button", { name: "Ajouter un compte bancaire" }).click();
     await page.getByLabel("Nom du compte bancaire").fill("Compte fictif");
@@ -82,10 +89,39 @@ test.describe.serial("parcours critique", () => {
     await page.goto("/operations/transactions");
     await expect(page.getByLabel("Compte des lignes payées")).toBeVisible();
     await page.getByText("Importer depuis Google Sheets ou un CSV").click();
+    const rejected = [
+      "Nature;Date;Date de la pièce;Type;Tiers;Montant;Libellé;Référence de pièce;Justificatif;Déjà payée",
+      "Recette;15/03/2025;15/03/2025;LOY;Dupont;800,00;Loyer mars fictif;LOY-2025-03;bail.pdf;oui",
+      "Dépense;99/99/2025;99/99/2025;ASS;Assureur;100,00;Date impossible;ASS-BAD;pno.pdf;non",
+    ].join("\n");
+    await page.locator("#import-operations").fill(rejected);
+    await page.getByRole("button", { name: "Prévisualiser les justificatifs" }).click();
+    await expect(page.getByText("2 lignes : 1 valide, 1 rejet.")).toBeVisible();
+    const rejects = page.getByRole("list", { name: "Lignes rejetées" });
+    await expect(rejects).toContainText("Date");
+    const post = page.getByRole("button", { name: "Comptabiliser les justificatifs" });
+    await expect(post).toBeDisabled();
+    const partial = page.getByRole("button", { name: "Importer uniquement la ligne valide" });
+    await expect(partial).toBeDisabled();
+    await page.getByRole("radio", { name: "Importer uniquement la ligne valide" }).check();
+    await expect(partial).toBeEnabled();
+    await expect(post).toBeDisabled();
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 800 });
+      const box = await rejects.boundingBox();
+      expect(box).toBeTruthy();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
+      const panel = page.locator("#import-import-operations");
+      const overflow = await panel.evaluate((node) => node.scrollWidth - node.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(1);
+    }
+    await page.setViewportSize({ width: 1280, height: 720 });
     await page.locator("#import-operations").fill(CSV);
     await page.getByRole("button", { name: "Prévisualiser les justificatifs" }).click();
-    await expect(page.getByText(/2 ligne\(s\)/)).toBeVisible();
+    await expect(page.getByText("2 lignes : 2 valides.")).toBeVisible();
     await page.getByRole("button", { name: "Comptabiliser les justificatifs" }).click();
+    await expect(page.getByText("2 lignes comptabilisées.")).toBeVisible();
     await expect(page.getByRole("heading", { name: /Loyer mars fictif/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Assurance PNO fictive/ })).toBeVisible();
 

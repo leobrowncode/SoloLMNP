@@ -345,7 +345,7 @@ export const GLOSSARY = {
     label: "Import CSV",
     what: "Chargement d’un relevé, de recettes et dépenses, ou d’un échéancier depuis un fichier. Le modèle français nomme les colonnes en clair. Vous associez ensuite celles de votre fichier. Rien n’est enregistré avant la confirmation de l’aperçu.",
     why: "Un export de banque ou de tableur n’utilise pas les noms techniques du logiciel. L’aperçu sépare les lignes valides, les doublons, les avertissements et les erreurs. Un rejet n’efface pas une écriture déjà validée.",
-    example: "Modèle téléchargé, dates 05/03/2026, montants 800,00. Une cellule « abc » dans Montant est une erreur : la correction attendue demande un montant au centime. Les autres lignes peuvent être importées. Le fichier des rejets se corrige puis se recharge.",
+    example: "Modèle téléchargé, dates 05/03/2026, montants 800,00. Une cellule « abc » dans Montant est un rejet : la raison est listée avant toute comptabilisation. Tant qu’un rejet reste, le bouton de comptabilisation est inactif. Vous corrigez le fichier, ou vous confirmez l’import des seules lignes valides.",
     mistake: "Laisser des noms techniques sans les associer, mélanger deux prêts dans le même fichier, ou confirmer un montant déjà comptabilisé avec une autre ventilation.",
   },
   justificatif: {

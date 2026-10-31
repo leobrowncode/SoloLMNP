@@ -4,6 +4,9 @@ import {
   DATE_HINT,
   centsToApiAmount,
   enumLabel,
+  frenchCount,
+  importPreviewSummary,
+  importValidOnlyLabel,
   formatAmount,
   formatCents,
   formatEuros,
@@ -72,5 +75,19 @@ describe("French dates and enums", () => {
     expect(enumLabel("entrySource", "OPENING")).toBe("À-nouveaux");
     expect(enumLabel("importStatus", "warning")).toBe("Avertissement");
     expect(enumLabel("accountType", "PASSIF")).toBe("PASSIF");
+  });
+
+  it("counts import lines in French", () => {
+    expect(frenchCount(0, "ligne", "lignes")).toBe("0 lignes");
+    expect(frenchCount(1, "valide", "valides")).toBe("1 valide");
+    expect(frenchCount(11, "rejet", "rejets")).toBe("11 rejets");
+    expect(importPreviewSummary({
+      count: 12, valid: 1, error: 11, duplicate: 0, warning: 0,
+    })).toBe("12 lignes : 1 valide, 11 rejets.");
+    expect(importPreviewSummary({
+      count: 2, valid: 2, error: 0, duplicate: 0, warning: 0,
+    })).toBe("2 lignes : 2 valides.");
+    expect(importValidOnlyLabel(1)).toBe("Importer uniquement la ligne valide");
+    expect(importValidOnlyLabel(11)).toBe("Importer uniquement les 11 lignes valides");
   });
 });

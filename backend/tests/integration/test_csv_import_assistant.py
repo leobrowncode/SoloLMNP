@@ -1,4 +1,4 @@
-"""Assistant preview commits only importable rows; legacy endpoints stay strict."""
+"""Assistant preview. Operations refuse a silent partial post; bank and loans keep their rules."""
 
 from fastapi.testclient import TestClient
 
@@ -78,6 +78,18 @@ def test_operations_commit_skips_conflicts_and_keeps_validated_entries(settings,
             "Nature;Date;Type;Tiers;Montant;Libellé;Référence de pièce;Justificatif;Déjà payée\n"
             "Dépense;01/02/2025;ASS;Assureur;42,50;Assurance PNO;ASS-1;facture.pdf;oui\n"
         )
+        missing_key = client.post(
+            "/api/operations/imports/operations/commit",
+            json={
+                "content": first,
+                "property_id": 1,
+                "fiscal_year_id": 1,
+                "bank_account_id": 1,
+            },
+        )
+        assert missing_key.status_code == 422
+        assert missing_key.json()["detail"]["code"] == "IDEMPOTENCY_KEY_REQUIRED"
+        assert client.get("/api/operations").json() == []
         assert (
             client.post(
                 "/api/operations/imports/operations/commit",
@@ -87,6 +99,7 @@ def test_operations_commit_skips_conflicts_and_keeps_validated_entries(settings,
                     "fiscal_year_id": 1,
                     "bank_account_id": 1,
                 },
+                headers={"Idempotency-Key": "operations-import-1"},
             ).json()["imported"]
             == 1
         )
@@ -118,24 +131,83 @@ def test_operations_commit_skips_conflicts_and_keeps_validated_entries(settings,
         outside = next(row for row in preview.json()["rows"] if row["line"] == 4)
         assert outside["issues"][0]["code"] == "DATE_OUTSIDE_YEAR"
         assert outside["issues"][0]["help"] == "exercice"
+        payload = {
+            "content": mixed,
+            "property_id": 1,
+            "fiscal_year_id": 1,
+            "bank_account_id": 1,
+            "mapping": preview.json()["mapping"],
+        }
+        refused = client.post("/api/operations/imports/operations/commit", json=payload)
+        assert refused.status_code == 422, refused.text
+        assert refused.json()["detail"]["code"] == "CSV_PARTIAL_REFUSED"
+        assert "Rien n’a été comptabilisé" in refused.json()["detail"]["message"]
+        assert client.get("/api/operations").json() == [original]
         committed = client.post(
             "/api/operations/imports/operations/commit",
-            json={
-                "content": mixed,
-                "property_id": 1,
-                "fiscal_year_id": 1,
-                "bank_account_id": 1,
-                "mapping": preview.json()["mapping"],
-            },
+            json={**payload, "import_valid_only": True},
+            headers={"Idempotency-Key": "operations-import-2"},
         )
         assert committed.status_code == 200, committed.text
-        assert committed.json()["imported"] == 1
+        body = committed.json()
+        assert body["imported"] == 1
+        assert body["batch"]["posted_count"] == 1
+        assert body["batch"]["rejected_count"] == 2
+        assert body["batch"]["replayed"] is False
         amounts = {
             row["description"]: row["amount"] for row in client.get("/api/operations").json()
         }
         assert amounts["Assurance PNO"] == "42.50"
         assert amounts["Loyer février"] == "800.00"
         assert "Hors exercice" not in amounts
+        replay = client.post(
+            "/api/operations/imports/operations/commit",
+            json={**payload, "import_valid_only": True},
+            headers={"Idempotency-Key": "operations-import-2"},
+        )
+        assert replay.status_code == 200, replay.text
+        assert replay.json()["batch"]["replayed"] is True
+        assert replay.json()["imported"] == 1
+        assert len(client.get("/api/operations").json()) == 2
+        conflict = client.post(
+            "/api/operations/imports/operations/commit",
+            json={**payload, "content": first, "import_valid_only": True},
+            headers={"Idempotency-Key": "operations-import-2"},
+        )
+        assert conflict.status_code == 409
+        assert conflict.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+
+
+def test_operations_paid_lines_without_a_bank_post_nothing(settings, database):
+    with TestClient(create_app(settings), headers={"X-SoloLMNP-Request": "1"}) as client:
+        _seed(client)
+        content = (
+            "Nature;Date;Type;Tiers;Montant;Libellé;Référence de pièce;Déjà payée\n"
+            "Recette;15/03/2025;LOY;Dupont;800,00;Loyer mars;LOY-1;oui\n"
+            "Dépense;20/03/2025;ENT;Artisan;240,00;Entretien;ENT-1;non\n"
+        )
+        preview = client.post(
+            "/api/operations/imports/operations/preview",
+            json={"content": content, "property_id": 1, "fiscal_year_id": 1},
+        )
+        assert preview.status_code == 422, preview.text
+        assert preview.json()["detail"]["code"] == "BANK_REQUIRED"
+        assert "compte bancaire" in preview.json()["detail"]["message"]
+        assert preview.json()["detail"]["action"]["href"] == "/operations/banque#ajouter-banque"
+        committed = client.post(
+            "/api/operations/imports/operations/commit",
+            json={
+                "content": content,
+                "property_id": 1,
+                "fiscal_year_id": 1,
+                "import_valid_only": True,
+            },
+            headers={"Idempotency-Key": "operations-import-bank"},
+        )
+        assert committed.status_code == 422, committed.text
+        assert committed.json()["detail"]["code"] == "BANK_REQUIRED"
+        assert client.get("/api/operations").json() == []
+        assert client.get("/api/ledger/entries?fiscal_year_id=1").json()["count"] == 0
 
 
 def test_loan_preview_separates_warning_and_imports_only_arrived_rows(settings, database):

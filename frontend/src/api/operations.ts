@@ -1,6 +1,10 @@
-import { request } from "./ledger";
-export const operationsRequest = <T>(path: string, method = "GET", body?: unknown) =>
-  request<T>(path, method, body, "/api/operations");
+import { request, type RequestOptions } from "./ledger";
+export const operationsRequest = <T>(
+  path: string,
+  method = "GET",
+  body?: unknown,
+  options?: RequestOptions,
+) => request<T>(path, method, body, "/api/operations", options);
 interface CorrectionView {
   locks: { code: string; fields: string[]; message: string }[];
   calculated_periods: number;
