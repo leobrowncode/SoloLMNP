@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { RequestError } from "../api/ledger";
@@ -164,5 +164,47 @@ describe("ReviewForm", () => {
     await userEvent.click(screen.getByRole("button", { name: "Confirmer l’enregistrement" }));
     expect(await screen.findByText("Le libellé est requis.")).toBeInTheDocument();
     expect(screen.getByLabelText("Libellé")).toHaveAttribute("aria-describedby", expect.stringContaining("-error"));
+  });
+
+  it("leaves an optional amount empty and shows JJ/MM/AAAA on an empty date", async () => {
+    render(<ReviewForm title="Bien" fields={[
+      { name: "acquisition_date", label: "Date d’acquisition", type: "date" },
+      { name: "price_m2", label: "Prix constaté au m² (€)", money: true, optional: true, local: true },
+      { name: "acquisition_price", label: "Prix d’acquisition (€)", money: true },
+    ]} onSave={vi.fn()} onCancel={() => undefined} />);
+    expect(screen.getByText("JJ/MM/AAAA")).toBeInTheDocument();
+    expect(screen.getByLabelText("Date d’acquisition")).toHaveAttribute("lang", "fr");
+    expect(screen.getByLabelText("Date d’acquisition")).toHaveAttribute("type", "date");
+    expect(screen.getByText("Format JJ/MM/AAAA.")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Prix constaté au m²/)).toHaveValue("");
+    expect(screen.getByLabelText(/Prix constaté au m²/)).not.toBeRequired();
+    expect(screen.getByLabelText("Prix d’acquisition (€)")).toHaveValue("0.00");
+    fireEvent.change(screen.getByLabelText("Date d’acquisition"), { target: { value: "2025-01-09" } });
+    expect(screen.queryByText("JJ/MM/AAAA")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Date d’acquisition")).toHaveValue("2025-01-09");
+  });
+
+  it("blocks review when land and building do not equal the price", async () => {
+    const save = vi.fn();
+    render(<ReviewForm
+      title="Bien"
+      validate={(draft) => (
+        draft.land_value === draft.acquisition_price ? "" : "Le terrain et le bâtiment ne totalisent pas le prix."
+      )}
+      fields={[
+        { name: "acquisition_price", label: "Prix", money: true, value: "100.00" },
+        { name: "land_value", label: "Terrain", money: true, value: "40.00" },
+      ]}
+      onSave={save}
+      onCancel={() => undefined}
+    />);
+    expect(screen.getByRole("alert")).toHaveTextContent("ne totalisent pas le prix");
+    await userEvent.click(screen.getByRole("button", { name: "Vérifier avant enregistrement" }));
+    expect(screen.queryByText(/Vérifiez les informations/)).not.toBeInTheDocument();
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Terrain"), { target: { value: "100.00" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Vérifier avant enregistrement" }));
+    expect(screen.getByText(/Vérifiez les informations/)).toBeInTheDocument();
   });
 });

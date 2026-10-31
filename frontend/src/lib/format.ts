@@ -10,7 +10,8 @@
 import { GLOSSARY } from "../features/glossary";
 
 export const AMOUNT_INPUT_ERROR = "Indiquez un montant en euros, par exemple 1 234,56.";
-export const DATE_HINT = "Format JJ/MM/AAAA.";
+export const DATE_PLACEHOLDER = "JJ/MM/AAAA";
+export const DATE_HINT = `Format ${DATE_PLACEHOLDER}.`;
 export const YEAR_END_BEFORE_START = "La date de fin doit être postérieure ou égale à la date de début.";
 
 const CURRENCY = new Intl.NumberFormat("fr-FR", {

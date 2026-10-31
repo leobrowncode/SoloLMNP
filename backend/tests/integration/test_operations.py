@@ -746,6 +746,71 @@ def test_google_sheet_paste_imports_paid_and_unpaid_rows(client):
     assert {line["account_number"] for line in rent["lines"]} == {"512000", "706000"}
 
 
+def test_property_round_trip_keeps_price_land_and_building(client):
+    created = client.post(
+        "/api/operations/properties",
+        json={
+            "name": "Studio fictif",
+            "address": "1 rue des Scénarios",
+            "acquisition_date": "2025-06-01",
+            "acquisition_price": "145000.00",
+            "acquisition_costs": "18262.00",
+            "land_value": "29000.00",
+            "building_value": "116000.00",
+        },
+    )
+    assert created.status_code == 201, created.text
+    saved = created.json()
+    assert saved["acquisition_price"] == "145000.00"
+    assert saved["acquisition_costs"] == "18262.00"
+    assert saved["land_value"] == "29000.00"
+    assert saved["building_value"] == "116000.00"
+    assert saved["acquisition_date"] == "2025-06-01"
+    assert "lot_m2" not in saved
+    assert "price_m2" not in saved
+    reloaded = next(
+        row for row in client.get("/api/operations/properties").json() if row["id"] == saved["id"]
+    )
+    assert reloaded["acquisition_price"] == "145000.00"
+    assert reloaded["acquisition_costs"] == "18262.00"
+    assert reloaded["land_value"] == "29000.00"
+    assert reloaded["building_value"] == "116000.00"
+    assert reloaded["name"] == "Studio fictif"
+
+    extra = client.post(
+        "/api/operations/properties",
+        json={
+            "name": "Surface ignorée",
+            "address": "1 rue des Scénarios",
+            "acquisition_date": "2025-06-01",
+            "acquisition_price": "100000.00",
+            "land_value": "20000.00",
+            "building_value": "80000.00",
+            "lot_m2": "12.5",
+            "price_m2": "1500.00",
+        },
+    )
+    assert extra.status_code == 422
+    assert extra.json()["detail"]["code"] == "VALIDATION_ERROR"
+    names = [row["name"] for row in client.get("/api/operations/properties").json()]
+    assert "Surface ignorée" not in names
+
+    mismatch = client.post(
+        "/api/operations/properties",
+        json={
+            "name": "Ventilation fausse",
+            "address": "1 rue des Scénarios",
+            "acquisition_date": "2025-06-01",
+            "acquisition_price": "100000.00",
+            "land_value": "20000.00",
+            "building_value": "70000.00",
+        },
+    )
+    assert mismatch.status_code == 422
+    messages = [issue["message"] for issue in mismatch.json()["detail"]["issues"]]
+    assert "Le terrain et le bâtiment doivent totaliser le prix d’acquisition." in messages
+
+
 def test_migration_refuses_to_discard_business_records(client, settings, database):
     create(client)
     database.engine.dispose()

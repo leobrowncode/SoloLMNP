@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AMOUNT_INPUT_ERROR,
   DATE_HINT,
+  DATE_PLACEHOLDER,
   centsToApiAmount,
   enumLabel,
   frenchCount,
@@ -54,6 +55,7 @@ describe("French amounts", () => {
 
 describe("French dates and enums", () => {
   it("shows dates as JJ/MM/AAAA and keeps the input hint", () => {
+    expect(DATE_PLACEHOLDER).toBe("JJ/MM/AAAA");
     expect(DATE_HINT).toBe("Format JJ/MM/AAAA.");
     expect(formatIsoDate("2026-03-01")).toBe("01/03/2026");
     expect(formatIsoDate("2026-03-01T08:15:00Z")).toBe("01/03/2026");

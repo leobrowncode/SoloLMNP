@@ -1,7 +1,7 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { amount, cents, RequestError } from "../api/ledger";
 import { formFieldName, issuesForForm, type ApiErrorIssue } from "../api/errors";
-import { DATE_HINT, formatCents, formatEuros, formatIsoDate } from "../lib/format";
+import { DATE_HINT, DATE_PLACEHOLDER, formatCents, formatEuros, formatIsoDate } from "../lib/format";
 import FrenchForm from "../lib/FrenchForm";
 import ApiErrorAlert from "./ApiErrorAlert";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
@@ -23,6 +23,18 @@ export interface Field {
   local?: boolean;
   group?: string;
   hint?: string;
+}
+
+function initialValue(field: Field): string {
+  if (field.value !== undefined) return field.value;
+  const preset = field.choices?.[0]?.[0];
+  if (preset !== undefined) return preset;
+  if (field.money && !field.optional) return "0.00";
+  return "";
+}
+
+function initialDraft(fields: Field[]): Record<string, string> {
+  return Object.fromEntries(fields.map((field) => [field.name, initialValue(field)]));
 }
 
 function readField(field: Field, raw: string): unknown {
@@ -51,6 +63,7 @@ export default function ReviewForm({
   help,
   sumInto,
   derive,
+  validate,
   locked = false,
 }: {
   title: string;
@@ -63,6 +76,8 @@ export default function ReviewForm({
   sumInto?: { target: string; sources: string[] } | undefined;
   /** Derive dependent fields after a user change. piece_reference is only applied if empty or still auto. */
   derive?: ((draft: Record<string, string>, changed: string) => Partial<Record<string, string>>) | undefined;
+  /** Block the review step with one sentence when the draft is inconsistent. */
+  validate?: ((draft: Record<string, string>) => string) | undefined;
   /** Page-level lock: another mutation is already running. */
   locked?: boolean;
 }) {
@@ -71,25 +86,16 @@ export default function ReviewForm({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [businessError, setBusinessError] = useState<RequestError | null>(null);
   const { busy, step, run } = useMutation();
-  const [draft, setDraft] = useState<Record<string, string>>(() =>
-    Object.fromEntries(fields.map((field) => [
-      field.name,
-      field.value ?? field.choices?.[0]?.[0] ?? (field.money ? "0.00" : ""),
-    ])),
-  );
+  const [draft, setDraft] = useState<Record<string, string>>(() => initialDraft(fields));
   const [touched, setTouched] = useState(false);
   useUnsavedGuard(touched || review !== null);
   const formUid = useId();
   const autoRef = useRef(
-    derive?.({
-      ...Object.fromEntries(fields.map((field) => [
-        field.name,
-        field.value ?? field.choices?.[0]?.[0] ?? (field.money ? "0.00" : ""),
-      ])),
-    }, "")?.piece_reference
+    derive?.(initialDraft(fields), "")?.piece_reference
       ?? fields.find((field) => field.name === "piece_reference")?.value
       ?? "",
   );
+  const splitGap = validate?.(draft) ?? "";
 
   const formFields = useMemo(() => new Set(fields.map((field) => field.name)), [fields]);
 
@@ -203,6 +209,7 @@ export default function ReviewForm({
         setFieldErrors({});
         setBusinessError(null);
         if (!review) {
+          if (validate?.(draft)) return;
           try {
             setReview(buildPayload(draft));
           } catch (reason) {
@@ -238,6 +245,33 @@ export default function ReviewForm({
               const errorId = fieldError ? `${controlId}-error` : undefined;
               const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
               const choices = choicesOf(field, draft);
+              const emptyDate = field.type === "date" && !(draft[field.name] ?? "");
+              const textInput = (
+                <input
+                  id={controlId}
+                  name={field.name}
+                  aria-describedby={describedBy}
+                  aria-invalid={fieldError ? true : undefined}
+                  value={draft[field.name] ?? ""}
+                  type={field.type === "number" ? "number" : field.type ?? "text"}
+                  lang={field.type === "date" || field.money ? "fr" : undefined}
+                  className={emptyDate ? "date-empty" : undefined}
+                  min={field.type === "number" ? "1" : undefined}
+                  placeholder={field.money ? "1 234,56" : undefined}
+                  data-money={field.money ? "true" : undefined}
+                  inputMode={field.money ? "decimal" : undefined}
+                  required={!field.optional}
+                  onChange={(event) => {
+                    setFieldErrors((current) => {
+                      if (!current[field.name]) return current;
+                      const next = { ...current };
+                      delete next[field.name];
+                      return next;
+                    });
+                    applyChange(field.name, event.target.value);
+                  }}
+                />
+              );
               return (
                 <div key={field.name} className={field.money ? "form-field field-money" : "form-field"}>
                   <label htmlFor={controlId}>
@@ -270,31 +304,12 @@ export default function ReviewForm({
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </FitSelect>
-                  ) : (
-                    <input
-                      id={controlId}
-                      name={field.name}
-                      aria-describedby={describedBy}
-                      aria-invalid={fieldError ? true : undefined}
-                      value={draft[field.name] ?? ""}
-                      type={field.type === "number" ? "number" : field.type ?? "text"}
-                      lang={field.type === "date" || field.money ? "fr" : undefined}
-                      min={field.type === "number" ? "1" : undefined}
-                      placeholder={field.money ? "1 234,56" : undefined}
-                      data-money={field.money ? "true" : undefined}
-                      inputMode={field.money ? "decimal" : undefined}
-                      required={!field.optional}
-                      onChange={(event) => {
-                        setFieldErrors((current) => {
-                          if (!current[field.name]) return current;
-                          const next = { ...current };
-                          delete next[field.name];
-                          return next;
-                        });
-                        applyChange(field.name, event.target.value);
-                      }}
-                    />
-                  )}
+                  ) : field.type === "date" ? (
+                    <div className="date-control">
+                      {textInput}
+                      {emptyDate ? <span className="date-placeholder" aria-hidden="true">{DATE_PLACEHOLDER}</span> : null}
+                    </div>
+                  ) : textInput}
                   {fieldError && (
                     <span id={errorId} className="field-error" role="alert">{fieldError}</span>
                   )}
@@ -310,6 +325,8 @@ export default function ReviewForm({
           )}
         </fieldset>
       ))}
+
+      {!review && splitGap ? <p role="alert" className="ledger-error">{splitGap}</p> : null}
 
       {review && (
         <div className="review-summary">
