@@ -47,12 +47,14 @@ function amount(value: string): string | null {
 }
 
 export default function PropertyEntry({
-  properties, years, onDone, locked = false,
+  properties, years, onDone, locked = false, compact = false,
 }: {
   properties: Property[];
   years: YearOption[];
   onDone: () => void;
   locked?: boolean;
+  /** Hide the repeated explanation; the page already shows it once. */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -178,14 +180,18 @@ export default function PropertyEntry({
         Faire entrer le bien en comptabilité
       </button>
       <PrerequisiteList id={startCauseId} causes={startCauses} />
-      <p className="form-help">
-        À faire une fois, après avoir créé les immobilisations du logement : inscrit au bilan le terrain, le bâtiment,
-        les emprunts et les frais payés avant le début de l’exercice. L’écart va au compte de l’exploitant (108).
-      </p>
-      <div className="heading-with-help">
-        <GlossaryTip id="compte-108" />
-        <GlossaryTip id="extourne" />
-      </div>
+      {!compact && (
+        <>
+          <p className="form-help">
+            À faire une fois, après avoir créé les immobilisations du logement : inscrit au bilan le terrain, le bâtiment,
+            les emprunts et les frais payés avant le début de l’exercice. L’écart va au compte de l’exploitant (108).
+          </p>
+          <div className="heading-with-help">
+            <GlossaryTip id="compte-108" />
+            <GlossaryTip id="extourne" />
+          </div>
+        </>
+      )}
       {loadState.phase === "loading" && <p role="status">Chargement des emprunts et des comptes…</p>}
       {loadState.phase === "error" && loadState.error && (
         <ApiErrorAlert detail={loadState.error} onRetry={() => { void start(); }} />

@@ -18,6 +18,10 @@ import {
   PLAN_HELP, correctionMessage, editTitle, locked, readInvalidation, type CorrectionState,
 } from "./correction";
 import {
+  depreciationPostedSentence, isSharedText, postedTotalCents, repeatedTexts,
+} from "./assetJustification";
+import ComponentJustification from "./ComponentJustification";
+import {
   activityCause, assetCreateCauses, depreciationCalculateCauses, describedBy, listed, postDepreciationCauses,
 } from "./actionCauses";
 import PrerequisiteList from "./PrerequisiteList";
@@ -342,8 +346,6 @@ export default function AssetsPage() {
       );
     }
     fields.push(
-      { name: "basis_reason", label: "Justification de la ventilation", value: part.basis_reason ?? "", group: "Justification" },
-      { name: "duration_reason", label: "Justification de la durée", value: part.duration_reason ?? "", group: "Justification" },
       { name: "reason", label: "Motif de la correction (au moins 5 caractères)", group: "Motif" },
     );
     setEditor({
@@ -450,15 +452,16 @@ export default function AssetsPage() {
             `${failed.message} L’écran recharge l’état enregistré : les dotations déjà passées restent comptabilisées.`,
           );
         } else {
-          const postedText = result.replayed
-            ? `${result.posted_count} dotation(s) déjà comptabilisée(s). Aucun doublon.`
-            : `${result.posted_count} dotation(s) comptabilisée(s).`;
           show({
             kind: GLOSSARY.dotation.label,
             name: `${result.posted_count} écriture(s)`,
             action: result.replayed ? "déjà comptabilisée" : "comptabilisée",
-            targetId: "dotations",
-            detail: postedText,
+            sentence: depreciationPostedSentence(
+              result.posted_count,
+              postedTotalCents(pending, result.items),
+              result.replayed,
+            ),
+            targetId: "actions-dotations",
             next: { label: "Voir le journal", href: "/comptabilite/journal" },
           });
         }
@@ -484,7 +487,7 @@ export default function AssetsPage() {
             kind: rows.length > 1 ? "Dotations" : GLOSSARY.dotation.label,
             name: `${rows.length} période(s)`,
             action: rows.length > 1 ? "calculées" : "calculée",
-            targetId: "dotations",
+            targetId: "actions-dotations",
             detail: `${rows.length} période(s) calculée(s). Vérifiez-les avant comptabilisation.`,
             next: rows.length
               ? { label: "Comptabiliser toutes les dotations", href: "/immobilisations#comptabiliser-dotations" }
@@ -500,7 +503,34 @@ export default function AssetsPage() {
     });
   }
 
+  async function saveComponentJustification(
+    asset: Asset,
+    part: Asset["components"][number],
+    data: { basis_reason?: string; duration_reason?: string; reason: string },
+  ) {
+    const result = await run(async (report) => {
+      report("Enregistrement de la justification…");
+      return api<Record<string, unknown>>(`/${asset.id}/components/${part.id}`, "PATCH", data);
+    });
+    if (!result) return;
+    const invalidation = readInvalidation(result.invalidation);
+    show({
+      kind: GLOSSARY.composant.label,
+      name: part.label,
+      action: "précisé",
+      targetId: `asset-${asset.id}`,
+      highlightId: `asset-${asset.id}`,
+      detail: invalidation ? correctionMessage(invalidation) : undefined,
+    });
+    setRevision((value) => value + 1);
+  }
+
   const bootReady = boot.phase === "loaded" || showsData(boot);
+  const sharedDuration = repeatedTexts(assets.flatMap((row) => row.components.map((part) => part.duration_reason)));
+  const sharedBasis = repeatedTexts(assets.flatMap((row) => row.components.map((part) => part.basis_reason)));
+  const sharedLocks = repeatedTexts(assets.flatMap((row) => (
+    row.components.flatMap((part) => part.correction?.locks.map((lock) => lock.message) ?? [])
+  )));
   const assetCauses = assetCreateCauses(properties.length);
   const assetCauseId = "asset-create-causes";
   const planCauses = assetCreateCauses(properties.length);
@@ -511,15 +541,46 @@ export default function AssetsPage() {
   const postCauses = yearId && periodsSettled ? postDepreciationCauses(periods) : [];
   const postCauseId = "asset-post-causes";
   const postDescribed = yearId ? describedBy(postCauseId, postCauses) : describedBy(periodCauseId, periodCauses);
-  return <section id="assets" className="ledger-page" aria-labelledby="assets-title" data-screen-phase={boot.phase}>
+  return <section id="assets" className="ledger-page asset-page" aria-labelledby="assets-title" data-screen-phase={boot.phase}>
     <div className="heading-with-help">
       <h2 id="assets-title">Immobilisations</h2>
-      <GlossaryTip id="immobilisation" />
       <GlossaryTip id="amortissement" />
-      <GlossaryTip id="terrain" />
-      <GlossaryTip id="composant" />
     </div>
-    <p>Inscrivez le terrain à part : il ne s’amortit pas. Puis le bâtiment, le mobilier, et comptabilisez les dotations. Le formulaire ne propose que les comptes de la catégorie. Un couple déjà enregistré et incohérent est signalé ; il n’est pas réécrit. Modifier une fiche demande un motif : tant qu’aucune dotation n’est comptabilisée, la valeur, la durée et les comptes peuvent être corrigés.</p>
+    <p id="assets-method-note" className="form-help asset-shared-note">Terrain à part : il ne s’amortit pas. Le bâtiment et les composants sont en linéaire. Les durées proposées se confirment selon l’état du bien.</p>
+    <details className="asset-note">
+      <summary>Détail et aides</summary>
+      <p>Le formulaire ne propose que les comptes de la catégorie. Un couple déjà enregistré et incohérent est signalé ; il n’est pas réécrit. Modifier une fiche demande un motif : tant qu’aucune dotation n’est comptabilisée, la valeur, la durée et les comptes peuvent être corrigés.</p>
+      <p>L’aperçu du logement n’enregistre rien. Créer les immobilisations affichées inscrit le terrain à part, ajoute les frais de notaire et d’agence à la base du bâtiment, puis crée six composants. Annuler laisse la base inchangée. Confirmer une seconde fois ne crée pas de doublon. Le mobilier se saisit à part.</p>
+      <p>L’entrée du bien se fait une fois : elle inscrit au bilan le terrain, le bâtiment, les emprunts et les frais payés avant l’exercice. L’écart va au compte de l’exploitant (108).</p>
+      {sharedDuration.length === 0 && (
+        <p>Pour un logement, la durée d’usage proposée se confirme selon l’état du bien et les travaux. Ce n’est pas un barème légal.</p>
+      )}
+      {sharedDuration.length > 0 && (
+        <>
+          <p className="field-hint">Justification de durée, commune aux composants.</p>
+          {sharedDuration.map((text) => <p key={text}>{text}</p>)}
+        </>
+      )}
+      {sharedBasis.length > 0 && (
+        <>
+          <p className="field-hint">Justification de quote-part, commune aux composants.</p>
+          {sharedBasis.map((text) => <p key={text}>{text}</p>)}
+        </>
+      )}
+      {sharedLocks.length > 0 && (
+        <>
+          <p className="field-hint">Règle commune après comptabilisation.</p>
+          {sharedLocks.map((text) => <p key={text}>{text}</p>)}
+        </>
+      )}
+      <div className="heading-with-help">
+        <GlossaryTip id="immobilisation" />
+        <GlossaryTip id="terrain" />
+        <GlossaryTip id="composant" />
+        <GlossaryTip id="compte-108" />
+        <GlossaryTip id="extourne" />
+      </div>
+    </details>
     <PageAnchors
       label="Sections des immobilisations"
       links={[
@@ -539,13 +600,32 @@ export default function AssetsPage() {
       <PrerequisiteList id="assets-activity" causes={listed(activityCause(false))} intro="Les immobilisations restent indisponibles :" />
     )}
     {bootReady && setup?.activity && <>
-      <div id="creer-immobilisation">
+      <div id="creer-immobilisation" className="asset-actions">
         <button id="nouvelle-immobilisation" disabled={assetCauses.length > 0 || busy} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(false)}>Nouvelle immobilisation</button>
         <button disabled={assetCauses.length > 0 || busy} aria-describedby={describedBy(assetCauseId, assetCauses)} onClick={() => openAsset(true)}>Inscrire un terrain</button>
-        <SaveNoticeHost place="creer-immobilisation" notice={notice} onDismiss={dismiss} />
       </div>
       <PrerequisiteList id={assetCauseId} causes={assetCauses} />
-      <div className="toolbar">
+      <PropertyEntry
+        properties={properties}
+        years={setup.years}
+        locked={busy}
+        compact
+        onDone={() => { setError(""); setRevision((value) => value + 1); }}
+      />
+      <div id="actions-dotations" className="asset-actions" tabIndex={-1}>
+        <label>Exercice<FitSelect value={yearId} onChange={(event) => {
+          ++periodRequest.current;
+          setPeriods([]); setError(""); dismiss(); setEditor(null);
+          setYearId(Number(event.target.value));
+        }}>{setup.years.filter((year) => year.status === "OPEN").map((year) => <option key={year.id} value={year.id}>{year.year}</option>)}</FitSelect></label>
+        <button id="calculer-periodes" disabled={periodCauses.length > 0 || busy} aria-busy={busy || undefined} aria-describedby={describedBy(periodCauseId, periodCauses)} onClick={() => { void calculate(); }}>Calculer les périodes</button>
+        <button id="comptabiliser-dotations" type="button" disabled={busy || (yearId ? postCauses.length > 0 || !periodsSettled : periodCauses.length > 0)} aria-busy={busy || undefined} aria-describedby={postDescribed} onClick={() => { void postAll(); }}>Comptabiliser toutes les dotations</button>
+        <SaveNoticeHost place="actions-dotations" notice={notice} onDismiss={dismiss} />
+      </div>
+      <PrerequisiteList id={periodCauseId} causes={periodCauses} />
+      <PrerequisiteList id={postCauseId} causes={postCauses} />
+      <SaveNoticeHost place="creer-immobilisation" notice={notice} onDismiss={dismiss} />
+      <div className="toolbar asset-actions">
         <label>Logement
           <FitSelect value={selectedProperty} disabled={confirming || busy} onChange={(event) => {
             if (confirming) return;
@@ -559,7 +639,6 @@ export default function AssetsPage() {
         <button id="preview-amortissement" type="button" disabled={planCauses.length > 0 || busy} aria-busy={busy || undefined} aria-describedby={describedBy(planCauseId, planCauses)} onClick={() => { void previewPlan(); }}>Prévisualiser l’amortissement du logement</button>
         <PrerequisiteList id={planCauseId} causes={planCauses} />
       </div>
-      <p className="form-help">La prévisualisation n’enregistre ni immobilisation ni compte. Après vérification, « Créer les immobilisations affichées » inscrit le terrain à part, ajoute les frais de notaire et d’agence à la base du bâtiment, puis crée six composants (gros œuvre, toiture, façade, électricité, plomberie, agencements). Les durées sont à confirmer : ce n’est pas un barème légal. Annuler laisse la base inchangée. Répéter la confirmation ne crée pas de doublon. Le mobilier reste à saisir à part.</p>
       {visiblePlan && <>
         <ResponsiveTable
           label="Aperçu d’amortissement"
@@ -591,12 +670,6 @@ export default function AssetsPage() {
           <button type="button" disabled={confirming} onClick={cancelPlan}>Annuler l’aperçu</button>
         </div>
       </>}
-      <PropertyEntry
-        properties={properties}
-        years={setup.years}
-        locked={busy}
-        onDone={() => { setError(""); setRevision((value) => value + 1); }}
-      />
       {editor && <ReviewForm key={JSON.stringify(editor)} title={editor.title} fields={editor.fields} help={editor.help} onSave={save} onCancel={() => setEditor(null)} retryId={editor.retry} derive={editor.derive} locked={busy} />}
       <MobileSection id="registre-immobilisations" title="Registre des immobilisations" open>
       <BrowsableList
@@ -627,31 +700,58 @@ export default function AssetsPage() {
           {row.category === "BUILDING" && <button type="button" disabled={busy} onClick={() => openComponent(row)}>Ajouter un composant</button>}
           <button type="button" disabled={busy} onClick={() => openAssetCorrection(row)}>{editTitle(row.label, row.correction, row.category === "LAND" ? ["value", "dates", "account"] : ["value", "life", "dates", "account"])}</button>
         </div>
-        {row.category === "BUILDING" && <p>Ajoutez tous les composants avant le premier calcul ; leur total doit couvrir exactement la base.</p>}
-        {row.components.map((part) => <div key={part.id}>
-          <p>↳ {part.label} · {formatEuros(part.value)} · {part.useful_life_months} mois</p>
-          {part.account_warning && <p role="alert" className="ledger-error">{part.account_warning}</p>}
-          {part.correction?.locks.map((lock) => <p className="form-help" key={`${part.id}-${lock.code}`}>{lock.message}</p>)}
-          <div className="entry-actions">
-            <button type="button" disabled={busy} onClick={() => openComponentCorrection(row, part)}>{editTitle(part.label, part.correction, ["value", "life", "dates", "account"])}</button>
-          </div>
-        </div>)}
+        {row.category === "BUILDING" && row.components.length === 0 && <p>Ajoutez tous les composants avant le premier calcul ; leur total doit couvrir exactement la base.</p>}
+        {row.components.length > 0 && <ResponsiveTable
+          label={`Composants de ${row.label}`}
+          caption={`${row.components.length} composants`}
+          columns={[
+            { key: "label", label: "Composant" },
+            { key: "amount", label: "Montant" },
+            { key: "justification", label: "Justification" },
+            { key: "life", label: "Durée", priority: "secondary" },
+            { key: "account", label: "Comptes", priority: "secondary" },
+          ]}
+          rows={row.components.map((part) => {
+            const groups = ["value", "life", "dates", "account"];
+            const frozen = groups.every((group) => locked(part.correction, group));
+            const ownLocks = (part.correction?.locks ?? []).filter((lock) => !isSharedText(lock.message, sharedLocks));
+            return {
+              key: String(part.id),
+              cells: [
+                <span key="label">
+                  {part.label}
+                  {part.account_warning && <span role="alert" className="component-alert">{part.account_warning}</span>}
+                  {ownLocks.map((lock) => <span className="component-note" key={lock.code}>{lock.message}</span>)}
+                </span>,
+                formatEuros(part.value),
+                <span key="justification">
+                  <ComponentJustification
+                    key={`${part.id}-${part.basis_reason ?? ""}-${part.duration_reason ?? ""}`}
+                    part={part}
+                    sharedBasis={isSharedText(part.basis_reason, sharedBasis)}
+                    sharedDuration={isSharedText(part.duration_reason, sharedDuration)}
+                    busy={busy}
+                    onSave={(data) => saveComponentJustification(row, part, data)}
+                  />
+                  {!frozen && (
+                    <button type="button" disabled={busy} onClick={() => openComponentCorrection(row, part)}>
+                      {editTitle(part.label, part.correction, groups)}
+                    </button>
+                  )}
+                </span>,
+                `${part.useful_life_months} mois`,
+                `${part.asset_account ?? "—"} / ${part.depreciation_account ?? "—"}`,
+              ],
+            };
+          })}
+        />}
         <SaveNoticeHost place={`asset-${row.id}`} notice={notice} onDismiss={dismiss} />
       </article>)}
       </BrowsableList>
       </MobileSection>
       <div className="section-heading" id="dotations" tabIndex={-1}><div><div className="heading-with-help"><h3>Dotations comptables</h3><GlossaryTip id="dotation" /><GlossaryTip id="compte-681" /></div><p>Le calcul en jours calendaires ne modifie jamais la couche fiscale.</p></div>
-        <label>Exercice<FitSelect value={yearId} onChange={(event) => {
-          ++periodRequest.current;
-          setPeriods([]); setError(""); dismiss(); setEditor(null);
-          setYearId(Number(event.target.value));
-        }}>{setup.years.filter((year) => year.status === "OPEN").map((year) => <option key={year.id} value={year.id}>{year.year}</option>)}</FitSelect></label>
         <SaveNoticeHost place="dotations" notice={notice} onDismiss={dismiss} />
       </div>
-      <button id="calculer-periodes" disabled={periodCauses.length > 0 || busy} aria-busy={busy || undefined} aria-describedby={describedBy(periodCauseId, periodCauses)} onClick={() => { void calculate(); }}>Calculer les périodes</button>
-      <PrerequisiteList id={periodCauseId} causes={periodCauses} />
-      <button id="comptabiliser-dotations" type="button" disabled={busy || (yearId ? postCauses.length > 0 || !periodsSettled : periodCauses.length > 0)} aria-busy={busy || undefined} aria-describedby={postDescribed} onClick={() => { void postAll(); }}>Comptabiliser toutes les dotations</button>
-      <PrerequisiteList id={postCauseId} causes={postCauses} />
       <ScreenStatus
         state={periodsView}
         onRetry={() => setPeriodsAttempt((value) => value + 1)}
