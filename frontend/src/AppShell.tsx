@@ -5,11 +5,9 @@ import { MOBILE_QUERY, NARROW_CONTROL_QUERY, useMediaQuery } from "./lib/viewpor
 import { focusRouteTarget } from "./routing/focusTarget";
 import { navItems, pageIdFromPathname, ROUTES, viewDocumentTitle, type PageId } from "./routing/paths";
 import { UnsavedChangesProvider } from "./routing/unsaved";
-import DossierProgress from "./features/DossierProgress";
-import DossierStatus from "./features/DossierStatus";
 import GlossaryTip from "./features/GlossaryTip";
 import OverviewDashboard from "./features/OverviewDashboard";
-import { showsDossierIndicator, showsOperationalStorage } from "./features/dossierStatus";
+import { showsOperationalStorage } from "./features/dossierStatus";
 import ScreenStatus from "./features/ScreenStatus";
 import { showsLoading } from "./features/screenState";
 import { useScreenQuery } from "./features/useScreenQuery";
@@ -108,9 +106,6 @@ export default function AppShell() {
 
   const status = state.data;
   const serviceReady = status?.database.status === "ready";
-  const dossier = status?.dossier;
-  const liveDossier = showsDossierIndicator(state.phase, serviceReady, dossier) ? dossier : null;
-  const showProgress = state.phase === "loaded" && Boolean(serviceReady);
   const storageLive = showsOperationalStorage(state.phase, serviceReady);
   const showWorkspace = Boolean(serviceReady) && (
     state.phase === "loaded" || state.phase === "loading" || state.stale
@@ -123,6 +118,18 @@ export default function AppShell() {
   }
 
   const menuOpen = !mobileNav || navOpen;
+
+  const overviewIntro = page === "overview" && showWorkspace ? (
+    <section className="intro" aria-labelledby="welcome-title">
+      <h2 id="welcome-title">De l’écriture à la liasse que vous recopierez.</h2>
+      <p className="intro-description">LMNP au réel, location longue durée. Le menu sert à naviguer. Ici, chaque étape du dossier indique son état. SoloLMNP prépare la liasse et le FEC. Il n’envoie rien aux impôts.</p>
+      <div className="heading-with-help">
+        <GlossaryTip id="lmnp-reel" label="LMNP" />
+        <GlossaryTip id="liasse" />
+        <GlossaryTip id="fec" />
+      </div>
+    </section>
+  ) : null;
 
   function renderNavLink(item: (typeof navItems)[number], className?: string) {
     return (
@@ -191,10 +198,6 @@ export default function AppShell() {
           <header className="topbar">
             <p id="route-announcement" className="sr-only" aria-live="polite" aria-atomic="true">{pageTitle}</p>
             <h1 id="page-title" className="topbar-title" tabIndex={-1}>{pageTitle}</h1>
-            <div className="topbar-meta">
-              {liveDossier && <DossierStatus dossier={liveDossier} />}
-              {showProgress && <DossierProgress />}
-            </div>
           </header>
           <div className="content">
             {status?.storage_warning && (
@@ -205,17 +208,10 @@ export default function AppShell() {
             )}
             {workspace}
 
-            {page === "overview" && showWorkspace && (
-              <section className="intro" aria-labelledby="welcome-title">
-                <h2 id="welcome-title">De l’écriture à la liasse que vous recopierez.</h2>
-                <p className="intro-description">LMNP au réel, location longue durée. Le menu sert à naviguer. Ici, chaque étape du dossier indique son état. SoloLMNP prépare la liasse et le FEC. Il n’envoie rien aux impôts.</p>
-                <div className="heading-with-help">
-                  <GlossaryTip id="lmnp-reel" />
-                  <GlossaryTip id="liasse" />
-                  <GlossaryTip id="fec" />
-                </div>
-              </section>
+            {page === "overview" && showWorkspace && state.phase !== "error" && (
+              <OverviewDashboard lead={overviewIntro} />
             )}
+            {page === "overview" && showWorkspace && state.phase === "error" && overviewIntro}
 
             {showInstall && (
               <section id="installation" className="installation" aria-labelledby="installation-title" data-screen-phase={state.phase}>
@@ -236,10 +232,6 @@ export default function AppShell() {
                   )}
                 </div>
               </section>
-            )}
-
-            {page === "overview" && showWorkspace && state.phase !== "error" && (
-              <OverviewDashboard />
             )}
 
             {page === "overview" && showWorkspace && (

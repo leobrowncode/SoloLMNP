@@ -30,6 +30,62 @@ async function fillMoney(page: Page, label: string | RegExp, value: string) {
 }
 
 test.describe.serial("parcours critique", () => {
+  test("vue d’ensemble compacte : une action, aides lisibles", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Continuer" })).toHaveCount(1);
+    await expect(page.locator(".topbar")).not.toContainText("Continuer");
+    await expect(page.locator(".topbar")).not.toContainText("Progression");
+    await expect(page.getByRole("region", { name: "Progression du dossier" })).toBeVisible();
+    await expect(page.getByText("L’activité n’est pas créée.")).toHaveCount(1);
+    await expect(page.getByText("Aucun événement utile pour l’instant.")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Créer l’activité" })).toHaveCount(0);
+    const labels = await page.locator("button.help-tip-btn").allTextContents();
+    expect(labels.length).toBeGreaterThan(0);
+    for (const label of labels) expect(label.trim()).not.toBe("?");
+    await expect(page.getByRole("button", { name: "Aide : LMNP" })).toHaveText("LMNP");
+    await expect(page.getByRole("button", { name: "Aide : Liasse" }).first()).toHaveText("Liasse");
+    await expect(page.getByRole("button", { name: "Aide : FEC" }).first()).toHaveText("FEC");
+    await page.screenshot({ path: test.info().outputPath("overview-1280.png") });
+
+    await page.setViewportSize({ width: 390, height: 800 });
+    const title = page.getByRole("heading", { level: 1, name: "Vue d’ensemble" });
+    await expect(title).toBeVisible();
+    const titleBox = await title.boundingBox();
+    expect(titleBox).toBeTruthy();
+    expect(titleBox!.y).toBeGreaterThanOrEqual(0);
+    expect(titleBox!.y + titleBox!.height).toBeLessThanOrEqual(800);
+    const welcome = page.getByRole("heading", { name: /De l’écriture/ });
+    await expect(welcome).toBeVisible();
+    const welcomeBox = await welcome.boundingBox();
+    expect(welcomeBox).toBeTruthy();
+    expect(welcomeBox!.y).toBeLessThan(800);
+    const topbar = await page.locator(".topbar").boundingBox();
+    expect(topbar).toBeTruthy();
+    expect(topbar!.height).toBeLessThan(120);
+    const fold = page.locator("details.dossier-fold");
+    await expect(fold).toBeVisible();
+    await expect(fold).not.toHaveAttribute("open");
+    await expect(fold.locator("summary")).toHaveText("Statut et progression");
+    await expect(page.getByRole("region", { name: "Progression du dossier" })).toBeHidden();
+    await expect(page.getByRole("link", { name: "Continuer" })).toHaveCount(1);
+    await page.screenshot({ path: test.info().outputPath("overview-390.png") });
+
+    await page.goto("/comptabilite/brouillons");
+    const ledgerTitle = page.getByRole("heading", { level: 1, name: "Comptabilité" });
+    await expect(ledgerTitle).toBeVisible();
+    await expect(page.getByRole("link", { name: "Continuer" })).toHaveCount(0);
+    await expect(page.getByText("Statut dossier", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Progression du dossier" })).toHaveCount(0);
+    const ledgerBox = await ledgerTitle.boundingBox();
+    expect(ledgerBox).toBeTruthy();
+    expect(ledgerBox!.y + ledgerBox!.height).toBeLessThanOrEqual(800);
+    await page.screenshot({ path: test.info().outputPath("ledger-390.png") });
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+  });
+
   test("onboarding, import, dotations, clôture, déclaration, FEC, reprise et restauration", async ({ page }) => {
     await page.goto("/comptabilite/brouillons");
     await expect(page.getByRole("heading", { level: 1, name: "Comptabilité" })).toBeVisible();

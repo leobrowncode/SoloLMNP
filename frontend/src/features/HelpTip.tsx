@@ -142,10 +142,10 @@ export default function HelpTip({ label, children }: { label: string; children: 
         aria-expanded={open}
         aria-controls={panelId}
         aria-describedby={panelId}
-        style={{ width: 44, height: 44, minWidth: 44, minHeight: 44 }}
+        style={{ minWidth: 44, minHeight: 44 }}
         onClick={() => setOpen((value) => !value)}
       >
-        ?
+        {label}
       </button>
       {createPortal(
         <span
