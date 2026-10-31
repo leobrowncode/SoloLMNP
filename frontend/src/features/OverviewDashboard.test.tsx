@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -61,17 +61,17 @@ describe("overview dashboard", () => {
     expect(steps).toHaveTextContent("À faire");
     expect(steps).not.toHaveTextContent("Comptabilité");
     expect(steps).not.toHaveTextContent("États comptables");
-    expect(screen.getByRole("link", { name: "Créer l’activité" })).toHaveAttribute(
-      "href",
-      "/comptabilite/brouillons#creer-activite",
-    );
+    expect(within(steps).getAllByText("L’activité n’est pas créée.", { exact: false })).toHaveLength(1);
+    expect(steps).not.toHaveTextContent("Aucun événement utile pour l’instant.");
+    expect(within(steps).queryByRole("link", { name: "Créer l’activité" })).not.toBeInTheDocument();
+    expect(steps.querySelectorAll(".dashboard-state")).toHaveLength(6);
     expect(screen.queryByText(/déclarable/i)).not.toBeInTheDocument();
   });
 
   it("shows a partial dossier with the missing SIREN and the last event", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply(dashboardFixture("partial"))));
     renderBoard();
-    expect((await screen.findAllByText("Le SIREN n’est pas renseigné.")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Le SIREN n’est pas renseigné.", { exact: false })).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Continuer" })).toHaveAttribute(
       "href",
       "/comptabilite/brouillons#identite-liasse",
@@ -92,6 +92,9 @@ describe("overview dashboard", () => {
     expect(screen.getByText("25,00 €")).toBeInTheDocument();
     expect(screen.getByText("0,00 €")).toBeInTheDocument();
     expect(screen.getByText(/Millésime en recherche/)).toBeInTheDocument();
+    const progress = screen.getByRole("region", { name: "Progression du dossier" });
+    expect(progress).not.toHaveTextContent("Liasse");
+    expect(progress).not.toHaveTextContent("FEC");
     expect(screen.queryByText(/déclarable/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Continuer" })).toHaveAttribute(
       "href",
@@ -107,7 +110,7 @@ describe("overview dashboard", () => {
       "/fiscalite#close-title",
     );
     expect(screen.getByText("Prochaine action : confirmer la clôture.")).toBeInTheDocument();
-    expect(screen.getByText("Exercice prêt à clôturer.")).toBeInTheDocument();
+    expect(screen.getByText("Exercice prêt à clôturer.", { exact: false })).toBeInTheDocument();
     expect(screen.getByText(/Exercice passé en prêt à clôturer/)).toBeInTheDocument();
     expect(screen.getAllByText("Prête").length).toBeGreaterThan(0);
     expect(screen.queryByText(/déclarable/i)).not.toBeInTheDocument();
@@ -132,7 +135,7 @@ describe("overview dashboard", () => {
     view.unmount();
 
     const open = renderBoard();
-    expect((await screen.findAllByText("Les à-nouveaux ne sont pas comptabilisés.")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Les à-nouveaux ne sont pas comptabilisés.", { exact: false })).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Prévisualiser les à-nouveaux" })).toHaveAttribute(
       "href",
       "/etats-comptables#opening-title",
@@ -145,7 +148,7 @@ describe("overview dashboard", () => {
     open.unmount();
 
     renderBoard();
-    expect(await screen.findByText("Les à-nouveaux sont comptabilisés.")).toBeInTheDocument();
+    expect(await screen.findByText("Les à-nouveaux sont comptabilisés.", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("2 500,50 €")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Continuer" })).toHaveAttribute("href", "/fiscalite#calcul-fiscal");
     expect(screen.queryByText(/déclarable/i)).not.toBeInTheDocument();

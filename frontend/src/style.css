@@ -256,6 +256,41 @@ main{
   gap:12px 18px;
   margin-bottom:8px
 }
+.dossier-zone{
+  align-items:flex-start;
+  margin-bottom:18px
+}
+.dossier-context{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px 28px;
+  flex:1 1 100%
+}
+.dossier-fold{
+  flex:1 1 100%;
+  margin:0
+}
+.dossier-fold summary{
+  display:flex;
+  align-items:center;
+  min-height:44px;
+  cursor:pointer;
+  color:var(--text-heading);
+  font-size:14px;
+  font-weight:650
+}
+.dossier-fold .dossier-context{
+  margin-top:8px
+}
+.dashboard-actions{
+  list-style:none;
+  margin:8px 0 0;
+  padding:0
+}
+.dashboard-actions a{
+  color:var(--text-heading);
+  font-weight:650
+}
 .dashboard-next p{
   margin:0;
   color:var(--text-muted);
@@ -677,8 +712,8 @@ footer{
     border-radius:7px
   }
   .topbar{
-    min-height:56px;
-    padding:12px 6%;
+    min-height:0;
+    padding:10px 6% 8px;
     font-size:13px
   }
   .dossier-progress{

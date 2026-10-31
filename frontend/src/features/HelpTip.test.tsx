@@ -104,8 +104,8 @@ describe("screen reader", () => {
     const style = getComputedStyle(trigger);
     expect(parseFloat(style.minWidth)).toBeGreaterThanOrEqual(44);
     expect(parseFloat(style.minHeight)).toBeGreaterThanOrEqual(44);
-    expect(parseFloat(style.width)).toBeGreaterThanOrEqual(44);
-    expect(parseFloat(style.height)).toBeGreaterThanOrEqual(44);
+    expect(trigger).toHaveTextContent("Déficit");
+    expect(trigger).not.toHaveTextContent("?");
   });
 });
 

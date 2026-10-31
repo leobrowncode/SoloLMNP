@@ -6,8 +6,13 @@ export const MOBILE_QUERY = "(max-width: 768px)";
 /** Widths where a fixed control can be clipped by the viewport. */
 export const NARROW_CONTROL_QUERY = "(max-width: 430px)";
 
+function queryMatches(query: string): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia(query).matches;
+}
+
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(false);
+  const [matches, setMatches] = useState(() => queryMatches(query));
 
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;

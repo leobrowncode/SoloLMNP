@@ -114,6 +114,9 @@ describe("responsive layout", () => {
     installViewport(1200);
     const shell = renderAt("/");
     expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Continuer" })).toHaveLength(1);
+    expect(document.querySelector(".topbar")).not.toHaveTextContent("Continuer");
+    expect(screen.getByRole("region", { name: "Progression du dossier" })).toBeVisible();
     const nav = screen.getByRole("navigation", { name: "Navigation principale" });
     expect(within(nav).queryByRole("button", { name: /menu/i })).not.toBeInTheDocument();
     expect(within(nav).getAllByRole("link")).toHaveLength(navItems.length);
@@ -130,7 +133,8 @@ describe("responsive layout", () => {
   it.each(WIDTHS)("folds the mobile menu without removing navigation at %s px", async (width) => {
     installViewport(width);
     renderAt("/");
-    expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeVisible();
+    expect((await screen.findByText("Statut et progression")).closest("details")).not.toHaveAttribute("open");
     const nav = screen.getByRole("navigation", { name: "Navigation principale" });
     const toggle = within(nav).getByRole("button", { name: "Ouvrir le menu" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -161,7 +165,8 @@ describe("responsive layout", () => {
   it.each([320, 390] as const)("shows the full select value between 320 and 430 px (%s)", async (width) => {
     installViewport(width);
     const shell = renderAt("/");
-    expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeVisible();
+    expect((await screen.findByText("Statut et progression")).closest("details")).not.toHaveAttribute("open");
     expect(document.querySelector(".app-layout")).toHaveClass("narrow-controls");
     shell.unmount();
 
@@ -177,7 +182,8 @@ describe("responsive layout", () => {
   it("does not repeat select values at 768 px", async () => {
     installViewport(768);
     renderAt("/");
-    expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeVisible();
+    expect((await screen.findByText("Statut et progression")).closest("details")).not.toHaveAttribute("open");
     expect(document.querySelector(".app-layout")).not.toHaveClass("narrow-controls");
     renderLedger();
     expect(await screen.findByLabelText("Exercice")).toBeInTheDocument();

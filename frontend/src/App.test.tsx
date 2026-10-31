@@ -61,8 +61,9 @@ describe("Foundation status", () => {
     expect(within(steps).getByRole("heading", { name: "Clôture" })).toBeInTheDocument();
     expect(within(steps).getByRole("heading", { name: "Fiscalité et exports" })).toBeInTheDocument();
     const resume = screen.getAllByRole("link", { name: "Continuer" });
-    expect(resume.length).toBeGreaterThan(1);
-    expect(resume.every((link) => link.getAttribute("href") === "/fiscalite#close-title")).toBe(true);
+    expect(resume).toHaveLength(1);
+    expect(resume[0]).toHaveAttribute("href", "/fiscalite#close-title");
+    expect(document.querySelector(".topbar")).not.toHaveTextContent("Continuer");
     expect(screen.queryByText("Bilan, résultat, puis centralisation.")).not.toBeInTheDocument();
   });
 
@@ -72,9 +73,17 @@ describe("Foundation status", () => {
     renderApp();
     expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
     expect(screen.getByText("Statut dossier")).toBeInTheDocument();
+    expect(document.querySelector(".topbar")).not.toHaveTextContent("Statut dossier");
+    expect(document.querySelector(".topbar")).not.toHaveTextContent("Progression");
     const progress = await screen.findByRole("region", { name: "Progression du dossier" });
     expect(progress).toHaveTextContent("4/6");
     expect(progress).toHaveTextContent("Prête");
+    expect(screen.getAllByRole("link", { name: "Continuer" })).toHaveLength(1);
+    for (const help of screen.getAllByRole("button", { name: /^Aide :/ })) {
+      expect(help.textContent?.trim()).not.toBe("?");
+      expect((help.textContent ?? "").trim().length).toBeGreaterThan(1);
+    }
+    expect(screen.getByRole("button", { name: "Aide : LMNP" })).toHaveTextContent("LMNP");
     const diagnostic = screen.getByText("Stockage opérationnel").closest("details");
     expect(diagnostic).toHaveAttribute("data-diagnostic", "storage");
     expect(document.querySelector(".topbar")).not.toHaveTextContent("Stockage opérationnel");
@@ -179,8 +188,10 @@ describe("Foundation status", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(warning);
     expect(screen.queryByText("Stockage opérationnel")).not.toBeInTheDocument();
     expect(screen.queryByText(/Base prête/)).not.toBeInTheDocument();
-    expect(screen.getByText("Prêt à vérifier")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Progression du dossier" })).toHaveTextContent("4/6");
+    expect(screen.queryByText("Prêt à vérifier")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Progression du dossier" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Continuer" })).not.toBeInTheDocument();
+    expect(document.querySelector(".topbar")).not.toHaveTextContent("Continuer");
     expect(await screen.findByRole("heading", { name: "Votre comptabilité" })).toBeInTheDocument();
   });
 
