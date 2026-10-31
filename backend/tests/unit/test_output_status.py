@@ -121,7 +121,9 @@ def test_validated_but_stale_rules_stay_provisional() -> None:
     assert shown["validation"]["effective"] is False
     assert not contains_ready_phrase(shown["disclaimer"])
     assert shown["export_posture"] == "provisoire"
-    assert shown["exports"]["fec"]["posture"] == "finale"
+    assert shown["exports"]["liasse"]["posture"] == "provisoire"
+    assert shown["exports"]["fec"]["posture"] == "provisoire"
+    assert shown["exports"]["archive"]["label"] == "Provisoire"
 
 
 def test_validated_without_copy_gates_is_provisional() -> None:
@@ -180,7 +182,10 @@ def test_research_copy_is_never_final_and_never_ready_to_copy() -> None:
     )
     assert closed["output_status"] == "recherche"
     assert closed["exports"]["liasse"]["posture"] == "provisoire"
-    assert closed["exports"]["fec"]["posture"] == "finale"
+    assert closed["exports"]["pdf"]["posture"] == "provisoire"
+    assert closed["exports"]["fec"]["posture"] == "provisoire"
+    assert closed["exports"]["archive"]["label"] == "Provisoire"
+    assert closed["exports"]["fec"]["label"] != "Finale"
     blocked = classify(
         validation=record,
         copy_complete=False,
@@ -191,6 +196,22 @@ def test_research_copy_is_never_final_and_never_ready_to_copy() -> None:
     assert blocked["exports"]["liasse"]["download"] is False
     assert resolve_trust(record_valid=False, rules_aligned=True, copy_complete=True) == "recherche"
     assert artifact_posture(produced=False, blocked=False, final=True) == "bloquee"
+
+
+def test_blocked_liasse_on_a_closed_year_never_labels_the_fec_final() -> None:
+    shown = classify(
+        validation=load_validation("2025"),
+        copy_complete=False,
+        year_closed=True,
+        produced=True,
+    )
+    assert shown["output_status"] == "recherche"
+    assert shown["exports"]["liasse"]["posture"] == "bloquee"
+    assert shown["exports"]["pdf"]["label"] == "Bloquée"
+    assert shown["exports"]["fec"]["posture"] == "bloquee"
+    assert shown["exports"]["archive"]["posture"] == "bloquee"
+    assert shown["exports"]["fec"]["download"] is False
+    assert shown["exports"]["fec"]["label"] != "Finale"
 
 
 def test_only_the_declarable_headline_uses_the_ready_phrase() -> None:
@@ -221,6 +242,33 @@ def test_download_follows_the_posture_without_recomputing_gates() -> None:
     assert aligned["pdf"]["download"] is True
     assert aligned["fec"]["download"] is False
     assert aligned["archive"]["label"] == "Bloquée"
+    research = align_controlled_exports(
+        {
+            "liasse": export_slot("provisoire"),
+            "pdf": export_slot("provisoire"),
+            "fec": export_slot("finale"),
+            "archive": export_slot("finale"),
+        },
+        year_closed=True,
+        fec_blocked=False,
+    )
+    assert research["liasse"]["label"] == "Provisoire"
+    assert research["fec"]["posture"] == "provisoire"
+    assert research["archive"]["label"] == "Provisoire"
+    assert research["fec"]["download"] is True
+    blocked_liasse = align_controlled_exports(
+        {
+            "liasse": export_slot("bloquee"),
+            "pdf": export_slot("bloquee"),
+            "fec": export_slot("finale"),
+            "archive": export_slot("finale"),
+        },
+        year_closed=True,
+        fec_blocked=False,
+    )
+    assert blocked_liasse["fec"]["posture"] == "bloquee"
+    assert blocked_liasse["archive"]["download"] is False
+    assert blocked_liasse["fec"]["label"] != "Finale"
     status = {
         "exports": aligned,
         "prerequisites": [

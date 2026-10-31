@@ -23,7 +23,8 @@ function slot(posture: "provisoire" | "bloquee" | "finale") {
 
 function exportBody(closed = false, liasse: "provisoire" | "bloquee" | "finale" = closed ? "provisoire" : "bloquee") {
   const liasseSlot = slot(liasse);
-  const fecSlot = slot(closed ? "finale" : "bloquee");
+  const fecPosture = !closed || liasse === "bloquee" ? "bloquee" : liasse === "finale" ? "finale" : "provisoire";
+  const fecSlot = slot(fecPosture);
   const prerequisites = [];
   if (liasse === "bloquee") {
     prerequisites.push({
@@ -42,6 +43,8 @@ function exportBody(closed = false, liasse: "provisoire" | "bloquee" | "finale" 
     });
   }
   return {
+    output_status: liasse === "finale" ? "declarable" : "recherche",
+    output_label: liasse === "finale" ? "Déclarable" : "Recherche",
     exports: { liasse: liasseSlot, pdf: liasseSlot, fec: fecSlot, archive: fecSlot },
     prerequisites,
   };
@@ -298,7 +301,9 @@ test("closing reloads the exercise status, the dashboard and the frozen exports"
   expect(screen.queryByText(/exigent un exercice clôturé/)).not.toBeInTheDocument();
   expect(await screen.findByText(/montants figés à la clôture/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Télécharger le dossier de contrôle" })).toBeEnabled();
-  expect(screen.getAllByText("Finale").length).toBeGreaterThan(0);
+  expect(screen.queryByText("Finale")).not.toBeInTheDocument();
+  expect(screen.getByText("Même statut pour le calcul, la liasse et les exports.")).toBeInTheDocument();
+  expect(screen.getAllByText(/Document de travail, à vérifier/).length).toBeGreaterThan(0);
   expect(document.querySelector('a[href*="/api/filing"]')).toBeNull();
   expect(screen.getByText("60,00 €")).toBeInTheDocument();
   expect(screen.queryByText("-200,00 €")).not.toBeInTheDocument();
@@ -482,7 +487,7 @@ test("reloads the last calculation with its date and ledger fingerprint", async 
   expect(screen.getByText(`Empreinte ${STORED}`)).toBeInTheDocument();
   expect(screen.getByText("Correspond au ledger")).toBeInTheDocument();
   expect(screen.queryByText("Obsolète")).not.toBeInTheDocument();
-  expect(screen.getByText("Recherche")).toBeInTheDocument();
+  expect(screen.getAllByText("Recherche").length).toBeGreaterThan(0);
   expect(screen.getByText(/pas une base de déclaration/)).toBeInTheDocument();
   expect(screen.queryByText(/Prête à recopier/)).not.toBeInTheDocument();
 });

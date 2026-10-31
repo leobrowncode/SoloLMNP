@@ -7,6 +7,10 @@ records an official source, a date, a scope and a version that still matches
 
 `exports.*.posture` is Provisoire, Bloquée or Finale. `download` is false only
 for Bloquée. Download routes refuse that slot; they do not recompute the gates.
+
+The FEC and the control archive follow the liasse. They are Finale only when
+the liasse is Finale. An open year, a missing SIREN or an invalid FEC blocks
+them. A research or blocked liasse never yields a final FEC.
 """
 
 from __future__ import annotations
@@ -139,6 +143,21 @@ def artifact_posture(*, produced: bool, blocked: bool, final: bool) -> str:
     return POSTURE_PROVISOIRE
 
 
+def controlled_fec_posture(*, liasse: str, year_closed: bool, fec_blocked: bool) -> str:
+    """FEC and control archive. Same posture as the liasse, or Bloquée if stricter.
+
+    Finale exists only when the liasse itself is Finale. An open year, a missing
+    SIREN or an invalid FEC stays Bloquée: that file is not ready to send.
+    """
+    if liasse not in POSTURES:
+        liasse = POSTURE_BLOQUEE
+    if not year_closed or fec_blocked or liasse == POSTURE_BLOQUEE:
+        return POSTURE_BLOQUEE
+    if liasse == POSTURE_FINALE:
+        return POSTURE_FINALE
+    return POSTURE_PROVISOIRE
+
+
 def classify(
     *,
     validation: Mapping[str, Any],
@@ -163,12 +182,12 @@ def classify(
     shown = presentation(trust, copy_complete=copy_complete)
     liasse_blocked = not copy_complete
     liasse_final = trust == OUTPUT_DECLARABLE and year_closed and copy_complete
-    fec_is_blocked = not year_closed if fec_blocked is None else fec_blocked or not year_closed
+    fec_extra_blocked = False if fec_blocked is None else fec_blocked
     liasse = artifact_posture(produced=produced, blocked=liasse_blocked, final=liasse_final)
-    fec = artifact_posture(
-        produced=year_closed,
-        blocked=fec_is_blocked,
-        final=year_closed and not fec_is_blocked,
+    fec = controlled_fec_posture(
+        liasse=liasse,
+        year_closed=year_closed,
+        fec_blocked=fec_extra_blocked,
     )
     return {
         "output_status": trust,
@@ -331,7 +350,7 @@ def align_controlled_exports(
     year_closed: bool,
     fec_blocked: bool,
 ) -> dict[str, Any]:
-    """Keep liasse and PDF slots. FEC and the control archive stay Bloquée until both gates pass."""
+    """Keep liasse and PDF slots. FEC and the archive never outrank the liasse."""
     stamped: dict[str, Any] = {}
     for key, value in exports.items():
         posture = POSTURE_BLOQUEE
@@ -340,10 +359,15 @@ def align_controlled_exports(
             if isinstance(raw, str):
                 posture = raw
         stamped[key] = export_slot(posture)
-    if not year_closed or fec_blocked:
-        blocked = export_slot(POSTURE_BLOQUEE)
-        stamped["fec"] = blocked
-        stamped["archive"] = blocked
+    liasse = stamped.get("liasse", export_slot(POSTURE_BLOQUEE))
+    fec = controlled_fec_posture(
+        liasse=str(liasse.get("posture") or POSTURE_BLOQUEE),
+        year_closed=year_closed,
+        fec_blocked=fec_blocked,
+    )
+    shared = export_slot(fec)
+    stamped["fec"] = shared
+    stamped["archive"] = shared
     return stamped
 
 

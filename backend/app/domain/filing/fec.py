@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.csv_text import safe_cell
 from app.core.money import to_cents
 from app.models import (
     Account,
@@ -198,6 +199,18 @@ def validate_fec(payload: bytes, start: date, end: date) -> dict[str, Any]:
     return _report(errors, warnings, payload)
 
 
+def fec_text(value: str) -> str:
+    """Keep a FEC zone from being read as a spreadsheet formula.
+
+    Tabs and line breaks would split the 18 zones (tab separator, CR LF
+    records). A leading formula mark is prefixed with an apostrophe, which
+    stays inside the zone. Dates, account numbers and amounts are not passed
+    here: their shapes are fixed by article A47 A-1.
+    """
+    cleaned = value.replace("\t", " ").replace("\r", " ").replace("\n", " ")
+    return safe_cell(cleaned)
+
+
 def _row(
     line: AccountingEntryLine,
     entry: AccountingEntry,
@@ -207,16 +220,16 @@ def _row(
     validated = entry.validated_at or datetime.min
     return {
         "JournalCode": entry.journal_code,
-        "JournalLib": entry.journal_label or journal.label,
+        "JournalLib": fec_text(entry.journal_label or journal.label),
         "EcritureNum": entry.entry_number or "",
         "EcritureDate": entry.accounting_date.strftime("%Y%m%d"),
         "CompteNum": line.account_number,
-        "CompteLib": line.account_label or account.label,
+        "CompteLib": fec_text(line.account_label or account.label),
         "CompAuxNum": "",
         "CompAuxLib": "",
-        "PieceRef": entry.piece_reference,
+        "PieceRef": fec_text(entry.piece_reference),
         "PieceDate": entry.piece_date.strftime("%Y%m%d"),
-        "EcritureLib": line.label,
+        "EcritureLib": fec_text(line.label),
         "Debit": _money(to_cents(line.debit)),
         "Credit": _money(to_cents(line.credit)),
         "EcritureLet": "",

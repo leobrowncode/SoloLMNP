@@ -119,6 +119,49 @@ test("a blocked liasse shows the missing prerequisite instead of a file link", (
   expect(screen.getByRole("button", { name: "Télécharger la feuille JSON" })).toBeDisabled();
 });
 
+test("a research FEC matches the liasse and stays a working document", () => {
+  renderExports({
+    ...status({ liasse: "provisoire", fec: "provisoire" }),
+    output_status: "recherche",
+    output_label: "Recherche",
+  });
+  expect(screen.getByText("Même statut pour le calcul, la liasse et les exports.")).toBeInTheDocument();
+  expect(screen.queryByText("Finale")).not.toBeInTheDocument();
+  expect(screen.getAllByText("Recherche").length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/Document de travail, à vérifier/).length).toBe(2);
+  expect(screen.getByRole("button", { name: "Télécharger le FEC" })).toBeEnabled();
+  expect(screen.getAllByRole("link", { name: "Voir le pré-contrôle" })[0]).toHaveAttribute(
+    "href",
+    "/fiscalite#close-title",
+  );
+  expect(document.querySelector('[data-export="fec"]')).toHaveAttribute("data-posture", "provisoire");
+});
+
+test("a blocked liasse does not present the FEC as final", () => {
+  renderExports({
+    ...status({
+      liasse: "bloquee",
+      fec: "bloquee",
+      prerequisites: [{
+        code: "CLASSEMENT_INCOMPLET",
+        message: "Le classement du 2033-E est incomplet.",
+        export: "fec",
+        action: { label: "Voir la liasse", href: "/fiscalite#sorties-figees" },
+      }],
+    }),
+    output_status: "recherche",
+    output_label: "Recherche",
+  });
+  expect(screen.queryByText("Même statut pour le calcul, la liasse et les exports.")).not.toBeInTheDocument();
+  expect(screen.queryByText("Finale")).not.toBeInTheDocument();
+  expect(screen.getByText(/Le classement du 2033-E/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Voir la liasse" })).toHaveAttribute(
+    "href",
+    "/fiscalite#sorties-figees",
+  );
+  expect(screen.getByRole("button", { name: "Télécharger le FEC" })).toBeDisabled();
+});
+
 test("a final FEC and control file can be downloaded, and a refusal stays on the page", async () => {
   const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const url = String(input);
