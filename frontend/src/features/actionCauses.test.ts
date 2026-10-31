@@ -104,6 +104,25 @@ test("inventory, centralization, closing and reopen list each unmet condition", 
     sealed: false, blocking: false, errors: [], warnings: [], acks: [],
   })).toEqual([]);
   expect(closePrepareCauses({
+    sealed: false, blocking: false, errors: [],
+    warnings: [
+      { code: "CLASSEMENT_INCOMPLET", message: "2033-A" },
+      { code: "CLASSEMENT_INCOMPLET", message: "2033-E" },
+    ],
+    acks: ["CLASSEMENT_INCOMPLET"],
+  }).map((item) => item.code)).toEqual(["WARNINGS_UNACKED"]);
+  expect(closePrepareCauses({
+    sealed: false, blocking: false, errors: [],
+    warnings: [
+      { code: "CLASSEMENT_INCOMPLET", message: "2033-A" },
+      { code: "CLASSEMENT_INCOMPLET", message: "2033-E" },
+    ],
+    acks: [
+      "CLASSEMENT_INCOMPLET\n2033-A",
+      "CLASSEMENT_INCOMPLET\n2033-E",
+    ],
+  })).toEqual([]);
+  expect(closePrepareCauses({
     sealed: true, blocking: true,
     errors: [{ code: "YEAR_DRAFTS", message: "brouillons" }, { code: "UNKNOWN", message: "autre" }],
     warnings: [{ code: "A" }], acks: [],

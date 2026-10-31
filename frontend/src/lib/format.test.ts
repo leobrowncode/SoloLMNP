@@ -13,14 +13,30 @@ import {
   formatEuros,
   formatClockTime,
   formatIsoDate,
+  formatRateFromApi,
   formatTimestamp,
   parseAmountToCents,
+  parseRateToMillis,
+  RATE_INPUT_ERROR,
+  rateToApi,
 } from "./format";
 import { cents } from "../api/ledger";
 
 function spaces(value: string): string {
   return value.replace(/[\u00a0\u202f\u2009\u2007]/g, " ");
 }
+
+describe("interest rates", () => {
+  it("keeps three decimals and is not a centime amount", () => {
+    expect(parseRateToMillis("3,50")).toBe(3500n);
+    expect(parseRateToMillis("3.125")).toBe(3125n);
+    expect(rateToApi(3500n)).toBe("3.50");
+    expect(rateToApi(3125n)).toBe("3.125");
+    expect(formatRateFromApi("3.125")).toBe("3,125");
+    expect(() => parseRateToMillis("3,1251")).toThrow(RATE_INPUT_ERROR);
+    expect(() => parseAmountToCents("3.125")).toThrow(AMOUNT_INPUT_ERROR);
+  });
+});
 
 describe("French amounts", () => {
   it("parses French and API amounts to exact cents", () => {

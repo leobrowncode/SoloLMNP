@@ -349,11 +349,30 @@ export function precheckAction(code: string): CauseAction {
   return PRECHECK[code] ?? FIX.close;
 }
 
+export function warningKey(item: { code: string; message?: string }): string {
+  const message = item.message?.trim() ?? "";
+  return message ? `${item.code}\n${message}` : item.code;
+}
+
+export function warningsAcknowledged(
+  warnings: readonly { code: string; message?: string }[],
+  acks: readonly string[],
+): boolean {
+  const pending = warnings.map(warningKey);
+  if (acks.length !== pending.length) return false;
+  for (const ack of acks) {
+    const index = pending.indexOf(ack);
+    if (index < 0) return false;
+    pending.splice(index, 1);
+  }
+  return pending.length === 0;
+}
+
 export function closePrepareCauses(input: {
   sealed: boolean;
   blocking: boolean;
   errors: readonly { code: string; message: string }[];
-  warnings: readonly { code: string }[];
+  warnings: readonly { code: string; message?: string }[];
   acks: readonly string[];
 }): ActionCause[] {
   return [
@@ -363,7 +382,7 @@ export function closePrepareCauses(input: {
       action: FIX.reopen,
     } : null),
     ...blockingCauses(input.blocking, input.errors),
-    ...listed(!acknowledgedExactly(input.warnings, input.acks) ? {
+    ...listed(!warningsAcknowledged(input.warnings, input.acks) ? {
       code: "WARNINGS_UNACKED",
       message: "Chaque avertissement affiché doit être coché.",
       action: FIX.close,
@@ -409,11 +428,6 @@ function blockingCauses(
     message: error.message,
     action: precheckAction(error.code),
   }));
-}
-
-function acknowledgedExactly(warnings: readonly { code: string }[], acks: readonly string[]): boolean {
-  const expected = new Set(warnings.map((item) => item.code));
-  return acks.length === expected.size && acks.every((code) => expected.has(code));
 }
 
 export function reopenCauses(confirmation: string, reason: string): ActionCause[] {

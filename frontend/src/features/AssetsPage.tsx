@@ -34,6 +34,7 @@ import ReviewForm, { type Field } from "./ReviewForm";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 import { ENUM_LABELS, enumChoices, enumLabel, formatEuros, formatIsoDate } from "../lib/format";
+import { presentPlan } from "./planPreview";
 import "./ledger.css";
 import FitSelect from "../lib/FitSelect";
 import { MobileSection, PageAnchors } from "../lib/PageSection";
@@ -640,31 +641,44 @@ export default function AssetsPage() {
         <PrerequisiteList id={planCauseId} causes={planCauses} />
       </div>
       {visiblePlan && <>
-        <ResponsiveTable
-          label="Aperçu d’amortissement"
-          caption={`Aperçu non enregistré · base amortissable ${formatEuros(visiblePlan.depreciable_base)} · frais inclus ${formatEuros(visiblePlan.acquisition_costs_included)}`}
-          columns={[
-            { key: "kind", label: "Élément" },
-            { key: "label", label: "Libellé" },
-            { key: "amount", label: "Montant" },
-            { key: "account", label: "Compte", priority: "secondary" },
-            { key: "depreciation", label: "Amortissement", priority: "secondary" },
-            { key: "life", label: "Durée", priority: "secondary" },
-            { key: "start", label: "Mise en service", priority: "secondary" },
-          ]}
-          rows={visiblePlan.items.map((item) => ({
-            key: `${item.kind}-${item.label}`,
-            cells: [
-              planKind(item.kind),
-              item.label,
-              formatEuros(item.amount),
-              item.asset_account,
-              item.depreciation_account ?? "—",
-              item.useful_life_months === null ? "Non amortissable" : `${item.useful_life_months} mois`,
-              formatIsoDate(item.service_start_date),
-            ],
-          }))}
-        />
+        {(() => {
+          const presented = presentPlan(visiblePlan.items);
+          return (
+            <>
+              {presented.buildingIsBreakdown && presented.building && (
+                <p>
+                  <span>{presented.building.label}</span>
+                  {` : ${formatEuros(presented.building.amount)}, dont :`}
+                </p>
+              )}
+              <ResponsiveTable
+                label="Aperçu d’amortissement"
+                caption={`Aperçu non enregistré · base amortissable ${formatEuros(visiblePlan.depreciable_base)} · frais inclus ${formatEuros(visiblePlan.acquisition_costs_included)}`}
+                columns={[
+                  { key: "kind", label: "Élément" },
+                  { key: "label", label: "Libellé" },
+                  { key: "amount", label: "Montant" },
+                  { key: "account", label: "Compte", priority: "secondary" },
+                  { key: "depreciation", label: "Amortissement", priority: "secondary" },
+                  { key: "life", label: "Durée", priority: "secondary" },
+                  { key: "start", label: "Mise en service", priority: "secondary" },
+                ]}
+                rows={presented.lines.map((item) => ({
+                  key: `${item.kind}-${item.label}`,
+                  cells: [
+                    planKind(item.kind),
+                    item.label,
+                    formatEuros(item.amount),
+                    item.asset_account,
+                    item.depreciation_account ?? "—",
+                    item.useful_life_months === null ? "Non amortissable" : `${item.useful_life_months} mois`,
+                    formatIsoDate(item.service_start_date),
+                  ],
+                }))}
+              />
+            </>
+          );
+        })()}
         <div className="form-actions">
           <button type="button" disabled={busy || !visiblePlan.preview_token} aria-busy={busy || undefined} onClick={() => { void confirmPlan(); }}>Créer les immobilisations affichées</button>
           <button type="button" disabled={confirming} onClick={cancelPlan}>Annuler l’aperçu</button>

@@ -114,7 +114,7 @@ test("a new precheck replaces acknowledgements and closing reports a server refu
   expect(await screen.findByText(/prêt à clôturer/)).toBeInTheDocument();
   const readyCall = fetchMock.mock.calls.find((call) => String(call[0]).endsWith("/ready"));
   expect(JSON.parse(String((readyCall?.[1] as RequestInit | undefined)?.body))).toEqual({
-    acknowledged: ["NEW"],
+    acknowledged: ["NEW\nNouvel avertissement."],
   });
   expect(onExerciseTransition).toHaveBeenCalledTimes(1);
 
@@ -205,4 +205,31 @@ test("a failed precheck keeps the acknowledgements already on screen", async () 
   expect(await screen.findByRole("alert")).toHaveTextContent("Pré-contrôle indisponible.");
   expect(screen.getByRole("checkbox", { name: "Avertissement stable." })).toBeChecked();
   expect(screen.getByRole("button", { name: "Accuser et préparer la clôture" })).toBeEnabled();
+});
+
+test("two warnings with the same code are acknowledged separately", async () => {
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+    blocking: false,
+    errors: [],
+    warnings: [
+      { code: "CLASSEMENT_INCOMPLET", message: "Des comptes de bilan ne sont pas détaillés sur le 2033-A." },
+      { code: "CLASSEMENT_INCOMPLET", message: "Des produits hors loyers ne sont pas détaillés sur le 2033-E." },
+    ],
+  }));
+  render(<CloseYear year={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  const balance = await screen.findByRole("checkbox", { name: /2033-A/ });
+  const income = screen.getByRole("checkbox", { name: /2033-E/ });
+  fireEvent.click(balance);
+  expect(income).not.toBeChecked();
+  expect(screen.getByRole("button", { name: "Accuser et préparer la clôture" })).toBeDisabled();
+  fireEvent.click(income);
+  expect(screen.getByRole("button", { name: "Accuser et préparer la clôture" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Accuser et préparer la clôture" }));
+  const readyCall = fetchMock.mock.calls.find((call) => String(call[0]).endsWith("/ready"));
+  const body = JSON.parse(String((readyCall?.[1] as RequestInit | undefined)?.body)) as { acknowledged: string[] };
+  expect(body.acknowledged).toEqual([
+    "CLASSEMENT_INCOMPLET\nDes comptes de bilan ne sont pas détaillés sur le 2033-A.",
+    "CLASSEMENT_INCOMPLET\nDes produits hors loyers ne sont pas détaillés sur le 2033-E.",
+  ]);
 });

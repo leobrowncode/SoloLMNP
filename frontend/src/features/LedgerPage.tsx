@@ -15,6 +15,7 @@ import {
 } from "../routing/paths";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
 import { DATE_HINT, YEAR_END_BEFORE_START, enumChoices, enumLabel, formatAmount, formatCents, formatIsoDate } from "../lib/format";
+import FrenchDateInput from "../lib/FrenchDateInput";
 import FrenchForm from "../lib/FrenchForm";
 import { showFrenchValidation } from "../lib/validation";
 import "./ledger.css";
@@ -254,7 +255,7 @@ export default function LedgerPage() {
       <p>Pour une activité déjà existante, les soldes antérieurs devront être repris par des écritures d’à-nouveaux justifiées. La création de cet espace ne reconstitue pas votre historique.</p>
       <GlossaryTip id="a-nouveaux" />
       <label>Nom de l’activité<input name="name" required maxLength={200} /></label>
-      <label>Date réelle de début<input name="start" type="date" lang="fr" required /><span className="field-hint">{DATE_HINT}</span></label>
+      <label>Date réelle de début<FrenchDateInput name="start" required /><span className="field-hint">{DATE_HINT}</span></label>
       <button disabled={busy}>Créer l’activité</button>
     </FrenchForm>}
     {setup?.activity && <FrenchForm onSubmit={(e) => {
@@ -317,8 +318,8 @@ export default function LedgerPage() {
           next: { label: "Saisir une écriture", href: `${ledgerPath("Brouillons")}#nouvelle-ecriture` },
         });
       }}>
-        <label>Début de l’exercice<input name="start" type="date" lang="fr" required /><span className="field-hint">{DATE_HINT}</span></label>
-        <label>Fin de l’exercice<input name="end" type="date" lang="fr" required /><span className="field-hint">{DATE_HINT}</span></label>
+        <label>Début de l’exercice<FrenchDateInput name="start" required /><span className="field-hint">{DATE_HINT}</span></label>
+        <label>Fin de l’exercice<FrenchDateInput name="end" required /><span className="field-hint">{DATE_HINT}</span></label>
         <label>Millésime fiscal<input name="vintage" pattern="[0-9]{4}" required placeholder="2026" /></label>
         <GlossaryTip id="millesime" />
         <GlossaryTip id="exercice" />
@@ -385,8 +386,8 @@ export default function LedgerPage() {
       }}>
         <h3>{editing ? "Modifier le brouillon" : "Nouvelle écriture"}</h3>
         <label>Journal<FitSelect value={draft.journal_code} onChange={(e) => setDraft({ ...draft, journal_code: e.target.value })}>{journals.filter((j) => j.active).map((j) => <option key={j.code} value={j.code}>{j.code} · {j.label}</option>)}</FitSelect></label>
-        <label>Date comptable<input type="date" lang="fr" required min={selectedYear?.start_date} max={selectedYear?.end_date} value={draft.accounting_date} onChange={(e) => setDraft({ ...draft, accounting_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
-        <label>Date de la pièce<input type="date" lang="fr" required value={draft.piece_date} onChange={(e) => setDraft({ ...draft, piece_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
+        <label>Date comptable<FrenchDateInput required min={selectedYear?.start_date} max={selectedYear?.end_date} value={draft.accounting_date} onChange={(e) => setDraft({ ...draft, accounting_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
+        <label>Date de la pièce<FrenchDateInput required value={draft.piece_date} onChange={(e) => setDraft({ ...draft, piece_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
         <label>Référence de la pièce<input required value={draft.piece_reference} onChange={(e) => setDraft({ ...draft, piece_reference: e.target.value })} /></label>
         <label>Libellé de l’écriture<input required value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} /></label>
         {draft.lines.map((line, index) => <fieldset key={index}>
@@ -407,7 +408,7 @@ export default function LedgerPage() {
           <input type="search" value={entrySearch} autoComplete="off" onChange={(event) => setEntrySearch(event.target.value)} />
         </label>
         <details><summary>Filtres</summary><div className="ledger-filters">
-          {Object.entries(filter).filter(([key]) => key !== "source").map(([key, value]) => <label key={key}>{{ journal_code: "Code journal", account_number: "Numéro de compte", date_from: "Du", date_to: "Au", piece: "Pièce" }[key]}<input type={key.startsWith("date") ? "date" : "text"} lang={key.startsWith("date") ? "fr" : undefined} value={value} onChange={(e) => { setFilter({ ...filter, [key]: e.target.value }); setOffset(0); }} />{key.startsWith("date") ? <span className="field-hint">{DATE_HINT}</span> : null}</label>)}
+          {Object.entries(filter).filter(([key]) => key !== "source").map(([key, value]) => <label key={key}>{{ journal_code: "Code journal", account_number: "Numéro de compte", date_from: "Du", date_to: "Au", piece: "Pièce" }[key]}{key.startsWith("date") ? <FrenchDateInput value={value} onChange={(e) => { setFilter({ ...filter, [key]: e.target.value }); setOffset(0); }} /> : <input type="text" value={value} onChange={(e) => { setFilter({ ...filter, [key]: e.target.value }); setOffset(0); }} />}{key.startsWith("date") ? <span className="field-hint">{DATE_HINT}</span> : null}</label>)}
           <label>Source<FitSelect value={filter.source} onChange={(e) => { setFilter({ ...filter, source: e.target.value }); setOffset(0); }}>
             <option value="">Toutes les sources</option>
             {enumChoices("entrySource").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -499,7 +500,7 @@ export default function LedgerPage() {
         <h3>Confirmer : {confirmation.entry.label}</h3>
         <p>{confirmation.action === "validate" ? "La validation attribue un numéro définitif. Cette écriture ne pourra plus être modifiée ou supprimée." : confirmation.action === "delete" ? "Le brouillon sera supprimé. Son historique sera conservé." : "Une nouvelle écriture inversera les débits et crédits. L’écriture d’origine sera conservée."}</p>
         {confirmation.action === "reverse" && <>
-          <label>Date de l’extourne<input name="date" type="date" lang="fr" required min={selectedYear?.start_date} max={selectedYear?.end_date} /><span className="field-hint">{DATE_HINT}</span></label>
+          <label>Date de l’extourne<FrenchDateInput name="date" required min={selectedYear?.start_date} max={selectedYear?.end_date} /><span className="field-hint">{DATE_HINT}</span></label>
           <label>Pièce de l’extourne<input name="piece" required /></label>
           <label>Motif<input name="reason" required minLength={5} maxLength={300} /></label>
         </>}

@@ -122,7 +122,7 @@ export default function AppShell() {
   const overviewIntro = page === "overview" && showWorkspace ? (
     <section className="intro" aria-labelledby="welcome-title">
       <h2 id="welcome-title">De l’écriture à la liasse que vous recopierez.</h2>
-      <p className="intro-description">LMNP au réel, location longue durée. Le menu sert à naviguer. Ici, chaque étape du dossier indique son état. SoloLMNP prépare la liasse et le FEC. Il n’envoie rien aux impôts.</p>
+      <p className="intro-description">LMNP au réel, location longue durée. Le menu sert à naviguer. Ici, chaque étape du dossier indique son état. SoloLMNP prépare la liasse et le FEC.</p>
       <div className="heading-with-help">
         <GlossaryTip id="lmnp-reel" label="LMNP" />
         <GlossaryTip id="liasse" />
@@ -189,7 +189,7 @@ export default function AppShell() {
           <div className="sidebar-note">
             <span className="small-dot" aria-hidden="true" />
             <strong>Dans l’ordre du menu</strong>
-            <p>Une étape à la fois. SoloLMNP n’envoie rien aux impôts.</p>
+            <p>Une étape à la fois.</p>
           </div>
           <div className="sidebar-version">SoloLMNP · {status ? `v${status.application_version}` : "Développement"}</div>
         </aside>

@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.domain.accounting.centralization import STALE_CODE, STALE_MESSAGE
+from app.domain.filing.acknowledgements import acknowledgements_match
 from app.domain.filing.fec import render_fec
 from app.domain.filing.mappings import compile_package
 from app.domain.fiscal.output_status import (
@@ -152,8 +153,7 @@ def mark_ready(session: Session, year_id: int, acknowledged: list[str]) -> dict[
     report = precheck(session, year_id)
     if report["blocking"]:
         fail("CLOSE_BLOCKED", "Le pré-contrôle contient des erreurs.")
-    expected = {item["code"] for item in report["warnings"]}
-    if set(acknowledged) != expected:
+    if not acknowledgements_match(report["warnings"], acknowledged):
         fail("WARNINGS_UNACKNOWLEDGED", "Tous les avertissements doivent être accusés.")
     before = year.status
     year.status = "READY_TO_CLOSE"

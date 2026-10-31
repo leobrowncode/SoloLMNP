@@ -9,7 +9,7 @@ from sqlalchemy.pool import ConnectionPoolEntry
 
 from app.core.config import Settings
 
-SCHEMA_REVISION = "0011_entry_year_status"
+SCHEMA_REVISION = "0012_loan_rate_millis"
 
 
 def create_database_engine(settings: Settings) -> Engine:

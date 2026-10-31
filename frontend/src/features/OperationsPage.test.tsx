@@ -124,7 +124,7 @@ describe("OperationsPage", () => {
         id: 1, lender: "Banque fictive", property_id: 1, initial_principal: "15000.00",
         remaining_principal: "15000.00", monthly_payment: "62.58",
         monthly_insurance: "4.53", principal_account: "164000",
-        interest_rate_basis_points: 150,
+        interest_rate_basis_points: 1500,
       }],
       loanPreview: {
         ready: true,
@@ -192,7 +192,7 @@ describe("OperationsPage", () => {
         id: 1, lender: "Banque fictive", property_id: 1, initial_principal: "15000.00",
         remaining_principal: "15000.00", monthly_payment: "62.58",
         monthly_insurance: "4.53", principal_account: "164000",
-        interest_rate_basis_points: 150,
+        interest_rate_basis_points: 1500,
       }],
       loanPreviewResponse: pendingPreview,
     });
@@ -262,7 +262,7 @@ describe("OperationsPage", () => {
       if (url === "/api/operations/loans") return response([{
         id: 1, lender: "Crédit fictif", property_id: 1, initial_principal: "15000.00",
         remaining_principal: "15000.00", monthly_payment: "62.58", monthly_insurance: "4.53",
-        principal_account: "164000", interest_rate: "1.50", interest_rate_basis_points: 150,
+        principal_account: "164000", interest_rate: "1.50", interest_rate_basis_points: 1500,
         start_date: "2025-01-01", duration_months: 240,
         correction: {
           locks: [{
@@ -371,7 +371,7 @@ describe("OperationsPage", () => {
         id: 1, lender: "Banque fictive", property_id: 1, initial_principal: "15000.00",
         remaining_principal: "0.00", on_balance_sheet: false, posting_path: "funding",
         monthly_payment: "62.58", monthly_insurance: "4.53", principal_account: "164000",
-        interest_rate_basis_points: 150,
+        interest_rate_basis_points: 1500,
       }],
     });
     renderOperations("Emprunts");
@@ -390,7 +390,7 @@ describe("OperationsPage", () => {
         id: 2, lender: "Crédit Habitat 195k", property_id: 1, initial_principal: "195000.00",
         remaining_principal: "0.00", on_balance_sheet: false, posting_path: "funding",
         monthly_payment: "0.00", monthly_insurance: "0.00", principal_account: "164001",
-        interest_rate_basis_points: 325, start_date: "2025-06-01",
+        interest_rate_basis_points: 3250, start_date: "2025-06-01",
       }],
     });
     renderOperations("Emprunts");
@@ -520,7 +520,7 @@ describe("OperationsPage", () => {
 
   it("keeps the entry detail and its close button on a narrow screen", async () => {
     vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: /max-width:\s*(?:768|430)px/.test(query),
+      matches: /max-width:\s*(?:800|768|430)px/.test(query),
       media: query,
       onchange: null,
       addEventListener() { return undefined; },

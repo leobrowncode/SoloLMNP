@@ -102,6 +102,7 @@ const dwellingPlan = {
     { kind: "LAND", label: "Terrain — Bien fictif", amount: "20000.00", asset_account: "211000", depreciation_account: null, useful_life_months: null, service_start_date: "2025-01-01" },
     { kind: "BUILDING", label: "Construction — Bien fictif", amount: "80000.00", asset_account: "213000", depreciation_account: "281300", useful_life_months: 480, service_start_date: "2025-01-01" },
     { kind: "COMPONENT", label: "Gros œuvre", amount: "32000.00", asset_account: "213000", depreciation_account: "281300", useful_life_months: 480, service_start_date: "2025-01-01" },
+    { kind: "COMPONENT", label: "Toiture", amount: "48000.00", asset_account: "213000", depreciation_account: "281300", useful_life_months: 480, service_start_date: "2025-01-01" },
   ],
 };
 
@@ -139,8 +140,12 @@ test("previews a dwelling plan, cancels it, then confirms without duplicating", 
   fireEvent.click(preview);
   expect(await screen.findByText("Non amortissable")).toBeInTheDocument();
   expect(screen.getByText("Terrain — Bien fictif")).toBeInTheDocument();
-  expect(screen.getByText("Construction — Bien fictif")).toBeInTheDocument();
+  expect(screen.getByText((_, node) => (
+    node?.tagName === "P" && /Construction — Bien fictif : .+dont :/.test(node.textContent ?? "")
+  ))).toBeInTheDocument();
+  expect(screen.queryByRole("cell", { name: "Construction" })).not.toBeInTheDocument();
   expect(screen.getByText("Gros œuvre")).toBeInTheDocument();
+  expect(screen.getByText("Toiture")).toBeInTheDocument();
   expect(screen.getByText("20 000,00 €")).toBeInTheDocument();
   expect(screen.getByText("211000")).toBeInTheDocument();
   expect(screen.getAllByText("281300")).toHaveLength(2);

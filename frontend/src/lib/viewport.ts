@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 /** Phone and small tablet. 768 px is included so the checked widths match. */
 export const MOBILE_QUERY = "(max-width: 768px)";
 
+/** Tables become cards a little before the page feels cramped. Navigation stays at 768. */
+export const TABLE_CARD_QUERY = "(max-width: 800px)";
+
 /** Widths where a fixed control can be clipped by the viewport. */
 export const NARROW_CONTROL_QUERY = "(max-width: 430px)";
 

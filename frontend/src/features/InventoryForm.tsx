@@ -10,6 +10,7 @@ import { useSaveNotice } from "./localFeedback";
 import MutationStatus from "./MutationStatus";
 import { useMutation } from "./useMutation";
 import { DATE_HINT, formatAmount, formatCents, formatIsoDate } from "../lib/format";
+import FrenchDateInput from "../lib/FrenchDateInput";
 import FrenchForm from "../lib/FrenchForm";
 import FitSelect from "../lib/FitSelect";
 
@@ -140,8 +141,8 @@ export default function InventoryForm({ year, accounts, journals, onPosted }: {
     {!review && <fieldset disabled={year.status !== "OPEN" || !!recovery.error}>
       <legend>Saisie justifiée</legend>
       <label>Journal d’inventaire<FitSelect required value={draft.journal_code} onChange={(e) => setDraft({ ...draft, journal_code: e.target.value })}><option value="">Choisir un journal</option>{general.map((j) => <option key={j.code} value={j.code}>{j.code} · {j.label}</option>)}</FitSelect></label>
-      <label>Date comptable<input type="date" lang="fr" required min={year.start_date} max={year.end_date} value={draft.accounting_date} onChange={(e) => setDraft({ ...draft, accounting_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
-      <label>Date de la pièce<input type="date" lang="fr" required value={draft.piece_date} onChange={(e) => setDraft({ ...draft, piece_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
+      <label>Date comptable<FrenchDateInput required min={year.start_date} max={year.end_date} value={draft.accounting_date} onChange={(e) => setDraft({ ...draft, accounting_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
+      <label>Date de la pièce<FrenchDateInput required value={draft.piece_date} onChange={(e) => setDraft({ ...draft, piece_date: e.target.value })} /><span className="field-hint">{DATE_HINT}</span></label>
       <label>Référence de la pièce<input required maxLength={200} value={draft.piece_reference} onChange={(e) => setDraft({ ...draft, piece_reference: e.target.value })} /></label>
       <label>Libellé de l’écriture<input required maxLength={300} value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} /></label>
       <label>Justification et calcul<textarea required minLength={10} maxLength={3000} value={justification} onChange={(e) => setJustification(e.target.value)} /></label>

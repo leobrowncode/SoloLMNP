@@ -36,7 +36,7 @@ import {
   PLAN_HELP, RECORD_HELP, correctionMessage, locked, readInvalidation,
 } from "./correction";
 import { buildPieceReference, defaultType, findType, typesFor } from "./operationTypes";
-import { enumChoices, enumLabel, formatEuros, formatIsoDate } from "../lib/format";
+import { enumChoices, enumLabel, formatEuros, formatIsoDate, rateToApi } from "../lib/format";
 import { propertySplitGap, proposeLandFromArea } from "./propertySplit";
 import FrenchForm from "../lib/FrenchForm";
 import "./ledger.css";
@@ -227,7 +227,8 @@ export default function OperationsPage() {
   function openInstallment(loan: Loan) {
     const rate = BigInt(loan.interest_rate_basis_points ?? 0);
     const remaining = cents(loan.remaining_principal);
-    const interest = remaining * rate / 120000n;
+    // Rate is thousandths of a percent. Monthly interest ≈ capital × rate / 1 200 000.
+    const interest = remaining * rate / 1_200_000n;
     const insurance = cents(loan.monthly_insurance || "0");
     const payment = cents(loan.monthly_payment || "0");
     let principal = payment > 0n ? payment - interest - insurance : 0n;
@@ -488,7 +489,7 @@ export default function OperationsPage() {
   }
   function openLoan(row: Loan) {
     const identity = !locked(row.correction, "identity");
-    const rate = row.interest_rate ?? (Number(row.interest_rate_basis_points ?? 0) / 100).toFixed(2);
+    const rate = (row.interest_rate ?? rateToApi(BigInt(row.interest_rate_basis_points ?? 0))).replace(".", ",");
     const fields: Field[] = [];
     if (identity) {
       fields.push(
@@ -498,7 +499,7 @@ export default function OperationsPage() {
     }
     fields.push(
       { name: "lender", label: "Prêteur", value: row.lender, group: "Emprunt" },
-      { name: "interest_rate", label: "Taux annuel (%)", money: true, value: rate, group: "Conditions" },
+      { name: "interest_rate", label: "Taux annuel (%)", rate: true, value: rate, group: "Conditions" },
       { name: "duration_months", label: "Durée en mois", type: "number", value: row.duration_months == null ? "" : String(row.duration_months), group: "Conditions" },
       { name: "monthly_payment", label: "Mensualité contractuelle (€)", money: true, value: row.monthly_payment, group: "Conditions" },
       { name: "monthly_insurance", label: "Assurance mensuelle (€)", money: true, value: row.monthly_insurance, group: "Conditions" },
@@ -835,7 +836,7 @@ export default function OperationsPage() {
             { name: "lender", label: "Prêteur", group: "Emprunt" },
             { name: "start_date", label: "Début de l’emprunt", type: "date", group: "Emprunt" },
             { name: "initial_principal", label: "Capital de cette ligne (€)", money: true, group: "Conditions", hint: "Montant d’une seule ligne du crédit, pas le total du contrat." },
-            { name: "interest_rate", label: "Taux annuel (%)", money: true, group: "Conditions", hint: "Informatif." },
+            { name: "interest_rate", label: "Taux annuel (%)", rate: true, group: "Conditions", hint: "Informatif." },
             { name: "duration_months", label: "Durée en mois", type: "number", group: "Conditions" },
             { name: "monthly_payment", label: "Mensualité contractuelle (€)", money: true, value: "0.00", group: "Conditions", hint: "Informatif." },
             { name: "monthly_insurance", label: "Assurance mensuelle (€)", money: true, value: "0.00", group: "Conditions", hint: "Informatif." },

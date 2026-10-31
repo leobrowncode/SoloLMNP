@@ -1,7 +1,8 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { amount, cents, RequestError } from "../api/ledger";
 import { formFieldName, issuesForForm, type ApiErrorIssue } from "../api/errors";
-import { DATE_HINT, DATE_PLACEHOLDER, formatCents, formatEuros, formatIsoDate } from "../lib/format";
+import { DATE_HINT, formatCents, formatEuros, formatIsoDate, formatRateFromApi, rateToApi, parseRateToMillis } from "../lib/format";
+import FrenchDateInput from "../lib/FrenchDateInput";
 import FrenchForm from "../lib/FrenchForm";
 import ApiErrorAlert from "./ApiErrorAlert";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
@@ -14,6 +15,8 @@ export interface Field {
   label: string;
   type?: "date" | "text" | "number";
   money?: boolean;
+  /** Percent with up to three decimals. Not a euro amount. */
+  rate?: boolean;
   value?: string | undefined;
   choices?: [string, string][];
   /** Options that depend on the current draft (category, asset account, …). */
@@ -39,6 +42,7 @@ function initialDraft(fields: Field[]): Record<string, string> {
 
 function readField(field: Field, raw: string): unknown {
   if (field.money) return amount(cents(raw));
+  if (field.rate) return rateToApi(parseRateToMillis(raw));
   if (field.type === "number") return raw ? Number(raw) : null;
   return raw || (field.optional ? null : "");
 }
@@ -50,6 +54,7 @@ function choicesOf(field: Field, draft: Record<string, string>): [string, string
 function labelOf(field: Field, value: unknown, draft: Record<string, string>): string {
   const key = String(value ?? "");
   if (field.money) return formatEuros(key);
+  if (field.rate) return `${formatRateFromApi(key)} %`;
   if (field.type === "date") return formatIsoDate(key);
   return choicesOf(field, draft)?.find(([choice]) => choice === key)?.[1] ?? (key || "—");
 }
@@ -252,7 +257,14 @@ export default function ReviewForm({
               const errorId = fieldError ? `${controlId}-error` : undefined;
               const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
               const choices = choicesOf(field, draft);
-              const emptyDate = field.type === "date" && !(draft[field.name] ?? "");
+              const clearError = () => {
+                setFieldErrors((current) => {
+                  if (!current[field.name]) return current;
+                  const next = { ...current };
+                  delete next[field.name];
+                  return next;
+                });
+              };
               const textInput = (
                 <input
                   id={controlId}
@@ -260,27 +272,22 @@ export default function ReviewForm({
                   aria-describedby={describedBy}
                   aria-invalid={fieldError ? true : undefined}
                   value={draft[field.name] ?? ""}
-                  type={field.type === "number" ? "number" : field.type ?? "text"}
-                  lang={field.type === "date" || field.money ? "fr" : undefined}
-                  className={emptyDate ? "date-empty" : undefined}
+                  type={field.rate ? "text" : field.type === "number" ? "number" : field.type ?? "text"}
+                  lang={field.money || field.rate ? "fr" : undefined}
                   min={field.type === "number" ? "1" : undefined}
-                  placeholder={field.money ? "1 234,56" : undefined}
+                  placeholder={field.money ? "1 234,56" : field.rate ? "3,125" : undefined}
                   data-money={field.money ? "true" : undefined}
-                  inputMode={field.money ? "decimal" : undefined}
+                  data-rate={field.rate ? "true" : undefined}
+                  inputMode={field.money || field.rate ? "decimal" : undefined}
                   required={!field.optional}
                   onChange={(event) => {
-                    setFieldErrors((current) => {
-                      if (!current[field.name]) return current;
-                      const next = { ...current };
-                      delete next[field.name];
-                      return next;
-                    });
+                    clearError();
                     applyChange(field.name, event.target.value);
                   }}
                 />
               );
               return (
-                <div key={field.name} className={field.money ? "form-field field-money" : "form-field"}>
+                <div key={field.name} className={field.money || field.rate ? "form-field field-money" : "form-field"}>
                   <label htmlFor={controlId}>
                     {field.label}{field.optional ? " (facultatif)" : ""}
                   </label>
@@ -312,10 +319,18 @@ export default function ReviewForm({
                       ))}
                     </FitSelect>
                   ) : field.type === "date" ? (
-                    <div className="date-control">
-                      {textInput}
-                      {emptyDate ? <span className="date-placeholder" aria-hidden="true">{DATE_PLACEHOLDER}</span> : null}
-                    </div>
+                    <FrenchDateInput
+                      id={controlId}
+                      name={field.name}
+                      aria-describedby={describedBy}
+                      aria-invalid={fieldError ? true : undefined}
+                      value={draft[field.name] ?? ""}
+                      required={!field.optional}
+                      onChange={(event) => {
+                        clearError();
+                        applyChange(field.name, event.target.value);
+                      }}
+                    />
                   ) : textInput}
                   {fieldError && (
                     <span id={errorId} className="field-error" role="alert">{fieldError}</span>

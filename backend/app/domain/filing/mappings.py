@@ -183,6 +183,11 @@ def _context(
     }
 
 
+def _unique_ids(ids: list[int]) -> list[int]:
+    """One writing can post to several accounts of the same line. List it once."""
+    return list(dict.fromkeys(ids))
+
+
 def _named(
     charges: dict[str, int],
     products: dict[str, int],
@@ -191,7 +196,7 @@ def _named(
 ) -> dict[str, tuple[int, list[str], list[int]]]:
     def bucket(amounts: dict[str, int]) -> tuple[int, list[str], list[int]]:
         accounts = sorted(amounts)
-        entries = [entry for number in accounts for entry in entry_ids.get(number, [])]
+        entries = _unique_ids([entry for number in accounts for entry in entry_ids.get(number, [])])
         return sum(amounts.values()), accounts, entries
 
     def pick(source: dict[str, int], prefixes: tuple[str, ...]) -> dict[str, int]:
@@ -221,11 +226,13 @@ def _named(
         "operating_result": (
             income_total - charge_total,
             income_accounts + charge_accounts,
-            [
-                entry
-                for number in income_accounts + charge_accounts
-                for entry in entry_ids.get(number, [])
-            ],
+            _unique_ids(
+                [
+                    entry
+                    for number in income_accounts + charge_accounts
+                    for entry in entry_ids.get(number, [])
+                ]
+            ),
         ),
         "accounting": (_cents(fiscal["accounting_result"]), [], []),
         "unused": (_cents(fiscal["unused_depreciation"]), [], []),
@@ -264,7 +271,9 @@ def _eval(
     if op == "sum_accounts":
         prefixes = tuple(formula.get("prefixes", []))
         accounts = [number for number in context["balances"] if number.startswith(prefixes)]
-        entries = [entry for number in accounts for entry in context["entries"].get(number, [])]
+        entries = _unique_ids(
+            [entry for number in accounts for entry in context["entries"].get(number, [])]
+        )
         return sum(context["balances"][number] for number in accounts), sorted(accounts), entries
     if op == "balance":
         number = str(formula.get("account", ""))
@@ -278,19 +287,30 @@ def _eval(
             total += value
             used_accounts.extend(used)
             used_entries.extend(ids)
-        return total, used_accounts, used_entries
+        return total, used_accounts, _unique_ids(used_entries)
     left, left_accounts, left_entries = _eval(formula["left"], context, errors, code)
     right, right_accounts, right_entries = _eval(formula["right"], context, errors, code)
-    return left - right, left_accounts + right_accounts, left_entries + right_entries
+    return (
+        left - right,
+        left_accounts + right_accounts,
+        _unique_ids(left_entries + right_entries),
+    )
 
 
 def _entry_ids(session: Session, year_id: int, account: str) -> list[int]:
+    """Source writings of a 2033 line. Closing entries are not sources.
+
+    Operating totals already ignore centralization and appropriation. Listing
+    those entries once per account they close made the same writing appear
+    several times on one EFI line.
+    """
     rows = session.scalars(
         select(AccountingEntry.id)
         .join(AccountingEntryLine)
         .where(
             AccountingEntry.fiscal_year_id == year_id,
             AccountingEntry.status == "VALIDATED",
+            AccountingEntry.source_type.notin_(("CENTRALIZATION", "APPROPRIATION")),
             AccountingEntryLine.account_number == account,
         )
         .order_by(AccountingEntry.id)

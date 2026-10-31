@@ -54,6 +54,7 @@ class Loan(Base):
     lender: Mapped[str] = mapped_column(String(200))
     start_date: Mapped[date] = mapped_column(Date)
     initial_principal: Mapped[Decimal] = mapped_column(Money)
+    # Thousandths of a percent: 3.50 % = 3500, 3.125 % = 3125.
     interest_rate_basis_points: Mapped[int]
     duration_months: Mapped[int]
     monthly_payment: Mapped[Decimal] = mapped_column(Money, default=Decimal("0.00"))

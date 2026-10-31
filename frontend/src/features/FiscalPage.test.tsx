@@ -10,11 +10,12 @@ const response = (body: unknown, status = 200) => new Response(JSON.stringify(bo
 });
 
 const notComputed = () => response({
-  detail: {
-    code: "FISCAL_NOT_COMPUTED",
-    message: "Aucun calcul fiscal n’est enregistré pour cet exercice.",
-  },
-}, 404);
+  empty: true,
+  fiscal_year_id: 1,
+  year: 2025,
+  status: "absent",
+  message: "Aucun calcul fiscal n’est enregistré pour cet exercice.",
+});
 
 function slot(posture: "provisoire" | "bloquee" | "finale") {
   const label = posture === "finale" ? "Finale" : posture === "provisoire" ? "Provisoire" : "Bloquée";
@@ -221,7 +222,18 @@ test("closing reloads the exercise status, the dashboard and the frozen exports"
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
-    if (isFiscalRead(url, method)) return notComputed();
+    if (isFiscalRead(url, method)) return response({
+      status: "research_only",
+      declarable: false,
+      accounting_result: "-200.00",
+      fiscal_result: "-200.00",
+      deductible_depreciation: "0.00",
+      unused_depreciation: "0.00",
+      tax_loss: "0.00",
+      non_deductible: "0.00",
+      output_status: "recherche",
+      output_label: "Recherche",
+    });
     if (url.endsWith("/vintages")) {
       return response({ vintages: [{ vintage: "2025", status: "research_only", blocked: [], executable: [] }] });
     }

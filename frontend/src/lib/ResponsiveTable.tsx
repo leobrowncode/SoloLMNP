@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { MOBILE_QUERY, useMediaQuery } from "./viewport";
+import { TABLE_CARD_QUERY, useMediaQuery } from "./viewport";
 
 export type ResponsiveColumn = {
   key: string;
@@ -49,7 +49,7 @@ export function ResponsiveTable({
   footerNote?: ReactNode;
   label: string;
 }) {
-  const mobile = useMediaQuery(MOBILE_QUERY);
+  const mobile = useMediaQuery(TABLE_CARD_QUERY);
   const primary = columns.filter((column) => (column.priority ?? "primary") === "primary");
   const secondary = columns.filter((column) => column.priority === "secondary");
 

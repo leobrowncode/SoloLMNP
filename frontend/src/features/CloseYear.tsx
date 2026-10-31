@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api/ledger";
-import { closeConfirmCauses, closePrepareCauses, describedBy, precheckAction } from "./actionCauses";
+import { closeConfirmCauses, closePrepareCauses, describedBy, precheckAction, warningKey, warningsAcknowledged } from "./actionCauses";
 import { sameStatusClaim, type ExportStatus } from "./exportStatus";
 import PrerequisiteList from "./PrerequisiteList";
 import GlossaryTip from "./GlossaryTip";
@@ -25,11 +25,6 @@ interface Check {
   errors: Notice[];
   warnings: Notice[];
   infos?: Notice[];
-}
-
-function acknowledgedExactly(warnings: Notice[], acks: string[]) {
-  const expected = new Set(warnings.map((item) => item.code));
-  return acks.length === expected.size && acks.every((code) => expected.has(code));
 }
 
 export default function CloseYear({
@@ -72,7 +67,7 @@ export default function CloseYear({
   const canPrepare = check !== null
     && !check.blocking
     && !sealed
-    && acknowledgedExactly(check.warnings, acks);
+    && warningsAcknowledged(check.warnings, acks);
   const prepareCauses = check ? closePrepareCauses({
     sealed, blocking: check.blocking, errors: check.errors, warnings: check.warnings, acks,
   }) : [];
@@ -109,10 +104,10 @@ export default function CloseYear({
         const next = await request<Check>(
           `/years/${year}/ready`, "POST", { acknowledged: acks }, "/api/filing",
         );
-        const kept = acks.filter((code) => next.warnings.some((item) => item.code === code));
+        const kept = acks.filter((token) => next.warnings.some((item) => warningKey(item) === token));
         const accepted = !next.blocking
           && next.year_status !== "CLOSED"
-          && acknowledgedExactly(next.warnings, kept);
+          && warningsAcknowledged(next.warnings, kept);
         setCheck(next);
         setAcks(kept);
         setPrepared(accepted);
@@ -190,12 +185,15 @@ export default function CloseYear({
           )}
         </p>
       )}
-      {(check.infos ?? []).map((item) => <p key={item.code}>{item.message}</p>)}
+      {(check.infos ?? []).map((item) => <p key={warningKey(item)}>{item.message}</p>)}
       {check.errors.map((item) => {
         const action = precheckAction(item.code);
         return <p key={`${item.code}-${item.message}`} role="alert">{item.message} <a href={action.href}>{action.label}</a></p>;
       })}
-      {check.warnings.map((item) => <label key={item.code}><input type="checkbox" disabled={busy} checked={acks.includes(item.code)} onChange={(event) => toggle(item.code, event.target.checked)} />{item.message}</label>)}
+      {check.warnings.map((item) => {
+        const token = warningKey(item);
+        return <label key={token}><input type="checkbox" disabled={busy} checked={acks.includes(token)} onChange={(event) => toggle(token, event.target.checked)} />{item.message}</label>;
+      })}
       <button id="close-prepare" type="button" disabled={!canPrepare || busy} aria-busy={busy || undefined} aria-describedby={describedBy(prepareCauseId, prepareCauses)} onClick={() => { void ready(); }}>Accuser et préparer la clôture</button>
       <PrerequisiteList id={prepareCauseId} causes={prepareCauses} />
       <button type="button" disabled={!prepared || Boolean(check.blocking) || sealed || busy} aria-busy={busy || undefined} aria-describedby={describedBy(confirmCauseId, confirmCauses)} onClick={() => { void closeYear(); }}>Confirmer la clôture</button>

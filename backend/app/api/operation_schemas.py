@@ -4,13 +4,16 @@ from datetime import date as Date
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import Field, model_validator
+from pydantic import BeforeValidator, Field, model_validator
 
 from app.api.ledger_schemas import AccountNumber, Input, Label, MoneyInput, OptionalMoney
 from app.core.money import to_cents
+from app.core.rate import parse_optional_rate, parse_rate
 
 PositiveMoney = Annotated[MoneyInput, Field(gt=0)]
 Percentage = Annotated[MoneyInput, Field(le=100)]
+RateInput = Annotated[Decimal, BeforeValidator(parse_rate)]
+OptionalRate = Annotated[Decimal | None, BeforeValidator(parse_optional_rate)]
 RequestId = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{8,64}$")]
 
 
@@ -104,7 +107,7 @@ class LoanInput(Input):
     lender: Label
     start_date: Date
     initial_principal: PositiveMoney
-    interest_rate: Percentage
+    interest_rate: RateInput
     duration_months: int = Field(ge=1, le=1200)
     monthly_payment: MoneyInput = Decimal("0.00")
     monthly_insurance: MoneyInput = Decimal("0.00")
@@ -189,7 +192,6 @@ class ReasonInput(Input):
 
 CorrectionReason = Annotated[str, Field(min_length=5, max_length=2000)]
 OptionalPositiveMoney = Annotated[OptionalMoney, Field(gt=0)]
-OptionalPercentage = Annotated[OptionalMoney, Field(le=100)]
 
 
 class PropertyCorrectionInput(Input):
@@ -224,7 +226,7 @@ class LoanCorrectionInput(Input):
     lender: Label | None = None
     start_date: Date | None = None
     initial_principal: OptionalPositiveMoney = None
-    interest_rate: OptionalPercentage = None
+    interest_rate: OptionalRate = None
     duration_months: int | None = Field(default=None, ge=1, le=1200)
     monthly_payment: OptionalMoney = None
     monthly_insurance: OptionalMoney = None

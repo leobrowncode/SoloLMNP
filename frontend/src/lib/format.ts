@@ -10,6 +10,7 @@
 import { GLOSSARY } from "../features/glossary";
 
 export const AMOUNT_INPUT_ERROR = "Indiquez un montant en euros, par exemple 1 234,56.";
+export const RATE_INPUT_ERROR = "Indiquez un taux en pour cent, par exemple 3,125.";
 export const DATE_PLACEHOLDER = "JJ/MM/AAAA";
 export const DATE_HINT = `Format ${DATE_PLACEHOLDER}.`;
 export const YEAR_END_BEFORE_START = "La date de fin doit être postérieure ou égale à la date de début.";
@@ -113,6 +114,68 @@ export function parseAmountToCents(input: string): bigint {
   if (!/^\d+(?:\.\d{1,2})?$/.test(body)) throw new Error(AMOUNT_INPUT_ERROR);
   const [whole = "0", fraction = ""] = body.split(".");
   return sign * (BigInt(whole) * 100n + BigInt(fraction.padEnd(2, "0")));
+}
+
+/**
+ * Parse a percent such as "3,125" or "3.50" to thousandths of a percent.
+ * 3.50 % is 3500. At most three decimals. Not a euro amount.
+ */
+export function parseRateToMillis(input: string): bigint {
+  const trimmed = input.trim().replace(/%/g, "");
+  if (!trimmed || /[eE€]/.test(trimmed)) throw new Error(RATE_INPUT_ERROR);
+  let body = trimmed.replace(/[\s\u00a0\u202f\u2009\u2007]+/g, "");
+  if (body.startsWith("+")) body = body.slice(1);
+  if (body.startsWith("-") || body.startsWith("−")) throw new Error(RATE_INPUT_ERROR);
+  const lastComma = body.lastIndexOf(",");
+  const lastDot = body.lastIndexOf(".");
+  if (lastComma >= 0 && lastDot >= 0) {
+    body = lastComma > lastDot
+      ? body.replace(/\./g, "").replace(",", ".")
+      : body.replace(/,/g, "");
+  } else if (lastComma >= 0) {
+    if ((body.match(/,/g)?.length ?? 0) > 1) throw new Error(RATE_INPUT_ERROR);
+    body = body.replace(",", ".");
+  } else if ((body.match(/\./g)?.length ?? 0) > 1) {
+    throw new Error(RATE_INPUT_ERROR);
+  }
+  if (!/^\d+(?:\.\d{1,3})?$/.test(body)) throw new Error(RATE_INPUT_ERROR);
+  const [whole = "0", fraction = ""] = body.split(".");
+  const millis = BigInt(whole) * 1000n + BigInt(fraction.padEnd(3, "0"));
+  if (millis > 100000n) throw new Error(RATE_INPUT_ERROR);
+  return millis;
+}
+
+function rateFraction(millis: bigint): { sign: string; whole: string; fraction: string } {
+  const negative = millis < 0n;
+  const absolute = negative ? -millis : millis;
+  let fraction = (absolute % 1000n).toString().padStart(3, "0").replace(/0+$/, "");
+  if (fraction.length < 2) fraction = fraction.padEnd(2, "0");
+  return {
+    sign: negative ? "-" : "",
+    whole: (absolute / 1000n).toString(),
+    fraction,
+  };
+}
+
+/** API decimal. 3500 → "3.50", 3125 → "3.125". */
+export function rateToApi(millis: bigint): string {
+  const parts = rateFraction(millis);
+  return `${parts.sign}${parts.whole}.${parts.fraction}`;
+}
+
+/** French display without the percent sign. 3500 → "3,50". */
+export function formatRateMillis(millis: bigint): string {
+  const parts = rateFraction(millis);
+  const sign = parts.sign === "-" ? "−" : "";
+  return `${sign}${parts.whole},${parts.fraction}`;
+}
+
+export function formatRateFromApi(value: string): string {
+  try {
+    return formatRateMillis(parseRateToMillis(value));
+  } catch {
+    return value;
+  }
 }
 
 /** Canonical API decimal. The backend stores the same number as integer cents. */

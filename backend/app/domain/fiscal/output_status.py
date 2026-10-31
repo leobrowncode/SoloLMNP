@@ -300,8 +300,7 @@ def _replace_trust_warning(package: dict[str, Any], trust: str) -> None:
             {
                 "code": "RESEARCH_ONLY",
                 "message": (
-                    "Millésime en recherche : cette feuille n’est pas une base de déclaration. "
-                    "SoloLMNP n’envoie rien aux impôts."
+                    "Millésime en recherche : cette feuille n’est pas une base de déclaration."
                 ),
             }
         )
