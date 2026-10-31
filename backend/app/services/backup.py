@@ -2,11 +2,16 @@
 
 Restore replaces the live database only after a new pre-restore backup. It does
 not update validated entries in place: the whole file is swapped for the
-archive contents.
+archive contents. Only justificatifs registered in that database are archived.
+A placeholder such as ``documents/.gitkeep`` is left out, and if an older
+archive still contains one it is ignored. Unsafe paths are refused by the
+integrity check and by restore alike. A failed install puts the previous
+database and documents back; a failed rollback is logged and raised.
 """
 
 import hashlib
 import json
+import logging
 import os
 import shutil
 import sqlite3
@@ -24,8 +29,11 @@ from app.core.config import Settings
 from app.core.database import SCHEMA_REVISION, Database
 from app.core.version import APPLICATION_VERSION
 from app.domain.filing.backup_catalog import (
+    UnsafeDocumentPath,
+    archived_document_names,
     backup_timestamp,
     backup_view,
+    classify_document_member,
     fingerprint,
     integrity_view,
     population,
@@ -37,6 +45,7 @@ from app.services.ledger import fail
 MAX_ARCHIVE = 200 * 1024 * 1024
 MAX_MEMBER = 100 * 1024 * 1024
 _CHECKS = "integrity.json"
+logger = logging.getLogger(__name__)
 
 
 def create_backup(settings: Settings) -> dict[str, str]:
@@ -53,13 +62,10 @@ def create_backup(settings: Settings) -> dict[str, str]:
         manifest_files = [_file_record(database_copy, "database.sqlite3")]
         with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             archive.write(database_copy, "database.sqlite3")
-            documents = settings.documents_dir
-            if documents.is_dir():
-                for path in sorted(documents.iterdir()):
-                    if path.is_file() and not path.is_symlink():
-                        name = f"documents/{path.name}"
-                        archive.write(path, name)
-                        manifest_files.append(_file_record(path, name))
+            for path in _documents_to_archive(settings, database_copy):
+                name = f"documents/{path.name}"
+                archive.write(path, name)
+                manifest_files.append(_file_record(path, name))
             manifest = {
                 "created_at": utc_now().strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "application_version": APPLICATION_VERSION,
@@ -142,18 +148,44 @@ def restore_backup(
         )
     path = _archive_path(settings, filename)
     manifest, backup_counts = _inspect(path)
-    safety = create_backup(settings)
     documents = _archive_documents(path)
+    safety = create_backup(settings)
+    snapshot_db: Path | None = None
+    snapshot_docs: Path | None = None
+    database_started = False
+    documents_started = False
     try:
+        snapshot_db = _snapshot_database(settings.database_path)
+        snapshot_docs = _snapshot_documents(settings.documents_dir)
+        database_started = True
         _replace_live_database(settings, database, path)
+        documents_started = True
         _replace_documents(settings.documents_dir, documents)
-    except Exception:
-        safety_path = _backup_root(settings) / safety["filename"]
-        try:
-            _replace_live_database(settings, database, safety_path)
-        except Exception:
-            database.reopen()
+    except Exception as original:
+        # Any install failure restores the pre-restore snapshots. A rollback
+        # failure is logged and propagated; it must not disappear.
+        if database_started or documents_started:
+            try:
+                _rollback_restore(
+                    settings,
+                    database,
+                    snapshot_db if database_started else None,
+                    snapshot_docs,
+                    restore_documents=documents_started,
+                )
+            except Exception as rollback_error:
+                logger.exception(
+                    "Échec du retour arrière de la restauration. "
+                    "Instantané base : %s. Instantané documents : %s.",
+                    snapshot_db,
+                    snapshot_docs,
+                )
+                raise rollback_error from original
+        _discard_snapshot(snapshot_db)
+        _discard_snapshot(snapshot_docs)
         raise
+    _discard_snapshot(snapshot_db)
+    _discard_snapshot(snapshot_docs)
     return {
         "restored_from": path.name,
         "pre_restore_backup": safety["filename"],
@@ -254,6 +286,133 @@ def _copy_database(source: Path, target: Path) -> None:
         origin.close()
 
 
+def _stored_document_names(database_path: Path) -> set[str]:
+    connection = sqlite3.connect(database_path)
+    try:
+        rows = connection.execute("SELECT stored_name FROM supporting_document").fetchall()
+    finally:
+        connection.close()
+    return {row[0] for row in rows if isinstance(row[0], str) and row[0]}
+
+
+def _documents_to_archive(settings: Settings, database_copy: Path) -> list[Path]:
+    documents = settings.documents_dir
+    if not documents.is_dir():
+        return []
+    present = [
+        path.name for path in documents.iterdir() if path.is_file() and not path.is_symlink()
+    ]
+    chosen: list[Path] = []
+    for name in archived_document_names(present, _stored_document_names(database_copy)):
+        path = documents / name
+        if path.is_file() and not path.is_symlink() and _inside(path, documents):
+            chosen.append(path)
+    return chosen
+
+
+def _document_decision(member: str) -> str | None:
+    try:
+        return classify_document_member(member)
+    except UnsafeDocumentPath:
+        fail("BACKUP_REJECTED", "Chemin de document refusé.", 422)
+
+
+def _snapshot_database(source: Path) -> Path:
+    target = source.with_name(f".{source.name}.snapshot-{uuid4().hex}")
+    _copy_database(source, target)
+    return target
+
+
+def _snapshot_documents(root: Path) -> Path | None:
+    if not root.exists():
+        return None
+    destination = root.parent / f".documents-snapshot-{uuid4().hex}"
+    shutil.copytree(root, destination, symlinks=True)
+    return destination
+
+
+def _rollback_restore(
+    settings: Settings,
+    database: Database,
+    snapshot_db: Path | None,
+    snapshot_docs: Path | None,
+    *,
+    restore_documents: bool,
+) -> None:
+    failures: list[Exception] = []
+    if snapshot_db is not None:
+        try:
+            _restore_database_file(settings, database, snapshot_db)
+        except Exception as exc:
+            failures.append(exc)
+            try:
+                database.reopen()
+            except Exception as reopen_error:
+                logger.exception(
+                    "Échec de la réouverture de la base après un retour arrière impossible."
+                )
+                failures.append(reopen_error)
+    if restore_documents:
+        try:
+            _restore_documents_snapshot(settings.documents_dir, snapshot_docs)
+        except Exception as exc:
+            failures.append(exc)
+    if not failures:
+        return
+    for extra in failures[1:]:
+        logger.error(
+            "Échec supplémentaire du retour arrière de la restauration.",
+            exc_info=extra,
+        )
+    raise failures[0]
+
+
+def _restore_database_file(settings: Settings, database: Database, snapshot: Path) -> None:
+    destination = settings.database_path
+    database.engine.dispose()
+    for suffix in ("-wal", "-shm"):
+        Path(f"{destination}{suffix}").unlink(missing_ok=True)
+    incoming = destination.with_name(f"{destination.name}.rollback-{uuid4().hex}")
+    try:
+        _copy_database(snapshot, incoming)
+        os.replace(incoming, destination)
+    finally:
+        incoming.unlink(missing_ok=True)
+    database.reopen()
+
+
+def _restore_documents_snapshot(root: Path, snapshot: Path | None) -> None:
+    parent = root.parent
+    displaced: Path | None = None
+    if root.exists():
+        displaced = parent / f".documents-displaced-{uuid4().hex}"
+        os.replace(root, displaced)
+    staging: Path | None = None
+    try:
+        if snapshot is not None:
+            staging = parent / f".documents-restored-{uuid4().hex}"
+            shutil.copytree(snapshot, staging, symlinks=True)
+            os.replace(staging, root)
+            staging = None
+    except Exception:
+        if staging is not None and staging.exists():
+            shutil.rmtree(staging, ignore_errors=True)
+        if displaced is not None and not root.exists():
+            os.replace(displaced, root)
+        raise
+    if displaced is not None and displaced.exists():
+        shutil.rmtree(displaced, ignore_errors=True)
+
+
+def _discard_snapshot(path: Path | None) -> None:
+    if path is None or not path.exists():
+        return
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path, ignore_errors=True)
+        return
+    path.unlink(missing_ok=True)
+
+
 def _replace_live_database(settings: Settings, database: Database, archive_path: Path) -> None:
     destination = settings.database_path
     with tempfile.TemporaryDirectory(dir=destination.parent) as folder:
@@ -290,10 +449,10 @@ def _archive_documents(path: Path) -> list[tuple[str, bytes]]:
     documents: list[tuple[str, bytes]] = []
     with zipfile.ZipFile(path) as archive:
         for info in archive.infolist():
-            member = info.filename
-            if not member.startswith("documents/") or member.endswith("/"):
+            decision = _document_decision(info.filename)
+            if decision != "keep":
                 continue
-            name = member.removeprefix("documents/")
+            name = info.filename.removeprefix("documents/")
             if not _single_segment(name):
                 fail("BACKUP_REJECTED", "Chemin de document refusé.", 422)
             documents.append((name, archive.read(info)))
@@ -328,14 +487,10 @@ def _replace_documents(root: Path, files: list[tuple[str, bytes]]) -> None:
 
 
 def _single_segment(name: str) -> bool:
-    return (
-        bool(name)
-        and name == Path(name).name
-        and ".." not in name
-        and "\\" not in name
-        and "\x00" not in name
-        and not name.startswith(".")
-    )
+    try:
+        return classify_document_member(f"documents/{name}") == "keep"
+    except UnsafeDocumentPath:
+        return False
 
 
 def _unsafe_member(member: str) -> bool:
@@ -391,6 +546,7 @@ def _validate_archive(path: Path) -> None:
             member = info.filename
             if _unsafe_member(member) or _is_symlink(info):
                 fail("BACKUP_REJECTED", "Chemin d’archive refusé.", 422)
+            _document_decision(member)
             if info.file_size > MAX_MEMBER:
                 fail("BACKUP_REJECTED", "Membre d’archive trop volumineux.", 422)
             total += info.file_size

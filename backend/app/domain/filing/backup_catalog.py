@@ -1,12 +1,67 @@
-"""Pure descriptions of a backup archive: population, date and last check."""
+"""Pure descriptions of a backup archive: population, date, members and last check."""
 
 from __future__ import annotations
 
 import hashlib
 import sqlite3
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+DocumentMember = Literal["keep", "ignore"]
+
+
+class UnsafeDocumentPath(ValueError):
+    """A documents/ member is not a single safe file name."""
+
+
+def classify_document_member(member: str) -> DocumentMember | None:
+    """Decide what restore does with one zip member.
+
+    ``None`` means the member is not under ``documents/``. A leading dot on a
+    single file name (``.gitkeep``) is ignored: the application may have put it
+    in an older archive, and it is not a stored justificatif. Nested paths,
+    traversal, separators and empty names are refused.
+    """
+    if not member.startswith("documents/") or member.endswith("/"):
+        return None
+    name = member.removeprefix("documents/")
+    if not _single_document_name(name):
+        raise UnsafeDocumentPath("Chemin de document refusé.")
+    if name.startswith("."):
+        return "ignore"
+    return "keep"
+
+
+def archived_document_names(present: Iterable[str], registered: Iterable[str]) -> list[str]:
+    """File names to archive: registered in the database, never hidden or unsafe."""
+    allowed = {name for name in registered if name}
+    chosen: list[str] = []
+    for name in sorted(present):
+        if name not in allowed:
+            continue
+        try:
+            decision = classify_document_member(f"documents/{name}")
+        except UnsafeDocumentPath:
+            continue
+        if decision == "keep":
+            chosen.append(name)
+    return chosen
+
+
+def _single_document_name(name: str) -> bool:
+    if (
+        not name
+        or name in {".", ".."}
+        or "\x00" in name
+        or ".." in name
+        or "\\" in name
+        or "/" in name
+        or name != Path(name).name
+    ):
+        return False
+    return True
 
 
 def fingerprint(path: Path) -> str:
