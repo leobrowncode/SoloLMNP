@@ -190,6 +190,27 @@ test.describe.serial("parcours critique", () => {
     await page.getByRole("button", { name: "Prévisualiser l’amortissement du logement" }).click();
     await page.getByRole("button", { name: "Créer les immobilisations affichées" }).click();
     await expect(page.getByRole("heading", { name: /Construction — Studio fictif/ })).toBeVisible();
+    const desktop = page.viewportSize();
+    expect(desktop?.width).toBe(1280);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    for (const name of [
+      "Faire entrer le bien en comptabilité",
+      "Calculer les périodes",
+      "Comptabiliser toutes les dotations",
+    ]) {
+      const box = await page.getByRole("button", { name }).boundingBox();
+      expect(box, name).toBeTruthy();
+      expect(box!.y + box!.height, name).toBeLessThanOrEqual(desktop!.height);
+    }
+    const sharedDuration = "Durée d’usage proposée pour un logement en location longue durée, à confirmer selon l’état du bien et les travaux. Ce n’est pas un barème légal.";
+    await expect(page.getByText(sharedDuration)).toHaveCount(1);
+    await page.getByText("Détail et aides").click();
+    await expect(page.getByText(sharedDuration)).toBeVisible();
+    await page.setViewportSize({ width: 390, height: desktop!.height });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+    await expect(page.getByText(sharedDuration)).toHaveCount(1);
+    await page.setViewportSize({ width: desktop!.width, height: desktop!.height });
     await page.getByRole("button", { name: "Calculer les périodes" }).click();
     await expect(page.getByText(/période\(s\) calculée/)).toBeVisible();
     const postDotations = page.getByRole("button", { name: "Comptabiliser toutes les dotations" });
@@ -204,7 +225,8 @@ test.describe.serial("parcours critique", () => {
     await expect(page.getByText(/Bien entré en comptabilité/)).toBeVisible();
     await expect(postDotations).toBeEnabled();
     await postDotations.click();
-    await expect(page.getByText(/dotation\(s\) comptabilisée/)).toBeVisible();
+    await expect(page.getByText(/dotations comptabilisées, total/)).toBeVisible();
+    await expect(page.locator("#actions-dotations").getByRole("link", { name: "Voir le journal" })).toBeVisible();
 
     await page.goto("/etats-comptables");
     await expect(page.getByText(/Bilan/)).toBeVisible();

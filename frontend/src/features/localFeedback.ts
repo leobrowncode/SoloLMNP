@@ -40,6 +40,11 @@ export interface ShowSaveNotice {
   highlightId?: string | undefined;
   focus?: boolean | undefined;
   detail?: string | undefined;
+  /**
+   * Replaces the composed « kind “name” action à time » sentence.
+   * Use it when the acknowledgement must stay a single sentence.
+   */
+  sentence?: string | undefined;
   next?: SaveNextAction | undefined;
 }
 
@@ -59,7 +64,7 @@ export function useSaveNotice() {
     const at = input.at ?? new Date();
     setNotice({
       id: crypto.randomUUID(),
-      text: saveFeedbackText({ kind: input.kind, name: input.name, action: input.action, at }),
+      text: input.sentence ?? saveFeedbackText({ kind: input.kind, name: input.name, action: input.action, at }),
       targetId: input.targetId,
       highlightId: input.highlightId,
       focus: input.focus,

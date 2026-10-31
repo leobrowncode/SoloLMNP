@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import AssetsPage from "./AssetsPage";
 
@@ -452,7 +452,11 @@ test("a double click posts the batch once and keeps the trigger disabled", async
       items: openPeriods.map((row) => ({ period_id: row.id, status: "posted", entry_id: row.id, replayed: false })),
     }));
   });
-  expect(await screen.findByRole("status")).toHaveTextContent("3 dotation(s) comptabilisée(s).");
+  const posted = await screen.findByRole("status");
+  expect(posted).toHaveTextContent(/3 dotations comptabilisées, total .+€\./);
+  expect(posted.textContent?.split(".").filter((part) => part.trim())).toHaveLength(1);
+  expect(posted).not.toHaveTextContent("Cuisine");
+  expect(screen.getByRole("link", { name: "Voir le journal" })).toHaveAttribute("href", "/comptabilite/journal");
   expect(button).toBeEnabled();
 });
 
@@ -530,4 +534,80 @@ test("a partial batch error reloads the periods the server actually kept", async
   expect(await screen.findByRole("cell", { name: "Comptabilisée" })).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "Comptabiliser" })).toHaveLength(2);
   expect(reads).toBeGreaterThan(1);
+});
+
+const SHARED_DURATION = "Durée d’usage proposée pour un logement en location longue durée, à confirmer selon l’état du bien et les travaux. Ce n’est pas un barème légal.";
+const SHARED_BASIS = "Quote-part proposée pour un logement en location longue durée. À confirmer selon l’état réel du bien.";
+const SHARED_LOCK = "Une dotation est déjà comptabilisée. La valeur, la durée, les dates et les comptes restent figés : une écriture validée n’est pas réécrite, et l’extourne d’une dotation n’est pas proposée ici. Seule la justification peut être précisée.";
+const SHARED_BOOKED = "L’écriture d’acquisition 2025-000001 a déjà inscrit la valeur et les comptes de ce composant. Contrepassez cette écriture depuis le journal avant de les corriger. La durée et la justification restent modifiables tant qu’aucune dotation n’est comptabilisée.";
+const COMPONENT_LABELS = ["Gros œuvre", "Toiture", "Façade", "Électricité", "Plomberie", "Agencements"];
+
+test("shows a shared component justification once and edits it on the row", async () => {
+  const calls: { url: string; method: string; body: unknown }[] = [];
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    const body = init?.body ? JSON.parse(String(init.body)) as unknown : undefined;
+    calls.push({ url, method, body });
+    if (url === "/api/ledger/setup") return response({ activity: { id: 1 }, years: [{ id: 1, year: 2025, status: "OPEN" }] });
+    if (url === "/api/ledger/accounts") return response([]);
+    if (url === "/api/operations/properties") return response([{ id: 1, name: "Studio fictif" }]);
+    if (url.endsWith("/periods")) return response([]);
+    if (url === "/api/assets" && method === "GET") {
+      return response([{
+        id: 2, property_id: 1, category: "BUILDING", label: "Construction — Studio fictif",
+        acquisition_value: "80000.00", depreciable_value: "80000.00", non_depreciable_value: "0.00",
+        residual_value: "0.00", useful_life_months: 480, method: "LINEAR",
+        asset_account: "213000", depreciation_account: "281300",
+        duration_reason: SHARED_DURATION,
+        correction: { locks: [], calculated_periods: 0 },
+        components: COMPONENT_LABELS.map((label, index) => ({
+          id: index + 1,
+          asset_id: 2,
+          category: "STRUCTURE",
+          label,
+          value: "10000.00",
+          useful_life_months: 240 + index,
+          service_start_date: "2025-01-01",
+          asset_account: "213500",
+          depreciation_account: "281350",
+          basis_reason: SHARED_BASIS,
+          duration_reason: SHARED_DURATION,
+          correction: {
+            locks: [
+              { code: "DEPRECIATION_POSTED", fields: ["value", "life", "dates", "account"], message: SHARED_LOCK },
+              { code: "PROPERTY_ALREADY_BOOKED", fields: ["value", "account"], message: SHARED_BOOKED },
+            ],
+            calculated_periods: 0,
+          },
+        })),
+      }]);
+    }
+    if (url === "/api/assets/2/components/1" && method === "PATCH") return response({ id: 1 });
+    throw new Error(`Unexpected ${method} ${url}`);
+  });
+  render(<AssetsPage />);
+  expect(await screen.findByRole("heading", { name: "Construction — Studio fictif" })).toBeInTheDocument();
+  expect(screen.getAllByText(SHARED_DURATION)).toHaveLength(1);
+  expect(screen.getAllByText(SHARED_BASIS)).toHaveLength(1);
+  expect(screen.getAllByText(SHARED_LOCK)).toHaveLength(1);
+  expect(screen.getAllByText(SHARED_BOOKED)).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: "Préciser la justification de Gros œuvre" })).not.toBeInTheDocument();
+  for (const label of COMPONENT_LABELS) {
+    expect(screen.getByRole("textbox", { name: `Justification de ${label}` })).toHaveValue("");
+    expect(screen.getByText(`${240 + COMPONENT_LABELS.indexOf(label)} mois`)).toBeInTheDocument();
+  }
+  const field = screen.getByRole("textbox", { name: "Justification de Gros œuvre" });
+  fireEvent.change(field, { target: { value: "Gros œuvre repris en 2018" } });
+  fireEvent.change(screen.getByLabelText("Motif pour Gros œuvre"), { target: { value: "État constaté sur place" } });
+  fireEvent.click(screen.getByRole("button", { name: "Vérifier la justification de Gros œuvre" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmer la justification de Gros œuvre" }));
+  await waitFor(() => {
+    expect(calls.some((call) => call.url === "/api/assets/2/components/1" && call.method === "PATCH")).toBe(true);
+  });
+  const sent = calls.find((call) => call.url === "/api/assets/2/components/1" && call.method === "PATCH");
+  expect(sent?.body).toEqual({
+    basis_reason: "Gros œuvre repris en 2018",
+    reason: "État constaté sur place",
+  });
 });

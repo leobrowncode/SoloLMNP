@@ -44,6 +44,33 @@
 .ledger-page pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 25rem; overflow: auto; }
 .ledger-page summary { cursor: pointer; padding: .8rem 0; }
 .form-help { margin: .4rem 0 1rem; max-width: 68ch; line-height: 1.45; color: var(--text-secondary); }
+.asset-page { margin-top: 0; padding-top: 1.25rem; }
+.asset-page h2 { margin: 0; }
+.asset-page .heading-with-help { margin-bottom: .35rem; }
+.asset-shared-note { margin: .35rem 0 .5rem; }
+.asset-note { margin: 0 0 .75rem; max-width: 68ch; }
+.asset-note > summary { font-weight: 650; color: var(--text-strong); }
+.asset-note p { overflow-wrap: anywhere; }
+.asset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: .35rem .75rem;
+  margin: 0 0 .35rem;
+}
+.asset-actions > label { flex: 1 1 12rem; max-width: 22rem; min-width: 0; margin: 0; }
+.row-justification {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: .35rem;
+  min-width: 0;
+  max-width: 18rem;
+}
+.component-alert, .component-note { display: block; margin-top: .25rem; overflow-wrap: anywhere; }
+@media (max-width: 768px) {
+  .row-justification { max-width: 100%; }
+}
 .field-hint { font-size: .82rem; color: var(--text-muted); line-height: 1.35; }
 .field-error { font-size: .82rem; color: var(--text-danger); line-height: 1.35; }
 .import-error-lines { margin: .35rem 0 0; padding-left: 1.2rem; }
