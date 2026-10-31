@@ -160,6 +160,7 @@ class CsvAssistInput(Input):
     fiscal_year_id: int | None = Field(default=None, gt=0)
     loan_id: int | None = Field(default=None, gt=0)
     confirmed_loan_reference: Annotated[str, Field(max_length=200)] | None = None
+    import_valid_only: bool = False
 
     @model_validator(mode="after")
     def bounded_mapping(self) -> "CsvAssistInput":

@@ -473,6 +473,7 @@ export function csvPreviewCauses(input: {
   missingYear: boolean;
   missingBank: boolean;
   missingLoan: boolean;
+  paidWithoutBank?: boolean;
 }): ActionCause[] {
   return listed(
     input.hasContent ? null : {
@@ -487,6 +488,11 @@ export function csvPreviewCauses(input: {
       action: FIX.year,
     } : null,
     input.missingBank ? bankCause(0) : null,
+    input.paidWithoutBank ? {
+      code: "BANK_REQUIRED",
+      message: "Choisissez le compte bancaire des lignes déjà payées.",
+      action: { label: "Ajouter un compte bancaire", href: "/operations/banque#ajouter-banque" },
+    } : null,
     input.missingLoan ? {
       code: "NO_LOAN",
       message: "Aucun emprunt n’est choisi.",

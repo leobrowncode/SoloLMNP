@@ -2,10 +2,12 @@ import { useRef, useState } from "react";
 import {
   downloadImportTemplate,
   downloadRejects,
+  type CsvCommitResult,
   type CsvField,
   type CsvPreview,
   type CsvProfile,
   type CsvInspect,
+  type CsvRow,
 } from "../api/csvImport";
 import type { ApiErrorDetail } from "../api/errors";
 import { operationsRequest } from "../api/operations";
@@ -23,9 +25,10 @@ import { SaveNoticeHost } from "./LocalFeedback";
 import { useSaveNotice } from "./localFeedback";
 import PrerequisiteList from "./PrerequisiteList";
 import FrenchFileInput from "../lib/FrenchFileInput";
-import { enumChoices, enumLabel } from "../lib/format";
+import { enumChoices, enumLabel, formatEuros, frenchCount, importPreviewSummary, importValidOnlyLabel } from "../lib/format";
 import { ResponsiveTable } from "../lib/ResponsiveTable";
 import FitSelect from "../lib/FitSelect";
+import { contentHasPaidLines } from "./csvPaidLines";
 
 const REJECT_FILE = {
   bank: "rejets-releve-bancaire.csv",
@@ -87,24 +90,32 @@ export default function CsvImportAssistant({
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<CsvPreview | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const [acceptPartial, setAcceptPartial] = useState(false);
   const generation = useRef(0);
+  const batchKey = useRef<string | null>(null);
+  const paidWithoutBank = profile === "operations"
+    && missingBank
+    && contentHasPaidLines(content, mapping.paid);
 
   const causes = csvPreviewCauses({
     hasContent: content.trim() !== "",
     anchor,
     missingProperty,
     missingYear,
-    missingBank,
+    missingBank: profile === "operations" ? false : missingBank,
     missingLoan,
+    paidWithoutBank,
   });
   const postCauses = postRequirements(preview, profile, confirmed, anchor);
-  const detail = preview ? previewDetail(preview) : null;
+  const detail = preview && profile !== "operations" ? previewDetail(preview) : null;
 
   function updateContent(value: string) {
     const current = ++generation.current;
     setContent(value);
     setPreview(null);
     setConfirmed(false);
+    setAcceptPartial(false);
+    batchKey.current = null;
     if (!value.trim()) {
       setHeaders([]);
       setFields([]);
@@ -126,6 +137,8 @@ export default function CsvImportAssistant({
     setMapping((current) => ({ ...current, [key]: value }));
     setPreview(null);
     setConfirmed(false);
+    setAcceptPartial(false);
+    batchKey.current = null;
   }
 
   function body(confirmReference?: string) {
@@ -140,8 +153,42 @@ export default function CsvImportAssistant({
     };
   }
 
+  function postImport(currentPreview: CsvPreview, partial: boolean) {
+    const current = generation.current;
+    const key = batchKey.current ?? crypto.randomUUID();
+    batchKey.current = key;
+    void action(async () => {
+      const result = await operationsRequest<CsvCommitResult>(
+        `/imports/${profile}/commit`,
+        "POST",
+        {
+          ...body(currentPreview.loan_reference ?? undefined),
+          ...(partial ? { import_valid_only: true } : {}),
+        },
+        profile === "operations" ? { headers: { "Idempotency-Key": key } } : undefined,
+      );
+      if (generation.current !== current) return;
+      show({
+        kind: GLOSSARY["import-csv"].label,
+        name: IMPORT_NAMES[profile],
+        action: "enregistré",
+        targetId: place,
+        detail: importedMessage(profile, result),
+        next: IMPORT_NEXT[profile],
+      });
+      onImported();
+      setPreview(null);
+      setContent("");
+      setHeaders([]);
+      setMapping({});
+      setConfirmed(false);
+      setAcceptPartial(false);
+      batchKey.current = null;
+    }, "Comptabilisation de l’import…");
+  }
+
   return (
-    <details id={place}>
+    <details id={place} className="csv-import">
       <summary>{summaryTitle}</summary>
       <SaveNoticeHost place={place} notice={notice} onDismiss={dismiss} />
       <p>
@@ -208,6 +255,8 @@ export default function CsvImportAssistant({
             setFields(result.fields);
             setMapping(result.mapping);
             setConfirmed(false);
+            setAcceptPartial(false);
+            batchKey.current ??= crypto.randomUUID();
           }, "Analyse du fichier…");
         }}
       >{previewLabel}</button>
@@ -215,6 +264,10 @@ export default function CsvImportAssistant({
       {detail && <ApiErrorAlert detail={detail} />}
       {preview && (
         <>
+          {profile === "operations" ? (
+            <OperationsPreview preview={preview} />
+          ) : (
+          <>
           <p>
             {preview.summary.count} ligne(s) : {preview.summary.valid} valide(s),{" "}
             {preview.summary.duplicate} doublon(s), {preview.summary.warning} avertissement(s),{" "}
@@ -269,6 +322,8 @@ export default function CsvImportAssistant({
             )}
             </BrowsableList>
           )}
+          </>
+          )}
           {preview.rejects_csv && (
             <button type="button" disabled={busy} onClick={() => downloadRejects(REJECT_FILE[profile], preview.rejects_csv)}>
               Télécharger les lignes à corriger
@@ -284,38 +339,50 @@ export default function CsvImportAssistant({
               Je confirme que le prêt source {preview.loan_reference} correspond à {loanLabel}.
             </label>
           )}
+          {profile === "operations" && preview.summary.error > 0 && preview.summary.importable > 0 && (
+            <fieldset className="import-choice">
+              <legend>Que faire des rejets ?</legend>
+              <label>
+                <input
+                  type="radio"
+                  name={`${textareaId}-decision`}
+                  checked={!acceptPartial}
+                  onChange={() => setAcceptPartial(false)}
+                />
+                <span>Corriger le fichier d’abord</span>
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name={`${textareaId}-decision`}
+                  checked={acceptPartial}
+                  onChange={() => setAcceptPartial(true)}
+                />
+                <span>{importValidOnlyLabel(preview.summary.importable)}</span>
+              </label>
+            </fieldset>
+          )}
           <button
             type="button"
             disabled={busy || postCauses.length > 0}
             aria-busy={busy || undefined}
             aria-describedby={describedBy(postCauseId, postCauses)}
-            onClick={() => {
-              const current = generation.current;
-              void action(async () => {
-                const result = await operationsRequest<CsvPreview>(
-                  `/imports/${profile}/commit`,
-                  "POST",
-                  body(preview.loan_reference ?? undefined),
-                );
-                if (generation.current !== current) return;
-                show({
-                  kind: GLOSSARY["import-csv"].label,
-                  name: IMPORT_NAMES[profile],
-                  action: "enregistré",
-                  targetId: place,
-                  detail: importedMessage(profile, result.imported),
-                  next: IMPORT_NEXT[profile],
-                });
-                onImported();
-                setPreview(null);
-                setContent("");
-                setHeaders([]);
-                setMapping({});
-                setConfirmed(false);
-              }, "Comptabilisation de l’import…");
-            }}
+            onClick={() => postImport(preview, false)}
           >{commitLabel}</button>
           <PrerequisiteList id={postCauseId} causes={postCauses} />
+          {profile === "operations" && preview.summary.error > 0 && preview.summary.importable > 0 && (
+            <button
+              type="button"
+              disabled={busy || !acceptPartial}
+              aria-describedby={`${textareaId}-partial-note`}
+              onClick={() => postImport(preview, true)}
+            >{importValidOnlyLabel(preview.summary.importable)}</button>
+          )}
+          {profile === "operations" && preview.summary.error > 0 && preview.summary.importable > 0 && (
+            <p id={`${textareaId}-partial-note`} className="form-help">
+              Les lignes rejetées ne seront pas comptabilisées. Une écriture validée ne se modifie pas.
+            </p>
+          )}
         </>
       )}
     </details>
@@ -334,6 +401,15 @@ function postRequirements(
       code: "CSV_NOT_READY",
       message: "Associez les colonnes obligatoires avant de confirmer.",
       action: { label: "Revoir les colonnes", href: anchor },
+    }];
+  }
+  if (profile === "operations" && preview.summary.error > 0) {
+    return [{
+      code: "CSV_REJECTS",
+      message: preview.summary.importable > 0
+        ? "Des lignes sont rejetées. Corrigez le fichier, ou confirmez l’import des seules lignes valides."
+        : "Aucune ligne valide. Corrigez le fichier avant de comptabiliser.",
+      action: { label: "Corriger le fichier", href: anchor },
     }];
   }
   if (preview.summary.importable === 0) {
@@ -390,12 +466,71 @@ const IMPORT_NEXT = {
   loan_payments: { label: "Rapprocher le relevé", href: "/operations/banque" },
 } as const;
 
-function importedMessage(profile: CsvProfile, imported: number): string {
+function importedMessage(profile: CsvProfile, result: CsvCommitResult): string {
   if (profile === "bank") {
-    return `${imported} mouvement(s) importé(s), en attente de rapprochement.`;
+    return `${frenchCount(result.imported, "mouvement importé", "mouvements importés")}, en attente de rapprochement.`;
   }
-  if (profile === "operations") {
-    return `${imported} opération(s) comptabilisée(s). Lignes non payées à régler ; traitement fiscal à vérifier.`;
-  }
-  return `${imported} échéance(s) comptabilisée(s). Rapprochez ensuite le relevé bancaire.`;
+  if (profile === "operations") return operationsImportedMessage(result);
+  return `${frenchCount(result.imported, "échéance comptabilisée", "échéances comptabilisées")}. Rapprochez ensuite le relevé bancaire.`;
+}
+
+function operationsImportedMessage(result: CsvCommitResult): string {
+  const posted = result.batch?.posted_count ?? result.imported;
+  const rejected = result.batch?.rejected_count ?? 0;
+  const postedText = result.batch?.replayed
+    ? `${frenchCount(posted, "ligne déjà comptabilisée", "lignes déjà comptabilisées")}. Aucun doublon.`
+    : `${frenchCount(posted, "ligne comptabilisée", "lignes comptabilisées")}.`;
+  const rejectedText = rejected === 0
+    ? ""
+    : rejected === 1
+      ? " 1 ligne rejetée n’a pas été comptabilisée."
+      : ` ${frenchCount(rejected, "ligne rejetée", "lignes rejetées")} n’ont pas été comptabilisées.`;
+  return `${postedText}${rejectedText} Les lignes non payées restent à régler. Le traitement fiscal est à vérifier.`;
+}
+
+function OperationsPreview({ preview }: { preview: CsvPreview }) {
+  const rejects = [...preview.issues, ...preview.rows.flatMap((row) => row.issues)];
+  const ready = preview.rows.filter((row) => row.status !== "error");
+  return (
+    <>
+      <p aria-live="polite">{importPreviewSummary(preview.summary)}</p>
+      {rejects.length > 0 && (
+        <ul className="import-rejects" aria-label="Lignes rejetées">
+          {rejects.map((issue) => (
+            <li key={`${issue.code}-${issue.line ?? "file"}-${issue.field ?? ""}-${issue.message}`}>
+              {rejectSentence(issue)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {ready.length > 0 && (
+        <ul className="import-ready" aria-label="Lignes prêtes">
+          {ready.map((row) => (
+            <li key={row.line}>{readyLine(row)}</li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+function rejectSentence(issue: CsvPreview["issues"][number]): string {
+  const place = issue.line === undefined
+    ? "Fichier"
+    : issue.column
+      ? `Ligne ${issue.line}, ${issue.column}`
+      : `Ligne ${issue.line}`;
+  const value = issue.value
+    ? ` La valeur « ${issue.value} » est refusée.`
+    : issue.value === ""
+      ? " La valeur est vide."
+      : "";
+  const correction = issue.correction ? ` ${issue.correction}` : "";
+  return `${place} : ${issue.message}${value}${correction}`;
+}
+
+function readyLine(row: CsvRow): string {
+  const label = row.display.description || row.display.label || row.display.counterparty || "—";
+  const amount = row.display.amount ? formatEuros(row.display.amount) : "";
+  return [`Ligne ${row.line}`, label, amount, enumLabel("importStatus", row.status)].filter(Boolean).join(" · ");
 }

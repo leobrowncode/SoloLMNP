@@ -56,6 +56,7 @@ HELP_IDS: dict[str, str] = {
     "CSV_HEADER": "import-csv",
     "CSV_INVALID": "import-csv",
     "CSV_PAID": "import-csv",
+    "CSV_PARTIAL_REFUSED": "import-csv",
     "CSV_PROFILE": "import-csv",
     "CSV_REFERENCE": "import-csv",
     "CSV_SHAPE": "import-csv",

@@ -52,6 +52,48 @@
 .import-row-duplicate { background: var(--bg-neutral); }
 .import-row-warning { background: var(--bg-warning); }
 .import-row-error { background: var(--bg-danger); }
+.csv-import { min-width: 0; max-width: 100%; }
+.csv-import textarea,
+.csv-import .import-map { max-width: 100%; min-width: 0; }
+.import-rejects,
+.import-ready {
+  list-style: none;
+  margin: .6rem 0;
+  padding: 0;
+  display: grid;
+  gap: .45rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.import-rejects li,
+.import-ready li {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  padding: .65rem .8rem;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.import-rejects li { background: var(--bg-danger); }
+.import-ready li { background: var(--bg-success-soft); }
+.import-choice {
+  display: grid;
+  gap: .55rem;
+  margin: .8rem 0;
+  min-width: 0;
+  max-width: 100%;
+  border: 0;
+  padding: 0;
+}
+.import-choice legend { font-weight: 650; padding: 0; }
+.import-choice label {
+  display: flex;
+  gap: .5rem;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+}
+.import-choice label span { overflow-wrap: anywhere; }
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));

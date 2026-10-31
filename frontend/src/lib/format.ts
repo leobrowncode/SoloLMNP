@@ -261,3 +261,30 @@ export function enumLabel(group: EnumGroup, code: string): string {
 export function enumChoices(group: EnumGroup): [string, string][] {
   return Object.entries(ENUM_LABELS[group]);
 }
+
+const INTEGER = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
+
+/** "1 ligne" or "12 lignes". Zero uses the plural. */
+export function frenchCount(count: number, singular: string, plural: string): string {
+  return `${INTEGER.format(count)} ${count === 1 ? singular : plural}`;
+}
+
+/** "12 lignes : 1 valide, 11 rejets." Zero counts other than the total are omitted. */
+export function importPreviewSummary(summary: {
+  count: number;
+  valid: number;
+  error: number;
+  duplicate: number;
+  warning: number;
+}): string {
+  const parts = [frenchCount(summary.valid, "valide", "valides")];
+  if (summary.error > 0) parts.push(frenchCount(summary.error, "rejet", "rejets"));
+  if (summary.duplicate > 0) parts.push(frenchCount(summary.duplicate, "doublon", "doublons"));
+  if (summary.warning > 0) parts.push(frenchCount(summary.warning, "avertissement", "avertissements"));
+  return `${frenchCount(summary.count, "ligne", "lignes")} : ${parts.join(", ")}.`;
+}
+
+export function importValidOnlyLabel(count: number): string {
+  if (count === 1) return "Importer uniquement la ligne valide";
+  return `Importer uniquement les ${INTEGER.format(count)} lignes valides`;
+}

@@ -30,6 +30,29 @@ export interface CsvSummary {
   importable: number;
 }
 
+export interface CsvBatchItem {
+  line: number;
+  status: "posted" | "rejected" | "skipped";
+  piece_reference?: string;
+  code?: string;
+  message?: string;
+  replayed?: boolean;
+}
+
+export interface CsvBatch {
+  idempotency_key: string;
+  replayed: boolean;
+  posted_count: number;
+  rejected_count: number;
+  skipped_count: number;
+  items: CsvBatchItem[];
+}
+
+export interface CsvCommitResult {
+  imported: number;
+  batch?: CsvBatch;
+}
+
 export interface CsvPreview {
   profile: CsvProfile;
   ready: boolean;

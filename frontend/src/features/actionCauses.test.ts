@@ -134,6 +134,15 @@ test("import buttons explain a missing file, a missing context and duplicates", 
     hasContent: false, anchor: "/operations/transactions#import-operations",
     missingProperty: true, missingYear: true, missingBank: true, missingLoan: true,
   }).map((item) => item.code)).toEqual(["NO_CSV", "NO_PROPERTY", "NO_OPEN_YEAR", "NO_BANK", "NO_LOAN"]);
+  expect(csvPreviewCauses({
+    hasContent: true, anchor: "/operations/transactions#import-operations",
+    missingProperty: false, missingYear: false, missingBank: false, missingLoan: false,
+    paidWithoutBank: true,
+  })[0]).toMatchObject({
+    code: "BANK_REQUIRED",
+    message: "Choisissez le compte bancaire des lignes déjà payées.",
+    action: { href: "/operations/banque#ajouter-banque" },
+  });
   expect(duplicatePostCauses(false, "/x")).toEqual([]);
   expect(duplicatePostCauses(true, "/operations/transactions#import-operations")[0]?.code).toBe("ALL_DUPLICATES");
   expect(loanPostCauses(true, true)).toEqual([]);

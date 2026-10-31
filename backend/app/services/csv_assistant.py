@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from decimal import Decimal
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_cents
@@ -21,10 +22,17 @@ from app.domain.csv_assistant import (
     settle,
     summarize,
 )
-from app.models import AccountingEntry
+from app.domain.csv_import_batch import (
+    batch_items,
+    fingerprint,
+    guard_operations_commit,
+    paid_lines_need_bank,
+    summarize_batch,
+)
+from app.models import AccountingEntry, LedgerEvent
 from app.models.base import utc_now
 from app.models.operations import BankTransaction, BusinessOperation, Loan
-from app.services.ledger import fail, get_year
+from app.services.ledger import event, fail, get_year
 from app.services.operations import (
     _same_imported_loan_payment,
     bank,
@@ -41,6 +49,17 @@ from app.services.operations import (
     reversed_entry,
     same_imported_operation,
 )
+
+_IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
+_BATCH_ACTION = "CSV_OPERATIONS_BATCH"
+_IMPORT_ACTION = {
+    "label": "Revenir à l’import",
+    "href": "/operations/transactions#import-operations",
+}
+_BANK_ACTION = {
+    "label": "Ajouter un compte bancaire",
+    "href": "/operations/banque#ajouter-banque",
+}
 
 
 def suggest_account(label: str, amount: str) -> str | None:
@@ -88,6 +107,14 @@ def preview_import(
         if bank_account_id is not None:
             bank(session, bank_account_id)
         _annotate_operations(session, property_id, year.id, year, bank_account_id, result["rows"])
+        if paid_lines_need_bank(result["rows"], bank_account_id):
+            fail(
+                "BANK_REQUIRED",
+                "Choisissez le compte bancaire des lignes déjà payées.",
+                422,
+                field="bank_account_id",
+                action=_BANK_ACTION,
+            )
     else:
         if loan_id is None:
             fail("LOAN_NOT_FOUND", "Choisissez l’emprunt.", 422, field="loan_id")
@@ -117,6 +144,8 @@ def commit_import(
     fiscal_year_id: int | None,
     loan_id: int | None,
     confirmed_loan_reference: str | None,
+    import_valid_only: bool = False,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     result = preview_import(
         session,
@@ -128,6 +157,18 @@ def commit_import(
         fiscal_year_id=fiscal_year_id,
         loan_id=loan_id,
     )
+    if profile == "operations":
+        return _commit_operations(
+            session,
+            result,
+            content,
+            mapping,
+            property_id=property_id,
+            fiscal_year_id=fiscal_year_id,
+            bank_account_id=bank_account_id,
+            import_valid_only=import_valid_only,
+            idempotency_key=idempotency_key,
+        )
     if not result["ready"]:
         fail(
             "CSV_HEADER",
@@ -159,20 +200,6 @@ def commit_import(
         outcome = import_csv(
             session, bank_account_id, content, True, parsed_rows=_bank_payload(importable)
         )
-    elif profile == "operations":
-        if property_id is None:
-            fail("PROPERTY_NOT_FOUND", "Choisissez le bien.", 422, field="property_id")
-        if fiscal_year_id is None:
-            fail("CSV_HEADER", "Choisissez l’exercice ouvert.", 422, field="fiscal_year_id")
-        outcome = import_operations_csv(
-            session,
-            property_id,
-            fiscal_year_id,
-            content,
-            True,
-            bank_account_id,
-            parsed_rows=_operation_payload(importable),
-        )
     else:
         if loan_id is None:
             fail("LOAN_NOT_FOUND", "Choisissez l’emprunt.", 422, field="loan_id")
@@ -192,6 +219,138 @@ def commit_import(
             require_preview_token=False,
         )
     result["imported"] = outcome["imported"]
+    return result
+
+
+def _require_idempotency_key(value: str | None) -> str:
+    if value is None or _IDEMPOTENCY_KEY.fullmatch(value) is None:
+        fail(
+            "IDEMPOTENCY_KEY_REQUIRED",
+            "L’en-tête Idempotency-Key est requis : 8 à 80 caractères (lettres, chiffres, _ ou -).",
+            422,
+            field="Idempotency-Key",
+            location="header",
+            action=_IMPORT_ACTION,
+        )
+    return value
+
+
+def _stored_operations_batch(session: Session, key: str) -> tuple[str, dict[str, Any]] | None:
+    row = session.scalar(
+        select(LedgerEvent)
+        .where(
+            LedgerEvent.action == _BATCH_ACTION,
+            func.json_extract(LedgerEvent.details, "$.idempotency_key") == key,
+        )
+        .order_by(LedgerEvent.id.desc())
+    )
+    if row is None:
+        return None
+    stored_fingerprint = row.details.get("fingerprint")
+    stored_result = row.details.get("result")
+    if not isinstance(stored_fingerprint, str) or not isinstance(stored_result, dict):
+        fail("IDEMPOTENCY_RECORD_INVALID", "L’import enregistré est illisible.", 500)
+    return stored_fingerprint, cast(dict[str, Any], stored_result)
+
+
+def _replay_operations(
+    session: Session,
+    idempotency_key: str | None,
+    digest: str,
+) -> dict[str, Any] | None:
+    if idempotency_key is None or _IDEMPOTENCY_KEY.fullmatch(idempotency_key) is None:
+        return None
+    stored = _stored_operations_batch(session, idempotency_key)
+    if stored is None:
+        return None
+    stored_fingerprint, stored_result = stored
+    if stored_fingerprint != digest:
+        fail(
+            "IDEMPOTENCY_CONFLICT",
+            "Cette clé d’idempotence a déjà servi pour un autre import.",
+            409,
+            action=_IMPORT_ACTION,
+        )
+    batch = dict(cast(dict[str, Any], stored_result["batch"]))
+    batch["replayed"] = True
+    return {**stored_result, "batch": batch}
+
+
+def _commit_operations(
+    session: Session,
+    result: dict[str, Any],
+    content: str,
+    mapping: dict[str, str] | None,
+    *,
+    property_id: int | None,
+    fiscal_year_id: int | None,
+    bank_account_id: int | None,
+    import_valid_only: bool,
+    idempotency_key: str | None,
+) -> dict[str, Any]:
+    digest = fingerprint(
+        content=content,
+        mapping=mapping,
+        property_id=property_id,
+        fiscal_year_id=fiscal_year_id,
+        bank_account_id=bank_account_id,
+        import_valid_only=import_valid_only,
+    )
+    replayed = _replay_operations(session, idempotency_key, digest)
+    if replayed is not None:
+        return replayed
+    if not result["ready"]:
+        fail(
+            "CSV_HEADER",
+            "Associez les colonnes obligatoires avant d’importer.",
+            422,
+            issues=result["issues"],
+            action=_IMPORT_ACTION,
+        )
+    if property_id is None:
+        fail("PROPERTY_NOT_FOUND", "Choisissez le bien.", 422, field="property_id")
+    if fiscal_year_id is None:
+        fail("CSV_HEADER", "Choisissez l’exercice ouvert.", 422, field="fiscal_year_id")
+    decision = guard_operations_commit(
+        result["rows"],
+        bank_account_id=bank_account_id,
+        import_valid_only=import_valid_only,
+    )
+    if not decision["ok"]:
+        code = str(decision["code"])
+        fail(
+            code,
+            str(decision["message"]),
+            int(decision["status"]),
+            field="bank_account_id" if code == "BANK_REQUIRED" else None,
+            action=_BANK_ACTION if code == "BANK_REQUIRED" else _IMPORT_ACTION,
+            issues=decision["issues"],
+        )
+    key = _require_idempotency_key(idempotency_key)
+    outcome = import_operations_csv(
+        session,
+        property_id,
+        fiscal_year_id,
+        content,
+        True,
+        bank_account_id,
+        parsed_rows=_operation_payload(decision["importable"]),
+    )
+    batch = summarize_batch(key, batch_items(result["rows"]), replayed=False)
+    stored = {
+        "profile": "operations",
+        "imported": outcome["imported"],
+        "summary": result["summary"],
+        "batch": batch,
+    }
+    event(
+        session,
+        _BATCH_ACTION,
+        None,
+        {"idempotency_key": key, "fingerprint": digest, "result": stored},
+    )
+    result["imported"] = outcome["imported"]
+    result["batch"] = batch
     return result
 
 

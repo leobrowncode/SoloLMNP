@@ -175,7 +175,7 @@ describe("OperationsPage", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: /prêt source 085644F/ }));
     expect(importButton).toBeEnabled();
     await userEvent.click(importButton);
-    expect(await screen.findByText(/1 échéance\(s\) comptabilisée\(s\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/1 échéance comptabilisée/)).toBeInTheDocument();
     const importCall = fetcher.mock.calls.find(([url]) =>
       url === "/api/operations/imports/loan_payments/commit"
     );

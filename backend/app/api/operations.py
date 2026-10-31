@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, cast
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 from fastapi.responses import Response
 from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
@@ -345,7 +345,12 @@ def build_operations_router(database: Database) -> APIRouter:
         )
 
     @router.post("/imports/{profile}/commit")
-    def csv_commit(profile: str, data: CsvAssistInput, session: Write) -> dict[str, Any]:
+    def csv_commit(
+        profile: str,
+        data: CsvAssistInput,
+        session: Write,
+        idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    ) -> dict[str, Any]:
         chosen, mapping = _assist(profile, data)
         return assistant.commit_import(
             session,
@@ -357,6 +362,8 @@ def build_operations_router(database: Database) -> APIRouter:
             fiscal_year_id=data.fiscal_year_id,
             loan_id=data.loan_id,
             confirmed_loan_reference=data.confirmed_loan_reference,
+            import_valid_only=data.import_valid_only,
+            idempotency_key=idempotency_key,
         )
 
     return router
