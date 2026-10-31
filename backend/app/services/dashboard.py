@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_cents
+from app.domain.assets.registration import Fix
 from app.domain.dashboard import (
     DashboardFacts,
     EventFact,
@@ -26,6 +27,7 @@ from app.models import (
     RentalActivity,
     TaxReturnSnapshot,
 )
+from app.services.asset_registration import year_asset_booking
 from app.services.closing import precheck
 from app.services.dossier import current_dossier
 from app.services.export_gate import export_status
@@ -84,6 +86,7 @@ def _facts(
     target_has_entries = False
     fiscal_produced = False
     fiscal_stale = False
+    asset_booking: Fix = "ok"
     fiscal_result: int | None = None
     close_errors: tuple[tuple[str, str], ...] = ()
     exports: dict[str, Any] = {}
@@ -104,6 +107,8 @@ def _facts(
         exports = raw_exports if isinstance(raw_exports, dict) else {}
         export_prerequisites = _prerequisites(posture.get("prerequisites"))
         close_errors = _close_errors(precheck(session, year.id))
+        if assets:
+            asset_booking = year_asset_booking(session, year)
     _asset_event(session, events)
     return DashboardFacts(
         activity_present=activity is not None,
@@ -121,6 +126,7 @@ def _facts(
         calculated_period_count=calculated,
         posted_period_count=posted,
         posted_depreciation_cents=posted_cents,
+        asset_booking=asset_booking,
         has_previous_year=has_previous,
         previous_year_closed=previous_closed,
         opening_posted=opening_posted,

@@ -10,7 +10,17 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
+
+from app.domain.accounting.centralization import STALE_CODE
+from app.domain.assets.registration import (
+    ECART_CODE,
+    ENTRY_CODE,
+    ENTRY_MESSAGE,
+    JOURNAL_CODE,
+    JOURNAL_MESSAGE,
+    NET_CODE,
+)
 
 STEP_IDS = ("structure", "operations", "assets", "opening", "closing", "filing")
 
@@ -52,6 +62,20 @@ _LINKS: dict[str, tuple[str, str]] = {
     "SIREN_MANQUANT": ("Renseigner le SIREN", "/comptabilite/brouillons#identite-liasse"),
     "YEAR_DRAFTS": ("Valider les brouillons", "/comptabilite/brouillons#nouvelle-ecriture"),
     "DEPRECIATION_UNPOSTED": ("Comptabiliser les dotations", "/immobilisations#dotations"),
+    ENTRY_CODE: ("Faire entrer le bien en comptabilité", "/immobilisations#entree-bien"),
+    JOURNAL_CODE: (
+        "Inscrire l’immobilisation au journal",
+        "/comptabilite/brouillons#nouvelle-ecriture",
+    ),
+    "IMMOBILISATIONS_ECART": (
+        "Faire entrer le bien en comptabilité",
+        "/immobilisations#entree-bien",
+    ),
+    "IMMOBILISATIONS_NETTES_NEGATIVES": (
+        "Faire entrer le bien en comptabilité",
+        "/immobilisations#entree-bien",
+    ),
+    STALE_CODE: ("Revoir la centralisation", "/etats-comptables#result-title"),
     "FISCAL_NOT_COMPUTED": ("Calculer le résultat fiscal", "/fiscalite#calcul-fiscal"),
     "FISCAL_STALE": ("Calculer le résultat fiscal", "/fiscalite#calcul-fiscal"),
     "CENTRALIZATION_REQUIRED": ("Centraliser le résultat", "/etats-comptables#result-title"),
@@ -105,6 +129,7 @@ class DashboardFacts:
     calculated_period_count: int
     posted_period_count: int
     posted_depreciation_cents: int
+    asset_booking: Literal["ok", "entry", "journal"]
     has_previous_year: bool
     previous_year_closed: bool
     opening_posted: bool
@@ -212,6 +237,22 @@ def _assets(facts: DashboardFacts) -> dict[str, Any]:
         prerequisites.append(_cause("NO_YEAR", "Aucun exercice n’est créé."))
         status = STATUS_EN_COURS
         summary = str(prerequisites[0]["message"])
+    elif facts.asset_booking != "ok":
+        if facts.asset_booking == "journal":
+            code, message = JOURNAL_CODE, JOURNAL_MESSAGE
+        else:
+            code, message = ENTRY_CODE, ENTRY_MESSAGE
+        prerequisites.append(_cause(code, message))
+        hard = facts.year_status in _FROZEN or any(
+            _has_code(facts, item)
+            for item in (
+                code,
+                "IMMOBILISATIONS_ECART",
+                "IMMOBILISATIONS_NETTES_NEGATIVES",
+            )
+        )
+        status = STATUS_BLOQUE if hard else STATUS_EN_COURS
+        summary = str(prerequisites[0]["message"])
     elif facts.depreciable_asset_count > 0 and _period_total(facts) == 0:
         prerequisites.append(_cause("NO_PERIOD", "Aucune période d’amortissement n’est calculée."))
         status = STATUS_EN_COURS
@@ -226,6 +267,14 @@ def _assets(facts: DashboardFacts) -> dict[str, Any]:
         hard = facts.year_status in _FROZEN or _has_code(facts, "DEPRECIATION_UNPOSTED")
         status = STATUS_BLOQUE if hard else STATUS_EN_COURS
         summary = str(prerequisites[0]["message"])
+    elif (balance := _listed(facts, NET_CODE)) is not None:
+        prerequisites.append(_cause(NET_CODE, balance))
+        status = STATUS_BLOQUE
+        summary = balance
+    elif (gap := _listed(facts, ECART_CODE)) is not None:
+        prerequisites.append(_cause(ECART_CODE, gap))
+        status = STATUS_BLOQUE
+        summary = gap
     elif facts.depreciable_asset_count == 0:
         status = STATUS_FAIT
         summary = "Le terrain n’est pas amorti."
@@ -591,7 +640,14 @@ def _period_total(facts: DashboardFacts) -> int:
 
 
 def _has_code(facts: DashboardFacts, code: str) -> bool:
-    return any(item == code for item, _message in facts.close_errors)
+    return _listed(facts, code) is not None
+
+
+def _listed(facts: DashboardFacts, code: str) -> str | None:
+    for item, message in facts.close_errors:
+        if item == code:
+            return message
+    return None
 
 
 def _guard(payload: dict[str, Any]) -> dict[str, Any]:

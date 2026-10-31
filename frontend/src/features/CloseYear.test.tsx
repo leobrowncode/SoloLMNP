@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import CloseYear from "./CloseYear";
 
@@ -36,6 +36,25 @@ test("links a missing or stale fiscal computation to the calculation", async () 
   const causes = document.getElementById("close-prepare-causes");
   expect(causes).toHaveTextContent("Aucun calcul fiscal n’est enregistré pour cet exercice.");
   expect(causes).toHaveTextContent("Le calcul fiscal ne correspond plus au ledger.");
+  expect(screen.getByRole("button", { name: "Accuser et préparer la clôture" })).toBeDisabled();
+});
+
+test("an immobilisation gap is a blocking link, not a checkbox", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+    blocking: true,
+    errors: [{
+      code: "IMMOBILISATIONS_ECART",
+      message: "Le registre des immobilisations ne retrouve pas les comptes 21, 28 et 681. Faites entrer le bien en comptabilité. Cet écart bloque la clôture et ne peut pas être accusé.",
+    }],
+    warnings: [{ code: "FISCAL_RESEARCH", message: "Le calcul fiscal reste en recherche." }],
+  }));
+  render(<CloseYear year={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  const alert = await screen.findByRole("alert");
+  const link = within(alert).getByRole("link", { name: "Faire entrer le bien en comptabilité" });
+  expect(link).toHaveAttribute("href", "/immobilisations#entree-bien");
+  expect(screen.queryByRole("checkbox", { name: /registre des immobilisations/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("checkbox", { name: "Le calcul fiscal reste en recherche." })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Accuser et préparer la clôture" })).toBeDisabled();
 });
 

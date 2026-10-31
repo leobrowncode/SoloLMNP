@@ -16,6 +16,7 @@ from app.models import (
     DepreciationPeriod,
     DepreciationSchedule,
 )
+from tests.integration.test_statements import book
 
 
 @pytest.fixture
@@ -164,6 +165,7 @@ def test_midyear_furniture_actual_day_schedule_and_posting(client):
     assert row["amount"] == f"{expected // 100}.{expected % 100:02d}"
     assert row["days"] == 184
     assert client.post("/api/assets/years/1/calculate").json() == periods
+    book(client, "218400", "108000", "1200.00")
     posted = client.post(
         f"/api/assets/periods/{row['id']}/post",
         json={"request_id": "depreciation-2025-001", "piece_reference": "DOT-2025-001"},

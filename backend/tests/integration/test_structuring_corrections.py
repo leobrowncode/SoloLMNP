@@ -17,6 +17,7 @@ from app.models import (
     TaxReturnSnapshot,
 )
 from tests.integration.test_assets import _open_account, building, component, furniture, land
+from tests.integration.test_statements import book
 
 
 @pytest.fixture
@@ -202,6 +203,7 @@ def test_open_dependents_are_invalidated_with_the_plan(client, database):
 
 def test_posted_dotation_freezes_plan_inputs_not_the_justification(client, database):
     assert client.post("/api/assets", json=furniture()).status_code == 201
+    book(client, "218400", "108000", "1200.00")
     period = client.post("/api/assets/years/1/calculate").json()[0]
     posted = client.post(
         f"/api/assets/periods/{period['id']}/post",

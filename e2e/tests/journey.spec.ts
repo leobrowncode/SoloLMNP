@@ -61,7 +61,7 @@ test.describe.serial("parcours critique", () => {
     await page.getByRole("button", { name: "Ajouter un bien" }).click();
     await page.getByLabel("Nom du bien").fill("Studio fictif");
     await page.getByLabel("Adresse").fill("1 rue des Scénarios");
-    await page.getByLabel(/Date d’acquisition/).fill("2025-01-15");
+    await page.getByLabel(/Date d’acquisition/).fill("2025-01-01");
     await page.getByLabel(/Début de location/).fill("2025-02-01");
     await fillMoney(page, /Prix d’acquisition/, "100000,00");
     await fillMoney(page, /Frais de notaire/, "0,00");
@@ -95,7 +95,18 @@ test.describe.serial("parcours critique", () => {
     await expect(page.getByRole("heading", { name: /Construction — Studio fictif/ })).toBeVisible();
     await page.getByRole("button", { name: "Calculer les périodes" }).click();
     await expect(page.getByText(/période\(s\) calculée/)).toBeVisible();
-    await page.getByRole("button", { name: "Comptabiliser toutes les dotations" }).click();
+    const postDotations = page.getByRole("button", { name: "Comptabiliser toutes les dotations" });
+    await expect(postDotations).toBeDisabled();
+    await expect(page.getByRole("link", { name: "Faire entrer le bien en comptabilité" })).toBeVisible();
+    await page.getByRole("button", { name: "Faire entrer le bien en comptabilité" }).click();
+    const entryForm = page.locator("section.property-entry");
+    await entryForm.getByRole("button", { name: "Prévisualiser l’écriture" }).click();
+    const bookEntry = entryForm.getByRole("button", { name: "Comptabiliser", exact: true });
+    await expect(bookEntry).toBeEnabled();
+    await bookEntry.click();
+    await expect(page.getByText(/Bien entré en comptabilité/)).toBeVisible();
+    await expect(postDotations).toBeEnabled();
+    await postDotations.click();
     await expect(page.getByText(/dotation\(s\) comptabilisée/)).toBeVisible();
 
     await page.goto("/etats-comptables");

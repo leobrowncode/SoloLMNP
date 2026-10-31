@@ -74,11 +74,60 @@ def _book_year_two(client, debit: str, credit: str, amount: str) -> None:
     assert post(client, draft(client, data)).status_code == 200
 
 
+def _post_matching_depreciation(client, amount: str = "800.00") -> None:
+    """Book a register gross equal to a full-year dotation so the close stays balanced."""
+    assert (
+        client.post(
+            "/api/operations/properties",
+            json={
+                "name": "Bien de la dotation",
+                "address": "Adresse fictive",
+                "acquisition_date": "2025-01-01",
+                "acquisition_price": amount,
+                "land_value": "0.00",
+                "building_value": amount,
+            },
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            "/api/assets",
+            json={
+                "property_id": 1,
+                "category": "FURNITURE",
+                "label": "Mobilier amorti sur l’exercice",
+                "acquisition_date": "2025-01-01",
+                "service_start_date": "2025-01-01",
+                "acquisition_value": amount,
+                "depreciable_value": amount,
+                "non_depreciable_value": "0.00",
+                "residual_value": "0.00",
+                "method": "LINEAR",
+                "useful_life_months": 12,
+                "asset_account": "218400",
+                "depreciation_account": "281840",
+                "basis_reason": "Facture fictive alignée sur la dotation de 800 euros",
+                "duration_reason": "Durée d’utilisation égale à l’exercice, pour un montant exact",
+            },
+        ).status_code
+        == 201
+    )
+    book(client, "218400", "108000", amount)
+    period = client.post("/api/assets/years/1/calculate").json()[0]
+    assert period["amount"] == amount
+    posted = client.post(
+        f"/api/assets/periods/{period['id']}/post",
+        json={"request_id": "dotation-fifo-800", "piece_reference": "DOT-FIFO"},
+    )
+    assert posted.status_code == 201, posted.text
+
+
 def test_prior_unused_depreciation_is_consumed_fifo_on_capacity(client):
     # N : loyers 1000, charges 400, dotation 800 → capacité 600, non déduit 200, résultat fiscal 0
     book(client, "512000", "706000", "1000.00")
     book(client, "615000", "401000", "400.00")
-    book(client, "681100", "281840", "800.00")
+    _post_matching_depreciation(client)
     preview = client.post("/api/fiscal/years/1", json={"adjustments": []}).json()
     assert preview["deductible_depreciation"] == "600.00"
     assert preview["unused_depreciation"] == "200.00"

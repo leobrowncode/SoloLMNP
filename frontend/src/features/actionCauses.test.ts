@@ -49,6 +49,13 @@ test("operation, rent and asset entry causes stack independent blockers", () => 
   expect(postDepreciationCauses([{ status: "CALCULATED" }])).toEqual([]);
   expect(postDepreciationCauses([])[0]?.code).toBe("NO_PERIOD");
   expect(postDepreciationCauses([{ status: "POSTED" }])[0]?.code).toBe("ALL_POSTED");
+  const unbooked = postDepreciationCauses([{ status: "CALCULATED", asset_on_ledger: false, booking: "entry" }]);
+  expect(unbooked[0]?.code).toBe("ASSET_NOT_BOOKED");
+  expect(unbooked[0]?.action.href).toBe("/immobilisations#entree-bien");
+  expect(unbooked[0]?.action.label).toBe("Faire entrer le bien en comptabilité");
+  const purchase = postDepreciationCauses([{ status: "CALCULATED", asset_on_ledger: false, booking: "journal" }]);
+  expect(purchase[0]?.code).toBe("ASSET_PURCHASE_UNBOOKED");
+  expect(purchase[0]?.action.href).toBe("/comptabilite/brouillons#nouvelle-ecriture");
   expect(propertyEntryStartCauses(0, ready).map((item) => item.code)).toEqual(["NO_PROPERTY", "YEAR_READY_TO_CLOSE"]);
   expect(propertyEntryPreviewCauses(0, 0).map((item) => item.code)).toEqual(["NO_PROPERTY", "NO_OPEN_YEAR"]);
   expect(propertyEntryPreviewCauses(1, 2)).toEqual([]);

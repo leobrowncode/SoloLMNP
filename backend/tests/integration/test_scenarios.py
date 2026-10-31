@@ -56,7 +56,6 @@ def test_scenarios_cover_the_fictional_catalogue(client):
     book(client, "512000", "108000", "1000.00")
     book(client, "512000", "706000", "100.00")
     book(client, "615000", "401000", "150.00")
-    book(client, "681100", "281840", "20.00")
     opening_count = client.get("/api/ledger/entries?fiscal_year_id=1&source=OPENING").json()
     assert opening_count["count"] == 0
     proven.add("opening_balances_explicit")
@@ -65,6 +64,7 @@ def test_scenarios_cover_the_fictional_catalogue(client):
     proven.add("balanced_ledger")
 
     assert client.post("/api/assets", json=furniture()).status_code == 201
+    book(client, "218400", "108000", "1200.00")
     periods = client.post("/api/assets/years/1/calculate").json()
     row = periods[0]
     assert row["days"] == 184

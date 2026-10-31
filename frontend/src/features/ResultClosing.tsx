@@ -16,8 +16,10 @@ interface PreviewLine { account_number: string; label: string; debit: string; cr
 interface ProposedAccount { number: string; label: string; account_type: string }
 interface CentralPreview {
   result: string; result_account_prefix: string | null; excluded_draft_count: number;
-  lines: PreviewLine[]; already_posted: boolean; year_status: string;
+  lines: PreviewLine[];   already_posted: boolean; year_status: string;
   proposed_accounts?: ProposedAccount[];
+  recentralization_required?: boolean;
+  recentralization_message?: string | null;
 }
 interface Proposal { source_account: string; label: string; amount: string }
 interface ApproPreview { centralization_posted: boolean; proposals: Proposal[]; already_posted: boolean }
@@ -209,7 +211,10 @@ export default function ResultClosing({ year }: { year: number }) {
       <PrerequisiteList id={centralCauseId} causes={centralCauses} />
       {review && <button type="button" disabled={busy} onClick={() => setReview(false)}>Corriger</button>}
     </FrenchForm>}
-    {preview?.already_posted && appropriation && !appropriation.already_posted && <FrenchForm onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(event.currentTarget); }}>
+    {preview?.recentralization_required && <p role="alert">
+      {preview.recentralization_message} <a href="/comptabilite/journal">Ouvrir le journal pour extourner</a>
+    </p>}
+    {preview?.already_posted && !preview.recentralization_required && appropriation && !appropriation.already_posted && <FrenchForm onSubmit={(event) => { event.preventDefault(); if (review) void post(); else prepare(event.currentTarget); }}>
       <p>La centralisation est déjà comptabilisée. Choisissez l’affectation du solde restant.</p>
       {!appropriation.proposals.length && <p>Aucun solde 120 ou 129 à affecter.</p>}
       {!!appropriation.proposals.length && <>

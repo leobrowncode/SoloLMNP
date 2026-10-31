@@ -152,6 +152,22 @@ def main() -> None:
             })
             periods = post("/api/assets/years/1/calculate", {})
             assert isinstance(periods, list) and len(periods) == 1
+            gross = post("/api/ledger/entries", {
+                "fiscal_year_id": 1,
+                "journal_code": "OD",
+                "accounting_date": "2025-07-01",
+                "piece_reference": "DOCKER-IMMO",
+                "piece_date": "2025-07-01",
+                "label": "Brut du mobilier fictif",
+                "lines": [
+                    {"account_number": "218400", "label": "Mobilier", "debit": "1200.00", "credit": "0.00"},
+                    {"account_number": "108000", "label": "Exploitant", "debit": "0.00", "credit": "1200.00"},
+                ],
+            })
+            post(
+                f"/api/ledger/entries/{gross['id']}/validate",
+                {"expected_version": gross["version"]},
+            )
             depreciation = post(f"/api/assets/periods/{periods[0]['id']}/post", {
                 "request_id": "docker-depreciation-001",
                 "piece_reference": "DOCKER-DOT-001",
@@ -192,7 +208,7 @@ def main() -> None:
                 "assert db.execute('select value from ci_persistence_probe').fetchone()[0] "
                 "== 'fictitious'; "
                 "assert db.execute('select count(*) from business_operation').fetchone()[0] == 1; "
-                "assert db.execute('select count(*) from accounting_entry').fetchone()[0] == 2; "
+                "assert db.execute('select count(*) from accounting_entry').fetchone()[0] == 3; "
                 "assert db.execute('select count(*) from asset').fetchone()[0] == 1; "
                 "assert db.execute(\"select count(*) from depreciation_period where status='POSTED'\").fetchone()[0] == 1; "
                 "db.close(); "

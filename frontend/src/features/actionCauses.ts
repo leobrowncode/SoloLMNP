@@ -25,6 +25,8 @@ export const FIX = {
   fiscal: { label: "Calculer le résultat fiscal", href: "/fiscalite#calcul-fiscal" },
   centralize: { label: "Centraliser le résultat", href: "/etats-comptables#result-title" },
   depreciation: { label: "Comptabiliser les dotations", href: "/immobilisations#dotations" },
+  enterProperty: { label: "Faire entrer le bien en comptabilité", href: "/immobilisations#entree-bien" },
+  bookAsset: { label: "Inscrire l’immobilisation au journal", href: "/comptabilite/brouillons#nouvelle-ecriture" },
   opening: { label: "Prévisualiser les à-nouveaux", href: "/etats-comptables#opening-title" },
   statements: { label: "Vérifier les états", href: "/etats-comptables#statements-title" },
   calculatePeriods: { label: "Calculer les périodes", href: "/immobilisations#calculer-periodes" },
@@ -38,10 +40,15 @@ export const FIX = {
 const PRECHECK: Record<string, CauseAction> = {
   YEAR_DRAFTS: FIX.drafts,
   CENTRALIZATION_REQUIRED: FIX.centralize,
+  CENTRALIZATION_STALE: FIX.centralize,
   DEPRECIATION_UNPOSTED: FIX.depreciation,
   FISCAL_NOT_COMPUTED: FIX.fiscal,
   FISCAL_STALE: FIX.fiscal,
   SIREN_REQUIRED: FIX.identity,
+  ASSET_NOT_BOOKED: FIX.enterProperty,
+  ASSET_PURCHASE_UNBOOKED: FIX.bookAsset,
+  IMMOBILISATIONS_ECART: FIX.enterProperty,
+  IMMOBILISATIONS_NETTES_NEGATIVES: FIX.enterProperty,
 };
 
 const OPENING_BLOCKERS: Record<string, CauseAction> = {
@@ -188,7 +195,28 @@ export function depreciationCalculateCauses(
   return openYearCauses(years);
 }
 
-export function postDepreciationCauses(periods: readonly { status: string }[]): ActionCause[] {
+const ENTRY_BEFORE_DOTATION = "Le bien n’est pas entré en comptabilité : le brut du registre n’est pas au journal. Faites entrer le bien avant de comptabiliser les dotations.";
+const JOURNAL_BEFORE_DOTATION = "L’immobilisation acquise pendant l’exercice n’est pas au journal. Inscrivez son brut au compte d’immobilisation avant de comptabiliser la dotation.";
+
+export function postDepreciationCauses(
+  periods: readonly { status: string; asset_on_ledger?: boolean; booking?: string }[],
+): ActionCause[] {
+  const pending = periods.filter((row) => row.status !== "POSTED");
+  const unbooked = pending.filter((row) => row.asset_on_ledger === false);
+  if (unbooked.length > 0) {
+    if (unbooked.every((row) => row.booking === "journal")) {
+      return [{
+        code: "ASSET_PURCHASE_UNBOOKED",
+        message: JOURNAL_BEFORE_DOTATION,
+        action: FIX.bookAsset,
+      }];
+    }
+    return [{
+      code: "ASSET_NOT_BOOKED",
+      message: ENTRY_BEFORE_DOTATION,
+      action: FIX.enterProperty,
+    }];
+  }
   if (periods.some((row) => row.status !== "POSTED")) return [];
   if (periods.length === 0) {
     return [{
