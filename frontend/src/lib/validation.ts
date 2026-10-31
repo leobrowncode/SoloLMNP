@@ -1,4 +1,4 @@
-import { AMOUNT_INPUT_ERROR, parseAmountToCents } from "./format";
+import { AMOUNT_INPUT_ERROR, RATE_INPUT_ERROR, parseAmountToCents, parseRateToMillis } from "./format";
 
 const ERROR_CLASS = "field-error french-validation";
 
@@ -53,6 +53,13 @@ export function frenchValidityMessage(field: HTMLInputElement | HTMLSelectElemen
   if (validity.stepMismatch) return "Indiquez un montant au centime près.";
   if (validity.typeMismatch) return "La valeur ne correspond pas au format attendu.";
   if (validity.badInput) return "La valeur saisie est incomplète.";
+  if (field instanceof HTMLInputElement && field.dataset.rate === "true" && field.value.trim()) {
+    try {
+      parseRateToMillis(field.value);
+    } catch {
+      return RATE_INPUT_ERROR;
+    }
+  }
   if (field instanceof HTMLInputElement && field.dataset.money === "true" && field.value.trim()) {
     try {
       if (parseAmountToCents(field.value) < 0n) return AMOUNT_INPUT_ERROR;

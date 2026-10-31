@@ -35,6 +35,7 @@ from app.api.operation_schemas import (
 from app.api.sessions import dependencies
 from app.core.database import Database
 from app.core.money import to_cents
+from app.core.rate import to_rate_millis
 from app.domain.csv_assistant import (
     PROFILES,
     TEMPLATE_NAMES,
@@ -184,7 +185,7 @@ def build_operations_router(database: Database) -> APIRouter:
         row = Loan(
             **payload,
             principal_account=principal_account,
-            interest_rate_basis_points=to_cents(data.interest_rate),
+            interest_rate_basis_points=to_rate_millis(data.interest_rate),
         )
         balance = service.principal_balance(session, row)
         if not 0 <= balance <= to_cents(data.initial_principal):

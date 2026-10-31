@@ -32,6 +32,7 @@ from app.api.operation_schemas import (
     TenantInput,
 )
 from app.core.money import from_cents, to_cents
+from app.core.rate import format_rate, to_rate_millis
 from app.domain.loans.posting import choose_posting_path
 from app.models import (
     AccountingEntry,
@@ -318,7 +319,7 @@ def present_loan(session: Session, loan: Loan) -> dict[str, Any]:
         "remaining_principal": money(balance),
         "on_balance_sheet": booked,
         "posting_path": posting_path,
-        "interest_rate": money(loan.interest_rate_basis_points),
+        "interest_rate": format_rate(loan.interest_rate_basis_points),
         "correction": _view(_loan_locks(session, loan)),
     }
 
@@ -451,7 +452,7 @@ def correct_loan(session: Session, loan_id: int, data: LoanCorrectionInput) -> d
     before = snapshot(loan)
     for name in changed:
         if name == "interest_rate":
-            loan.interest_rate_basis_points = to_cents(merged.interest_rate)
+            loan.interest_rate_basis_points = to_rate_millis(merged.interest_rate)
         else:
             setattr(loan, name, getattr(merged, name))
     session.flush()
@@ -750,7 +751,7 @@ def _loan_changed(loan: Loan, data: LoanCorrectionInput) -> dict[str, object]:
     if "interest_rate" not in data.model_fields_set:
         return changed
     rate = data.interest_rate
-    if rate is None or to_cents(rate) != loan.interest_rate_basis_points:
+    if rate is None or to_rate_millis(rate) != loan.interest_rate_basis_points:
         changed["interest_rate"] = rate
     return changed
 
@@ -825,7 +826,7 @@ def _loan_base(loan: Loan) -> dict[str, Any]:
         "lender": loan.lender,
         "start_date": loan.start_date.isoformat(),
         "initial_principal": money(to_cents(loan.initial_principal)),
-        "interest_rate": money(loan.interest_rate_basis_points),
+        "interest_rate": format_rate(loan.interest_rate_basis_points),
         "duration_months": loan.duration_months,
         "monthly_payment": money(to_cents(loan.monthly_payment)),
         "monthly_insurance": money(to_cents(loan.monthly_insurance)),

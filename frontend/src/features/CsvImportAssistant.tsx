@@ -91,6 +91,7 @@ export default function CsvImportAssistant({
   const [preview, setPreview] = useState<CsvPreview | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [acceptPartial, setAcceptPartial] = useState(false);
+  const [inspectError, setInspectError] = useState("");
   const generation = useRef(0);
   const batchKey = useRef<string | null>(null);
   const paidWithoutBank = profile === "operations"
@@ -107,7 +108,9 @@ export default function CsvImportAssistant({
     paidWithoutBank,
   });
   const postCauses = postRequirements(preview, profile, confirmed, anchor);
-  const detail = preview && profile !== "operations" ? previewDetail(preview) : null;
+  const detail = preview && profile !== "operations" && profile !== "loan_payments"
+    ? previewDetail(preview)
+    : null;
 
   function updateContent(value: string) {
     const current = ++generation.current;
@@ -115,6 +118,7 @@ export default function CsvImportAssistant({
     setPreview(null);
     setConfirmed(false);
     setAcceptPartial(false);
+    setInspectError("");
     batchKey.current = null;
     if (!value.trim()) {
       setHeaders([]);
@@ -129,7 +133,10 @@ export default function CsvImportAssistant({
         setFields(result.fields[profile] ?? []);
         setMapping(result.suggestions[profile] ?? {});
       })
-      .catch(() => undefined);
+      .catch((reason: unknown) => {
+        if (generation.current !== current) return;
+        setInspectError(reason instanceof Error ? reason.message : "La lecture du fichier a échoué.");
+      });
   }
 
   function updateMapping(key: string, value: string) {
@@ -218,6 +225,7 @@ export default function CsvImportAssistant({
       <label>{contentLabel}
         <textarea id={textareaId} rows={6} value={content} disabled={busy} onChange={(event) => updateContent(event.target.value)} />
       </label>
+      {inspectError && <p role="alert">{inspectError}</p>}
       {headers.length > 0 && fields.length > 0 && (
         <fieldset className="import-map">
           <legend>Associer les colonnes de votre fichier</legend>
@@ -273,6 +281,7 @@ export default function CsvImportAssistant({
             {preview.summary.duplicate} doublon(s), {preview.summary.warning} avertissement(s),{" "}
             {preview.summary.error} erreur(s).
           </p>
+          {profile === "loan_payments" && <LoanRejects preview={preview} />}
           {preview.rows.length === 0 ? (
             <EmptyState
               title="Aucune ligne dans cet import."
@@ -305,7 +314,7 @@ export default function CsvImportAssistant({
                   priority: "secondary" as const,
                 })),
                 ...(profile === "bank" ? [{ key: "suggested", label: "Compte suggéré", priority: "secondary" as const }] : []),
-                { key: "detail", label: "Détail" },
+                { key: "detail", label: "Détail", priority: profile === "loan_payments" ? "secondary" : "primary" },
               ]}
               rows={rows.map((row) => ({
                 key: String(row.line),
@@ -315,7 +324,7 @@ export default function CsvImportAssistant({
                   enumLabel("importStatus", row.status),
                   ...preview.fields.map((field) => row.display[field.key] || "—"),
                   ...(profile === "bank" ? [row.suggested_account || "À choisir"] : []),
-                  rowDetail(row),
+                  profile === "loan_payments" && row.issues.length > 0 ? "—" : rowDetail(row),
                 ],
               }))}
             />
@@ -486,6 +495,20 @@ function operationsImportedMessage(result: CsvCommitResult): string {
       ? " 1 ligne rejetée n’a pas été comptabilisée."
       : ` ${frenchCount(rejected, "ligne rejetée", "lignes rejetées")} n’ont pas été comptabilisées.`;
   return `${postedText}${rejectedText} Les lignes non payées restent à régler. Le traitement fiscal est à vérifier.`;
+}
+
+function LoanRejects({ preview }: { preview: CsvPreview }) {
+  const rejects = [...preview.issues, ...preview.rows.flatMap((row) => row.issues)];
+  if (rejects.length === 0) return null;
+  return (
+    <ul className="import-rejects" aria-label="Lignes rejetées">
+      {rejects.map((issue) => (
+        <li key={`${issue.code}-${issue.line ?? "file"}-${issue.field ?? ""}-${issue.message}`} role="alert">
+          {rejectSentence(issue)}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function OperationsPreview({ preview }: { preview: CsvPreview }) {

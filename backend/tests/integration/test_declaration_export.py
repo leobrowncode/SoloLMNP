@@ -59,6 +59,8 @@ def test_vintage_2025_explains_amounts_and_archives_them(client):
     assert services["amount"] == "1000.00"
     assert services["source_url"].startswith("https://www.impots.gouv.fr/")
     assert rent["id"] in services["entry_ids"]
+    for row in declaration["efi_rows"]:
+        assert len(row["entry_ids"]) == len(set(row["entry_ids"]))
     unnumbered = next(
         row for row in declaration["efi_rows"] if row["code"] == "2031_RESULTAT_BENEFICE"
     )

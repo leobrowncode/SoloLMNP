@@ -26,6 +26,7 @@ import {
 import "./ledger.css";
 import FitSelect from "../lib/FitSelect";
 import { MobileSection, PageAnchors } from "../lib/PageSection";
+import { ResponsiveTable } from "../lib/ResponsiveTable";
 
 interface BlockedRule {
   id: string;
@@ -73,6 +74,8 @@ interface CarryUse {
   remaining_after: string;
 }
 interface Computation {
+  empty?: boolean;
+  message?: string;
   status: string;
   declarable: boolean;
   output_status?: string;
@@ -161,36 +164,34 @@ function RegisterTable({
     ? `Échéance : ${register.horizon_years ?? 10} ans`
     : "Pas d’échéance";
   return (
-    <div className="ledger-table">
-      <table>
-        <caption>
+    <ResponsiveTable
+      label={title}
+      caption={
+        <>
           <span>{title}</span>
           <GlossaryTip id={help} />
           <GlossaryTip id="registre-reports" />
           <span> {horizon}</span>
-        </caption>
-        <thead>
-          <tr>
-            <th>Exercice d’origine</th>
-            <th>Créé (€)</th>
-            <th>Utilisé (€)</th>
-            <th>Expiré (€)</th>
-            <th>Restant (€)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {register.rows.map((row) => (
-            <tr key={row.origin_year}>
-              <td>{row.origin_year}</td>
-              <td>{formatAmount(row.created)}</td>
-              <td>{formatAmount(row.used)}</td>
-              <td>{formatAmount(row.expired)}</td>
-              <td>{formatAmount(row.remaining)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        </>
+      }
+      columns={[
+        { key: "year", label: "Exercice d’origine" },
+        { key: "remaining", label: "Restant (€)" },
+        { key: "created", label: "Créé (€)", priority: "secondary" },
+        { key: "used", label: "Utilisé (€)", priority: "secondary" },
+        { key: "expired", label: "Expiré (€)", priority: "secondary" },
+      ]}
+      rows={register.rows.map((row) => ({
+        key: String(row.origin_year),
+        cells: [
+          row.origin_year,
+          formatAmount(row.remaining),
+          formatAmount(row.created),
+          formatAmount(row.used),
+          formatAmount(row.expired),
+        ],
+      }))}
+    />
   );
 }
 
@@ -501,6 +502,11 @@ export default function FiscalPage() {
     });
     void request<Computation>(`/years/${year}`, "GET", undefined, "/api/fiscal").then((value) => {
       if (!(current && resultEpoch.current === epoch)) return;
+      if (value.empty) {
+        setResult(null);
+        setResultView(emptyView());
+        return;
+      }
       setResult(value);
       setResultView(finishLoad(value));
     }, (reason: unknown) => {
@@ -567,6 +573,10 @@ export default function FiscalPage() {
   }
 
   async function loadWorksheet() {
+    if (!result) {
+      setError("Aucun calcul fiscal n’est enregistré pour cet exercice.");
+      return;
+    }
     await run(async (report) => {
       report("Chargement de la feuille EFI…");
       setError("");
@@ -629,6 +639,11 @@ export default function FiscalPage() {
     const resultTask = selected && hadResult
       ? request<Computation>(`/years/${selected}`, "GET", undefined, "/api/fiscal").then((value) => {
         if (!(current() && resultEpoch.current === epoch)) return;
+        if (value.empty) {
+          setResult(null);
+          setResultView(emptyView());
+          return;
+        }
         setResult(value);
         setResultView(finishLoad(value));
       }, (reason: unknown) => {
@@ -758,7 +773,7 @@ export default function FiscalPage() {
       <ScreenStatus
         state={resultView}
         onRetry={() => setResultAttempt((value) => value + 1)}
-        empty={<EmptyState title="Aucun calcul fiscal n’est enregistré pour cet exercice." reason="Le calcul lit les écritures validées et prépare le résultat fiscal. Il n’envoie rien." action={{ label: "Calculer le résultat fiscal", href: "#calcul-fiscal" }} />}
+        empty={<EmptyState title="Aucun calcul fiscal n’est enregistré pour cet exercice." reason="Le calcul lit les écritures validées et prépare le résultat fiscal." action={{ label: "Calculer le résultat fiscal", href: "#calcul-fiscal" }} />}
       />
 
       <div id="calcul-fiscal-zone" className="toolbar fiscal-toolbar">
@@ -822,42 +837,35 @@ export default function FiscalPage() {
               help="resultat-comptable"
             />
           </dl>
-          <div className="ledger-table">
-            <table>
-              <caption>Détail des charges (hors lecture fiscale)</caption>
-              <thead>
-                <tr>
-                  <th>Compte</th>
-                  <th>Libellé</th>
-                  <th>Montant (€)</th>
-                  <th>Rôle LMNP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {statements.income_statement.expenses.map((row) => (
-                  <tr key={row.account_number}>
-                    <td>{row.account_number}</td>
-                    <td>{row.label}</td>
-                    <td>{formatAmount(row.amount)}</td>
-                    <td>
-                      {row.account_number.startsWith("681")
-                        ? "Dotation — plafonnée fiscalement"
-                        : "Charge — déductible sauf réintégration"}
-                    </td>
-                  </tr>
-                ))}
-                {statements.income_statement.expenses.length === 0 && (
-                  <tr><td colSpan={4}>
-                    <EmptyState
-                      title="Aucune charge validée pour cet exercice."
-                      reason="Les charges du compte de résultat apparaissent après validation des écritures."
-                      action={{ label: "Saisir une dépense", href: "/operations/transactions" }}
-                    />
-                  </td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {statements.income_statement.expenses.length === 0 ? (
+            <EmptyState
+              title="Aucune charge validée pour cet exercice."
+              reason="Les charges du compte de résultat apparaissent après validation des écritures."
+              action={{ label: "Saisir une dépense", href: "/operations/transactions" }}
+            />
+          ) : (
+            <ResponsiveTable
+              label="Détail des charges"
+              caption="Détail des charges (hors lecture fiscale)"
+              columns={[
+                { key: "account", label: "Compte" },
+                { key: "amount", label: "Montant (€)" },
+                { key: "label", label: "Libellé", priority: "secondary" },
+                { key: "role", label: "Rôle LMNP", priority: "secondary" },
+              ]}
+              rows={statements.income_statement.expenses.map((row) => ({
+                key: row.account_number,
+                cells: [
+                  row.account_number,
+                  formatAmount(row.amount),
+                  row.label,
+                  row.account_number.startsWith("681")
+                    ? "Dotation — plafonnée fiscalement"
+                    : "Charge — déductible sauf réintégration",
+                ],
+              }))}
+            />
+          )}
         </div>
       )}
 
@@ -1047,37 +1055,36 @@ export default function FiscalPage() {
           )}
 
           {(depUses.length > 0 || lossUses.length > 0) && (
-            <div className="ledger-table">
-              <table>
-                <caption>Reports antérieurs consommés (FIFO)</caption>
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Exercice d’origine</th>
-                    <th>Repris (€)</th>
-                    <th>Reste après (€)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {depUses.map((item) => (
-                    <tr key={`dep-${item.origin_year}`}>
-                      <td>Amortissement non déduit</td>
-                      <td>{item.origin_year}</td>
-                      <td>{formatAmount(item.used)}</td>
-                      <td>{formatAmount(item.remaining_after)}</td>
-                    </tr>
-                  ))}
-                  {lossUses.map((item) => (
-                    <tr key={`loss-${item.origin_year}`}>
-                      <td>Déficit LMNP</td>
-                      <td>{item.origin_year}</td>
-                      <td>{formatAmount(item.used)}</td>
-                      <td>{formatAmount(item.remaining_after)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ResponsiveTable
+              label="Reports consommés"
+              caption="Reports antérieurs consommés (FIFO)"
+              columns={[
+                { key: "type", label: "Type" },
+                { key: "year", label: "Exercice d’origine" },
+                { key: "used", label: "Repris (€)", priority: "secondary" },
+                { key: "after", label: "Reste après (€)", priority: "secondary" },
+              ]}
+              rows={[
+                ...depUses.map((item) => ({
+                  key: `dep-${item.origin_year}`,
+                  cells: [
+                    "Amortissement non déduit",
+                    item.origin_year,
+                    formatAmount(item.used),
+                    formatAmount(item.remaining_after),
+                  ],
+                })),
+                ...lossUses.map((item) => ({
+                  key: `loss-${item.origin_year}`,
+                  cells: [
+                    "Déficit LMNP",
+                    item.origin_year,
+                    formatAmount(item.used),
+                    formatAmount(item.remaining_after),
+                  ],
+                })),
+              ]}
+            />
           )}
 
           <p className={`fiscal-output-status fiscal-output-${outputTrust(result)}`}>

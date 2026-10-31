@@ -479,7 +479,13 @@ def displayed_fiscal(session: Session, year_id: int) -> dict[str, Any]:
         .order_by(FiscalComputation.id.desc())
     )
     if row is None:
-        fail("FISCAL_NOT_COMPUTED", "Aucun calcul fiscal n’est enregistré pour cet exercice.", 404)
+        return {
+            "empty": True,
+            "fiscal_year_id": year.id,
+            "year": year.year,
+            "status": "absent",
+            "message": "Aucun calcul fiscal n’est enregistré pour cet exercice.",
+        }
     assert row is not None  # noqa: S101
     return _with_freshness(session, year, row, _json(row, replayed=True))
 

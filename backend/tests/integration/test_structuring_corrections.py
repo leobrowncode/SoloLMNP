@@ -479,15 +479,16 @@ def test_loan_terms_stay_editable_after_a_movement(client, database):
         json={"interest_rate": "2.50", "reason": "Taux contractuel corrigé"},
     )
     assert rated.status_code == 200, rated.text
-    assert rated.json()["interest_rate_basis_points"] == 250
+    assert rated.json()["interest_rate"] == "2.50"
+    assert rated.json()["interest_rate_basis_points"] == 2500
     assert rated.json()["invalidation"]["fiscal_computations"] == 1
     rated_fiscal = _shown_fiscal(client)
     assert rated_fiscal["invalidated"] is True
     assert rated_fiscal["fiscal_result"] == renamed_fiscal["fiscal_result"]
     assert rated_fiscal["current_structuring_sha256"] != rated_fiscal["structuring_sha256"]
     event = _audits(database, "loan")[-1]
-    assert event.before["interest_rate_basis_points"] == 350
-    assert event.after["interest_rate_basis_points"] == 250
+    assert event.before["interest_rate_basis_points"] == 3500
+    assert event.after["interest_rate_basis_points"] == 2500
     with pytest.raises(IntegrityError) as caught, database.sessions.begin() as session:
         session.execute(text("UPDATE loan SET initial_principal=1 WHERE id=1"))
     assert "LOAN_REFERENCED" in str(caught.value)

@@ -8,6 +8,7 @@ import { NoResults } from "./EmptyState";
 import GlossaryTip from "./GlossaryTip";
 import { toApiError } from "./screenState";
 import { DATE_HINT } from "../lib/format";
+import FrenchDateInput from "../lib/FrenchDateInput";
 
 export default function EntryPicker({
   selected,
@@ -85,9 +86,7 @@ export default function EntryPicker({
         </label>
         <label>
           <span id={`${dateId}-label`}>Date de l’écriture</span>
-          <input
-            type="date"
-            lang="fr"
+          <FrenchDateInput
             aria-labelledby={`${dateId}-label`}
             aria-describedby={`${dateId}-hint`}
             value={entryDate}

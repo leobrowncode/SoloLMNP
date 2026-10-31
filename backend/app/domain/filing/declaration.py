@@ -537,7 +537,9 @@ def _efi_row(
         "rules": [_rule_view(rules, rule_id) for rule_id in rule_ids],
         "source_label": None if source is None else source.get("title"),
         "source_url": None if source is None else source.get("pdf_url"),
-        "entry_ids": [int(item) for item in field.get("entries") or [] if _is_int(item)],
+        "entry_ids": list(
+            dict.fromkeys(int(item) for item in field.get("entries") or [] if _is_int(item))
+        ),
         "accounts": [str(item) for item in field.get("accounts") or []],
     }
 

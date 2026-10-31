@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import LiasseSheet, { type Worksheet } from "./LiasseSheet";
 
 function sheet(partial: Partial<Worksheet>): Worksheet {
@@ -11,6 +11,48 @@ function sheet(partial: Partial<Worksheet>): Worksheet {
     ...partial,
   };
 }
+
+test("an EFI line lists a source entry once", () => {
+  const errors: unknown[][] = [];
+  const spy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+    errors.push(args);
+  });
+  const writing = {
+    id: 10,
+    accounting_date: "2025-12-31",
+    journal_code: "OD",
+    piece_reference: "CENT-2025",
+    label: "Centralisation des comptes",
+    accounts: ["616000", "681100"],
+  };
+  render(
+    <LiasseSheet
+      worksheet={sheet({
+        declaration: {
+          marker: "document de travail, à vérifier",
+          status: "research_only",
+          vintage: "2025",
+          explanations: [],
+          efi_rows: [{
+            code: "CHARGES",
+            form: "2033-B-SD",
+            case: "264",
+            case_status: "verified",
+            label: "Total des charges d’exploitation",
+            amount: "180.00",
+            formula: "charges",
+            rules: [],
+            entries: [writing, writing],
+          }],
+        },
+      })}
+    />,
+  );
+  expect(screen.getByText("1 écriture source")).toBeInTheDocument();
+  expect(screen.getAllByText(/Centralisation des comptes/)).toHaveLength(1);
+  expect(errors.flat().join(" ")).not.toMatch(/same key/);
+  spy.mockRestore();
+});
 
 test("a research sheet never says it is ready to copy", () => {
   render(
@@ -161,7 +203,9 @@ test("the declaration sheet explains amounts and blocks uncertain boxes", () => 
   expect(screen.getAllByText("bloquée").length).toBeGreaterThan(0);
   expect(screen.queryByText("370")).not.toBeInTheDocument();
   expect(screen.getByText("5NA")).toBeInTheDocument();
-  expect(screen.getByText("non servie")).toBeInTheDocument();
+  expect(screen.getByText("La case 5NY reste à 0.")).toBeInTheDocument();
+  expect(screen.queryByText("non servie")).not.toBeInTheDocument();
+  expect(screen.queryByText("5NY")).not.toBeInTheDocument();
   expect(screen.getByText(/Ne pas utiliser la case 5NK/)).toBeInTheDocument();
   expect(screen.getByText(/Ne pas utiliser la case 5NZ/)).toBeInTheDocument();
   expect(screen.getByText("5GJ")).toBeInTheDocument();

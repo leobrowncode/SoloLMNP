@@ -182,7 +182,11 @@ def test_cession_account_blocks_the_computation(client):
     assert "RULE-BLOCKED-CESSION-001" in detail["message"]
     assert "RULE-BLOCKED-PLUS-VALUE-001" in detail["message"]
     assert detail["help"] == "cession"
-    assert client.get("/api/fiscal/years/1").status_code == 404
+    absent = client.get("/api/fiscal/years/1")
+    assert absent.status_code == 200, absent.text
+    assert absent.json()["empty"] is True
+    assert absent.json()["status"] == "absent"
+    assert "Aucun calcul fiscal" in absent.json()["message"]
 
 
 def identify(client):

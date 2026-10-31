@@ -125,6 +125,36 @@ def loan(client):
     return response.json()
 
 
+def test_loan_rate_accepts_three_decimals(client):
+    created = client.post(
+        "/api/operations/loans",
+        json={
+            "property_id": 1,
+            "lender": "Banque fictive",
+            "start_date": "2025-01-01",
+            "initial_principal": "10000.00",
+            "interest_rate": "3.125",
+            "duration_months": 120,
+            "principal_account": "164000",
+        },
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["interest_rate"] == "3.125"
+    assert created.json()["interest_rate_basis_points"] == 3125
+    refused = client.post(
+        "/api/operations/loans",
+        json={
+            "property_id": 1,
+            "lender": "Banque fictive",
+            "start_date": "2025-01-01",
+            "initial_principal": "10000.00",
+            "interest_rate": "3.1251",
+            "duration_months": 120,
+        },
+    )
+    assert refused.status_code == 422
+
+
 def test_full_expense_preserved_with_partial_tax_metadata(client):
     row = create(client)
     assert row["deductible_percentage"] == "80.00"

@@ -12,6 +12,25 @@ import { expect, test, type Page } from "@playwright/test";
  * deterministic FEC download, and a research-only declaration sheet.
  */
 
+const consoleProblems = new WeakMap<Page, string[]>();
+
+function installConsoleGuard(page: Page) {
+  const problems: string[] = [];
+  consoleProblems.set(page, problems);
+  page.on("console", (message) => {
+    const text = message.text();
+    if (/same key|Encountered two children with the same key/i.test(text)) problems.push(text);
+  });
+  page.on("pageerror", (error) => {
+    if (/same key/i.test(error.message)) problems.push(error.message);
+  });
+  page.on("response", (response) => {
+    if (response.status() !== 404) return;
+    if (/favicon|apple-touch-icon/i.test(response.url())) return;
+    problems.push(`404 ${response.url()}`);
+  });
+}
+
 const CSV = [
   "Nature;Date;Date de la pièce;Type;Tiers;Montant;Libellé;Référence de pièce;Justificatif;Déjà payée",
   "Recette;15/03/2025;15/03/2025;LOY;Dupont;800,00;Loyer mars fictif;LOY-2025-03;bail.pdf;oui",
@@ -30,6 +49,14 @@ async function fillMoney(page: Page, label: string | RegExp, value: string) {
 }
 
 test.describe.serial("parcours critique", () => {
+  test.beforeEach(async ({ page }) => {
+    installConsoleGuard(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    expect(consoleProblems.get(page) ?? []).toEqual([]);
+  });
+
   test("vue d’ensemble compacte : une action, aides lisibles", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");

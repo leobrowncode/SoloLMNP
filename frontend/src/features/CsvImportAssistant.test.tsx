@@ -154,3 +154,103 @@ test("rejects stay in a short list and posting waits for an explicit choice", as
   expect(await screen.findByText(/1 ligne comptabilisée/)).toBeInTheDocument();
   expect(screen.getByText(/1 ligne rejetée n’a pas été comptabilisée/)).toBeInTheDocument();
 });
+
+test("a failed inspect is shown instead of being swallowed", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+    detail: { code: "CSV_INVALID", message: "Le fichier n’a pas pu être lu." },
+  }), { status: 422, headers: { "Content-Type": "application/json" } })));
+  renderWithRouter(
+    <CsvImportAssistant
+      profile="operations"
+      summaryTitle="Importer depuis Google Sheets ou un CSV"
+      intro="Collez les justificatifs."
+      contentLabel="Lignes collées ou contenu CSV"
+      textareaId="import-operations"
+      anchor="/operations/transactions#import-operations"
+      causeId="operation-preview-causes"
+      postCauseId="operation-post-causes"
+      previewLabel="Prévisualiser les justificatifs"
+      commitLabel="Comptabiliser les justificatifs"
+      busy={false}
+      action={(fn) => { void fn(); }}
+      context={{ property_id: 1, fiscal_year_id: 1, bank_account_id: 1 }}
+      onImported={() => undefined}
+    />,
+    "/operations/transactions",
+    "/operations/:tab",
+  );
+  await userEvent.click(screen.getByText("Importer depuis Google Sheets ou un CSV"));
+  fireEvent.change(screen.getByLabelText("Lignes collées ou contenu CSV"), { target: { value: "Nature;Date\n" } });
+  expect(await screen.findByRole("alert")).toHaveTextContent("Le fichier n’a pas pu être lu.");
+});
+
+test("loan payment rejects are one alert per line, above the table", async () => {
+  const loanPreview = {
+    ...preview,
+    profile: "loan_payments",
+    summary: { valid: 0, duplicate: 0, warning: 0, error: 1, count: 1, importable: 0 },
+    rows: [{
+      line: 2,
+      status: "error",
+      importable: false,
+      duplicate: false,
+      suggested_account: null,
+      display: { loan_reference: "085644F", due_date: "05/03/2025", principal: "100,00", amount: "999,00" },
+      issues: [{
+        code: "SPLIT_MISMATCH",
+        message: "La ventilation ne correspond pas au total.",
+        line: 2,
+        column: "Total",
+        value: "999,00",
+        correction: "Alignez le total sur la ventilation.",
+      }],
+      warnings: [],
+    }],
+    issues: [],
+  };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const path = String(url);
+    if (path.endsWith("/imports/inspect")) {
+      return new Response(JSON.stringify({
+        delimiter: ";",
+        headers: loanPreview.headers,
+        fields: { loan_payments: loanPreview.fields },
+        suggestions: { loan_payments: {} },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    if (path.endsWith("/imports/loan_payments/preview")) {
+      return new Response(JSON.stringify(loanPreview), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+  }));
+  renderWithRouter(
+    <CsvImportAssistant
+      profile="loan_payments"
+      summaryTitle="Importer les échéances"
+      intro="Collez l’échéancier."
+      contentLabel="Lignes du tableau d’amortissement"
+      textareaId="import-echeances"
+      anchor="#import-echeances"
+      causeId="loan-preview-causes"
+      postCauseId="loan-post-causes"
+      previewLabel="Prévisualiser les échéances"
+      commitLabel="Comptabiliser les échéances"
+      busy={false}
+      action={(fn) => { void fn(); }}
+      context={{ fiscal_year_id: 1, bank_account_id: 1, loan_id: 1 }}
+      loanLabel="Crédit fictif"
+      onImported={() => undefined}
+    />,
+    "/operations/emprunts",
+    "/operations/:tab",
+  );
+  await userEvent.click(screen.getByText("Importer les échéances"));
+  fireEvent.change(screen.getByLabelText("Lignes du tableau d’amortissement"), { target: { value: "Prêt;Date\n" } });
+  await userEvent.click(screen.getByRole("button", { name: "Prévisualiser les échéances" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("Ligne 2, Total : La ventilation ne correspond pas au total.");
+  expect(alert.compareDocumentPosition(screen.getByRole("table", { name: "Aperçu de l’import" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});

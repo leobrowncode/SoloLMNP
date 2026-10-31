@@ -1,5 +1,6 @@
 import { outputLabel, outputTrust, readyToCopy } from "./outputStatus";
 import GlossaryTip from "./GlossaryTip";
+import { idleCaseSentence, visiblePersonalLines } from "./personalCases";
 import { enumLabel, formatAmount, formatEuros, formatIsoDate } from "../lib/format";
 import { ResponsiveTable } from "../lib/ResponsiveTable";
 
@@ -161,8 +162,8 @@ function RuleLinks({ rules }: { rules: RuleRef[] }) {
   if (rules.length === 0) return null;
   return (
     <ul className="field-hint">
-      {rules.map((rule) => (
-        <li key={rule.id ?? rule.source_url ?? "regle"}>
+      {rules.map((rule, index) => (
+        <li key={`${rule.id ?? rule.source_url ?? "regle"}-${index}`}>
           {rule.source_url ? (
             <a href={rule.source_url} target="_blank" rel="noreferrer">
               {rule.id ?? "source officielle"}
@@ -177,13 +178,25 @@ function RuleLinks({ rules }: { rules: RuleRef[] }) {
   );
 }
 
+function uniqueEntries(entries: EntryBrief[]): EntryBrief[] {
+  const seen = new Set<number>();
+  const rows: EntryBrief[] = [];
+  for (const entry of entries) {
+    if (seen.has(entry.id)) continue;
+    seen.add(entry.id);
+    rows.push(entry);
+  }
+  return rows;
+}
+
 function EntryList({ entries }: { entries: EntryBrief[] }) {
-  if (entries.length === 0) return <p className="field-hint">Aucune écriture de ledger sur cette ligne.</p>;
+  const rows = uniqueEntries(entries);
+  if (rows.length === 0) return <p className="field-hint">Aucune écriture de ledger sur cette ligne.</p>;
   return (
     <details>
-      <summary>{entries.length} écriture{entries.length > 1 ? "s" : ""} source</summary>
+      <summary>{rows.length} écriture{rows.length > 1 ? "s" : ""} source</summary>
       <ul>
-        {entries.map((entry) => (
+        {rows.map((entry) => (
           <li key={entry.id}>
             {frDate(entry.accounting_date)} · {entry.journal_code} · {entry.piece_reference || "sans pièce"} · {entry.label}
             {entry.accounts.length > 0 ? ` · ${entry.accounts.join(", ")}` : ""}
@@ -202,6 +215,7 @@ function DeclarationPanel({
   personal: Worksheet["personal_return"];
 }) {
   const usage = personal.deficit_usage ?? [];
+  const personalView = visiblePersonalLines(personal.lines ?? []);
   return (
     <section id="declaration" aria-label="Déclaration">
       <h3>Déclaration</h3>
@@ -216,8 +230,8 @@ function DeclarationPanel({
       </p>
 
       <h3>Calculs</h3>
-      {declaration.explanations.map((item) => (
-        <details key={item.code}>
+      {declaration.explanations.map((item, index) => (
+        <details key={`${item.code}-${index}`}>
           <summary>{item.label} — {shownAmount(item.amount)} €</summary>
           <p>Formule : {item.formula}</p>
           <RuleLinks rules={item.rules} />
@@ -235,8 +249,8 @@ function DeclarationPanel({
           { key: "amount", label: "Montant (€)" },
           { key: "formula", label: "Formule", priority: "secondary" },
         ]}
-        rows={declaration.efi_rows.map((row) => ({
-          key: row.code,
+        rows={declaration.efi_rows.map((row, index) => ({
+          key: `${row.form}-${row.code}-${index}`,
           cells: [
             row.form,
             caseText(row.case_status, row.case),
@@ -280,15 +294,15 @@ function DeclarationPanel({
           { key: "label", label: "Libellé" },
           { key: "amount", label: "Montant (€)" },
         ]}
-        rows={(personal.lines ?? []).map((line) => ({
-          key: line.code ?? line.case ?? line.label,
+        rows={personalView.shown.map((line, index) => ({
+          key: `${line.code ?? line.case ?? line.label}-${index}`,
           cells: [
             caseText(line.case_status, line.case),
             <>
               {line.label}
               {line.block_reason && <p className="field-hint">{line.block_reason}</p>}
             </>,
-            line.served === false ? "non servie" : shownAmount(line.amount),
+            shownAmount(line.amount),
           ],
         }))}
       />
@@ -339,7 +353,9 @@ function DeclarationPanel({
           ))}
         </ul>
       )}
-      {personal.note && <p className="field-hint">{personal.note}</p>}
+      {personalView.idleCase
+        ? <p className="field-hint">{idleCaseSentence(personalView.idleCase)}</p>
+        : personal.note && <p className="field-hint">{personal.note}</p>}
     </section>
   );
 }
@@ -427,86 +443,98 @@ export default function LiasseSheet({ worksheet }: { worksheet: Worksheet }) {
         const rows = fields.filter((field) => (field.form_ref ?? worksheet.liasse?.form) === form);
         if (rows.length === 0) return null;
         return (
-          <div className="ledger-table" key={form}>
-            <table>
-              <caption>{title}</caption>
-              <thead><tr><th>Case</th><th>Libellé</th><th>Montant (€)</th></tr></thead>
-              <tbody>
-                {rows.map((field) => (
-                  <tr key={field.code}>
-                    <td>{field.official_case ?? "—"}</td>
-                    <td>{field.label}</td>
-                    <td>{formatAmount(field.value)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable
+            key={form}
+            label={title}
+            caption={title}
+            columns={[
+              { key: "case", label: "Case" },
+              { key: "amount", label: "Montant (€)" },
+              { key: "label", label: "Libellé", priority: "secondary" },
+            ]}
+            rows={rows.map((field, index) => ({
+              key: `${form}-${field.code}-${index}`,
+              cells: [field.official_case ?? "—", formatAmount(field.value), field.label],
+            }))}
+          />
         );
       })}
 
       {tracking && (
-        <div className="ledger-table">
-          <table>
-            <caption>État de suivi des amortissements non déduits (art. 39 C) — à conserver avec la liasse</caption>
-            <tbody>
-              <tr><td>Dotation comptable de l’exercice</td><td>{formatEuros(tracking.accounting_depreciation)}</td></tr>
-              <tr><td>Plafond (loyers − autres charges)</td><td>{formatEuros(tracking.capacity)}</td></tr>
-              <tr><td>Dotation déduite cette année</td><td>{formatEuros(tracking.deducted_current)}</td></tr>
-              <tr><td>Non déduite, réintégrée ligne 318</td><td>{formatEuros(tracking.deferred_current)}</td></tr>
-              <tr><td>Reprise d’années antérieures, déduite ligne 350</td><td>{formatEuros(tracking.prior_used)}</td></tr>
-              {tracking.prior.map((row) => (
-                <tr key={row.origin_year}>
-                  <td>Stock {row.origin_year} : {formatEuros(row.opening)}, repris {formatEuros(row.used)}</td>
-                  <td>reste {formatEuros(row.remaining)}</td>
-                </tr>
-              ))}
-              <tr><td><strong>Stock total reporté</strong></td><td><strong>{formatEuros(tracking.remaining_total)}</strong></td></tr>
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveTable
+          label="Suivi des amortissements"
+          caption="État de suivi des amortissements non déduits (art. 39 C) — à conserver avec la liasse"
+          columns={[
+            { key: "label", label: "Élément" },
+            { key: "amount", label: "Montant" },
+          ]}
+          rows={[
+            { key: "accounting", cells: ["Dotation comptable de l’exercice", formatEuros(tracking.accounting_depreciation)] },
+            { key: "capacity", cells: ["Plafond (loyers − autres charges)", formatEuros(tracking.capacity)] },
+            { key: "deducted", cells: ["Dotation déduite cette année", formatEuros(tracking.deducted_current)] },
+            { key: "deferred", cells: ["Non déduite, réintégrée ligne 318", formatEuros(tracking.deferred_current)] },
+            { key: "prior-used", cells: ["Reprise d’années antérieures, déduite ligne 350", formatEuros(tracking.prior_used)] },
+            ...tracking.prior.map((row) => ({
+              key: `prior-${row.origin_year}`,
+              cells: [
+                `Stock ${row.origin_year} : ${formatEuros(row.opening)}, repris ${formatEuros(row.used)}`,
+                `reste ${formatEuros(row.remaining)}`,
+              ],
+            })),
+            { key: "total", cells: ["Stock total reporté", formatEuros(tracking.remaining_total)] },
+          ]}
+        />
       )}
 
-      {!worksheet.declaration && (personal.lines ?? []).length > 0 && (
-        <div className="ledger-table">
-          <table>
-            <caption>2042-C-PRO — déclaration de revenus du foyer (à part de la liasse)</caption>
-            <thead><tr><th>Case</th><th>Libellé</th><th>Montant (€)</th></tr></thead>
-            <tbody>
-              {personal.lines?.map((line) => (
-                <tr key={line.case}>
-                  <td>{line.case} <span className="field-hint">(déclarant 2 : {line.case_declarant_2})</span></td>
-                  <td>{line.label}</td>
-                  <td>{formatAmount(line.amount)}</td>
-                </tr>
-              ))}
-              {personal.prior_deficits?.map((row) => (
-                <tr key={row.origin_year}>
-                  <td>{row.case ?? "à vérifier"}</td>
-                  <td>Déficit LMNP {row.origin_year} non encore imputé</td>
-                  <td>{formatAmount(row.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {personal.note && <p className="field-hint">{personal.note}</p>}
-        </div>
-      )}
+      {!worksheet.declaration && (personal.lines ?? []).length > 0 && (() => {
+        const personalView = visiblePersonalLines(personal.lines ?? []);
+        return (
+          <>
+            <ResponsiveTable
+              label="2042-C-PRO"
+              caption="2042-C-PRO — déclaration de revenus du foyer (à part de la liasse)"
+              columns={[
+                { key: "case", label: "Case" },
+                { key: "amount", label: "Montant (€)" },
+                { key: "label", label: "Libellé", priority: "secondary" },
+              ]}
+              rows={[
+                ...personalView.shown.map((line, index) => ({
+                  key: `${line.case ?? "case"}-${index}`,
+                  cells: [line.case ?? "—", formatAmount(line.amount), line.label],
+                })),
+                ...(personal.prior_deficits ?? []).map((row) => ({
+                  key: `deficit-${row.origin_year}`,
+                  cells: [
+                    row.case ?? "à vérifier",
+                    formatAmount(row.amount),
+                    `Déficit LMNP ${row.origin_year} non encore imputé`,
+                  ],
+                })),
+              ]}
+            />
+            {personalView.idleCase
+              ? <p className="field-hint">{idleCaseSentence(personalView.idleCase)}</p>
+              : personal.note && <p className="field-hint">{personal.note}</p>}
+          </>
+        );
+      })()}
 
       {(worksheet.by_property ?? []).length > 1 && (
-        <div className="ledger-table">
-          <table>
-            <caption>Répartition par bien (information)</caption>
-            <thead><tr><th>Bien</th><th>Loyers (€)</th><th>Charges (€)</th><th>Dotations (€)</th></tr></thead>
-            <tbody>
-              {worksheet.by_property?.map((row) => (
-                <tr key={row.property_id}>
-                  <td>{row.name}</td><td>{formatAmount(row.rents)}</td><td>{formatAmount(row.expenses)}</td><td>{formatAmount(row.depreciation)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ResponsiveTable
+          label="Répartition par bien"
+          caption="Répartition par bien (information)"
+          columns={[
+            { key: "name", label: "Bien" },
+            { key: "rents", label: "Loyers (€)" },
+            { key: "expenses", label: "Charges (€)", priority: "secondary" },
+            { key: "depreciation", label: "Dotations (€)", priority: "secondary" },
+          ]}
+          rows={worksheet.by_property?.map((row) => ({
+            key: String(row.property_id),
+            cells: [row.name, formatAmount(row.rents), formatAmount(row.expenses), formatAmount(row.depreciation)],
+          })) ?? []}
+        />
       )}
       <p className="field-hint">
         {ready
