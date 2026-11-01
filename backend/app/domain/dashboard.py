@@ -172,13 +172,13 @@ def _structure(facts: DashboardFacts) -> dict[str, Any]:
     if not facts.activity_present:
         status = STATUS_A_FAIRE
         prerequisites.append(_cause("NO_ACTIVITY", "L’activité n’est pas créée."))
-    elif facts.year_id is None:
-        status = STATUS_EN_COURS
-        prerequisites.append(_cause("NO_YEAR", "Aucun exercice n’est créé."))
     elif not facts.siren_present:
         prerequisites.append(_cause("SIREN_REQUIRED", "Le SIREN n’est pas renseigné."))
         blocked = facts.fiscal_produced or facts.year_status == "CLOSED"
         status = STATUS_BLOQUE if blocked else STATUS_EN_COURS
+    elif facts.year_id is None:
+        status = STATUS_EN_COURS
+        prerequisites.append(_cause("NO_YEAR", "Aucun exercice n’est créé."))
     else:
         status = STATUS_FAIT
     if status == STATUS_FAIT:

@@ -97,7 +97,7 @@ export function operationSaveNotice(input: {
       highlightId: id ? `bien-${id}` : undefined,
       detail,
       next: created
-        ? { label: "Ajouter un compte bancaire", href: operationsPath("Banque") }
+        ? { label: "Ajouter un compte bancaire", href: "/operations/banque#ajouter-banque" }
         : { label: "Préparer les loyers", href: `${operationsPath("Biens")}#biens-saisie` },
     };
   }

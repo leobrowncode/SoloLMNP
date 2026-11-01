@@ -119,8 +119,11 @@ test.describe.serial("parcours critique", () => {
 
     await page.getByLabel("Nom de l’activité").fill("LMNP fictif");
     await page.getByLabel(/Date réelle de début/).fill("2025-01-01");
-    await page.getByRole("button", { name: "Créer l’activité" }).click();
-    await expect(page.getByRole("textbox", { name: "SIREN", exact: true })).toBeVisible();
+    await page.getByLabel("SIRET").fill("12345678900019");
+    const siren = page.getByRole("textbox", { name: "SIREN", exact: true });
+    await expect(siren).toHaveValue("123456789");
+    await expect(siren).toHaveJSProperty("readOnly", true);
+    await page.getByRole("button", { name: "Enregistrer et continuer" }).click();
 
     await page.getByLabel(/Début de l’exercice/).fill("2025-12-31");
     await page.getByLabel(/Fin de l’exercice/).fill("2025-01-01");
@@ -135,12 +138,9 @@ test.describe.serial("parcours critique", () => {
     await page.getByLabel(/Fin de l’exercice/).fill("2025-12-31");
     await page.getByLabel("Millésime fiscal").fill("2025");
     await page.getByRole("button", { name: "Créer l’exercice" }).click();
-    await expect(page.getByRole("combobox", { name: "Exercice" })).toBeVisible();
-    await page.getByRole("textbox", { name: "SIREN", exact: true }).fill("123456789");
-    await page.getByRole("button", { name: "Enregistrer l’identité" }).click();
-    await expect(page.getByText(/Identité .*enregistré/)).toBeVisible();
-
-    await page.goto("/operations/biens");
+    await expect(page.getByRole("heading", { name: "Ajouter un bien" })).toBeVisible();
+    await expect(page.getByText(/Indiquez le logement/)).toBeVisible();
+    await expect(page).toHaveURL(/\/operations\/biens/);
     await page.getByRole("button", { name: "Ajouter un bien" }).click();
     await expect(page.locator(".date-placeholder").first()).toHaveText("JJ/MM/AAAA");
     await expect(page.getByLabel(/Prix constaté au m²/)).toHaveValue("");

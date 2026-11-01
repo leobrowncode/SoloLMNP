@@ -10,7 +10,12 @@ import { AMOUNT_INPUT_ERROR, centsToApiAmount, parseAmountToCents } from "../lib
 export interface Year { id: number; year: number; start_date: string; end_date: string; status: string }
 
 export interface Setup {
-  activity: { activity_name: string; siren?: string | null; siret?: string | null } | null;
+  activity: {
+    activity_name: string;
+    activity_start_date?: string;
+    siren?: string | null;
+    siret?: string | null;
+  } | null;
   years: Year[];
 }
 export interface Account { number: string; label: string; account_type: string; active: boolean }

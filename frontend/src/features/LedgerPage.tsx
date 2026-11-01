@@ -14,10 +14,9 @@ import {
   type LedgerTab,
 } from "../routing/paths";
 import { useUnsavedGuard } from "../routing/useUnsavedGuard";
-import { DATE_HINT, YEAR_END_BEFORE_START, enumChoices, enumLabel, formatAmount, formatCents, formatIsoDate } from "../lib/format";
+import { DATE_HINT, enumChoices, enumLabel, formatAmount, formatCents, formatIsoDate } from "../lib/format";
 import FrenchDateInput from "../lib/FrenchDateInput";
 import FrenchForm from "../lib/FrenchForm";
-import { showFrenchValidation } from "../lib/validation";
 import "./ledger.css";
 import { BrowsableList } from "./BrowsableList";
 import ChartOfAccounts from "./ChartOfAccounts";
@@ -25,6 +24,7 @@ import { EmptyState, NoResults } from "./EmptyState";
 import InventoryForm from "./InventoryForm";
 import { matchesText } from "./listQuery";
 import GlossaryTip from "./GlossaryTip";
+import SetupGuide from "./SetupGuide";
 import { GLOSSARY } from "./glossary";
 import { SaveNoticeHost } from "./LocalFeedback";
 import { useSaveNotice, type ShowSaveNotice } from "./localFeedback";
@@ -236,96 +236,17 @@ export default function LedgerPage() {
     <MobileSection
       id="reglages-comptables"
       title="Réglages comptables"
-      open={!setup?.activity || (setup?.years.length ?? 0) === 0 || hash === "#ajouter-exercice" || hash === "#identite-liasse" || hash === "#reglages-comptables"}
+      open={!setup?.activity || !setup.activity.siren || (setup?.years.length ?? 0) === 0 || hash === "#ajouter-exercice" || hash === "#identite-liasse" || hash === "#creer-activite" || hash === "#reglages-comptables"}
     >
     <SaveNoticeHost place="reglages-comptables" notice={notice} onDismiss={dismiss} />
-    {setup && !setup.activity && <FrenchForm id="creer-activite" tabIndex={-1} onSubmit={(e) => {
-      const data = formData(e);
-      const name = String(data.get("name") ?? "");
-      void mutate(() => request("/activity", "POST", { activity_name: name, activity_start_date: data.get("start") }), {
-        kind: "Activité",
-        name: name || "nouvelle activité",
-        action: "créée",
-        targetId: "reglages-comptables",
-        detail: "Activité créée.",
-        next: { label: "Renseigner le SIREN", href: "#identite-liasse" },
-      });
-    }}>
-      <h3>Initialiser votre activité</h3>
-      <p>Pour une activité déjà existante, les soldes antérieurs devront être repris par des écritures d’à-nouveaux justifiées. La création de cet espace ne reconstitue pas votre historique.</p>
-      <GlossaryTip id="a-nouveaux" />
-      <label>Nom de l’activité<input name="name" required maxLength={200} /></label>
-      <label>Date réelle de début<FrenchDateInput name="start" required /><span className="field-hint">{DATE_HINT}</span></label>
-      <button disabled={busy}>Créer l’activité</button>
-    </FrenchForm>}
-    {setup?.activity && <FrenchForm onSubmit={(e) => {
-      const data = formData(e);
-      const siren = String(data.get("siren") ?? "");
-      void mutate(() => request("/activity/identity", "POST", {
-        siren,
-        siret: String(data.get("siret") ?? ""),
-      }), {
-        kind: GLOSSARY.siren.label,
-        name: siren || "liasse",
-        action: "enregistré",
-        targetId: "reglages-comptables",
-        detail: "Identité enregistrée. Elle apparaîtra en tête de la liasse.",
-        next: { label: "Ajouter un exercice", href: "#ajouter-exercice" },
-      });
-    }}>
-      <div className="heading-with-help">
-        <h3 id="identite-liasse" tabIndex={-1}>Identité pour la liasse</h3>
-        <GlossaryTip id="liasse" />
-        <GlossaryTip id="siren" />
-      </div>
-      <p>Le SIRET figure sur la 2031. Laissez vide si vous ne l’avez pas encore.</p>
-      <label>SIREN<input name="siren" inputMode="numeric" maxLength={9} defaultValue={setup.activity.siren ?? ""} /></label>
-      <label>SIRET<input name="siret" inputMode="numeric" maxLength={14} defaultValue={setup.activity.siret ?? ""} /></label>
-      <button disabled={busy}>Enregistrer l’identité</button>
-    </FrenchForm>}
-    {setup?.activity && <details id="ajouter-exercice" tabIndex={-1} open={!setup.years.length || hash === "#ajouter-exercice"}>
-      <summary>{setup.activity.activity_name} · Ajouter un exercice</summary>
-      <FrenchForm onInput={(event) => {
-        const form = event.currentTarget;
-        const start = form.elements.namedItem("start");
-        const end = form.elements.namedItem("end");
-        if (start instanceof HTMLInputElement && end instanceof HTMLInputElement) {
-          end.setCustomValidity(start.value && end.value && start.value > end.value ? YEAR_END_BEFORE_START : "");
-        }
-      }} onSubmit={(e) => {
-        e.preventDefault();
-        const form = e.currentTarget;
-        const start = form.elements.namedItem("start");
-        const endInput = form.elements.namedItem("end");
-        if (start instanceof HTMLInputElement && endInput instanceof HTMLInputElement && start.value && endInput.value && start.value > endInput.value) {
-          endInput.setCustomValidity(YEAR_END_BEFORE_START);
-          showFrenchValidation(form);
-          return;
-        }
-        if (endInput instanceof HTMLInputElement) endInput.setCustomValidity("");
-        const data = formData(e);
-        const end = String(data.get("end") ?? "");
-        const vintage = String(data.get("vintage") ?? "");
-        void mutate(() => request("/years", "POST", {
-          year: Number(end.slice(0, 4)), start_date: data.get("start"),
-          end_date: end, fiscal_vintage: vintage,
-        }), {
-          kind: GLOSSARY.exercice.label,
-          name: vintage || end.slice(0, 4) || "nouvel exercice",
-          action: "créé",
-          targetId: "reglages-comptables",
-          detail: "Exercice créé.",
-          next: { label: "Saisir une écriture", href: `${ledgerPath("Brouillons")}#nouvelle-ecriture` },
-        });
-      }}>
-        <label>Début de l’exercice<FrenchDateInput name="start" required /><span className="field-hint">{DATE_HINT}</span></label>
-        <label>Fin de l’exercice<FrenchDateInput name="end" required /><span className="field-hint">{DATE_HINT}</span></label>
-        <label>Millésime fiscal<input name="vintage" pattern="[0-9]{4}" required placeholder="2026" /></label>
-        <GlossaryTip id="millesime" />
-        <GlossaryTip id="exercice" />
-        <button disabled={busy}>Créer l’exercice</button>
-      </FrenchForm>
-    </details>}
+    {setup && (
+      <SetupGuide
+        setup={setup}
+        hash={hash}
+        onReload={() => setRevision((value) => value + 1)}
+        show={show}
+      />
+    )}
     </MobileSection>
     {!!setup?.years.length && <>
       <PrerequisiteList id={yearCauseId} causes={yearCauses} intro="Saisie indisponible :" />

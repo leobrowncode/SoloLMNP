@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { amount, cents, request, type Account, type Setup, type Entry, RequestError } from "../api/ledger";
 import {
   activityCause, bankCause, describedBy, listed,
@@ -38,6 +38,7 @@ import {
 import { buildPieceReference, defaultType, findType, typesFor } from "./operationTypes";
 import { enumChoices, enumLabel, formatEuros, formatIsoDate, rateToApi } from "../lib/format";
 import { propertySplitGap, proposeLandFromArea } from "./propertySplit";
+import { guideNoteFrom } from "./declarationSetup";
 import FrenchForm from "../lib/FrenchForm";
 import "./ledger.css";
 import FitSelect from "../lib/FitSelect";
@@ -59,9 +60,51 @@ interface Editor {
   confirmBlocked?: string;
 }
 
+function newPropertyEditor(): Editor {
+  return {
+    title: "Ajouter un bien",
+    path: "/properties",
+    help: "Le terrain et le bâtiment doivent totaliser exactement le prix d’acquisition. Les frais restent à part.",
+    derive: proposeLandFromArea,
+    validate: propertySplitGap,
+    fields: [
+      { name: "name", label: "Nom du bien", group: "Identification" },
+      { name: "address", label: "Adresse", group: "Identification" },
+      { name: "acquisition_date", label: "Date d’acquisition", type: "date", group: "Dates" },
+      { name: "rental_start_date", label: "Début de location", type: "date", optional: true, group: "Dates" },
+      { name: "acquisition_price", label: "Prix d’acquisition (€)", money: true, group: "Valeurs" },
+      { name: "acquisition_costs", label: "Frais de notaire et d’agence (€)", money: true, group: "Valeurs", hint: "Ajoutés plus tard à la base amortissable, pas au prix." },
+      { name: "lot_m2", label: "Surface du terrain ou quote-part (m²)", local: true, optional: true, group: "Terrain constaté", hint: "Pour un appartement, la quote-part de la parcelle. Sert seulement à proposer le terrain." },
+      { name: "price_m2", label: "Prix constaté au m² (€)", money: true, local: true, optional: true, group: "Terrain constaté" },
+      { name: "land_value", label: "Valeur du terrain (€)", money: true, group: "Valeurs", hint: "Non amortissable. Proposée si vous avez saisi une surface et un prix au m²." },
+      { name: "building_value", label: "Valeur du bâtiment (€)", money: true, group: "Valeurs" },
+    ],
+  };
+}
+
+function newBankEditor(accounts: Account[]): Editor {
+  return {
+    title: "Ajouter un compte bancaire",
+    path: "/banks",
+    fields: [
+      { name: "name", label: "Nom du compte bancaire", group: "Banque" },
+      {
+        name: "account_number",
+        label: "Compte comptable dédié",
+        group: "Banque",
+        choices: accounts
+          .filter((account) => account.active && account.number.startsWith("512"))
+          .map((account) => [account.number, `${account.number} · ${account.label}`]),
+      },
+    ],
+  };
+}
+
 export default function OperationsPage() {
   const { tab: tabSlug } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
+  const guideNote = guideNoteFrom(location.state);
   const resolvedTab = operationsTabFromSlug(tabSlug);
   const tab: OperationsTab = resolvedTab ?? DEFAULT_OPERATIONS_TAB;
   const [setup, setSetup] = useState<Setup | null>(null);
@@ -78,6 +121,7 @@ export default function OperationsPage() {
   const [loanImportId, setLoanImportId] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
   const detailTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const openedGuide = useRef("");
   const detailTicket = useRef(0);
   const restoreDetailFocus = useRef(false);
   useUnsavedGuard(!!editor);
@@ -184,6 +228,22 @@ export default function OperationsPage() {
     });
     return () => { active = false; };
   }, [bankId, revision, bankOffset, bankQuery]);
+
+  useEffect(() => {
+    if (!showsData(bundleView) || !setup?.activity) return;
+    if (location.hash === "#ajouter-bien" && tab === "Biens" && properties.length === 0) {
+      if (openedGuide.current === "bien") return;
+      openedGuide.current = "bien";
+      setEditor(newPropertyEditor());
+      return;
+    }
+    if (location.hash === "#ajouter-banque" && tab === "Banque" && banks.length === 0) {
+      if (!accounts.some((account) => account.active && account.number.startsWith("512"))) return;
+      if (openedGuide.current === "banque") return;
+      openedGuide.current = "banque";
+      setEditor(newBankEditor(accounts));
+    }
+  }, [accounts, banks.length, bundleView, location.hash, properties.length, setup, tab]);
 
   const choices = (items: { id: number; name: string }[]): [string, string][] =>
     items.map((item) => [String(item.id), item.name]);
@@ -519,6 +579,7 @@ export default function OperationsPage() {
     <section id="operations" className="ledger-page" aria-labelledby="operations-title" data-screen-phase={bundleView.phase}>
     <h2 id="operations-title">Opérations et banque</h2>
     <p>Suivez l’ordre des onglets : bien, banque, emprunts, puis recettes et dépenses.</p>
+    {guideNote ? <p className="form-help" role="status">{guideNote}</p> : null}
     <PageAnchors
       label="Sections des opérations"
       links={
@@ -584,24 +645,7 @@ export default function OperationsPage() {
       {tab === "Biens" && <div id="biens-saisie">
         <SaveNoticeHost place="biens-saisie" notice={notice} onDismiss={dismiss} />
         <p className="form-help">Ajoutez le logement avant les loyers. Terrain et bâtiment doivent égaler le prix. Les frais de notaire viennent en plus.</p>
-        <button id="ajouter-bien" type="button" onClick={() => setEditor({
-          title: "Ajouter un bien", path: "/properties",
-          help: "Le terrain et le bâtiment doivent totaliser exactement le prix d’acquisition. Les frais restent à part.",
-          derive: proposeLandFromArea,
-          validate: propertySplitGap,
-          fields: [
-            { name: "name", label: "Nom du bien", group: "Identification" },
-            { name: "address", label: "Adresse", group: "Identification" },
-            { name: "acquisition_date", label: "Date d’acquisition", type: "date", group: "Dates" },
-            { name: "rental_start_date", label: "Début de location", type: "date", optional: true, group: "Dates" },
-            { name: "acquisition_price", label: "Prix d’acquisition (€)", money: true, group: "Valeurs" },
-            { name: "acquisition_costs", label: "Frais de notaire et d’agence (€)", money: true, group: "Valeurs", hint: "Ajoutés plus tard à la base amortissable, pas au prix." },
-            { name: "lot_m2", label: "Surface du terrain ou quote-part (m²)", local: true, optional: true, group: "Terrain constaté", hint: "Pour un appartement, la quote-part de la parcelle. Sert seulement à proposer le terrain." },
-            { name: "price_m2", label: "Prix constaté au m² (€)", money: true, local: true, optional: true, group: "Terrain constaté" },
-            { name: "land_value", label: "Valeur du terrain (€)", money: true, group: "Valeurs", hint: "Non amortissable. Proposée si vous avez saisi une surface et un prix au m²." },
-            { name: "building_value", label: "Valeur du bâtiment (€)", money: true, group: "Valeurs" },
-          ],
-        })}>Ajouter un bien</button>
+        <button id="ajouter-bien" type="button" onClick={() => setEditor(newPropertyEditor())}>Ajouter un bien</button>
         {properties.length === 0 ? (
           <EmptyState
             title="Aucun bien."
@@ -686,13 +730,7 @@ export default function OperationsPage() {
           <GlossaryTip id="compte-512" />
           <GlossaryTip id="rapprochement" />
         </div>
-        <button id="ajouter-banque" type="button" onClick={() => setEditor({
-          title: "Ajouter un compte bancaire", path: "/banks",
-          fields: [
-            { name: "name", label: "Nom du compte bancaire", group: "Banque" },
-            accountField("account_number", "Compte comptable dédié", "512", undefined, "Banque"),
-          ],
-        })}>Ajouter un compte bancaire</button>
+        <button id="ajouter-banque" type="button" onClick={() => setEditor(newBankEditor(accounts))}>Ajouter un compte bancaire</button>
         {banks.length === 0 ? (
           <EmptyState
             title="Aucun compte bancaire."

@@ -69,12 +69,14 @@ Vérifier, sur la vue d’ensemble, que le statut dossier s’affiche, que la pr
 
 ## 1. Comptabilité — initialiser
 
-Menu **Comptabilité** :
+Menu **Comptabilité**. Tant que le SIREN ou l’exercice manque, le guide n’ouvre qu’une étape à la fois :
 
-1. **Créer l’activité** (nom + date de début réelle).
-2. **Identité** : saisir le **SIREN** (et le SIRET). Sans SIREN, la liasse reste incomplète (statut Recherche ou Provisoire, jamais « Prête à recopier ») et le FEC ne s’exporte pas (son nom réglementaire commence par le SIREN).
-3. **Ajouter un exercice 2026** (achat en 2026 : pas de liasse 2025). Millésime `2026`. Les formulaires 2027 ne sont pas publiés : les numéros de cases restent bloqués. Vérifiez-les sur le formulaire en ligne au moment de déclarer en 2027.
-4. (Optionnel) Onglet **Plan comptable** pour ajouter des comptes. Chaque ligne sépare la nature (Actif, Dette, Capitaux, Charge ou Produit) de l’utilisation (**Activé** ou **Inactif**). Actif est une nature de bilan : un emprunt activé reste une Dette. Le filtre et le formulaire proposent ces cinq natures. La recherche porte sur le numéro et le libellé. Sans filtre de nature, les comptes sont regroupés par nature. Désactiver un compte le retire des saisies sans changer sa nature. La pastille **?** « Nature du compte » rappelle la différence. Si la recherche ou les filtres ne renvoient rien, **Réinitialiser les filtres** revient à la liste complète.
+1. **SIRET** (14 chiffres). Les 9 premiers remplissent le **SIREN**. Sans SIRET, le SIREN se saisit seul. Le même formulaire demande le nom de l’activité et la date réelle de début. **Enregistrer et continuer** crée l’activité et l’identité ensemble. Sans SIREN, la liasse reste incomplète (statut Recherche ou Provisoire, jamais « Prête à recopier ») et le FEC ne s’exporte pas (son nom réglementaire commence par le SIREN).
+2. **Exercice**. Les dates sont proposées du début d’activité au 31 décembre de cette année. Corrigez-les si l’exercice est différent. Pour un achat en 2026, millésime `2026` (pas de liasse 2025). Les formulaires 2027 ne sont pas publiés : les numéros de cases restent bloqués. Vérifiez-les sur le formulaire en ligne au moment de déclarer en 2027.
+3. **Bien**. L’enregistrement du premier exercice ouvre le formulaire du logement, déjà affiché, dans **Opérations & banque**.
+4. **Banque**. Après le bien, **Ajouter un compte bancaire** ouvre le formulaire du compte. Le plan comptable n’est pas une étape de cette chaîne.
+
+(Optionnel) Onglet **Plan comptable** pour ajouter des comptes. Chaque ligne sépare la nature (Actif, Dette, Capitaux, Charge ou Produit) de l’utilisation (**Activé** ou **Inactif**). Actif est une nature de bilan : un emprunt activé reste une Dette. Le filtre et le formulaire proposent ces cinq natures. La recherche porte sur le numéro et le libellé. Sans filtre de nature, les comptes sont regroupés par nature. Désactiver un compte le retire des saisies sans changer sa nature. La pastille **?** « Nature du compte » rappelle la différence. Si la recherche ou les filtres ne renvoient rien, **Réinitialiser les filtres** revient à la liste complète.
 
 Une liste vide (brouillons, journal, inventaire, immobilisations, opérations, imports, justificatifs, sauvegardes) explique pourquoi elle est vide et propose l’action suivante. Cet état n’apparaît pas pendant le chargement ni lorsqu’une lecture a échoué. Les listes longues se filtrent par statut et par catégorie, avec les mêmes libellés que le reste de l’écran. Sur un téléphone, les tableaux restent en cartes et les sections vides restent ouvertes pour montrer l’explication.
 
@@ -85,7 +87,7 @@ ne reconstitue pas l’historique.
 
 ## 2. Opérations & banque — setup métier
 
-Menu **Opérations & banque**, dans cet ordre :
+Menu **Opérations & banque**. Le premier logement est déjà saisi à la fin de l’initialisation ; les onglets servent à le compléter, dans cet ordre :
 
 | Onglet | Action |
 | --- | --- |
@@ -180,8 +182,8 @@ Menu **Conservation** :
 ## Ordre rapide
 
 ```text
-Activité + SIREN + exercice 2026
-  → Bien + banque + emprunts (sans déblocage si achat avant l’exercice)
+SIRET (le SIREN s’en déduit) + exercice 2026
+  → Bien (formulaire déjà ouvert) + banque (ouverte depuis le bien) + emprunts (sans déblocage si achat avant l’exercice)
   → Immobilisations : prévisualiser l’amortissement, créer les immobilisations, faire entrer le bien en comptabilité
   → Recettes / dépenses / échéances / rapprochements
   → Dotations (au 31/12)

@@ -633,6 +633,19 @@ describe("OperationsPage", () => {
     expect(screen.queryByLabelText(/Surface du terrain/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Prix constaté au m²/)).not.toBeInTheDocument();
   });
+
+  it("opens the property form from the declaration guide", async () => {
+    mockApi({ properties: [] });
+    renderWithRouter(<OperationsPage />, "/operations/biens#ajouter-bien", "/operations/:tab");
+    expect(await screen.findByLabelText("Nom du bien")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Ajouter un bien" })).toBeInTheDocument();
+  });
+
+  it("opens the bank form from the property follow-up", async () => {
+    mockApi({ banks: null });
+    renderWithRouter(<OperationsPage />, "/operations/banque#ajouter-banque", "/operations/:tab");
+    expect(await screen.findByLabelText("Nom du compte bancaire")).toBeInTheDocument();
+  });
 });
 
 function entryFixture(id: number, entryNumber: string, label: string) {
