@@ -144,8 +144,17 @@ def test_first_exercise_progression_follows_persisted_writes(settings, database)
         assert created.status_code == 201, created.text
         started = _board(client)
         assert _step(started, "structure")["status_label"] == "En cours"
-        assert started["continue"]["href"] == "/comptabilite/brouillons#ajouter-exercice"
+        assert started["continue"]["href"] == "/comptabilite/brouillons#identite-liasse"
+        assert _step(started, "structure")["prerequisites"][0]["code"] == "SIREN_REQUIRED"
         assert started["progression"]["done"] == 0
+        identity = client.post(
+            "/api/ledger/activity/identity",
+            json={"siren": "123456789", "siret": "12345678900019"},
+        )
+        assert identity.status_code == 200, identity.text
+        assert identity.json()["activity"]["siret"] == "12345678900019"
+        named = _board(client)
+        assert named["continue"]["href"] == "/comptabilite/brouillons#ajouter-exercice"
         year = client.post(
             "/api/ledger/years",
             json={
@@ -161,7 +170,7 @@ def test_first_exercise_progression_follows_persisted_writes(settings, database)
         assert _step(opened, "opening")["status_label"] == "Terminé"
         assert "Premier exercice" in _step(opened, "opening")["summary"]
         assert opened["progression"]["done"] >= 1
-        assert opened["continue"]["href"] == "/comptabilite/brouillons#identite-liasse"
+        assert opened["continue"]["href"] == "/operations/biens#ajouter-bien"
         assert _board(client)["progression"] == opened["progression"]
         assert opened["dossier"]["vintage_status"] == "research_only"
 
@@ -212,3 +221,20 @@ def test_following_year_opening_survives_a_reload(seeded_client, database) -> No
     assert posted["progression"]["done"] == waiting["progression"]["done"] + 1
     assert posted["dossier"]["vintage_status"] == "research_only"
     assert _board(seeded_client)["progression"] == posted["progression"]
+
+
+def test_activity_created_with_siret_skips_the_identity_step(settings, database) -> None:
+    with TestClient(create_app(settings), headers={"X-SoloLMNP-Request": "1"}) as client:
+        created = client.post(
+            "/api/ledger/activity",
+            json={
+                "activity_name": "LMNP fictif",
+                "activity_start_date": "2026-01-01",
+                "siren": "123456789",
+                "siret": "12345678900019",
+            },
+        )
+        assert created.status_code == 201, created.text
+        assert created.json()["activity"]["siren"] == "123456789"
+        assert created.json()["activity"]["siret"] == "12345678900019"
+        assert _board(client)["continue"]["href"] == "/comptabilite/brouillons#ajouter-exercice"

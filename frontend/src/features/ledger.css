@@ -187,6 +187,34 @@
 .review-list div { padding: .75rem .9rem; background: var(--bg-surface); border: 1px solid var(--border-hairline); border-radius: 8px; }
 .review-list dt { font-size: .8rem; color: var(--text-muted); margin-bottom: .25rem; }
 .review-list dd { margin: 0; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
+.declaration-guide { margin-bottom: 1.25rem; }
+.declaration-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+.declaration-rail li {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .35rem .75rem .35rem .35rem;
+  border-radius: 999px;
+  background: var(--bg-badge-muted);
+  color: var(--text-strong);
+  font-size: .88rem;
+}
+.declaration-rail li[aria-current="step"] {
+  background: var(--bg-inverse);
+  color: var(--text-on-accent);
+}
+.declaration-rail li[aria-current="step"] .step-index {
+  background: var(--bg-step-active);
+  color: var(--text-strong);
+}
+.declaration-rail li.is-done { background: var(--bg-success-soft); }
 .step-tabs { display: flex; flex-wrap: wrap; gap: .55rem; margin: 1rem 0 1.25rem; }
 .step-tabs button { display: inline-flex; align-items: center; gap: .5rem; }
 .step-index {

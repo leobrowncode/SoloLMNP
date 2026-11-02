@@ -459,8 +459,13 @@ def test_first_year_transitions_follow_prerequisites_until_close() -> None:
 
     activity = _board(_facts(activity_present=True))
     assert _step(activity, "structure")["status_label"] == "En cours"
-    assert activity["continue"]["href"] == "/comptabilite/brouillons#ajouter-exercice"
+    assert activity["continue"]["href"] == "/comptabilite/brouillons#identite-liasse"
     assert activity["progression"]["done"] == 0
+
+    identified = _board(_facts(activity_present=True, siren_present=True))
+    assert identified["continue"]["href"] == "/comptabilite/brouillons#ajouter-exercice"
+    assert _step(identified, "structure")["summary"] == "Aucun exercice n’est créé."
+    assert identified["progression"]["done"] == 0
 
     year = _board(
         _facts(

@@ -45,7 +45,7 @@ export const GLOSSARY = {
     what: "Identifiant à 9 chiffres de l’entreprise. Le SIRET (14 chiffres) le précise sur la 2031. Sans SIREN, la liasse reste incomplète et le FEC ne s’exporte pas.",
     why: "Le nom réglementaire du FEC commence par le SIREN. La liasse et le pré-contrôle s’en servent pour dire si la feuille est encore en recherche ou provisoire.",
     example: "SIREN 123456789 saisi dans Comptabilité → Identité. Le fichier FEC d’un exercice clos au 31/12/2026 se nomme alors 123456789FEC20261231.txt.",
-    mistake: "Laisser le SIREN vide puis télécharger le FEC, ou confondre SIREN et SIRET en saisissant 14 chiffres dans le champ à 9 chiffres.",
+    mistake: "Laisser le SIREN vide puis télécharger le FEC. Le SIRET se saisit dans son champ : ses 9 premiers chiffres deviennent le SIREN.",
   },
   liasse: {
     label: "Liasse",

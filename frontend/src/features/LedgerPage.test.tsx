@@ -210,7 +210,7 @@ describe("ledger", () => {
       const path = String(url).replace("/api/ledger", "");
       if (path === "/setup") {
         return new Response(JSON.stringify({
-          activity: { activity_name: "Fictif" },
+          activity: { activity_name: "Fictif", siren: "123456789", activity_start_date: "2025-01-01" },
           years: [],
         }), { status: 200 });
       }
