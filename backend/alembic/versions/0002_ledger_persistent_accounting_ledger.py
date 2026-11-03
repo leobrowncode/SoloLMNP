@@ -9,6 +9,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
+from app.models.base import cents
 
 revision: str = "0002_ledger"
 down_revision: str | None = "0001_foundation"
@@ -150,8 +151,8 @@ def upgrade() -> None:
         sa.Column("position", sa.Integer(), nullable=False),
         sa.Column("account_number", sa.String(length=10), nullable=False),
         sa.Column("label", sa.String(length=300), nullable=False),
-        sa.Column("debit", sa.Integer(), nullable=False),
-        sa.Column("credit", sa.Integer(), nullable=False),
+        sa.Column("debit", cents(), nullable=False),
+        sa.Column("credit", cents(), nullable=False),
         sa.Column("account_label", sa.String(length=200), nullable=True),
         sa.CheckConstraint(
             "typeof(debit)='integer' AND typeof(credit)='integer' AND ((debit > 0 AND credit = 0) OR (credit > 0 AND debit = 0))",

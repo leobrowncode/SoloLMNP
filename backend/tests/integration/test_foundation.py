@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import inspect, select, text
-from sqlalchemy.exc import IntegrityError, StatementError
+from sqlalchemy.exc import DataError, IntegrityError, StatementError
 from sqlalchemy.orm import Session
 
 from alembic import command
@@ -75,8 +75,15 @@ def test_migration_idempotent_and_metadata_matches(database: Database, settings:
             "supporting_document",
             "tenant",
         }
-        for pragma, expected in (("foreign_keys", 1), ("journal_mode", "wal"), ("synchronous", 2)):
-            assert connection.exec_driver_sql(f"PRAGMA {pragma}").scalar() == expected
+        if connection.dialect.name == "sqlite":
+            for pragma, expected in (
+                ("foreign_keys", 1),
+                ("journal_mode", "wal"),
+                ("synchronous", 2),
+            ):
+                assert connection.exec_driver_sql(f"PRAGMA {pragma}").scalar() == expected
+        else:
+            assert connection.exec_driver_sql("SHOW timezone").scalar() == "UTC"
 
 
 def test_exact_money_persists_across_sessions(database: Database) -> None:
@@ -134,7 +141,7 @@ def test_raw_sql_cannot_store_negative_or_fractional_money(
         session.add(activity())
         session.flush()
         session.add(property_record())
-    with pytest.raises(IntegrityError), database.engine.begin() as connection:
+    with pytest.raises((IntegrityError, DataError)), database.engine.begin() as connection:
         # Column comes exclusively from this test's fixed parameter list.
         connection.execute(text(f"UPDATE property SET {column} = :value"), {"value": value})  # noqa: S608
 

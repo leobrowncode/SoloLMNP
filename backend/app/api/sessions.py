@@ -2,11 +2,15 @@
 
 from collections.abc import Callable, Iterator
 
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.database import Database
 from app.services.ledger import fail
+
+# One lock for every write. SQLite uses BEGIN IMMEDIATE; Postgres has no equivalent.
+_POSTGRES_WRITE_LOCK = 119_001
 
 
 def dependencies(
@@ -26,6 +30,11 @@ def dependencies(
                     connection.begin(),
                     Session(bind=connection, expire_on_commit=False) as session,
                 ):
+                    if connection.dialect.name == "postgresql":
+                        connection.execute(
+                            text("SELECT pg_advisory_xact_lock(:key)"),
+                            {"key": _POSTGRES_WRITE_LOCK},
+                        )
                     yield session
                     session.flush()
         except IntegrityError:

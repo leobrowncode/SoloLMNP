@@ -1,5 +1,7 @@
 # Sauvegarde et restauration
 
+La sauvegarde fichier (zip de la base et des justificatifs) concerne SQLite. Sur Postgres, l’API répond `BACKUP_SQLITE_ONLY` : la copie se fait chez le fournisseur, ou avec `scripts/migrate_sqlite_to_postgres.py` pour passer d’un fichier local à Postgres. Le stockage des justificatifs hors disque local est hors de ce document.
+
 `POST /api/filing/backup` écrit une archive locale : copie SQLite via l’API backup, justificatifs enregistrés dans cette base (un fichier du dossier qui n’est pas en base, ou dont le nom commence par un point, comme `.gitkeep`, n’est pas archivé), manifeste (date, version, révision de schéma, millésimes fiscaux et empreinte de leurs règles, tailles, SHA-256). Aucun secret d’environnement. Le zip est composé dans un fichier temporaire puis renommé. Deux sauvegardes successives ne s’écrasent pas.
 
 `GET /api/filing/backups` liste ces archives : date, taille, version de l’application, révision de schéma, empreinte SHA-256 et résultat du dernier contrôle d’intégrité (`unchecked`, `ok` ou `failed`). Un contrôle dont l’empreinte ne correspond plus au fichier redevient `unchecked`.

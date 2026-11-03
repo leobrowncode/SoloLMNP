@@ -75,7 +75,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-        configuration.database_path.parent.mkdir(parents=True, exist_ok=True)
+        if configuration.uses_sqlite:
+            configuration.database_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             yield
         finally:
@@ -188,7 +189,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 dossier = None
         response.status_code = 200 if ready else 503
         response.headers["Cache-Control"] = "no-store"
-        on_cloud_drive = "onedrive" in str(configuration.database_path).lower()
+        on_cloud_drive = configuration.uses_sqlite and (
+            "onedrive" in str(configuration.database_path).lower()
+        )
         return ApplicationStatus(
             database=DatabaseStatus(
                 status="ready" if ready else "not_ready",

@@ -42,6 +42,7 @@ class TaxReturnSnapshot(Base):
             "fiscal_year_id",
             unique=True,
             sqlite_where=text("status = 'CURRENT'"),
+            postgresql_where=text("status = 'CURRENT'"),
         ),
     )
     id: Mapped[int] = mapped_column(primary_key=True)

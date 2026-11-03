@@ -3,6 +3,7 @@ fastapi>=0.115,<1
 pydantic-settings>=2.6,<3
 sqlalchemy>=2.0,<2.1
 alembic>=1.14,<2
+psycopg[binary]>=3.2,<4
 uvicorn>=0.32,<1
 setuptools==84.1.0
 wheel==0.48.0

@@ -9,6 +9,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
+from app.models.base import cents
 
 revision: str = "0008_dwelling"
 down_revision: str | None = "0007_filing"
@@ -24,7 +25,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("property_id", sa.Integer(), nullable=False),
         sa.Column("name", sa.String(length=200), nullable=False),
-        sa.Column("monthly_rent", sa.Integer(), nullable=False),
+        sa.Column("monthly_rent", cents(), nullable=False),
         sa.Column("entry_date", sa.Date(), nullable=False),
         sa.Column("exit_date", sa.Date(), nullable=True),
         sa.CheckConstraint("length(trim(name)) > 0", name=op.f("ck_tenant_name_required")),

@@ -9,6 +9,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
+from app.models.base import cents
 
 revision: str = "0006_fiscal"
 down_revision: str | None = "0005_opening"
@@ -25,12 +26,12 @@ def upgrade() -> None:
         sa.Column("rules_sha256", sa.String(64), nullable=False),
         sa.Column("ledger_sha256", sa.String(64), nullable=False),
         sa.Column("adjustments_sha256", sa.String(64), nullable=False),
-        sa.Column("accounting_result", sa.Integer(), nullable=False),
-        sa.Column("fiscal_result", sa.Integer(), nullable=False),
-        sa.Column("deductible_depreciation", sa.Integer(), nullable=False),
-        sa.Column("unused_depreciation", sa.Integer(), nullable=False),
-        sa.Column("tax_loss", sa.Integer(), nullable=False),
-        sa.Column("non_deductible", sa.Integer(), nullable=False),
+        sa.Column("accounting_result", cents(), nullable=False),
+        sa.Column("fiscal_result", cents(), nullable=False),
+        sa.Column("deductible_depreciation", cents(), nullable=False),
+        sa.Column("unused_depreciation", cents(), nullable=False),
+        sa.Column("tax_loss", cents(), nullable=False),
+        sa.Column("non_deductible", cents(), nullable=False),
         sa.Column("status", sa.String(20), nullable=False),
         sa.Column("details", sa.JSON(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
@@ -47,7 +48,7 @@ def upgrade() -> None:
         sa.Column(
             "computation_id", sa.Integer(), sa.ForeignKey("fiscal_computation.id"), nullable=False
         ),
-        sa.Column("amount", sa.Integer(), nullable=False),
+        sa.Column("amount", cents(), nullable=False),
         sa.Column("rule_id", sa.String(80), nullable=False),
         sa.UniqueConstraint("fiscal_year_id"),
         sa.CheckConstraint("amount >= 0", name="ck_depreciation_carry_forward_amount"),
@@ -59,7 +60,7 @@ def upgrade() -> None:
         sa.Column(
             "computation_id", sa.Integer(), sa.ForeignKey("fiscal_computation.id"), nullable=False
         ),
-        sa.Column("amount", sa.Integer(), nullable=False),
+        sa.Column("amount", cents(), nullable=False),
         sa.Column("rule_id", sa.String(80), nullable=False),
         sa.Column("note", sa.Text(), nullable=False),
         sa.UniqueConstraint("fiscal_year_id"),

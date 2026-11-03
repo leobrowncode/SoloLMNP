@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, utc_now
+from app.models.base import Base, cents, utc_now
 
 
 class FiscalComputation(Base):
@@ -20,12 +20,12 @@ class FiscalComputation(Base):
     rules_sha256: Mapped[str] = mapped_column(String(64))
     ledger_sha256: Mapped[str] = mapped_column(String(64))
     adjustments_sha256: Mapped[str] = mapped_column(String(64))
-    accounting_result: Mapped[int]
-    fiscal_result: Mapped[int]
-    deductible_depreciation: Mapped[int]
-    unused_depreciation: Mapped[int]
-    tax_loss: Mapped[int]
-    non_deductible: Mapped[int]
+    accounting_result: Mapped[int] = mapped_column(cents())
+    fiscal_result: Mapped[int] = mapped_column(cents())
+    deductible_depreciation: Mapped[int] = mapped_column(cents())
+    unused_depreciation: Mapped[int] = mapped_column(cents())
+    tax_loss: Mapped[int] = mapped_column(cents())
+    non_deductible: Mapped[int] = mapped_column(cents())
     status: Mapped[str] = mapped_column(String(20), default="research_only")
     details: Mapped[dict[str, object]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
@@ -41,7 +41,7 @@ class DepreciationCarryForward(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     fiscal_year_id: Mapped[int] = mapped_column(ForeignKey("fiscal_year.id"))
     computation_id: Mapped[int] = mapped_column(ForeignKey("fiscal_computation.id"))
-    amount: Mapped[int]
+    amount: Mapped[int] = mapped_column(cents())
     rule_id: Mapped[str] = mapped_column(String(80))
 
 
@@ -54,7 +54,7 @@ class TaxLossCarryForward(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     fiscal_year_id: Mapped[int] = mapped_column(ForeignKey("fiscal_year.id"))
     computation_id: Mapped[int] = mapped_column(ForeignKey("fiscal_computation.id"))
-    amount: Mapped[int]
+    amount: Mapped[int] = mapped_column(cents())
     rule_id: Mapped[str] = mapped_column(String(80))
     note: Mapped[str] = mapped_column(Text, default="")
 
@@ -97,6 +97,6 @@ class CarryForwardEvent(Base):
     origin_fiscal_year_id: Mapped[int] = mapped_column(ForeignKey("fiscal_year.id"), index=True)
     register: Mapped[str] = mapped_column(String(20))
     kind: Mapped[str] = mapped_column(String(20))
-    amount: Mapped[int]
-    remaining_after: Mapped[int]
+    amount: Mapped[int] = mapped_column(cents())
+    remaining_after: Mapped[int] = mapped_column(cents())
     rule_id: Mapped[str] = mapped_column(String(80))

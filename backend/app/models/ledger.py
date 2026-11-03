@@ -65,6 +65,7 @@ class AccountingEntry(Base):
             "fiscal_year_id",
             unique=True,
             sqlite_where=text("source_type = 'OPENING'"),
+            postgresql_where=text("source_type = 'OPENING'"),
         ),
         Index(
             "ix_accounting_entry_year_status_date",

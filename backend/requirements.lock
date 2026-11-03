@@ -28,6 +28,10 @@ markupsafe==3.0.3
     # via mako
 packaging==26.3
     # via wheel
+psycopg==3.3.7
+    # via -r requirements.in
+psycopg-binary==3.3.7
+    # via psycopg
 pydantic==2.13.5
     # via
     #   fastapi
@@ -49,6 +53,7 @@ typing-extensions==4.16.0
     #   alembic
     #   anyio
     #   fastapi
+    #   psycopg
     #   pydantic
     #   pydantic-core
     #   sqlalchemy

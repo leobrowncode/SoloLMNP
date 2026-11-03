@@ -9,6 +9,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
+from app.models.base import cents
 
 revision: str = "0004_assets"
 down_revision: str | None = "0003_operations"
@@ -49,10 +50,10 @@ def upgrade() -> None:
         sa.Column("label", sa.String(200), nullable=False),
         sa.Column("acquisition_date", sa.Date(), nullable=False),
         sa.Column("service_start_date", sa.Date(), nullable=False),
-        sa.Column("acquisition_value", sa.Integer(), nullable=False),
-        sa.Column("depreciable_value", sa.Integer(), nullable=False),
-        sa.Column("non_depreciable_value", sa.Integer(), nullable=False),
-        sa.Column("residual_value", sa.Integer(), nullable=False),
+        sa.Column("acquisition_value", cents(), nullable=False),
+        sa.Column("depreciable_value", cents(), nullable=False),
+        sa.Column("non_depreciable_value", cents(), nullable=False),
+        sa.Column("residual_value", cents(), nullable=False),
         sa.Column("method", sa.String(20), nullable=False),
         sa.Column("useful_life_months", sa.Integer()),
         sa.Column("asset_account", sa.String(10), nullable=False),
@@ -97,7 +98,7 @@ def upgrade() -> None:
         sa.Column("asset_id", sa.Integer(), nullable=False),
         sa.Column("category", sa.String(40), nullable=False),
         sa.Column("label", sa.String(200), nullable=False),
-        sa.Column("value", sa.Integer(), nullable=False),
+        sa.Column("value", cents(), nullable=False),
         sa.Column("useful_life_months", sa.Integer(), nullable=False),
         sa.Column("service_start_date", sa.Date(), nullable=False),
         sa.Column("asset_account", sa.String(10), nullable=False),
@@ -133,7 +134,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("asset_id", sa.Integer(), unique=True),
         sa.Column("component_id", sa.Integer(), unique=True),
-        sa.Column("base", sa.Integer(), nullable=False),
+        sa.Column("base", cents(), nullable=False),
         sa.Column("method", sa.String(20), nullable=False),
         sa.Column("useful_life_months", sa.Integer(), nullable=False),
         sa.Column("service_start_date", sa.Date(), nullable=False),
@@ -176,9 +177,9 @@ def upgrade() -> None:
         sa.Column("period_start", sa.Date(), nullable=False),
         sa.Column("period_end", sa.Date(), nullable=False),
         sa.Column("days", sa.Integer(), nullable=False),
-        sa.Column("amount", sa.Integer(), nullable=False),
-        sa.Column("accumulated", sa.Integer(), nullable=False),
-        sa.Column("net_book_value", sa.Integer(), nullable=False),
+        sa.Column("amount", cents(), nullable=False),
+        sa.Column("accumulated", cents(), nullable=False),
+        sa.Column("net_book_value", cents(), nullable=False),
         sa.Column("status", sa.String(20), nullable=False),
         sa.Column("accounting_entry_id", sa.Integer(), unique=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),

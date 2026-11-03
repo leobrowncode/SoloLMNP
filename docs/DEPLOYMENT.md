@@ -179,10 +179,11 @@ Il ne faut pas transformer ce test en vérification sur une base personnelle.
 
 La CI exécute :
 
-1. les contrôles backend sous Ubuntu et Windows, avec Python 3.12 ;
-2. l'audit des dépendances runtime Python sous Ubuntu ;
-3. les contrôles frontend et l'audit npm sous Ubuntu, avec Node.js 24 ;
-4. la validation Compose et le test Docker complet.
+1. les contrôles backend sous Ubuntu et Windows, avec Python 3.12 et SQLite ;
+2. les mêmes tests backend sous Ubuntu contre un service Postgres 16 ;
+3. l'audit des dépendances runtime Python sous Ubuntu ;
+4. les contrôles frontend et l'audit npm sous Ubuntu, avec Node.js 24 ;
+5. la validation Compose et le test Docker complet, toujours sur SQLite.
 
 Les actions GitHub sont référencées par SHA de commit. Les paquets applicatifs sont
 installés depuis les lockfiles ; les images de base utilisent des tags de version maintenue

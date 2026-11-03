@@ -17,7 +17,8 @@ def test_unsafe_origins_rejected(value: str) -> None:
 @pytest.mark.parametrize(
     "value",
     [
-        "postgresql://localhost/db",
+        "mysql://localhost/db",
+        "postgresql://localhost",
         "sqlite://",
         "sqlite:///:memory:",
         "sqlite:///data/db.sqlite3?mode=ro",
@@ -45,6 +46,18 @@ def test_relative_database_path_is_independent_of_cwd(
     monkeypatch.chdir(tmp_path)
     config = Settings(_env_file=None, database_url="sqlite:///data/sololmnp.sqlite3")
     assert config.database_path == PROJECT_ROOT / "data/sololmnp.sqlite3"
+
+
+def test_postgres_url_is_normalized() -> None:
+    config = Settings(
+        _env_file=None,
+        database_url="postgresql://user:secret@db.example/sololmnp?sslmode=require",
+    )
+    assert config.database_url.startswith("postgresql+psycopg://user:secret@db.example/sololmnp")
+    assert "sslmode=require" in config.database_url
+    assert config.uses_sqlite is False
+    with pytest.raises(ValueError, match="database_path"):
+        _ = config.database_path
 
 
 def test_wildcard_host_rejected() -> None:

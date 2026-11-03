@@ -15,7 +15,7 @@ Un résultat affiché, même équilibré, reste à contrôler sur le formulaire 
 - Ventilation automatique du terrain.
 - Imputation des déficits LMNP antérieurs sur la liasse. Le calcul interne peut montrer une estimation FIFO ; elle n’est pas une imputation officielle.
 - Authentification. L’application doit rester liée à `127.0.0.1`. Voir [SECURITY.md](SECURITY.md).
-- Plusieurs utilisateurs, ou une base autre que le fichier SQLite local.
+- Plusieurs utilisateurs. Postgres est possible via `DATABASE_URL` ([POSTGRES.md](POSTGRES.md)) ; le lanceur local, Docker et les tests par défaut restent sur SQLite.
 
 ## Données et restauration
 
