@@ -13,6 +13,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
+from app.models.base import cents
 
 revision: str = "0010_carry_events"
 down_revision: str | None = "0009_structuring"
@@ -44,8 +45,8 @@ def upgrade() -> None:
         ),
         sa.Column("register", sa.String(20), nullable=False),
         sa.Column("kind", sa.String(20), nullable=False),
-        sa.Column("amount", sa.Integer(), nullable=False),
-        sa.Column("remaining_after", sa.Integer(), nullable=False),
+        sa.Column("amount", cents(), nullable=False),
+        sa.Column("remaining_after", cents(), nullable=False),
         sa.Column("rule_id", sa.String(80), nullable=False),
         sa.UniqueConstraint(
             "computation_id",

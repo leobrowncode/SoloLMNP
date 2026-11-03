@@ -51,6 +51,7 @@ def upgrade() -> None:
         ["fiscal_year_id"],
         unique=True,
         sqlite_where=sa.text("status = 'CURRENT'"),
+        postgresql_where=sa.text("status = 'CURRENT'"),
     )
     op.create_table(
         "supporting_document",

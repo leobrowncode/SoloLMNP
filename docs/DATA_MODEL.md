@@ -11,10 +11,13 @@ Une activité au maximum par instance (clé 1), plusieurs biens, exercices liés
 au stade de préparation ; leur format et leur cohérence de préfixe sont contrôlés,
 sans prétendre vérifier leur existence administrative.
 
-Les valeurs monétaires sont des colonnes INTEGER, converties par le type
+Les valeurs monétaires sont des centimes entiers, convertis par le type
 SQLAlchemy `Money` depuis/vers Decimal. Aucune conversion implicite de float,
 aucun arrondi de sous-centime. Les CHECK refusent les montants négatifs et les
-valeurs SQLite non entières. La ventilation terrain/bâtiment et les frais
+valeurs non entières. SQLite stocke ces centimes dans INTEGER (64 bits).
+Postgres les stocke dans NUMERIC sans échelle, pour qu’une valeur fractionnaire
+reste visible et soit refusée par les CHECK. Son INTEGER s’arrête vers
+21 millions d’euros, et un BIGINT arrondirait la fraction avant le contrôle. La ventilation terrain/bâtiment et les frais
 d'acquisition restent des données administratives à valider en P4, pas une
 base amortissable déjà approuvée.
 

@@ -41,10 +41,6 @@ click==8.5.0
     #   -c requirements.lock
     #   pip-tools
     #   uvicorn
-colorama==0.4.6
-    # via
-    #   build
-    #   pytest
 coverage==7.16.1
     # via pytest-cov
 cyclonedx-python-lib==11.12.0
@@ -126,6 +122,14 @@ pluggy==1.6.0
     # via
     #   pytest
     #   pytest-cov
+psycopg==3.3.7
+    # via
+    #   -c requirements.lock
+    #   -r requirements.in
+psycopg-binary==3.3.7
+    # via
+    #   -c requirements.lock
+    #   psycopg
 py-serializable==2.1.0
     # via cyclonedx-python-lib
 pydantic==2.13.5
@@ -192,6 +196,7 @@ typing-extensions==4.16.0
     #   cyclonedx-python-lib
     #   fastapi
     #   mypy
+    #   psycopg
     #   pydantic
     #   pydantic-core
     #   sqlalchemy

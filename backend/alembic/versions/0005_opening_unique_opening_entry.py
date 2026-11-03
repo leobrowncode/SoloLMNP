@@ -23,6 +23,7 @@ def upgrade() -> None:
         ["fiscal_year_id"],
         unique=True,
         sqlite_where=sa.text("source_type = 'OPENING'"),
+        postgresql_where=sa.text("source_type = 'OPENING'"),
     )
 
 

@@ -48,7 +48,17 @@ _CHECKS = "integrity.json"
 logger = logging.getLogger(__name__)
 
 
+def _require_sqlite_file(settings: Settings) -> None:
+    if not settings.uses_sqlite:
+        fail(
+            "BACKUP_SQLITE_ONLY",
+            "La sauvegarde fichier concerne SQLite. Sur Postgres, utilisez la copie "
+            "du fournisseur ou le script de migration.",
+        )
+
+
 def create_backup(settings: Settings) -> dict[str, str]:
+    _require_sqlite_file(settings)
     backups = settings.database_path.parent / "backups"
     backups.mkdir(parents=True, exist_ok=True)
     filename = _fresh_name(backups)
@@ -91,6 +101,7 @@ def create_backup(settings: Settings) -> dict[str, str]:
 
 
 def list_backups(settings: Settings) -> dict[str, Any]:
+    _require_sqlite_file(settings)
     root = _backup_root(settings)
     if not root.is_dir():
         return {"backups": []}
@@ -105,6 +116,7 @@ def list_backups(settings: Settings) -> dict[str, Any]:
 
 
 def verify_backup(settings: Settings, filename: str) -> dict[str, Any]:
+    _require_sqlite_file(settings)
     path = _archive_path(settings, filename)
     try:
         _validate_archive(path)
@@ -126,6 +138,7 @@ def verify_backup(settings: Settings, filename: str) -> dict[str, Any]:
 
 
 def preview_restore(settings: Settings, filename: str) -> dict[str, Any]:
+    _require_sqlite_file(settings)
     path = _archive_path(settings, filename)
     manifest, backup_counts = _inspect(path)
     return {
@@ -139,6 +152,7 @@ def preview_restore(settings: Settings, filename: str) -> dict[str, Any]:
 def restore_backup(
     settings: Settings, database: Database, filename: str, confirmation: str
 ) -> dict[str, Any]:
+    _require_sqlite_file(settings)
     if confirmation != "RESTAURER":
         fail(
             "RESTORE_CONFIRMATION",

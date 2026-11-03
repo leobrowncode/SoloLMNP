@@ -135,6 +135,7 @@ def test_document_list_links_by_number_date_and_piece_without_touching_the_entry
     assert untouched["entry_number"] is None
 
 
+@pytest.mark.sqlite_file
 def test_backup_list_verify_preview_and_confirmed_restore(client, settings):
     original = _book(client, "PIECE-1")
     before = client.get(f"/api/ledger/entries/{original['id']}").json()
@@ -264,6 +265,7 @@ def _disk_files(root: Path) -> dict[str, bytes]:
     }
 
 
+@pytest.mark.sqlite_file
 def test_gitkeep_is_absent_from_new_archives_and_ignored_on_restore(client, settings):
     settings.documents_dir.mkdir(parents=True, exist_ok=True)
     (settings.documents_dir / ".gitkeep").write_bytes(b"")
@@ -326,6 +328,7 @@ def test_gitkeep_is_absent_from_new_archives_and_ignored_on_restore(client, sett
     assert originals == ["deux.pdf", "une.pdf"]
 
 
+@pytest.mark.sqlite_file
 def test_verify_and_restore_refuse_the_same_malicious_document_path(client, settings):
     _book(client, "PIECE-1")
     uploaded = client.post("/api/filing/documents", json=_pdf("une.pdf"))
@@ -362,6 +365,7 @@ def test_verify_and_restore_refuse_the_same_malicious_document_path(client, sett
     assert not (settings.documents_dir / "sous-dossier").exists()
 
 
+@pytest.mark.sqlite_file
 def test_restore_failure_rolls_back_database_and_documents(client, settings, monkeypatch):
     settings.documents_dir.mkdir(parents=True, exist_ok=True)
     (settings.documents_dir / ".gitkeep").write_bytes(b"keep")
@@ -390,6 +394,7 @@ def test_restore_failure_rolls_back_database_and_documents(client, settings, mon
     assert _disk_files(settings.documents_dir) == before_files
 
 
+@pytest.mark.sqlite_file
 def test_restore_rollback_failure_is_logged(client, settings, monkeypatch, caplog):
     _book(client, "PIECE-1")
     created = client.post("/api/filing/backup")

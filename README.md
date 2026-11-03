@@ -12,7 +12,7 @@ Prérequis locaux : Python 3.12+ et Node.js 24. Puis, depuis la racine du dépô
 - **Linux / macOS :** `./scripts/start_local.sh`
 - **Tous systèmes :** `python scripts/start_local.py`
 
-Le lanceur crée `.venv` et installe les dépendances au besoin, migre SQLite, démarre API + interface, puis ouvre [http://127.0.0.1:5173](http://127.0.0.1:5173). Les données restent dans `data/`. Tutoriel d’usage : [docs/TUTORIAL.md](docs/TUTORIAL.md).
+Le lanceur crée `.venv` et installe les dépendances au besoin, migre SQLite, démarre API + interface, puis ouvre [http://127.0.0.1:5173](http://127.0.0.1:5173). Les données restent dans `data/`. Une base Postgres (Neon) se branche avec `DATABASE_URL` : [docs/POSTGRES.md](docs/POSTGRES.md). Tutoriel d’usage : [docs/TUTORIAL.md](docs/TUTORIAL.md).
 
 Alternative Docker (Compose v2, conteneurs Linux) :
 

@@ -9,6 +9,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
+from app.models.base import cents
 
 revision: str = "0001_foundation"
 down_revision: str | None = None
@@ -104,10 +105,10 @@ def upgrade() -> None:
         sa.Column("address", sa.Text(), nullable=False),
         sa.Column("acquisition_date", sa.Date(), nullable=False),
         sa.Column("rental_start_date", sa.Date(), nullable=True),
-        sa.Column("acquisition_price", sa.Integer(), nullable=False),
-        sa.Column("acquisition_costs", sa.Integer(), nullable=False),
-        sa.Column("land_value", sa.Integer(), nullable=False),
-        sa.Column("building_value", sa.Integer(), nullable=False),
+        sa.Column("acquisition_price", cents(), nullable=False),
+        sa.Column("acquisition_costs", cents(), nullable=False),
+        sa.Column("land_value", cents(), nullable=False),
+        sa.Column("building_value", cents(), nullable=False),
         sa.Column("notes", sa.Text(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),

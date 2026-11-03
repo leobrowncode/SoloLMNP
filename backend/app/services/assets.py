@@ -8,7 +8,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, cast
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.asset_schemas import (
@@ -20,6 +20,7 @@ from app.api.asset_schemas import (
 )
 from app.api.ledger_schemas import EntryInput, LineInput
 from app.core.api_errors import HELP_IDS
+from app.core.json_field import json_text
 from app.core.money import from_cents, to_cents
 from app.domain.assets.accounts import (
     AssetAccountError,
@@ -372,7 +373,7 @@ def _stored_batch(session: Session, key: str) -> tuple[str, dict[str, Any]] | No
         select(LedgerEvent)
         .where(
             LedgerEvent.action == _BATCH_ACTION,
-            func.json_extract(LedgerEvent.details, "$.idempotency_key") == key,
+            json_text(LedgerEvent.details, "idempotency_key") == key,
         )
         .order_by(LedgerEvent.id.desc())
     )

@@ -7,9 +7,10 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, NoReturn, cast
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.core.json_field import json_text
 from app.core.money import to_cents
 from app.domain.csv_assistant import (
     CsvReadError,
@@ -240,7 +241,7 @@ def _stored_operations_batch(session: Session, key: str) -> tuple[str, dict[str,
         select(LedgerEvent)
         .where(
             LedgerEvent.action == _BATCH_ACTION,
-            func.json_extract(LedgerEvent.details, "$.idempotency_key") == key,
+            json_text(LedgerEvent.details, "idempotency_key") == key,
         )
         .order_by(LedgerEvent.id.desc())
     )

@@ -188,8 +188,8 @@ def test_inventory_retry_survives_lock_but_new_posting_is_refused(client, databa
     entry = client.post("/api/ledger/inventory", json=data).json()
     statements = {
         "year": "UPDATE fiscal_year SET status='CLOSED', closed_at=CURRENT_TIMESTAMP WHERE id=1",
-        "account": "UPDATE account SET active=0 WHERE number='512000'",
-        "journal": "UPDATE accounting_journal SET active=0 WHERE code='OD'",
+        "account": "UPDATE account SET active=FALSE WHERE number='512000'",
+        "journal": "UPDATE accounting_journal SET active=FALSE WHERE code='OD'",
     }
     with database.engine.begin() as connection:
         connection.execute(text(statements[lock]))

@@ -9,6 +9,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
+from app.models.base import cents
 
 revision: str = "0003_operations"
 down_revision: str | None = "0002_ledger"
@@ -55,7 +56,7 @@ def upgrade() -> None:
         sa.Column("external_reference", sa.String(length=200), nullable=False),
         sa.Column("date", sa.Date(), nullable=False),
         sa.Column("label", sa.String(length=300), nullable=False),
-        sa.Column("amount", sa.Integer(), nullable=False),
+        sa.Column("amount", cents(), nullable=False),
         sa.Column("fingerprint", sa.String(length=64), nullable=False),
         sa.Column("import_hash", sa.String(length=64), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
@@ -80,11 +81,11 @@ def upgrade() -> None:
         sa.Column("property_id", sa.Integer(), nullable=False),
         sa.Column("lender", sa.String(length=200), nullable=False),
         sa.Column("start_date", sa.Date(), nullable=False),
-        sa.Column("initial_principal", sa.Integer(), nullable=False),
+        sa.Column("initial_principal", cents(), nullable=False),
         sa.Column("interest_rate_basis_points", sa.Integer(), nullable=False),
         sa.Column("duration_months", sa.Integer(), nullable=False),
-        sa.Column("monthly_payment", sa.Integer(), nullable=False),
-        sa.Column("monthly_insurance", sa.Integer(), nullable=False),
+        sa.Column("monthly_payment", cents(), nullable=False),
+        sa.Column("monthly_insurance", cents(), nullable=False),
         sa.Column("principal_account", sa.String(length=10), nullable=False),
         sa.Column("notes", sa.Text(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
@@ -120,7 +121,7 @@ def upgrade() -> None:
         sa.Column("property_id", sa.Integer(), nullable=False),
         sa.Column("fiscal_year_id", sa.Integer(), nullable=False),
         sa.Column("date", sa.Date(), nullable=False),
-        sa.Column("amount", sa.Integer(), nullable=False),
+        sa.Column("amount", cents(), nullable=False),
         sa.Column("description", sa.String(length=300), nullable=False),
         sa.Column("counterparty", sa.String(length=200), nullable=False),
         sa.Column("accounting_account", sa.String(length=10), nullable=False),
@@ -130,10 +131,10 @@ def upgrade() -> None:
         sa.Column("accounting_entry_id", sa.Integer(), nullable=False),
         sa.Column("deductible_basis_points", sa.Integer(), nullable=False),
         sa.Column("fiscal_treatment", sa.String(length=40), nullable=False),
-        sa.Column("principal", sa.Integer(), nullable=False),
-        sa.Column("interest", sa.Integer(), nullable=False),
-        sa.Column("insurance", sa.Integer(), nullable=False),
-        sa.Column("other_costs", sa.Integer(), nullable=False),
+        sa.Column("principal", cents(), nullable=False),
+        sa.Column("interest", cents(), nullable=False),
+        sa.Column("insurance", cents(), nullable=False),
+        sa.Column("other_costs", cents(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.CheckConstraint(
             "kind IN ('REVENUE','EXPENSE','SETTLEMENT','LOAN_PAYMENT','LOAN_FUNDING')",

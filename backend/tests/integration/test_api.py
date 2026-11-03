@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -10,7 +11,26 @@ from app.main import create_app
 from tests.conftest import migration_config
 
 
-def test_liveness_does_not_claim_readiness_or_migrate(settings: Settings) -> None:
+def test_liveness_does_not_claim_readiness_or_migrate(settings: Settings, tmp_path: Path) -> None:
+    # The shared Postgres fixture is already migrated. This check needs an empty database.
+    if settings.uses_sqlite:
+        _assert_not_ready(settings)
+        return
+    import os
+    import uuid
+
+    from tests.conftest import _create_database, _drop_database, _postgres_settings
+
+    admin_url = os.environ["TEST_DATABASE_URL"]
+    name = f"sololmnp_t_{uuid.uuid4().hex}"
+    _create_database(admin_url, name)
+    try:
+        _assert_not_ready(_postgres_settings(admin_url, name, tmp_path / "empty-documents"))
+    finally:
+        _drop_database(admin_url, name)
+
+
+def _assert_not_ready(settings: Settings) -> None:
     with TestClient(create_app(settings)) as client:
         assert client.get("/api/health").json() == {"status": "ok"}
         response = client.get("/api/status")
@@ -46,6 +66,7 @@ def test_unknown_schema_revision_is_not_ready(settings: Settings, database: Data
         assert client.get("/api/status").status_code == 503
 
 
+@pytest.mark.sqlite_file
 def test_corrupt_database_does_not_leak_path(settings: Settings) -> None:
     settings.database_path.write_bytes(b"not a sqlite database")
     with TestClient(create_app(settings)) as client:

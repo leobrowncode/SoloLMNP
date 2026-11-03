@@ -266,6 +266,7 @@ def test_close_reopen_fec_efi_and_documents(client, settings):
     assert rejected.json()["detail"]["code"] == "DOCUMENT_SIGNATURE"
 
 
+@pytest.mark.sqlite_file
 def test_backup_rejects_zip_slip_members(client, settings):
     root = settings.database_path.parent / "backups"
     root.mkdir(parents=True, exist_ok=True)
@@ -285,6 +286,7 @@ def test_backup_rejects_zip_slip_members(client, settings):
     assert not (settings.documents_dir / "secret.txt").exists()
 
 
+@pytest.mark.sqlite_file
 def test_backup_round_trip_rejects_escape(client, settings):
     book(client, "512000", "706000", "10.00")
     created = client.post("/api/filing/backup")

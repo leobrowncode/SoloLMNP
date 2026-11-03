@@ -59,25 +59,48 @@ class Settings(BaseSettings):
 
     @field_validator("database_url")
     @classmethod
-    def file_sqlite_only(cls, value: str) -> str:
+    def supported_database(cls, value: str) -> str:
         url = make_url(value)
-        if (
-            url.drivername not in {"sqlite", "sqlite+pysqlite"}
-            or not url.database
-            or url.database == ":memory:"
-            or url.host
-            or url.username
-            or url.password
-            or url.query
-        ):
-            raise ValueError("DATABASE_URL must point to a local SQLite file without URL options")
-        path = Path(url.database)
-        if not path.is_absolute():
-            path = PROJECT_ROOT / path
-        return url.set(database=path.resolve().as_posix()).render_as_string(hide_password=False)
+        backend = url.get_backend_name()
+        if backend == "sqlite":
+            if (
+                url.drivername not in {"sqlite", "sqlite+pysqlite"}
+                or not url.database
+                or url.database == ":memory:"
+                or url.host
+                or url.username
+                or url.password
+                or url.query
+            ):
+                raise ValueError(
+                    "A SQLite DATABASE_URL must point to a local file without URL options"
+                )
+            path = Path(url.database)
+            if not path.is_absolute():
+                path = PROJECT_ROOT / path
+            return url.set(database=path.resolve().as_posix()).render_as_string(hide_password=False)
+        if backend == "postgresql":
+            if url.drivername in {"postgresql", "postgres"}:
+                url = url.set(drivername="postgresql+psycopg")
+            elif url.drivername != "postgresql+psycopg":
+                raise ValueError("Postgres requires the psycopg driver (postgresql+psycopg)")
+            if not url.host or not url.database:
+                raise ValueError("Postgres DATABASE_URL needs a host and a database name")
+            allowed = {"sslmode", "channel_binding", "connect_timeout", "application_name"}
+            unknown = set(url.query) - allowed
+            if unknown:
+                raise ValueError("Unsupported Postgres URL options: " + ", ".join(sorted(unknown)))
+            return url.render_as_string(hide_password=False)
+        raise ValueError("DATABASE_URL must be a SQLite file or a Postgres URL")
+
+    @property
+    def uses_sqlite(self) -> bool:
+        return make_url(self.database_url).get_backend_name() == "sqlite"
 
     @property
     def database_path(self) -> Path:
+        if not self.uses_sqlite:
+            raise ValueError("database_path is only available for a SQLite file")
         database = make_url(self.database_url).database
         if database is None:
             raise ValueError("SQLite database path is missing")
