@@ -16,7 +16,7 @@ cffi==2.1.1
     # via cryptography
 click==8.5.0
     # via uvicorn
-cryptography==48.0.1
+cryptography==50.0.2
     # via -r requirements.in
 fastapi==0.141.1
     # via -r requirements.in

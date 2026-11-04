@@ -47,7 +47,7 @@ click==8.5.0
     #   uvicorn
 coverage==7.16.1
     # via pytest-cov
-cryptography==48.0.1
+cryptography==50.0.2
     # via
     #   -c requirements.lock
     #   -r requirements.in
