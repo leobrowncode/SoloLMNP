@@ -8,11 +8,45 @@ import shutil
 import socket
 import subprocess
 import tempfile
+import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Same issuer and secret as app.core.auth. The smoke job does not install the API.
+_TEST_SECRET = "sololmnp-test-auth-secret"
+_TEST_EMAIL = "ada@sololmnp.test"
+_TEST_SUBJECT = "test-ada"
+
+
+def _b64(raw: bytes) -> str:
+    import base64
+
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def _token() -> str:
+    import hashlib
+    import hmac
+    import time
+
+    now = int(time.time())
+    header = _b64(b'{"alg":"HS256","typ":"JWT"}')
+    payload = _b64(
+        json.dumps(
+            {
+                "sub": _TEST_SUBJECT,
+                "email": _TEST_EMAIL,
+                "iss": "sololmnp-test",
+                "iat": now,
+                "exp": now + 3600,
+            },
+            separators=(",", ":"),
+        ).encode()
+    )
+    digest = hmac.new(_TEST_SECRET.encode(), f"{header}.{payload}".encode(), hashlib.sha256).digest()
+    return f"{header}.{payload}.{_b64(digest)}"
 
 
 def main() -> None:
@@ -37,6 +71,10 @@ def main() -> None:
             SOLOLMNP_UID=str(uid),
             SOLOLMNP_GID=str(gid),
             ALLOWED_HOSTS="localhost,127.0.0.1,[::1]",
+            APP_ENV="test",
+            AUTH_MODE="test",
+            AUTH_TEST_SECRET=_TEST_SECRET,
+            ALLOWED_EMAILS=_TEST_EMAIL,
         )
         compose = [
             docker,
@@ -65,10 +103,22 @@ def main() -> None:
                 assert response.status == 200
                 assert b'<div id="root">' in response.read()
                 assert response.headers["X-Content-Type-Options"] == "nosniff"
-            for route in ("/api/health", "/api/status"):
-                with urllib.request.urlopen(base + route, timeout=10) as response:
-                    assert response.status == 200
-                    assert isinstance(json.load(response), dict)
+            with urllib.request.urlopen(base + "/api/health", timeout=10) as response:
+                assert response.status == 200
+                assert isinstance(json.load(response), dict)
+            try:
+                urllib.request.urlopen(base + "/api/status", timeout=10)
+            except urllib.error.HTTPError as error:
+                assert error.code == 401
+            else:
+                raise AssertionError("GET /api/status must refuse an anonymous caller")
+            status_request = urllib.request.Request(
+                base + "/api/status",
+                headers={"Authorization": "Bearer " + _token()},
+            )
+            with urllib.request.urlopen(status_request, timeout=10) as response:
+                assert response.status == 200
+                assert isinstance(json.load(response), dict)
 
         try:
             run("up", "--build", "--detach", "--wait", "--wait-timeout", "180")
@@ -77,6 +127,7 @@ def main() -> None:
             base = f"http://127.0.0.1:{port}"
             headers = {
                     "Content-Type": "application/json",
+                    "Authorization": "Bearer " + _token(),
                     "X-SoloLMNP-Request": "1",
                     "Origin": base,
                     "Sec-Fetch-Site": "same-origin",

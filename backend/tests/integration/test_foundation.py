@@ -14,11 +14,14 @@ from tests.conftest import migration_config
 
 
 def activity() -> RentalActivity:
-    return RentalActivity(activity_name="Activité fictive", activity_start_date=date(2025, 1, 1))
+    return RentalActivity(
+        owner_id=1, activity_name="Activité fictive", activity_start_date=date(2025, 1, 1)
+    )
 
 
 def property_record() -> Property:
     return Property(
+        owner_id=1,
         rental_activity_id=1,
         name="Bien fictif",
         address="Adresse de test",
@@ -32,6 +35,7 @@ def property_record() -> Property:
 
 def fiscal_year(**changes: object) -> FiscalYear:
     fields: dict[str, object] = dict(
+        owner_id=1,
         rental_activity_id=1,
         year=2025,
         start_date=date(2025, 1, 1),
@@ -74,6 +78,8 @@ def test_migration_idempotent_and_metadata_matches(database: Database, settings:
             "tax_return_snapshot",
             "supporting_document",
             "tenant",
+            "app_account",
+            "dossier_archive",
         }
         if connection.dialect.name == "sqlite":
             for pragma, expected in (
@@ -169,11 +175,19 @@ def test_duplicate_year_rejected(database: Database) -> None:
         session.add_all([fiscal_year(), fiscal_year()])
 
 
-def test_only_one_activity_per_instance(database: Database) -> None:
+def test_one_activity_per_account_and_a_second_account_is_allowed(database: Database) -> None:
     with pytest.raises(IntegrityError), database.sessions.begin() as session:
-        record = activity()
-        record.id = 2
-        session.add(record)
+        session.add(activity())
+        session.flush()
+        session.add(activity())
+    with database.sessions.begin() as session:
+        from app.models.account import AppAccount
+
+        session.add(AppAccount(id=2, subject="autre", email="autre@sololmnp.test"))
+        session.flush()
+        second = activity()
+        second.owner_id = 2
+        session.add(second)
 
 
 def test_migration_downgrade_and_reupgrade(settings: Settings) -> None:
@@ -195,10 +209,31 @@ def test_operations_migration_preserves_existing_foundation_data(settings: Setti
     command.upgrade(config, "0002_ledger")
     database = Database(settings)
     try:
-        with database.sessions.begin() as session:
-            session.add(activity())
-            session.flush()
-            session.add_all([property_record(), fiscal_year()])
+        with database.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO rental_activity (id, activity_name, activity_start_date, "
+                    "tax_regime, accounting_method, notes, created_at, updated_at) VALUES "
+                    "(1, 'Activité fictive', '2025-01-01', 'REAL_SIMPLIFIED_BIC', 'ACCRUAL', "
+                    "'', '2025-01-01', '2025-01-01')"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO property (rental_activity_id, name, address, acquisition_date, "
+                    "acquisition_price, acquisition_costs, land_value, building_value, notes, "
+                    "created_at, updated_at) VALUES (1, 'Bien fictif', 'Adresse', '2025-01-01', "
+                    "100, 0, 40, 60, '', '2025-01-01', '2025-01-01')"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO fiscal_year (rental_activity_id, year, start_date, end_date, "
+                    "fiscal_vintage, status, created_at, updated_at) VALUES "
+                    "(1, 2025, '2025-01-01', '2025-12-31', '2025', 'OPEN', "
+                    "'2025-01-01', '2025-01-01')"
+                )
+            )
     finally:
         database.engine.dispose()
 
@@ -209,6 +244,10 @@ def test_operations_migration_preserves_existing_foundation_data(settings: Setti
             assert connection.scalar(text("SELECT activity_name FROM rental_activity")) == (
                 "Activité fictive"
             )
+            assert connection.scalar(text("SELECT owner_id FROM rental_activity")) == 1
+            assert connection.scalar(text("SELECT owner_id FROM property")) == 1
+            assert connection.scalar(text("SELECT owner_id FROM fiscal_year")) == 1
+            assert connection.scalar(text("SELECT subject FROM app_account WHERE id = 1")) is None
             assert connection.scalar(text("SELECT COUNT(*) FROM property")) == 1
             assert connection.scalar(text("SELECT COUNT(*) FROM fiscal_year")) == 1
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (

@@ -3,10 +3,27 @@ WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
+# Baked into the bundle. Empty leaves the login page unconfigured.
+ARG VITE_NEON_AUTH_URL=
+ENV VITE_NEON_AUTH_URL=$VITE_NEON_AUTH_URL
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.28-alpine
+ARG VITE_NEON_AUTH_URL=
 COPY scripts/nginx.conf /etc/nginx/nginx.conf
+# The page calls Neon Auth from the browser. Allow that origin only.
+USER root
+RUN if [ -n "$VITE_NEON_AUTH_URL" ]; then \
+      origin=$(printf '%s' "$VITE_NEON_AUTH_URL" | sed -E 's#^(https?://[^/]+).*#\1#'); \
+      case "$origin" in \
+        https://*|http://*) ;; \
+        *) echo "VITE_NEON_AUTH_URL must be an http(s) URL" >&2; exit 1 ;; \
+      esac; \
+      case "$origin" in \
+        *[!a-zA-Z0-9:/._-]*) echo "VITE_NEON_AUTH_URL origin is not usable in CSP" >&2; exit 1 ;; \
+      esac; \
+      sed -i "s#connect-src 'self'#connect-src 'self' ${origin}#" /etc/nginx/nginx.conf; \
+    fi
 COPY --from=build /app/dist /usr/share/nginx/html
 USER 101:101
 EXPOSE 8080

@@ -1,3 +1,5 @@
+import { authHeaders, noteUnauthorized } from "./session";
+
 export interface DossierStatus {
   status: "incomplet" | "bloque" | "pret_a_verifier" | "cloture";
   label: "Incomplet" | "Bloqué" | "Prêt à vérifier" | "Clôturé";
@@ -71,8 +73,9 @@ export function isApplicationStatus(value: unknown): value is ApplicationStatus 
 
 export async function fetchStatus(signal: AbortSignal): Promise<ApplicationStatus> {
   const response = await fetch("/api/status", {
-    signal, cache: "no-store", headers: { Accept: "application/json" },
+    signal, cache: "no-store", headers: authHeaders({ Accept: "application/json" }),
   });
+  noteUnauthorized(response.status);
   if (response.status !== 200 && response.status !== 503) {
     throw new Error("Le service ne répond pas correctement.");
   }

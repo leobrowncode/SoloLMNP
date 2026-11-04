@@ -90,10 +90,19 @@ def test_host_and_cors_boundaries(settings: Settings) -> None:
 
 
 def test_production_disables_interactive_api_docs(settings: Settings) -> None:
+    settings = settings.model_copy(update={"app_env": "production", "auth_mode": "neon"})
+    application = create_app(settings)
+    assert application.docs_url is None
+    with TestClient(application) as client:
+        assert client.get("/api/docs").status_code == 401
+        assert client.get("/api/openapi.json").status_code == 401
+        assert client.get("/api/health").status_code == 200
+
+
+def test_production_refuses_test_auth(settings: Settings) -> None:
     settings = settings.model_copy(update={"app_env": "production"})
-    with TestClient(create_app(settings)) as client:
-        assert client.get("/api/docs").status_code == 404
-        assert client.get("/api/openapi.json").status_code == 404
+    with pytest.raises(RuntimeError, match="AUTH_MODE=test"):
+        create_app(settings)
 
 
 def test_import_factory_does_not_create_database(tmp_path: Path) -> None:

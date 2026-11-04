@@ -12,6 +12,7 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 
 from alembic import command
+from app.core.auth import TEST_EMAIL, TEST_SECRET
 from app.core.config import Settings
 from app.core.database import Database
 from app.main import create_app
@@ -69,6 +70,9 @@ def blob_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         documents_dir=tmp_path / "documents",
         allowed_hosts=("testserver", "localhost", "127.0.0.1"),
         blob_read_write_token=TOKEN,
+        auth_mode="test",
+        auth_test_secret=TEST_SECRET,
+        allowed_emails=(TEST_EMAIL,),
     )
     config = Config(str(Path(__file__).resolve().parents[2] / "alembic.ini"))
     config.attributes["settings"] = settings

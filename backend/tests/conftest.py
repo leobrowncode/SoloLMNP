@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Iterator
 from pathlib import Path
 
+import fastapi.testclient as fastapi_testclient
 import pytest
 from alembic.config import Config
 from sqlalchemy import create_engine, text
@@ -11,6 +12,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.pool import NullPool
 
 from alembic import command
+from app.core.auth import OTHER_EMAIL, TEST_EMAIL, TEST_SECRET, TEST_SUBJECT, issue_test_token
 from app.core.config import Settings
 from app.core.database import Database
 
@@ -74,6 +76,7 @@ def settings(tmp_path: Path, postgres_template: str | None) -> Iterator[Settings
             documents_dir=tmp_path / "documents",
             allowed_hosts=("testserver", "localhost", "127.0.0.1"),
             blob_read_write_token="",
+            **_auth_overrides(),
         )
         return
     name = f"sololmnp_t_{uuid.uuid4().hex}"
@@ -104,7 +107,16 @@ def _postgres_settings(admin_url: str, name: str, documents_dir: Path) -> Settin
         documents_dir=documents_dir,
         allowed_hosts=("testserver", "localhost", "127.0.0.1"),
         blob_read_write_token="",
+        **_auth_overrides(),
     )
+
+
+def _auth_overrides() -> dict[str, object]:
+    return {
+        "auth_mode": "test",
+        "auth_test_secret": TEST_SECRET,
+        "allowed_emails": (TEST_EMAIL, OTHER_EMAIL),
+    }
 
 
 def _admin(url: str):
@@ -150,6 +162,22 @@ def _terminate(url: str, name: str) -> None:
             _terminate_connection(connection, name)
     finally:
         engine.dispose()
+
+
+class _AuthedTestClient(fastapi_testclient.TestClient):
+    """Existing API tests keep a default allowlisted session. Override the header to opt out."""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        headers = kwargs.get("headers")
+        merged = dict(headers) if isinstance(headers, dict) else {}
+        merged.setdefault(
+            "Authorization", "Bearer " + issue_test_token(TEST_SECRET, subject=TEST_SUBJECT)
+        )
+        kwargs["headers"] = merged
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+
+
+fastapi_testclient.TestClient = _AuthedTestClient  # type: ignore[misc]
 
 
 def _terminate_connection(connection, name: str) -> None:

@@ -7,7 +7,12 @@ services:
         APP_UID: ${SOLOLMNP_UID:-1000}
         APP_GID: ${SOLOLMNP_GID:-1000}
     environment:
-      APP_ENV: production
+      APP_ENV: ${APP_ENV:-production}
+      AUTH_MODE: ${AUTH_MODE:-neon}
+      AUTH_TEST_SECRET: ${AUTH_TEST_SECRET:-}
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
+      NEON_AUTH_BASE_URL: ${NEON_AUTH_BASE_URL:-}
+      NEON_AUTH_JWKS_URL: ${NEON_AUTH_JWKS_URL:-}
       DATABASE_URL: sqlite:////app/data/sololmnp.sqlite3
       DOCUMENTS_DIR: /app/data/documents
       CORS_ORIGINS: "[]"
@@ -28,7 +33,7 @@ services:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/status', timeout=3)"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
       interval: 5s
       timeout: 4s
       retries: 12
@@ -38,6 +43,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        VITE_NEON_AUTH_URL: ${VITE_NEON_AUTH_URL:-}
     ports:
       - "127.0.0.1:${SOLOLMNP_PORT:-5173}:8080"
     depends_on:

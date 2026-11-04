@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { signOutNeon } from "./api/neonAuth";
+import { clearToken, neonAuthConfigured, testAuthMode } from "./api/session";
 import { fetchStatus } from "./api/status";
 import { MOBILE_QUERY, NARROW_CONTROL_QUERY, useMediaQuery } from "./lib/viewport";
 import { focusRouteTarget } from "./routing/focusTarget";
@@ -192,6 +194,25 @@ export default function AppShell() {
             <p>Une étape à la fois.</p>
           </div>
           <div className="sidebar-version">SoloLMNP · {status ? `v${status.application_version}` : "Développement"}</div>
+          <button
+            type="button"
+            className="logout"
+            onClick={() => {
+              void (async () => {
+                clearToken();
+                if (!testAuthMode() && neonAuthConfigured()) {
+                  try {
+                    await signOutNeon();
+                  } catch {
+                    /* La session locale est déjà effacée. */
+                  }
+                }
+                window.location.assign("/connexion");
+              })();
+            }}
+          >
+            Se déconnecter
+          </button>
         </aside>
 
         <main id="main" tabIndex={-1}>

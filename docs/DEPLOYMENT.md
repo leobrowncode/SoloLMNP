@@ -81,16 +81,20 @@ Copier `.env.example` vers `.env` permet de personnaliser Compose :
 
 Compose utilise volontairement des chemins internes fixes pour SQLite et les documents.
 Les variables `DATABASE_URL` et `DOCUMENTS_DIR` de l'exemple servent au développement natif.
-L'application ne possède pas d'authentification : l'auto-hébergement doit rester privé.
-Un tunnel SSH vers le port local permet un accès distant sans publier directement le service.
+Chaque route `/api/*` exige une session vérifiée, sauf `GET /api/health`.
+Le navigateur envoie `Authorization: Bearer` après une connexion Neon Auth (e-mail ou Google).
+`ALLOWED_EMAILS` refuse toute autre adresse. Les variables sont dans `.env.example`.
+`VITE_NEON_AUTH_URL` est figée dans l’image frontend : la reconstruire après un changement.
+Elle est aussi ajoutée à `connect-src` pour que la page puisse appeler Neon Auth.
+L’écoute reste sur `127.0.0.1` : un tunnel SSH suffit pour un accès distant.
 
 ### Démarrage, disponibilité et migrations
 
 Le backend applique `python -m alembic upgrade head` avant Uvicorn, avec un masque de
 création des fichiers `077`. Une migration échouée arrête le processus.
 
-- `GET /api/health` vérifie que le processus répond ;
-- `GET /api/status` vérifie la disponibilité, notamment le schéma SQLite attendu ;
+- `GET /api/health` vérifie que le processus répond, sans session ;
+- `GET /api/status` vérifie la disponibilité, notamment le schéma attendu, et exige une session ;
 - Compose attend la disponibilité du backend avant de démarrer le frontend ;
 - `GET /healthz` vérifie le serveur de fichiers statiques Nginx.
 

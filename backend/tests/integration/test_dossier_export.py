@@ -225,11 +225,11 @@ def test_failed_row_rollback_is_logged(
     real = __import__("app.services.dossier_export", fromlist=["replace_rows"]).replace_rows
     calls = {"n": 0}
 
-    def wrapped(database: object, payload: object) -> None:
+    def wrapped(database: object, payload: object, owner_id: int) -> None:
         calls["n"] += 1
         if calls["n"] == 2:
             raise RuntimeError("rollback")
-        real(database, payload)
+        real(database, payload, owner_id)
 
     def explode(*_args: object, **_kwargs: object) -> None:
         raise RuntimeError("sync")

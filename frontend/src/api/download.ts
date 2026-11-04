@@ -1,13 +1,15 @@
 import { parseApiErrorDetail, type ApiErrorDetail } from "./errors";
 import { RequestError } from "./ledger";
+import { authHeaders, noteUnauthorized } from "./session";
 
 export async function downloadFiling(path: string): Promise<void> {
   const response = await fetch(path, {
     method: "GET",
     cache: "no-store",
-    headers: { "X-SoloLMNP-Request": "1", Accept: "application/octet-stream, application/json" },
+    headers: authHeaders({ "X-SoloLMNP-Request": "1", Accept: "application/octet-stream, application/json" }),
   });
   if (!response.ok) {
+    noteUnauthorized(response.status);
     let detail: ApiErrorDetail;
     try {
       const data = await response.json() as { detail?: unknown };

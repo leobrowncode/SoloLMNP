@@ -53,14 +53,26 @@ def main() -> None:
     database = Path(reuse) if reuse else Path(temporary) / "sololmnp.sqlite3"
     documents = Path(temporary) / "documents"
     documents.mkdir()
+    sys.path.insert(0, str(BACKEND))
+    from app.core.auth import TEST_SECRET, issue_test_token
+
+    email = "testeur@sololmnp.test"
+    token = issue_test_token(TEST_SECRET, email=email, subject="e2e-testeur")
     env = os.environ.copy()
     env.update(
         {
             "APP_ENV": "test",
+            "AUTH_MODE": "test",
+            "AUTH_TEST_SECRET": TEST_SECRET,
+            "ALLOWED_EMAILS": email,
             "DATABASE_URL": f"sqlite:///{database.as_posix()}",
             "DOCUMENTS_DIR": str(documents),
             "CORS_ORIGINS": "[]",
             "ALLOWED_HOSTS": "localhost,127.0.0.1,testserver",
+            "VITE_AUTH_MODE": "test",
+            "VITE_TEST_USER_EMAIL": email,
+            "VITE_TEST_USER_PASSWORD": "mot-de-passe-essai",
+            "VITE_TEST_TOKEN": token,
         }
     )
     print(f"Base temporaire : {database}", flush=True)

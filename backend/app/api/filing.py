@@ -3,7 +3,7 @@
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,7 @@ from app.api.filing_schemas import (
 from app.api.sessions import dependencies
 from app.core.config import Settings
 from app.core.database import Database
+from app.core.ownership import claimed_accounts, resolve_owner_id
 from app.domain.filing.declaration import archival_csv, archival_json
 from app.domain.filing.fec import export_fec
 from app.domain.filing.mappings import compile_package
@@ -54,6 +55,7 @@ from app.services.dossier_export import (
 )
 from app.services.efi import efi_worksheet, worksheet_pdf
 from app.services.export_gate import export_status, require_export
+from app.services.ledger import fail
 from app.services.spreadsheet import year_workbook
 
 
@@ -62,6 +64,21 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
     read_session, write_session = dependencies(database)
     Read = Annotated[Session, Depends(read_session)]
     Write = Annotated[Session, Depends(write_session, scope="function")]
+
+    def owner_id(request: Request) -> int:
+        return resolve_owner_id(database, request.state.principal)
+
+    def file_backup_owner(request: Request) -> int:
+        if claimed_accounts(database) > 1:
+            fail(
+                "BACKUP_MULTI_OWNER",
+                "La copie du fichier de base mélange les comptes. Utilisez l’archive de dossier.",
+                409,
+            )
+        return resolve_owner_id(database, request.state.principal)
+
+    Owner = Annotated[int, Depends(owner_id)]
+    FileBackup = Annotated[int, Depends(file_backup_owner)]
 
     @router.get("/years/{year_id}/precheck")
     def read_precheck(year_id: int, session: Read) -> dict[str, Any]:
@@ -217,44 +234,44 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
         return link_document(session, document_id, data)
 
     @router.post("/backup", status_code=201)
-    def backup() -> dict[str, str]:
+    def backup(_owner: FileBackup) -> dict[str, str]:
         return create_backup(settings)
 
     @router.get("/backups")
-    def backups() -> dict[str, Any]:
+    def backups(_owner: FileBackup) -> dict[str, Any]:
         return list_backups(settings)
 
     @router.post("/backups/verify")
-    def backup_verify(data: BackupNameInput) -> dict[str, Any]:
+    def backup_verify(data: BackupNameInput, _owner: FileBackup) -> dict[str, Any]:
         return verify_backup(settings, data.filename)
 
     @router.get("/backups/preview")
-    def backup_preview(filename: str) -> dict[str, Any]:
+    def backup_preview(filename: str, _owner: FileBackup) -> dict[str, Any]:
         return preview_restore(settings, filename)
 
     @router.post("/backup/restore")
-    def restore(data: RestoreInput) -> dict[str, Any]:
+    def restore(data: RestoreInput, _owner: FileBackup) -> dict[str, Any]:
         return restore_backup(settings, database, data.filename, data.confirmation)
 
     @router.post("/dossier/export", status_code=201)
-    def dossier_export() -> dict[str, str]:
-        return create_dossier_export(settings, database)
+    def dossier_export(owner: Owner) -> dict[str, str]:
+        return create_dossier_export(settings, database, owner)
 
     @router.get("/dossier/exports")
-    def dossier_exports() -> dict[str, Any]:
-        return list_dossier_exports(settings)
+    def dossier_exports(owner: Owner) -> dict[str, Any]:
+        return list_dossier_exports(settings, database, owner)
 
     @router.post("/dossier/exports/verify")
-    def dossier_verify(data: BackupNameInput) -> dict[str, Any]:
-        return verify_dossier_export(settings, data.filename)
+    def dossier_verify(data: BackupNameInput, owner: Owner) -> dict[str, Any]:
+        return verify_dossier_export(settings, database, data.filename, owner)
 
     @router.get("/dossier/exports/preview")
-    def dossier_preview(filename: str) -> dict[str, Any]:
-        return preview_dossier_export(settings, database, filename)
+    def dossier_preview(filename: str, owner: Owner) -> dict[str, Any]:
+        return preview_dossier_export(settings, database, filename, owner)
 
     @router.post("/dossier/restore")
-    def dossier_restore(data: RestoreInput) -> dict[str, Any]:
-        return restore_dossier(settings, database, data.filename, data.confirmation)
+    def dossier_restore(data: RestoreInput, owner: Owner) -> dict[str, Any]:
+        return restore_dossier(settings, database, data.filename, data.confirmation, owner)
 
     return router
 

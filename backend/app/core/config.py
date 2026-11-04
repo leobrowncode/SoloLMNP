@@ -22,8 +22,13 @@ class Settings(BaseSettings):
     allowed_hosts: Annotated[tuple[str, ...], NoDecode] = ("localhost", "127.0.0.1", "[::1]")
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0, le=50 * 1024 * 1024)
     blob_read_write_token: str = Field(default="", repr=False)
+    auth_mode: Literal["neon", "test"] = "neon"
+    auth_test_secret: str = Field(default="", repr=False)
+    allowed_emails: Annotated[tuple[str, ...], NoDecode] = ()
+    neon_auth_base_url: str = ""
+    neon_auth_jwks_url: str = ""
 
-    @field_validator("cors_origins", "allowed_hosts", mode="before")
+    @field_validator("cors_origins", "allowed_hosts", "allowed_emails", mode="before")
     @classmethod
     def parse_list(cls, value: object) -> object:
         if isinstance(value, str):
@@ -50,6 +55,34 @@ class Settings(BaseSettings):
                 raise ValueError("CORS requires explicit HTTP(S) origins without paths")
             _ = parsed.port
         return origins
+
+    @field_validator("allowed_emails")
+    @classmethod
+    def explicit_emails(cls, emails: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        for email in emails:
+            item = email.strip().lower()
+            if not item or "@" not in item or any(char.isspace() for char in item):
+                raise ValueError("ALLOWED_EMAILS entries must be email addresses")
+            normalized.append(item)
+        return tuple(dict.fromkeys(normalized))
+
+    @field_validator("neon_auth_base_url", "neon_auth_jwks_url")
+    @classmethod
+    def auth_endpoint(cls, value: str) -> str:
+        if not value:
+            return ""
+        parsed = urlsplit(value.strip())
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("Auth URLs must be HTTP(S) without a query or embedded secret")
+        return value.strip().rstrip("/")
 
     @field_validator("allowed_hosts")
     @classmethod

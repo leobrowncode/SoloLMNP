@@ -147,6 +147,7 @@ def test_open_dependents_are_invalidated_with_the_plan(client, database):
     with database.sessions.begin() as session:
         session.add(
             TaxReturnSnapshot(
+                owner_id=1,
                 fiscal_year_id=1,
                 generation=1,
                 status="CURRENT",

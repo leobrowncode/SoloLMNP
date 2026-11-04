@@ -35,6 +35,7 @@ from app.api.operation_schemas import (
 from app.api.sessions import dependencies
 from app.core.database import Database
 from app.core.money import to_cents
+from app.core.ownership import owned_activity
 from app.core.rate import to_rate_millis
 from app.domain.csv_assistant import (
     PROFILES,
@@ -45,7 +46,7 @@ from app.domain.csv_assistant import (
     is_profile,
     template_csv,
 )
-from app.models import AccountingEntryLine, Property, RentalActivity
+from app.models import AccountingEntryLine, Property
 from app.models.operations import (
     BankAccount,
     BankMatch,
@@ -86,9 +87,10 @@ def build_operations_router(database: Database) -> APIRouter:
 
     @router.post("/properties", status_code=201)
     def property_create(data: PropertyInput, session: Write) -> dict[str, Any]:
-        if session.get(RentalActivity, 1) is None:
+        activity = owned_activity(session)
+        if activity is None:
             fail("ACTIVITY_REQUIRED", "Initialisez d’abord l’activité dans Comptabilité.", 422)
-        row = Property(rental_activity_id=1, **data.model_dump())
+        row = Property(rental_activity_id=activity.id, **data.model_dump())
         session.add(row)
         event(session, "PROPERTY_CREATED", None, data.model_dump(mode="json"))
         return record(row)

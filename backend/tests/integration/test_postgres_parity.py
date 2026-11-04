@@ -11,7 +11,7 @@ from app.core.config import Settings
 from app.core.database import Database
 from app.main import create_app
 from app.services.sqlite_transfer import copy_sqlite_to_postgres
-from tests.conftest import migration_config
+from tests.conftest import _auth_overrides, migration_config
 from tests.integration.test_closing import centralize
 from tests.integration.test_statements import book
 
@@ -34,6 +34,7 @@ def test_closed_dossier_fec_and_liasse_match(
         database_url=f"sqlite:///{source_file.as_posix()}",
         documents_dir=tmp_path / "documents",
         allowed_hosts=("testserver", "localhost", "127.0.0.1"),
+        **_auth_overrides(),
     )
     command.upgrade(migration_config(source), "head")
     with TestClient(create_app(source), headers={"X-SoloLMNP-Request": "1"}) as client:

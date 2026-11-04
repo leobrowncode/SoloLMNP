@@ -3,16 +3,25 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, Money, Timestamps
+from app.models.base import Base, Money, Owned, Timestamps
 
 
-class RentalActivity(Timestamps, Base):
+class RentalActivity(Timestamps, Owned, Base):
     __tablename__ = "rental_activity"
     __table_args__ = (
-        CheckConstraint("id = 1", name="singleton"),
+        Index("uq_rental_activity_owner_id", "owner_id", unique=True),
         CheckConstraint("length(trim(activity_name)) > 0", name="name_required"),
         CheckConstraint("tax_regime = 'REAL_SIMPLIFIED_BIC'", name="tax_regime"),
         CheckConstraint("accounting_method = 'ACCRUAL'", name="accounting_method"),
@@ -26,7 +35,7 @@ class RentalActivity(Timestamps, Base):
             name="siret_format",
         ),
     )
-    id: Mapped[int] = mapped_column(primary_key=True, default=1)
+    id: Mapped[int] = mapped_column(primary_key=True)
     activity_name: Mapped[str] = mapped_column(String(200))
     siren: Mapped[str | None] = mapped_column(String(9))
     siret: Mapped[str | None] = mapped_column(String(14))
@@ -36,7 +45,7 @@ class RentalActivity(Timestamps, Base):
     notes: Mapped[str] = mapped_column(Text, default="")
 
 
-class Property(Timestamps, Base):
+class Property(Timestamps, Owned, Base):
     __tablename__ = "property"
     __table_args__ = (
         CheckConstraint("length(trim(name)) > 0", name="name_required"),
@@ -60,7 +69,7 @@ class Property(Timestamps, Base):
     notes: Mapped[str] = mapped_column(Text, default="")
 
 
-class FiscalYear(Timestamps, Base):
+class FiscalYear(Timestamps, Owned, Base):
     __tablename__ = "fiscal_year"
     __table_args__ = (
         UniqueConstraint("rental_activity_id", "year"),

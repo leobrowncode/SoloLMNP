@@ -1,5 +1,6 @@
 import { parseApiErrorDetail, type ApiErrorIssue } from "./errors";
 import { RequestError } from "./ledger";
+import { authHeaders, noteUnauthorized } from "./session";
 
 export type CsvProfile = "bank" | "operations" | "loan_payments";
 
@@ -79,9 +80,10 @@ export async function downloadImportTemplate(profile: CsvProfile): Promise<void>
   const response = await fetch(`/api/operations/imports/${profile}/template`, {
     method: "GET",
     cache: "no-store",
-    headers: { "X-SoloLMNP-Request": "1", Accept: "text/csv, application/json" },
+    headers: authHeaders({ "X-SoloLMNP-Request": "1", Accept: "text/csv, application/json" }),
   });
   if (!response.ok) {
+    noteUnauthorized(response.status);
     let detail;
     try {
       const data = await response.json() as { detail?: unknown };

@@ -34,6 +34,10 @@ certifi==2026.7.22
     #   httpcore
     #   httpx
     #   requests
+cffi==2.1.1
+    # via
+    #   -c requirements.lock
+    #   cryptography
 charset-normalizer==3.5.1
     # via requests
 click==8.5.0
@@ -43,6 +47,10 @@ click==8.5.0
     #   uvicorn
 coverage==7.16.1
     # via pytest-cov
+cryptography==50.0.2
+    # via
+    #   -c requirements.lock
+    #   -r requirements.in
 cyclonedx-python-lib==11.12.0
     # via pip-audit
 defusedxml==0.7.1
@@ -132,6 +140,10 @@ psycopg-binary==3.3.7
     #   psycopg
 py-serializable==2.1.0
     # via cyclonedx-python-lib
+pycparser==3.12
+    # via
+    #   -c requirements.lock
+    #   cffi
 pydantic==2.13.5
     # via
     #   -c requirements.lock
@@ -149,6 +161,10 @@ pygments==2.21.0
     # via
     #   pytest
     #   rich
+pyjwt==2.15.1
+    # via
+    #   -c requirements.lock
+    #   -r requirements.in
 pyparsing==3.3.2
     # via pip-requirements-parser
 pyproject-hooks==1.3.0

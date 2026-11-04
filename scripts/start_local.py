@@ -23,7 +23,7 @@ DATA = ROOT / "data"
 ENV_FILE = ROOT / ".env"
 ENV_EXAMPLE = ROOT / ".env.example"
 UI_URL = "http://127.0.0.1:5173"
-API_STATUS = "http://127.0.0.1:8000/api/status"
+API_HEALTH = "http://127.0.0.1:8000/api/health"
 
 
 def die(message: str) -> None:
@@ -187,14 +187,14 @@ def solo_already_running() -> bool:
         return False
     if read_http(UI_URL) is None:
         return False
-    body = read_http(API_STATUS)
+    body = read_http(API_HEALTH)
     if not body:
         return False
     try:
         payload = json.loads(body.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeError):
         return False
-    return isinstance(payload, dict) and isinstance(payload.get("application_version"), str)
+    return isinstance(payload, dict) and payload.get("status") == "ok"
 
 
 def ensure_ports_free() -> None:
@@ -280,7 +280,7 @@ def main() -> None:
         BACKEND,
     )
     try:
-        if not wait_owned(backend, API_STATUS, "backend"):
+        if not wait_owned(backend, API_HEALTH, "backend"):
             die(
                 "Le backend n'a pas répondu à temps. "
                 "Vérifiez qu'aucune autre application n'utilise le port 8000."

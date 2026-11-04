@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_cents
+from app.core.ownership import owned_activity
 from app.domain.assets.registration import Fix
 from app.domain.dashboard import (
     DashboardFacts,
@@ -51,7 +52,7 @@ _AUDIT_LABELS = {
 def current_dashboard(session: Session) -> dict[str, Any]:
     """Board for the same exercise as the dossier banner."""
     dossier = current_dossier(session)
-    activity = session.get(RentalActivity, 1)
+    activity = owned_activity(session)
     year_id = dossier.get("fiscal_year_id")
     year = session.get(FiscalYear, year_id) if isinstance(year_id, int) else None
     facts = _facts(session, activity, year, dossier)

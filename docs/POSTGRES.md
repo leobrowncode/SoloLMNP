@@ -2,7 +2,7 @@
 
 L’application parle à Postgres quand `DATABASE_URL` est une URL Postgres. Le lanceur local, Docker Compose et le parcours navigateur restent sur le fichier SQLite. Les tests par défaut aussi. La CI ajoute un job Ubuntu avec un service Postgres 16.
 
-Aucun `owner_id` n’est ajouté ici. L’authentification reste hors périmètre, et l’application doit rester liée à `127.0.0.1` tant qu’elle n’existe pas.
+La migration `0013_account_owner` ajoute `app_account` et `owner_id`. Les lignes déjà présentes sont rattachées au premier compte, encore sans sujet. La première adresse autorisée qui se connecte le réclame. Le plan comptable et les journaux restent partagés. L’écoute locale reste `127.0.0.1`.
 
 ## URL
 
@@ -23,7 +23,7 @@ Le fuseau de session est UTC, pour que `CURRENT_DATE` corresponde à `date('now'
 
 ## Schéma
 
-Les migrations `0001` à `0012_loan_rate_millis` sont la source SQLite. Sur Postgres elles sont traduites à l’exécution : `GLOB` et `typeof`, dates, `printf`, booléens `0`/`1`, et les triggers `RAISE(ABORT, …)` qui deviennent des fonctions PL/pgSQL. Les écritures validées restent immuables. Le journal validé reste la seule source des balances, des états, du FEC et de la liasse.
+Les migrations `0001` à `0013_account_owner` sont la source SQLite. Sur Postgres elles sont traduites à l’exécution : `GLOB` et `typeof`, dates, `printf`, booléens `0`/`1`, et les triggers `RAISE(ABORT, …)` qui deviennent des fonctions PL/pgSQL. Les écritures validées restent immuables. Le journal validé reste la seule source des balances, des états, du FEC et de la liasse.
 
 Les centimes tiennent dans un entier 64 bits. SQLite les stocke dans `INTEGER`. Postgres les stocke dans `NUMERIC` sans échelle : un `BIGINT` arrondirait une écriture SQL fractionnaire avant le `CHECK`, alors que `typeof` doit encore la refuser. Les identifiants, années, durées et taux restent des `INTEGER`, avec une séquence (le rowid SQLite n’a pas d’équivalent). Les triggers d’intégrité lèvent l’errcode `23514`, pour que l’API les voie comme un conflit d’intégrité, comme l’`ABORT` SQLite.
 
@@ -31,7 +31,7 @@ Les index partiels (une seule écriture d’à-nouveaux, un seul instantané cou
 
 ## Copier un dossier SQLite
 
-Le fichier source doit être à la révision `0012_loan_rate_millis` (ouvrir l’application une fois, ou laisser Alembic le migrer). La cible est migrée par le script. Elle doit être vide de dossier, sauf avec `--replace`.
+Le fichier source doit être à la révision `0013_account_owner` (ouvrir l’application une fois, ou laisser Alembic le migrer). La cible est migrée par le script. Elle doit être vide de dossier, sauf avec `--replace`.
 
 ```sh
 python scripts/migrate_sqlite_to_postgres.py \
