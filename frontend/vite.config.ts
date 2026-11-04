@@ -1,4 +1,5 @@
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
 import type { ProxyOptions } from "vite";
 import { defineConfig } from "vitest/config";
 
@@ -11,6 +12,7 @@ const localProxy: ProxyOptions["configure"] = (proxy) => {
 };
 
 export default defineConfig({
+  envDir: fileURLToPath(new URL("..", import.meta.url)),
   plugins: [react()],
   server: {
     host: "127.0.0.1", port: 5173, strictPort: true,

@@ -15,10 +15,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, utc_now
+from app.models.base import Base, Owned, utc_now
 
 
-class AuditEvent(Base):
+class AuditEvent(Owned, Base):
     __tablename__ = "audit_event"
     id: Mapped[int] = mapped_column(primary_key=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
@@ -31,7 +31,7 @@ class AuditEvent(Base):
     metadata_json: Mapped[dict[str, object]] = mapped_column("metadata", JSON, default=dict)
 
 
-class TaxReturnSnapshot(Base):
+class TaxReturnSnapshot(Owned, Base):
     __tablename__ = "tax_return_snapshot"
     __table_args__ = (
         UniqueConstraint("fiscal_year_id", "generation"),
@@ -55,7 +55,7 @@ class TaxReturnSnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
-class SupportingDocument(Base):
+class SupportingDocument(Owned, Base):
     __tablename__ = "supporting_document"
     __table_args__ = (
         CheckConstraint("size > 0", name="size"),

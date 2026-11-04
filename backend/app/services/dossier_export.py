@@ -20,7 +20,7 @@ import zipfile
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import func, select, text, update
+from sqlalchemy import func, insert, select, text, update
 from sqlalchemy.engine import Connection
 from sqlalchemy.sql.schema import Table
 
@@ -44,6 +44,7 @@ from app.domain.filing.dossier_archive import (
 )
 from app.domain.fiscal.loader import available_vintages, load_vintage
 from app.models import Base
+from app.models.account import DossierArchive
 from app.models.base import utc_now
 from app.services.ledger import fail
 from app.services.object_store import ObjectMissing, ObjectStore, ObjectStoreError, open_store
@@ -51,6 +52,8 @@ from app.services.object_store import ObjectMissing, ObjectStore, ObjectStoreErr
 MAX_ARCHIVE = 200 * 1024 * 1024
 MAX_MEMBER = 100 * 1024 * 1024
 _NAME = re.compile(r"^dossier-[0-9]{1,20}\.zip$")
+_SKIP_WRITE = frozenset({"app_account", "dossier_archive"})
+_SHARED = frozenset({"account", "accounting_journal"})
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _CHECKS = "integrity.json"
 _WRITE_LOCK = 119_001
@@ -60,24 +63,24 @@ Payload = dict[str, list[dict[str, object]]]
 Files = dict[str, tuple[bytes, str]]
 
 
-def create_dossier_export(settings: Settings, database: Database) -> dict[str, str]:
+def create_dossier_export(settings: Settings, database: Database, owner_id: int) -> dict[str, str]:
     store = open_store(settings)
     with database.engine.connect() as connection:
-        payload = _read_payload(connection)
+        payload = _read_payload(connection, owner_id)
     documents = _documents_for_payload(store, payload)
     raw = _build_zip(payload, documents)
     _validate_zip(raw)
     filename = _fresh_name(store)
     store.put(export_key(filename), raw, "application/zip")
+    _remember_archive(database, owner_id, filename)
     return {"filename": filename, "sha256": hashlib.sha256(raw).hexdigest()}
 
 
-def list_dossier_exports(settings: Settings) -> dict[str, Any]:
+def list_dossier_exports(settings: Settings, database: Database, owner_id: int) -> dict[str, Any]:
     store = open_store(settings)
-    checks = _read_checks(store)
-    names = [name for name in store.list_names("dossier-exports") if _NAME.fullmatch(name)]
+    checks = _read_checks(store, owner_id)
     rows: list[dict[str, Any]] = []
-    for name in sorted(names, key=_name_stamp, reverse=True):
+    for name in _owned_names(database, owner_id):
         try:
             raw = store.get(export_key(name))
         except ObjectMissing:
@@ -86,9 +89,11 @@ def list_dossier_exports(settings: Settings) -> dict[str, Any]:
     return {"backups": rows}
 
 
-def verify_dossier_export(settings: Settings, filename: str) -> dict[str, Any]:
+def verify_dossier_export(
+    settings: Settings, database: Database, filename: str, owner_id: int
+) -> dict[str, Any]:
     store = open_store(settings)
-    path_name = _checked_name(filename)
+    path_name = _require_owned_name(database, owner_id, filename)
     try:
         raw = store.get(export_key(path_name))
     except ObjectMissing:
@@ -96,18 +101,20 @@ def verify_dossier_export(settings: Settings, filename: str) -> dict[str, Any]:
     try:
         _validate_zip(raw)
     except HTTPException as exc:
-        _record_check(store, path_name, raw, ok=False, message=_error_message(exc))
+        _record_check(store, owner_id, path_name, raw, ok=False, message=_error_message(exc))
         raise
-    _record_check(store, path_name, raw, ok=True, message="Contrôle d’intégrité réussi.")
-    return _describe(path_name, raw, _read_checks(store).get(path_name))
+    _record_check(store, owner_id, path_name, raw, ok=True, message="Contrôle d’intégrité réussi.")
+    return _describe(path_name, raw, _read_checks(store, owner_id).get(path_name))
 
 
-def preview_dossier_export(settings: Settings, database: Database, filename: str) -> dict[str, Any]:
-    manifest, payload, _documents = _load_checked(settings, filename)
+def preview_dossier_export(
+    settings: Settings, database: Database, filename: str, owner_id: int
+) -> dict[str, Any]:
+    manifest, payload, _documents = _load_checked(settings, database, filename, owner_id)
     return {
         "filename": filename,
         "backup_date": _created_at(manifest),
-        "current": _live_population(database),
+        "current": _live_population(database, owner_id),
         "backup": {
             "entries": population(payload)["entries"],
             "years": population(payload)["years"],
@@ -120,6 +127,7 @@ def restore_dossier(
     database: Database,
     filename: str,
     confirmation: str,
+    owner_id: int,
 ) -> dict[str, Any]:
     if confirmation != "RESTAURER":
         fail(
@@ -128,21 +136,22 @@ def restore_dossier(
             422,
             field="confirmation",
         )
-    manifest, payload, documents = _load_checked(settings, filename)
+    manifest, payload, documents = _load_checked(settings, database, filename, owner_id)
     store = open_store(settings)
-    safety = create_dossier_export(settings, database)
+    safety = create_dossier_export(settings, database, owner_id)
     with database.engine.connect() as connection:
-        snapshot = _read_payload(connection)
+        snapshot = _read_payload(connection, owner_id)
+    protected = _other_document_names(database, owner_id)
     replaced = False
     try:
-        replace_rows(database, payload)
+        replace_rows(database, payload, owner_id)
         replaced = True
-        sync_documents(store, documents)
+        sync_documents(store, documents, protected)
     except Exception as original:
         if not replaced:
             raise
         try:
-            replace_rows(database, snapshot)
+            replace_rows(database, snapshot, owner_id)
         except Exception as rollback_error:
             logger.exception(
                 "Échec du retour arrière de la restauration. L’archive préalable est %s.",
@@ -160,10 +169,11 @@ def restore_dossier(
     }
 
 
-def replace_rows(database: Database, payload: Payload) -> None:
-    """Replace every application table. Triggers are off only inside this transaction."""
+def replace_rows(database: Database, payload: Payload, owner_id: int) -> None:
+    """Replace one account's rows. Triggers are off only inside this transaction."""
     tables = list(Base.metadata.sorted_tables)
     _require_tables(payload, tables)
+    _force_owner(payload, owner_id)
     with database.engine.connect().execution_options(sqlite_write=True) as connection:
         with connection.begin():
             if connection.dialect.name == "postgresql":
@@ -172,33 +182,41 @@ def replace_rows(database: Database, payload: Payload) -> None:
                     {"key": _WRITE_LOCK},
                 )
             _suspend(connection, tables)
-            _clear_self_references(connection, tables)
+            _clear_self_references(connection, tables, owner_id)
             for table in reversed(tables):
-                connection.execute(table.delete())
-            _insert_payload(connection, tables, payload)
+                if "owner_id" not in table.c or table.name in _SKIP_WRITE:
+                    continue
+                connection.execute(table.delete().where(table.c.owner_id == owner_id))
+            _insert_payload(connection, tables, payload, owner_id)
             if connection.dialect.name == "postgresql":
                 _reset_identities(connection, tables)
             _resume(connection)
 
 
-def sync_documents(store: ObjectStore, files: Files) -> None:
+def sync_documents(store: ObjectStore, files: Files, managed: set[str] | None = None) -> None:
+    """Install ``files``. ``managed`` names belong to other accounts and stay."""
     before = _snapshot_documents(store)
     try:
-        _apply_documents(store, files)
+        _apply_documents(store, files, managed)
     except Exception as original:
         try:
-            _apply_documents(store, before)
+            _apply_documents(store, before, None)
         except Exception as rollback_error:
             logger.exception("Échec du retour arrière des justificatifs.")
             raise rollback_error from original
         raise
 
 
-def _read_payload(connection: Connection) -> Payload:
+def _read_payload(connection: Connection, owner_id: int) -> Payload:
     payload: Payload = {}
     for table in Base.metadata.sorted_tables:
+        statement = table.select()
+        if table.name == "app_account":
+            statement = statement.where(table.c.id == owner_id)
+        elif "owner_id" in table.c:
+            statement = statement.where(table.c.owner_id == owner_id)
         rows: list[dict[str, object]] = []
-        for mapping in connection.execute(table.select()).mappings():
+        for mapping in connection.execute(statement).mappings():
             try:
                 encoded = {
                     column.name: encode_value(column, mapping[column.name])
@@ -413,9 +431,33 @@ def _require_tables(payload: Payload, tables: list[Table]) -> None:
         fail("DOSSIER_REJECTED", "Les tables de l’archive ne correspondent pas au schéma.", 422)
 
 
-def _insert_payload(connection: Connection, tables: list[Table], payload: Payload) -> None:
+def _force_owner(payload: Payload, owner_id: int) -> None:
+    for table in Base.metadata.sorted_tables:
+        if "owner_id" not in table.c or table.name in _SKIP_WRITE:
+            continue
+        for row in payload[table.name]:
+            row["owner_id"] = owner_id
+
+
+def _other_document_names(database: Database, owner_id: int) -> set[str]:
+    """Files that belong to someone else and must survive this restore."""
+    table = Base.metadata.tables["supporting_document"]
+    with database.engine.connect() as connection:
+        rows = connection.execute(select(table.c.stored_name).where(table.c.owner_id != owner_id))
+    return {str(name) for (name,) in rows if isinstance(name, str)}
+
+
+def _insert_payload(
+    connection: Connection, tables: list[Table], payload: Payload, owner_id: int
+) -> None:
+    del owner_id
     pending: list[tuple[Table, list[dict[str, object]]]] = []
     for table in tables:
+        if table.name in _SKIP_WRITE:
+            continue
+        if table.name in _SHARED:
+            _insert_missing(connection, table, payload[table.name])
+            continue
         self_refs = _self_fk_names(table)
         decoded_rows: list[dict[str, object]] = []
         updates: list[dict[str, object]] = []
@@ -459,15 +501,36 @@ def _self_fk_names(table: Table) -> list[str]:
     return names
 
 
-def _clear_self_references(connection: Connection, tables: list[Table]) -> None:
+def _insert_missing(connection: Connection, table: Table, rows: list[dict[str, object]]) -> None:
+    primary = list(table.primary_key.columns)
+    for raw in rows:
+        if set(raw) != {column.name for column in table.columns}:
+            fail("DOSSIER_REJECTED", "Une ligne de l’archive est illisible.", 422)
+        try:
+            decoded = {
+                column.name: decode_value(column, raw[column.name]) for column in table.columns
+            }
+        except DossierPayloadError:
+            fail("DOSSIER_REJECTED", "Une ligne de l’archive est illisible.", 422)
+        where = [column == decoded[column.name] for column in primary]
+        found = connection.execute(select(table.c[primary[0].name]).where(*where)).first()
+        if found is None:
+            connection.execute(table.insert(), [decoded])
+
+
+def _clear_self_references(connection: Connection, tables: list[Table], owner_id: int) -> None:
     for table in tables:
         names = _self_fk_names(table)
-        if not names:
+        if not names or "owner_id" not in table.c or table.name in _SKIP_WRITE:
             continue
-        present = connection.execute(select(func.count()).select_from(table)).scalar_one()
+        present = connection.execute(
+            select(func.count()).select_from(table).where(table.c.owner_id == owner_id)
+        ).scalar_one()
         if int(present) == 0:
             continue
-        connection.execute(update(table).values({name: None for name in names}))
+        connection.execute(
+            update(table).where(table.c.owner_id == owner_id).values({name: None for name in names})
+        )
 
 
 def _suspend(connection: Connection, tables: list[Table]) -> None:
@@ -532,14 +595,14 @@ def _snapshot_documents(store: ObjectStore) -> Files:
     return files
 
 
-def _apply_documents(store: ObjectStore, files: Files) -> None:
-    current = set(store.list_names("documents"))
+def _apply_documents(store: ObjectStore, files: Files, managed: set[str] | None) -> None:
     for name, (content, media) in files.items():
         if not safe_segment(name):
             fail("DOSSIER_REJECTED", "Nom de justificatif refusé.", 422)
         store.put(document_key(name), content, media, overwrite=True)
-    for name in current:
-        if name not in files:
+    protected = set() if managed is None else managed
+    for name in store.list_names("documents"):
+        if name not in files and name not in protected and safe_segment(name):
             store.delete(document_key(name))
 
 
@@ -570,9 +633,11 @@ def _checked_name(filename: str) -> str:
     return filename
 
 
-def _load_checked(settings: Settings, filename: str) -> tuple[dict[str, Any], Payload, Files]:
+def _load_checked(
+    settings: Settings, database: Database, filename: str, owner_id: int
+) -> tuple[dict[str, Any], Payload, Files]:
     store = open_store(settings)
-    path_name = _checked_name(filename)
+    path_name = _require_owned_name(database, owner_id, filename)
     try:
         raw = store.get(export_key(path_name))
     except ObjectMissing:
@@ -582,11 +647,43 @@ def _load_checked(settings: Settings, filename: str) -> tuple[dict[str, Any], Pa
     return _validate_zip(raw)
 
 
-def _live_population(database: Database) -> dict[str, int]:
+def _live_population(database: Database, owner_id: int) -> dict[str, int]:
     with database.engine.connect() as connection:
-        entries = connection.execute(text("SELECT COUNT(*) FROM accounting_entry")).scalar_one()
-        years = connection.execute(text("SELECT COUNT(*) FROM fiscal_year")).scalar_one()
+        entries = connection.execute(
+            text("SELECT COUNT(*) FROM accounting_entry WHERE owner_id = :owner"),
+            {"owner": owner_id},
+        ).scalar_one()
+        years = connection.execute(
+            text("SELECT COUNT(*) FROM fiscal_year WHERE owner_id = :owner"),
+            {"owner": owner_id},
+        ).scalar_one()
     return {"entries": int(entries), "years": int(years)}
+
+
+def _remember_archive(database: Database, owner_id: int, filename: str) -> None:
+    with database.engine.connect().execution_options(sqlite_write=True) as connection:
+        with connection.begin():
+            connection.execute(
+                insert(DossierArchive),
+                {"owner_id": owner_id, "filename": filename, "created_at": utc_now()},
+            )
+
+
+def _owned_names(database: Database, owner_id: int) -> list[str]:
+    with database.engine.connect() as connection:
+        rows = connection.execute(
+            select(DossierArchive.filename)
+            .where(DossierArchive.owner_id == owner_id)
+            .order_by(DossierArchive.id.desc())
+        ).scalars()
+        return [name for name in rows if _NAME.fullmatch(name)]
+
+
+def _require_owned_name(database: Database, owner_id: int, filename: str) -> str:
+    path_name = _checked_name(filename)
+    if path_name not in set(_owned_names(database, owner_id)):
+        fail("DOSSIER_NOT_FOUND", "Archive de dossier introuvable.", 404)
+    return path_name
 
 
 def _describe(filename: str, raw: bytes, stored: dict[str, Any] | None) -> dict[str, Any]:
@@ -647,7 +744,13 @@ def _checks_key() -> str:
     return export_key(_CHECKS)
 
 
-def _read_checks(store: ObjectStore) -> dict[str, Any]:
+def _read_checks(store: ObjectStore, owner_id: int) -> dict[str, Any]:
+    book = _read_check_book(store)
+    section = book.get(str(owner_id))
+    return section if isinstance(section, dict) else {}
+
+
+def _read_check_book(store: ObjectStore) -> dict[str, Any]:
     try:
         raw = store.get(_checks_key())
     except ObjectMissing:
@@ -659,17 +762,23 @@ def _read_checks(store: ObjectStore) -> dict[str, Any]:
     return loaded if isinstance(loaded, dict) else {}
 
 
-def _record_check(store: ObjectStore, filename: str, raw: bytes, *, ok: bool, message: str) -> None:
-    checks = _read_checks(store)
-    checks[filename] = {
+def _record_check(
+    store: ObjectStore, owner_id: int, filename: str, raw: bytes, *, ok: bool, message: str
+) -> None:
+    book = _read_check_book(store)
+    section = book.get(str(owner_id))
+    if not isinstance(section, dict):
+        section = {}
+    section[filename] = {
         "sha256": hashlib.sha256(raw).hexdigest(),
         "checked_at": utc_now().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "ok": ok,
         "message": message,
     }
+    book[str(owner_id)] = section
     store.put(
         _checks_key(),
-        json.dumps(checks, sort_keys=True, ensure_ascii=False).encode(),
+        json.dumps(book, sort_keys=True, ensure_ascii=False).encode(),
         "application/json",
         overwrite=True,
     )

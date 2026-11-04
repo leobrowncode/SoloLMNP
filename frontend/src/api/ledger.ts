@@ -5,6 +5,7 @@ import {
   type ApiErrorDetail,
   type ApiErrorIssue,
 } from "./errors";
+import { authHeaders, noteUnauthorized } from "./session";
 import { AMOUNT_INPUT_ERROR, centsToApiAmount, parseAmountToCents } from "../lib/format";
 
 export interface Year { id: number; year: number; start_date: string; end_date: string; status: string }
@@ -65,15 +66,16 @@ export async function request<T>(
 ): Promise<T> {
   const response = await fetch(prefix + path, {
     method, cache: "no-store",
-    headers: {
+    headers: authHeaders({
       "Content-Type": "application/json",
       "X-SoloLMNP-Request": "1",
       ...options?.headers,
-    },
+    }),
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const data = await response.json() as { detail?: unknown };
   if (!response.ok) {
+    noteUnauthorized(response.status);
     throw new RequestError(parseApiErrorDetail(data.detail as Parameters<typeof parseApiErrorDetail>[0]), response.status);
   }
   return data as T;

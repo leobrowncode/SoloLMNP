@@ -2,11 +2,13 @@
 
 from collections.abc import Callable, Iterator
 
+from fastapi import Request
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.database import Database
+from app.core.ownership import resolve_owner_id
 from app.services.ledger import fail
 
 # One lock for every write. SQLite uses BEGIN IMMEDIATE; Postgres has no equivalent.
@@ -15,15 +17,18 @@ _POSTGRES_WRITE_LOCK = 119_001
 
 def dependencies(
     database: Database,
-) -> tuple[Callable[[], Iterator[Session]], Callable[[], Iterator[Session]]]:
-    def read() -> Iterator[Session]:
+) -> tuple[Callable[[Request], Iterator[Session]], Callable[[Request], Iterator[Session]]]:
+    def read(request: Request) -> Iterator[Session]:
+        owner_id = resolve_owner_id(database, request.state.principal)
         try:
             with database.sessions() as session:
+                session.info["owner_id"] = owner_id
                 yield session
         except OperationalError:
             fail("DATABASE_UNAVAILABLE", "Base indisponible : vérifier les migrations.", 503)
 
-    def write() -> Iterator[Session]:
+    def write(request: Request) -> Iterator[Session]:
+        owner_id = resolve_owner_id(database, request.state.principal)
         try:
             with database.engine.connect().execution_options(sqlite_write=True) as connection:
                 with (
@@ -35,6 +40,7 @@ def dependencies(
                             text("SELECT pg_advisory_xact_lock(:key)"),
                             {"key": _POSTGRES_WRITE_LOCK},
                         )
+                    session.info["owner_id"] = owner_id
                     yield session
                     session.flush()
         except IntegrityError:

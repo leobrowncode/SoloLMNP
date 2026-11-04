@@ -1,5 +1,6 @@
 import { Navigate, createBrowserRouter, createMemoryRouter, type RouteObject } from "react-router-dom";
 import AppShell from "../AppShell";
+import LoginPage from "../features/LoginPage";
 import LedgerPage from "../features/LedgerPage";
 import OperationsPage from "../features/OperationsPage";
 import AssetsPage from "../features/AssetsPage";
@@ -7,8 +8,14 @@ import StatementsPage from "../features/StatementsPage";
 import FiscalPage from "../features/FiscalPage";
 import ConservationPage from "../features/ConservationPage";
 import { DEFAULT_LEDGER_TAB, DEFAULT_OPERATIONS_TAB, ledgerPath, operationsPath, ROUTES } from "./paths";
+import RequireAuth from "./RequireAuth";
 
 export const appRoutes: RouteObject[] = [
+  { path: "/connexion", element: <LoginPage /> },
+  {
+    path: "/",
+    element: <RequireAuth />,
+    children: [
   {
     path: "/",
     element: <AppShell />,
@@ -23,6 +30,8 @@ export const appRoutes: RouteObject[] = [
       { path: "fiscalite", element: <FiscalPage /> },
       { path: "conservation", element: <ConservationPage /> },
       { path: "*", element: <Navigate to={ROUTES.home} replace /> },
+    ],
+  },
     ],
   },
 ];

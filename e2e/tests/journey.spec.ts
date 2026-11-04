@@ -48,13 +48,36 @@ async function fillMoney(page: Page, label: string | RegExp, value: string) {
   await field.fill(value);
 }
 
+const E2E_EMAIL = "testeur@sololmnp.test";
+const E2E_PASSWORD = "mot-de-passe-essai";
+
+async function signIn(page: Page) {
+  await page.goto("/connexion");
+  await page.getByLabel("Adresse e-mail").fill(E2E_EMAIL);
+  await page.getByLabel("Mot de passe").fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page).not.toHaveURL(/\/connexion/);
+}
+
 test.describe.serial("parcours critique", () => {
   test.beforeEach(async ({ page }) => {
     installConsoleGuard(page);
+    await signIn(page);
   });
 
   test.afterEach(async ({ page }) => {
     expect(consoleProblems.get(page) ?? []).toEqual([]);
+  });
+
+  test("la page demandée revient après la connexion", async ({ page }) => {
+    await page.evaluate(() => sessionStorage.clear());
+    await page.goto("/comptabilite/journal");
+    await expect(page.getByRole("heading", { name: "Connexion" })).toBeVisible();
+    await page.getByLabel("Adresse e-mail").fill(E2E_EMAIL);
+    await page.getByLabel("Mot de passe").fill(E2E_PASSWORD);
+    await page.getByRole("button", { name: "Se connecter" }).click();
+    await expect(page).toHaveURL(/\/comptabilite\/journal$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Comptabilité" })).toBeVisible();
   });
 
   test("vue d’ensemble compacte : une action, aides lisibles", async ({ page }) => {

@@ -18,7 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, Money, utc_now
+from app.models.base import Base, Money, Owned, utc_now
 
 
 class Account(Base):
@@ -57,7 +57,7 @@ class AccountingJournal(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-class AccountingEntry(Base):
+class AccountingEntry(Owned, Base):
     __tablename__ = "accounting_entry"
     __table_args__ = (
         Index(
@@ -116,7 +116,7 @@ class AccountingEntry(Base):
     )
 
 
-class AccountingEntryLine(Base):
+class AccountingEntryLine(Owned, Base):
     __tablename__ = "accounting_entry_line"
     __table_args__ = (
         UniqueConstraint("accounting_entry_id", "position"),
@@ -140,7 +140,7 @@ class AccountingEntryLine(Base):
     account_label: Mapped[str | None] = mapped_column(String(200))
 
 
-class LedgerEvent(Base):
+class LedgerEvent(Owned, Base):
     __tablename__ = "ledger_event"
     id: Mapped[int] = mapped_column(primary_key=True)
     entry_id: Mapped[int | None] = mapped_column(Integer, index=True)

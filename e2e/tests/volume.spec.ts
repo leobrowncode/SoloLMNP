@@ -18,6 +18,11 @@ const routes = [
 
 test("temps d’affichage sur un volume réaliste", async ({ page }) => {
   test.setTimeout(180_000);
+  await page.goto("/connexion");
+  await page.getByLabel("Adresse e-mail").fill("testeur@sololmnp.test");
+  await page.getByLabel("Mot de passe").fill("mot-de-passe-essai");
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page).not.toHaveURL(/\/connexion/);
   for (const route of routes) {
     const started = Date.now();
     await page.goto(route);

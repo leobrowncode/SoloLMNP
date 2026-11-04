@@ -25,6 +25,7 @@ from app.api.ledger_schemas import (
 )
 from app.api.sessions import dependencies
 from app.core.database import Database
+from app.core.ownership import owned_activity
 from app.domain.accounting.chart import INITIAL_ACCOUNTS, INITIAL_JOURNALS
 from app.models import (
     Account,
@@ -70,7 +71,7 @@ def build_ledger_router(database: Database) -> APIRouter:
 
     @router.get("/setup")
     def setup(session: Read) -> dict[str, Any]:
-        activity = session.get(RentalActivity, 1)
+        activity = owned_activity(session)
         years = session.scalars(select(FiscalYear).order_by(FiscalYear.year.desc())).all()
         return {
             "activity": {
@@ -97,8 +98,8 @@ def build_ledger_router(database: Database) -> APIRouter:
 
     @router.post("/activity", status_code=201)
     def create_activity(data: ActivityInput, session: Write) -> dict[str, Any]:
-        if session.get(RentalActivity, 1):
-            fail("ACTIVITY_EXISTS", "Cette instance possède déjà une activité.")
+        if owned_activity(session) is not None:
+            fail("ACTIVITY_EXISTS", "Ce compte possède déjà une activité.")
         activity = RentalActivity(**data.model_dump())
         session.add(activity)
         for number, label, kind in INITIAL_ACCOUNTS:
@@ -112,7 +113,7 @@ def build_ledger_router(database: Database) -> APIRouter:
 
     @router.post("/activity/identity")
     def update_identity(data: IdentityInput, session: Write) -> dict[str, Any]:
-        activity = session.get(RentalActivity, 1)
+        activity = owned_activity(session)
         if activity is None:
             fail("ACTIVITY_REQUIRED", "Créez l’activité avant d’indiquer le SIRET.", 422)
         activity.siren = data.siren
@@ -122,7 +123,7 @@ def build_ledger_router(database: Database) -> APIRouter:
 
     @router.post("/years", status_code=201)
     def create_year(data: YearInput, session: Write) -> dict[str, Any]:
-        activity = session.get(RentalActivity, 1)
+        activity = owned_activity(session)
         if not activity:
             fail("ACTIVITY_REQUIRED", "Créez l’activité avant l’exercice.", 422)
         if data.start_date < activity.activity_start_date:
@@ -131,7 +132,7 @@ def build_ledger_router(database: Database) -> APIRouter:
                 "L’exercice ne peut pas précéder le début de l’activité.",
                 422,
             )
-        year = FiscalYear(rental_activity_id=1, **data.model_dump())
+        year = FiscalYear(rental_activity_id=activity.id, **data.model_dump())
         session.add(year)
         event(session, "YEAR_CREATED", None, data.model_dump(mode="json"))
         return setup(session)

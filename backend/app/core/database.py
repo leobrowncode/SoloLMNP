@@ -16,7 +16,7 @@ from sqlalchemy.pool import ConnectionPoolEntry, NullPool
 
 from app.core.config import Settings
 
-SCHEMA_REVISION = "0012_loan_rate_millis"
+SCHEMA_REVISION = "0013_account_owner"
 
 
 def create_database_engine(settings: Settings) -> Engine:
@@ -83,6 +83,9 @@ def _postgres_engine(url: str) -> Engine:
 
 class Database:
     def __init__(self, settings: Settings) -> None:
+        from app.core.ownership import install_ownership
+
+        install_ownership()
         self.settings = settings
         self.engine = create_database_engine(settings)
         self.sessions = sessionmaker(self.engine, expire_on_commit=False)

@@ -1,3 +1,4 @@
+from app.models.account import AppAccount, DossierArchive
 from app.models.assets import Asset, AssetComponent, DepreciationPeriod, DepreciationSchedule
 from app.models.base import Base
 from app.models.filing import AuditEvent, SupportingDocument, TaxReturnSnapshot
@@ -25,6 +26,8 @@ from app.models.operations import (
 )
 
 __all__ = [
+    "AppAccount",
+    "DossierArchive",
     "AuditEvent",
     "SupportingDocument",
     "TaxReturnSnapshot",

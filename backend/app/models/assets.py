@@ -6,10 +6,10 @@ from decimal import Decimal
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, Money, utc_now
+from app.models.base import Base, Money, Owned, utc_now
 
 
-class Asset(Base):
+class Asset(Owned, Base):
     __tablename__ = "asset"
     __table_args__ = (
         CheckConstraint(
@@ -58,7 +58,7 @@ class Asset(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
-class AssetComponent(Base):
+class AssetComponent(Owned, Base):
     __tablename__ = "asset_component"
     __table_args__ = (
         CheckConstraint("value>0 AND typeof(value)='integer'", name="value"),
@@ -81,7 +81,7 @@ class AssetComponent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
-class DepreciationSchedule(Base):
+class DepreciationSchedule(Owned, Base):
     __tablename__ = "depreciation_schedule"
     __table_args__ = (
         CheckConstraint(
@@ -104,7 +104,7 @@ class DepreciationSchedule(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
-class DepreciationPeriod(Base):
+class DepreciationPeriod(Owned, Base):
     __tablename__ = "depreciation_period"
     __table_args__ = (
         UniqueConstraint("schedule_id", "fiscal_year_id"),

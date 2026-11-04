@@ -1,5 +1,6 @@
 import { parseApiErrorDetail, type ApiErrorDetail } from "./errors";
 import { RequestError } from "./ledger";
+import { authHeaders, noteUnauthorized } from "./session";
 import { isDossierStatus, type DossierStatus } from "./status";
 
 export const DASHBOARD_STEPS = [
@@ -172,8 +173,9 @@ export async function fetchDashboard(signal: AbortSignal): Promise<DashboardPayl
   const response = await fetch("/api/dashboard", {
     signal,
     cache: "no-store",
-    headers: { Accept: "application/json" },
+    headers: authHeaders({ Accept: "application/json" }),
   });
+  noteUnauthorized(response.status);
   let body: unknown;
   try {
     body = await response.json();

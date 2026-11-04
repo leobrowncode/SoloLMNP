@@ -6,10 +6,10 @@ from decimal import Decimal
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, Money, utc_now
+from app.models.base import Base, Money, Owned, utc_now
 
 
-class Tenant(Base):
+class Tenant(Owned, Base):
     """Colocataire d’un logement en location longue durée.
 
     Le loyer mensuel sert à préparer les quittances.
@@ -29,14 +29,14 @@ class Tenant(Base):
     exit_date: Mapped[date | None] = mapped_column(Date)
 
 
-class BankAccount(Base):
+class BankAccount(Owned, Base):
     __tablename__ = "bank_account"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     account_number: Mapped[str] = mapped_column(ForeignKey("account.number"), unique=True)
 
 
-class Loan(Base):
+class Loan(Owned, Base):
     __tablename__ = "loan"
     __table_args__ = (
         CheckConstraint(
@@ -64,7 +64,7 @@ class Loan(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
-class BusinessOperation(Base):
+class BusinessOperation(Owned, Base):
     __tablename__ = "business_operation"
     __table_args__ = (
         CheckConstraint(
@@ -112,7 +112,7 @@ class BusinessOperation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
-class BankTransaction(Base):
+class BankTransaction(Owned, Base):
     __tablename__ = "bank_transaction"
     __table_args__ = (
         UniqueConstraint("bank_account_id", "external_reference"),
@@ -129,7 +129,7 @@ class BankTransaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
-class BankMatch(Base):
+class BankMatch(Owned, Base):
     __tablename__ = "bank_match"
     transaction_id: Mapped[int] = mapped_column(ForeignKey("bank_transaction.id"), primary_key=True)
     entry_line_id: Mapped[int] = mapped_column(ForeignKey("accounting_entry_line.id"), unique=True)

@@ -19,8 +19,10 @@ from app.api.fiscal import build_fiscal_router
 from app.api.ledger import build_ledger_router
 from app.api.operations import build_operations_router
 from app.core.api_errors import register_exception_handlers
+from app.core.auth import AuthError, verify_authorization
 from app.core.config import Settings, get_settings
 from app.core.database import SCHEMA_REVISION, Database
+from app.core.ownership import resolve_owner_id
 from app.core.version import APPLICATION_VERSION
 from app.domain.fiscal.loader import available_vintages
 from app.services.dossier import current_dossier
@@ -96,12 +98,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=list(configuration.cors_origins),
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Content-Type", "X-SoloLMNP-Request"],
+        allow_headers=["Authorization", "Content-Type", "X-SoloLMNP-Request"],
     )
     application.add_middleware(
         TrustedHostMiddleware, allowed_hosts=list(configuration.allowed_hosts)
     )
     register_exception_handlers(application)
+    if configuration.app_env == "production" and configuration.auth_mode == "test":
+        raise RuntimeError("AUTH_MODE=test est refusé en production.")
+
+    @application.middleware("http")
+    async def require_session(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        path = request.url.path
+        if request.method == "OPTIONS" or path == "/api/health" or not path.startswith("/api/"):
+            return await call_next(request)
+        try:
+            request.state.principal = verify_authorization(
+                configuration, request.headers.get("authorization")
+            )
+        except AuthError as exc:
+            return JSONResponse(
+                status_code=exc.status,
+                content={"detail": {"code": exc.code, "message": exc.message}},
+                headers={"Cache-Control": "no-store"},
+            )
+        return await call_next(request)
 
     @application.middleware("http")
     async def protect_writes(
@@ -141,7 +164,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"status": "ok"}
 
     @application.get("/api/status", tags=["system"], response_model=ApplicationStatus)
-    def status(response: Response) -> ApplicationStatus:
+    def status(request: Request, response: Response) -> ApplicationStatus:
         revision: str | None = None
         ready = False
         try:
@@ -176,6 +199,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "tax_return_snapshot",
                     "supporting_document",
                     "tenant",
+                    "app_account",
+                    "dossier_archive",
                 }.issubset(tables)
         except SQLAlchemyError:
             # Never expose a local path, SQL statement or exception to the client.
@@ -183,7 +208,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dossier: DossierStatus | None = None
         if ready:
             try:
+                owner_id = resolve_owner_id(database, request.state.principal)
                 with database.sessions() as session:
+                    session.info["owner_id"] = owner_id
                     dossier = DossierStatus.model_validate(current_dossier(session))
             except SQLAlchemyError:
                 ready = False

@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import DateTime, Integer, MetaData, Numeric
+from sqlalchemy import DateTime, ForeignKey, Integer, MetaData, Numeric
 from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator, TypeEngine
@@ -93,3 +93,11 @@ def utc_now() -> datetime:
 class Timestamps:
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class Owned:
+    """Row belongs to one account. Services see only the session's owner."""
+
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("app_account.id", ondelete="RESTRICT"), index=True
+    )

@@ -5,10 +5,10 @@ from datetime import datetime
 from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, cents, utc_now
+from app.models.base import Base, Owned, cents, utc_now
 
 
-class FiscalComputation(Base):
+class FiscalComputation(Owned, Base):
     __tablename__ = "fiscal_computation"
     __table_args__ = (
         CheckConstraint("status = 'research_only'", name="not_ready"),
@@ -32,7 +32,7 @@ class FiscalComputation(Base):
     invalidated_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
-class DepreciationCarryForward(Base):
+class DepreciationCarryForward(Owned, Base):
     __tablename__ = "depreciation_carry_forward"
     __table_args__ = (
         UniqueConstraint("fiscal_year_id"),
@@ -45,7 +45,7 @@ class DepreciationCarryForward(Base):
     rule_id: Mapped[str] = mapped_column(String(80))
 
 
-class TaxLossCarryForward(Base):
+class TaxLossCarryForward(Owned, Base):
     __tablename__ = "tax_loss_carry_forward"
     __table_args__ = (
         UniqueConstraint("fiscal_year_id"),
@@ -59,7 +59,7 @@ class TaxLossCarryForward(Base):
     note: Mapped[str] = mapped_column(Text, default="")
 
 
-class CarryForwardEvent(Base):
+class CarryForwardEvent(Owned, Base):
     """One created, used or expired movement of a carry-forward stock.
 
     The origin register keeps the amount created by that year. This table is

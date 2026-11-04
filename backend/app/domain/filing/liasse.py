@@ -33,7 +33,7 @@ def extend_package(
     package["errors"].extend(errors)
     package["warnings"].extend(warnings)
     package["by_property"] = _segments(session, year)
-    activity = session.get(RentalActivity, 1)
+    activity = session.get(RentalActivity, year.rental_activity_id)
     if activity is None or not activity.siren:
         package["warnings"].append(
             {
