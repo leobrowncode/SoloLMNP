@@ -73,6 +73,7 @@ def settings(tmp_path: Path, postgres_template: str | None) -> Iterator[Settings
             database_url=f"sqlite:///{(tmp_path / 'test.sqlite3').as_posix()}",
             documents_dir=tmp_path / "documents",
             allowed_hosts=("testserver", "localhost", "127.0.0.1"),
+            blob_read_write_token="",
         )
         return
     name = f"sololmnp_t_{uuid.uuid4().hex}"
@@ -102,6 +103,7 @@ def _postgres_settings(admin_url: str, name: str, documents_dir: Path) -> Settin
         database_url=database_url,
         documents_dir=documents_dir,
         allowed_hosts=("testserver", "localhost", "127.0.0.1"),
+        blob_read_write_token="",
     )
 
 

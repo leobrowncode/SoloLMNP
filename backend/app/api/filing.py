@@ -10,11 +10,13 @@ from sqlalchemy.orm import Session
 from app.api.filing_schemas import (
     BackupNameInput,
     CloseInput,
+    CompleteUploadInput,
     DocumentInput,
     EntryLinkInput,
     ReadyInput,
     ReopenInput,
     RestoreInput,
+    UploadGrantInput,
 )
 from app.api.sessions import dependencies
 from app.core.config import Settings
@@ -32,11 +34,23 @@ from app.services.backup import (
 )
 from app.services.closing import close_year, mark_ready, precheck, reopen_year
 from app.services.documents import (
+    complete_upload,
+    delete_document,
     link_document,
     list_documents,
     published_document,
+    read_document_content,
     search_entries,
+    storage_policy,
     store_document,
+    upload_grant,
+)
+from app.services.dossier_export import (
+    create_dossier_export,
+    list_dossier_exports,
+    preview_dossier_export,
+    restore_dossier,
+    verify_dossier_export,
 )
 from app.services.efi import efi_worksheet, worksheet_pdf
 from app.services.export_gate import export_status, require_export
@@ -147,6 +161,10 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
             sha256=bundle["sha256"],
         )
 
+    @router.get("/storage")
+    def storage() -> dict[str, object]:
+        return storage_policy(settings)
+
     @router.get("/documents")
     def document_list(session: Read) -> dict[str, Any]:
         return {"documents": list_documents(session)}
@@ -166,6 +184,33 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
     def documents(data: DocumentInput, session: Write) -> dict[str, Any]:
         row = store_document(session, settings, data)
         return published_document(session, row)
+
+    @router.post("/documents/upload-grant")
+    def document_grant(data: UploadGrantInput) -> dict[str, object]:
+        return upload_grant(settings, data)
+
+    @router.post("/documents/complete", status_code=201)
+    def document_complete(data: CompleteUploadInput, session: Write) -> dict[str, Any]:
+        row = complete_upload(session, settings, data)
+        return published_document(session, row)
+
+    @router.get("/documents/{document_id}/content")
+    def document_content(document_id: int, session: Read) -> Response:
+        document, content = read_document_content(session, settings, document_id)
+        return Response(
+            content=content,
+            media_type=document.media_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{document.original_name}"',
+                "Cache-Control": "private, no-store",
+                "X-Content-Type-Options": "nosniff",
+                "X-Content-SHA256": document.sha256,
+            },
+        )
+
+    @router.delete("/documents/{document_id}")
+    def document_delete(document_id: int, session: Write) -> dict[str, object]:
+        return delete_document(session, settings, document_id)
 
     @router.post("/documents/{document_id}/link")
     def link(document_id: int, data: EntryLinkInput, session: Write) -> dict[str, Any]:
@@ -190,6 +235,26 @@ def build_filing_router(database: Database, settings: Settings) -> APIRouter:
     @router.post("/backup/restore")
     def restore(data: RestoreInput) -> dict[str, Any]:
         return restore_backup(settings, database, data.filename, data.confirmation)
+
+    @router.post("/dossier/export", status_code=201)
+    def dossier_export() -> dict[str, str]:
+        return create_dossier_export(settings, database)
+
+    @router.get("/dossier/exports")
+    def dossier_exports() -> dict[str, Any]:
+        return list_dossier_exports(settings)
+
+    @router.post("/dossier/exports/verify")
+    def dossier_verify(data: BackupNameInput) -> dict[str, Any]:
+        return verify_dossier_export(settings, data.filename)
+
+    @router.get("/dossier/exports/preview")
+    def dossier_preview(filename: str) -> dict[str, Any]:
+        return preview_dossier_export(settings, database, filename)
+
+    @router.post("/dossier/restore")
+    def dossier_restore(data: RestoreInput) -> dict[str, Any]:
+        return restore_dossier(settings, database, data.filename, data.confirmation)
 
     return router
 

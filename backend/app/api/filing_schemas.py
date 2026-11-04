@@ -47,6 +47,34 @@ class EntryLinkInput(Input):
     piece_reference: Annotated[str, Field(min_length=1, max_length=200)]
 
 
+class UploadGrantInput(Input):
+    filename: Annotated[str, Field(min_length=1, max_length=200)]
+    media_type: Literal["application/pdf", "image/jpeg", "image/png"]
+    size: int = Field(gt=0, le=50 * 1024 * 1024)
+
+
+class CompleteUploadInput(Input):
+    filename: Annotated[str, Field(min_length=1, max_length=200)]
+    media_type: Literal["application/pdf", "image/jpeg", "image/png"]
+    stored_name: Annotated[str, Field(pattern=r"^[0-9a-f]{32}\.(pdf|jpg|png)$")]
+    sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+    size: int = Field(gt=0, le=50 * 1024 * 1024)
+    entry_id: int | None = Field(default=None, gt=0)
+    entry_number: Annotated[str, Field(min_length=1, max_length=40)] | None = None
+    accounting_date: date | None = None
+    piece_reference: Annotated[str, Field(min_length=1, max_length=200)] | None = None
+
+    @model_validator(mode="after")
+    def link_is_complete(self) -> Self:
+        has_date = self.accounting_date is not None
+        has_piece = self.piece_reference is not None
+        if has_date != has_piece:
+            raise ValueError("La date et la pièce sont requises ensemble pour lier une écriture.")
+        if self.entry_number is not None and not has_date:
+            raise ValueError("Le numéro d’écriture se joint à la date et à la pièce.")
+        return self
+
+
 class BackupNameInput(Input):
     filename: Annotated[str, Field(pattern=r"^[A-Za-z0-9._-]{1,120}$")]
 

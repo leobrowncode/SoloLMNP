@@ -71,7 +71,7 @@ function payload(url: string, method: string): { status: number; body: unknown }
   if (url.includes("/entries") && method === "POST") return { status: 200, body: { id: 1 } };
   if (url.includes("/entries")) return { status: 200, body: { entries: [], count: 0 } };
   if (url.includes("/documents")) return { status: 200, body: { documents: [] } };
-  if (url.includes("/backups")) return { status: 200, body: { backups: [] } };
+  if (url.includes("/backups") || url.includes("/dossier/exports")) return { status: 200, body: { backups: [] } };
   if (url.includes("/vintages")) return { status: 200, body: { vintages: [] } };
   if (url.includes("/statements")) return { status: 200, body: statements() };
   if (url.includes("/exports")) return { status: 200, body: { exports: {} } };

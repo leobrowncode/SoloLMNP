@@ -63,3 +63,14 @@ def test_postgres_url_is_normalized() -> None:
 def test_wildcard_host_rejected() -> None:
     with pytest.raises(ValidationError):
         Settings(_env_file=None, allowed_hosts=("*",))
+
+
+def test_blob_token_selects_the_store_and_stays_out_of_repr() -> None:
+    assert Settings(_env_file=None).uses_blob is False
+    token = "vercel_blob_rw_store_secretvalue"  # noqa: S105
+    config = Settings(_env_file=None, blob_read_write_token=f"  {token}  ")
+    assert config.uses_blob is True
+    assert config.blob_read_write_token == token
+    assert token not in repr(config)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, blob_read_write_token="two tokens")  # noqa: S106
