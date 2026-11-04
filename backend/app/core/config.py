@@ -1,12 +1,13 @@
 """Shared configuration for API and migrations, independent of working directory."""
 
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 from urllib.parse import urlsplit
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
@@ -84,6 +85,12 @@ class Settings(BaseSettings):
             raise ValueError("Auth URLs must be HTTP(S) without a query or embedded secret")
         return value.strip().rstrip("/")
 
+    @model_validator(mode="after")
+    def default_jwks(self) -> Self:
+        if self.neon_auth_base_url and not self.neon_auth_jwks_url:
+            self.neon_auth_jwks_url = f"{self.neon_auth_base_url}/.well-known/jwks.json"
+        return self
+
     @field_validator("allowed_hosts")
     @classmethod
     def explicit_hosts(cls, hosts: tuple[str, ...]) -> tuple[str, ...]:
@@ -156,6 +163,33 @@ class Settings(BaseSettings):
     @classmethod
     def absolute_documents_directory(cls, value: Path) -> Path:
         return (value if value.is_absolute() else PROJECT_ROOT / value).resolve()
+
+
+def deployment_hosts() -> tuple[str, ...]:
+    """Hosts Vercel sets for this deployment. Wildcards stay forbidden."""
+    hosts: list[str] = []
+    for name in ("VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+        host = _bare_host(os.environ.get(name, ""))
+        if host and host not in hosts:
+            hosts.append(host)
+    return tuple(hosts)
+
+
+def _bare_host(value: str) -> str:
+    raw = value.strip()
+    if not raw:
+        return ""
+    if "://" in raw:
+        raw = urlsplit(raw).hostname or ""
+    else:
+        raw = raw.split("/")[0]
+        if raw.startswith("[") and "]" in raw:
+            raw = raw[1 : raw.index("]")]
+        elif ":" in raw:
+            raw = raw.split(":", 1)[0]
+    if not raw or any(char in raw for char in "*/@?# "):
+        return ""
+    return raw
 
 
 @lru_cache

@@ -1,0 +1,26 @@
+[project]
+name = "sololmnp"
+version = "1.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "alembic==1.20.0",
+  "cryptography==50.0.2",
+  "fastapi==0.141.1",
+  "psycopg[binary]==3.3.7",
+  "pydantic-settings==2.15.0",
+  "pyjwt==2.15.1",
+  "sqlalchemy==2.0.54",
+  "uvicorn==0.53.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.vercel]
+entrypoint = "asgi:app"
+
+[tool.vercel.fastapi.static]
+cdn = true
+
+[tool.vercel.scripts]
+build = "python3 scripts/vercel_build.py"

@@ -28,6 +28,12 @@ Le backend applique les migrations avant de démarrer. L’interface affiche le 
 
 **Historique P1 :** tests natifs sous Windows et [CI complète réussie](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132) : backend Linux/Windows, frontend et test Docker de construction, démarrage et persistance.
 
+## Hébergement Vercel
+
+Un seul projet Vercel sert l’interface et l’API sur la même origine : le build Vite en fichiers statiques, la fonction Python `asgi.py` sous `/api`. `vercel.json` fixe le framework FastAPI et une durée de 300 secondes, pour la liasse, le FEC, les PDF et l’archive de dossier. Le mode local et Docker restent ceux de la section Démarrer : SQLite, migration au démarrage, aucune ressource cloud créée par le dépôt.
+
+Variables, previews (une branche Neon par pull request), migration au build et liste de réglages : [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 ## Développement et contrôles
 
 Python 3.12, Node.js 24 ; instructions PowerShell et Linux dans [DEPLOYMENT.md](docs/DEPLOYMENT.md).
@@ -48,6 +54,8 @@ Les fichiers `backend/requirements*.lock` et `frontend/package-lock.json` figent
 ```text
 backend/      FastAPI, configuration, SQLAlchemy, Alembic, contrats et tests
 frontend/     React, TypeScript strict, diagnostic réel et tests d'interface
+asgi.py       Point d’entrée Vercel : interface statique et API sous /api
+vercel.json   Projet Vercel (framework FastAPI, durée de la fonction)
 fiscal/       Recherches 2025/2026, statut research_only
 docs/         Modèles, règles, sécurité, déploiement, tutoriel et roadmap
 scripts/      Contrôles locaux, lanceur natif, Nginx et smoke Docker

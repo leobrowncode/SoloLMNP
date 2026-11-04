@@ -60,6 +60,31 @@ def test_postgres_url_is_normalized() -> None:
         _ = config.database_path
 
 
+def test_jwks_defaults_to_the_auth_base_well_known() -> None:
+    config = Settings(
+        _env_file=None,
+        neon_auth_base_url="https://ep.example/neondb/auth/",
+    )
+    assert config.neon_auth_jwks_url == "https://ep.example/neondb/auth/.well-known/jwks.json"
+    explicit = Settings(
+        _env_file=None,
+        neon_auth_base_url="https://ep.example/neondb/auth",
+        neon_auth_jwks_url="https://ep.example/custom/jwks.json",
+    )
+    assert explicit.neon_auth_jwks_url == "https://ep.example/custom/jwks.json"
+
+
+def test_deployment_hosts_come_from_vercel_without_wildcards(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.core.config import deployment_hosts
+
+    monkeypatch.setenv("VERCEL_URL", "preview.example.vercel.app")
+    monkeypatch.setenv("VERCEL_BRANCH_URL", "https://branch.example.vercel.app/ignored")
+    monkeypatch.setenv("VERCEL_PROJECT_PRODUCTION_URL", "*.vercel.app")
+    assert deployment_hosts() == ("preview.example.vercel.app", "branch.example.vercel.app")
+
+
 def test_wildcard_host_rejected() -> None:
     with pytest.raises(ValidationError):
         Settings(_env_file=None, allowed_hosts=("*",))

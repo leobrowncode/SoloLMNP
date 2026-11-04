@@ -85,7 +85,7 @@ Chaque route `/api/*` exige une session vérifiée, sauf `GET /api/health`.
 Le navigateur envoie `Authorization: Bearer` après une connexion Neon Auth (e-mail ou Google).
 `ALLOWED_EMAILS` refuse toute autre adresse. Les variables sont dans `.env.example`.
 `VITE_NEON_AUTH_URL` est figée dans l’image frontend : la reconstruire après un changement.
-Elle est aussi ajoutée à `connect-src` pour que la page puisse appeler Neon Auth.
+Elle est aussi ajoutée à `connect-src`, avec `https://vercel.com` pour le dépôt direct des fichiers de plus de 3 Mio.
 L’écoute reste sur `127.0.0.1` : un tunnel SSH suffit pour un accès distant.
 
 ### Démarrage, disponibilité et migrations
@@ -112,6 +112,87 @@ docker compose down
 ```
 
 L'arrêt et la suppression des conteneurs conservent le répertoire hôte `data/`.
+
+## Vercel
+
+Un projet, racine du dépôt (ni `frontend/` ni `backend/`). Le framework est FastAPI, déjà déclaré dans `vercel.json`. L’interface est le build Vite. L’API est la fonction `asgi.py`, sous `/api`, sur la même origine : pas de CORS en production. Ne pas définir `outputDirectory`, et ne pas ajouter de réécriture qui enverrait `/api` vers `index.html`.
+
+Le lanceur local et Docker ne passent pas par ce build. Ils migrent au démarrage du processus, sur SQLite, comme avant.
+
+### Déjà fixé dans le dépôt
+
+- Python 3.12 (`.python-version`) et Node 24 (`.node-version`).
+- `functions.asgi.py.maxDuration` : 300 secondes. La mémoire ne se règle pas dans `vercel.json`. Sur un plan Pro, choisir Performance (4 Go, 2 vCPU) dans le tableau de bord. Hobby reste à 2 Go et 1 vCPU. Si une archive expire encore, monter `maxDuration` jusqu’à 800 sur Pro.
+- `scripts/vercel_build.py` construit le frontend, puis lance `alembic upgrade head` seulement quand `VERCEL=1` et `VERCEL_ENV` vaut `preview` ou `production`. Ailleurs, il ne migre pas.
+- La migration utilise `DATABASE_URL_UNPOOLED` (hôte direct, sans `-pooler`). Le verrou `pg_advisory_lock` dure le temps du build, avec un `lock_timeout` de 180 secondes. Deux déploiements ne migrent pas ensemble. Un échec fait échouer le build : le déploiement précédent reste en service.
+- Une preview refuse la migration si `SOLOLMNP_PRODUCTION_DB_HOST` manque, ou si l’hôte direct visé est celui de la production. La variable est le nom d’hôte, sans utilisateur ni mot de passe.
+- `APP_ENV=production` est exigé. `AUTH_MODE=test` est refusé dès que `VERCEL=1`.
+- Les hôtes `VERCEL_URL`, `VERCEL_BRANCH_URL` et `VERCEL_PROJECT_PRODUCTION_URL` sont acceptés. Un domaine propre se déclare dans `ALLOWED_HOSTS`.
+- `VERCEL_FASTAPI_STATIC_CDN=1` et `tool.vercel.fastapi.static.cdn = true` envoient le build Vite vers le CDN. Sans la variable, les fichiers restent dans la fonction.
+- La CSP du navigateur est une balise injectée au build. `connect-src` contient l’origine de `VITE_NEON_AUTH_URL` et `https://vercel.com`. L’en-tête HTTP ne contient que `frame-ancestors 'none'` : un second `connect-src` plus étroit bloquerait Neon Auth.
+
+### Projet Neon
+
+1. Créer le projet dans la même région que la fonction Vercel.
+2. Activer Neon Auth (Better Auth géré) sur la branche de production, qui est aussi la branche par défaut.
+3. Noter l’hôte direct de production : le nom d’hôte sans `-pooler`, sans utilisateur et sans mot de passe.
+
+### Projet Vercel
+
+1. Importer `leobrowncode/SoloLMNP`.
+2. Racine du dépôt. Framework FastAPI, lu depuis `vercel.json`.
+3. Node.js 24.x, Python 3.12.
+4. Branche de production `main`. Previews activées pour les pull requests.
+5. Région de la fonction égale à la région Neon.
+
+### Intégration Neon–Vercel
+
+Ne pas poser `DATABASE_URL` avant de connecter l’intégration : la liaison échoue si la variable existe déjà.
+
+1. Console Neon, Integrations, Vercel, lier le compte existant.
+2. Intégration gérée par Neon. Un projet Neon pour un projet Vercel. Ne pas activer en même temps l’intégration gérée par Vercel.
+3. Choisir la branche de production : pas un nom `preview/*`, pas de TTL.
+4. Activer la suppression automatique des branches de preview devenues inutiles.
+5. La branche `vercel-dev` est facultative.
+6. Laisser l’intégration injecter `DATABASE_URL` (hôte `-pooler`), `DATABASE_URL_UNPOOLED` (hôte direct), `NEON_AUTH_BASE_URL` et `VITE_NEON_AUTH_URL`.
+7. Chaque pull request reçoit une branche Neon `preview/<branche-git>`, avec sa base et son URL d’auth. Ne jamais faire pointer le `DATABASE_URL` d’une preview vers la production.
+8. Cette branche de preview est créée depuis la branche par défaut du projet Neon, même si la production Vercel utilise une autre branche.
+
+`NEON_AUTH_JWKS_URL` n’est pas injectée. Vide, l’API prend `{NEON_AUTH_BASE_URL}/.well-known/jwks.json`.
+
+### Variables
+
+Production et Preview :
+
+| Variable | Rôle |
+| --- | --- |
+| `DATABASE_URL` | Injectée. Hôte `-pooler`. Exécution de l’API seulement. |
+| `DATABASE_URL_UNPOOLED` | Injectée. Hôte direct. Migrations Alembic seulement. |
+| `NEON_AUTH_BASE_URL` | URL Auth en https. La même que la ligne suivante. |
+| `VITE_NEON_AUTH_URL` | La même URL. Elle est lue au build : redéployer après un changement. |
+| `NEON_AUTH_JWKS_URL` | Facultative. |
+| `BLOB_READ_WRITE_TOKEN` | Sensible. Magasin Blob privé. |
+| `ALLOWED_EMAILS` | Adresses autorisées, séparées par des virgules. |
+| `APP_ENV` | `production`. |
+| `AUTH_MODE` | Absente, ou `neon`. Jamais `test`. |
+| `VERCEL_FASTAPI_STATIC_CDN` | `1`. |
+| `ALLOWED_HOSTS` | Domaine propre, et le host `vercel.app` de production s’il est utilisé. |
+
+Preview seulement :
+
+| Variable | Rôle |
+| --- | --- |
+| `SOLOLMNP_PRODUCTION_DB_HOST` | Hôte direct de production, sans mot de passe. Absent ou égal à la cible : le build échoue. |
+
+Développement local : ne pas définir ces variables. SQLite, `python scripts/start_local.py` et Compose restent la voie locale.
+
+### Blob, fichiers de plus de 3 Mio
+
+Le magasin est privé. Au-delà de 3 Mio, le navigateur envoie le fichier en PUT vers `https://vercel.com/api/blob`. Le magasin doit autoriser l’origine de l’application, en CORS : l’origine de production, l’alias stable de la branche de preview, et l’URL propre au déploiement. Pas de joker. Le stockage se choisit avec `BLOB_READ_WRITE_TOKEN` seulement (pas d’OIDC).
+
+### Après un déploiement
+
+Une migration ratée rate le déploiement. Deux builds attendent le verrou, puis le second échoue au bout de 180 secondes si le premier le tient encore. Ne pas lancer Alembic vers la production depuis une machine pendant un déploiement.
 
 ## Développement natif
 

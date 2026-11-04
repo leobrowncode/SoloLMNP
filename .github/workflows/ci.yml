@@ -43,6 +43,8 @@ jobs:
       - run: python -m ruff check .
       - run: python -m ruff format --check .
       - run: python -m mypy app
+      - name: Vercel entrypoint serves /api/health
+        run: python -m pytest tests/unit/test_vercel_entrypoint.py tests/unit/test_vercel_deploy.py -q --no-cov
       - run: python -m pytest --cov=app --cov-report=term-missing
       - name: Audit pinned Python runtime dependencies
         if: runner.os == 'Linux'
