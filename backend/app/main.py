@@ -1,5 +1,6 @@
 """Single-user accounting API; schema changes are owned exclusively by Alembic."""
 
+import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Literal, Self
@@ -20,7 +21,7 @@ from app.api.ledger import build_ledger_router
 from app.api.operations import build_operations_router
 from app.core.api_errors import register_exception_handlers
 from app.core.auth import AuthError, verify_authorization
-from app.core.config import Settings, get_settings
+from app.core.config import Settings, deployment_hosts, get_settings
 from app.core.database import SCHEMA_REVISION, Database
 from app.core.ownership import resolve_owner_id
 from app.core.version import APPLICATION_VERSION
@@ -71,6 +72,16 @@ class ApplicationStatus(BaseModel):
     dossier: DossierStatus | None = None
 
 
+def _request_origin(request: Request) -> str:
+    """On Vercel the edge terminates TLS. Trust its proto only there."""
+    if os.environ.get("VERCEL") == "1":
+        forwarded = request.headers.get("x-forwarded-proto", "").split(",")[0].strip()
+        host = request.headers.get("host", "")
+        if forwarded in {"http", "https"} and host:
+            return f"{forwarded}://{host}".rstrip("/")
+    return str(request.base_url).rstrip("/")
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     configuration = settings if settings is not None else get_settings()
     database = Database(configuration)
@@ -100,11 +111,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "X-SoloLMNP-Request"],
     )
-    application.add_middleware(
-        TrustedHostMiddleware, allowed_hosts=list(configuration.allowed_hosts)
-    )
+    hosts = tuple(dict.fromkeys((*configuration.allowed_hosts, *deployment_hosts())))
+    application.add_middleware(TrustedHostMiddleware, allowed_hosts=list(hosts))
     register_exception_handlers(application)
-    if configuration.app_env == "production" and configuration.auth_mode == "test":
+    if configuration.auth_mode == "test" and (
+        configuration.app_env == "production" or os.environ.get("VERCEL") == "1"
+    ):
         raise RuntimeError("AUTH_MODE=test est refusé en production.")
 
     @application.middleware("http")
@@ -132,7 +144,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> Response:
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
             origin = request.headers.get("origin")
-            same_origin = str(request.base_url).rstrip("/")
+            same_origin = _request_origin(request)
             if (
                 request.headers.get("x-sololmnp-request") != "1"
                 or (origin is not None and origin not in {same_origin, *configuration.cors_origins})

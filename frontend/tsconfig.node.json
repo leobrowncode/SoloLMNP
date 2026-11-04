@@ -3,7 +3,8 @@
     "target": "ES2022", "lib": ["ES2022"], "module": "ESNext",
     "moduleResolution": "Bundler", "skipLibCheck": true, "strict": true,
     "noUnusedLocals": true, "noUnusedParameters": true, "noEmit": true,
+    "allowImportingTsExtensions": true,
     "types": ["node"], "tsBuildInfoFile": "./node_modules/.cache/tsconfig.node.tsbuildinfo"
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts", "csp.ts"]
 }

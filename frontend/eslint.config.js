@@ -17,4 +17,8 @@ export default tseslint.config(
       "react-refresh/only-export-components": ["error", { allowConstantExport: true }],
     },
   },
+  {
+    files: ["csp.ts", "vite.config.ts"],
+    rules: { "react-refresh/only-export-components": "off" },
+  },
 );

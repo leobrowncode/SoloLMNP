@@ -17,6 +17,8 @@ L’hôte pooler est un PgBouncer en mode transaction. Le moteur n’y garde pas
 
 Les écritures prennent `pg_advisory_xact_lock` pour la durée de la transaction. C’est l’équivalent de `BEGIN IMMEDIATE` sur SQLite : deux requêtes ne peuvent pas valider deux fois la même clé idempotente. Le verrou est transactionnel, donc compatible avec le pooler.
 
+Sur Vercel, Alembic part de `DATABASE_URL_UNPOOLED` pendant le build, avec un verrou de session. Une preview ne migre pas l’hôte de production. Le détail est dans [DEPLOYMENT.md](DEPLOYMENT.md).
+
 Le pilote est `postgresql+psycopg`. Une URL `postgresql://` est réécrite ainsi. Les options acceptées sont `sslmode`, `channel_binding`, `connect_timeout` et `application_name`.
 
 Le fuseau de session est UTC, pour que `CURRENT_DATE` corresponde à `date('now')` de SQLite.
