@@ -125,7 +125,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     },
                 )
         response = await call_next(request)
-        response.headers["Cache-Control"] = "no-store"
+        if "cache-control" not in response.headers:
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     application.include_router(build_dashboard_router(database))

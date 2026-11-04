@@ -45,7 +45,7 @@ Le script désactive les triggers utilisateur le temps de l’insertion, laisse 
 - FEC de chaque exercice, octet par octet ;
 - liasse JSON, CSV et PDF, octet par octet.
 
-Les justificatifs ne bougent pas : pointez `DOCUMENTS_DIR` vers le même dossier. La sauvegarde zip de l’API reste réservée à SQLite (`BACKUP_SQLITE_ONLY`). Sur Neon, la copie du fournisseur remplace cette archive jusqu’au stockage objet.
+Les justificatifs ne bougent pas avec ce script : pointez `DOCUMENTS_DIR` vers le même dossier, ou posez `BLOB_READ_WRITE_TOKEN` pour un magasin privé (voir [BACKUP.md](BACKUP.md)). La sauvegarde zip fichier reste réservée à SQLite (`BACKUP_SQLITE_ONLY`). L’archive de dossier (`POST /api/filing/dossier/export`) emporte les lignes et les justificatifs enregistrés, sur Postgres comme sur SQLite.
 
 ## Tests
 

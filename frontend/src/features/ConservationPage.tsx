@@ -3,6 +3,8 @@ import {
   entryLabel, frStamp, integrityLabel, octets,
   type BackupRow, type EntryChoice, type RestorePreview, type SupportingDocumentRow,
 } from "../api/conservation";
+import { needsDirectUpload, uploadDirect, uploadInline, type StoragePolicy } from "../api/documentUpload";
+import { downloadFiling } from "../api/download";
 import { RequestError, request } from "../api/ledger";
 import ApiErrorAlert from "./ApiErrorAlert";
 import { BrowsableList } from "./BrowsableList";
@@ -90,7 +92,7 @@ export default function ConservationPage() {
         }
       },
     );
-    void request<{ backups: BackupRow[] }>("/backups", "GET", undefined, "/api/filing").then(
+    void request<{ backups: BackupRow[] }>("/dossier/exports", "GET", undefined, "/api/filing").then(
       (value) => {
         if (current) setBackupsView(finishLoad(value.backups, (rows) => rows.length === 0));
       },
@@ -116,7 +118,7 @@ export default function ConservationPage() {
     });
     const filename = selectedBackup;
     void request<RestorePreview>(
-      `/backups/preview?filename=${encodeURIComponent(filename)}`,
+      `/dossier/exports/preview?filename=${encodeURIComponent(filename)}`,
       "GET",
       undefined,
       "/api/filing",
@@ -138,25 +140,20 @@ export default function ConservationPage() {
       }
       report("Dépôt du justificatif…");
       const content = await file.arrayBuffer();
-      const bytes = new Uint8Array(content);
-      let binary = "";
-      bytes.forEach((value) => { binary += String.fromCharCode(value); });
+      const link = choice ? {
+        entry_number: choice.entry_number,
+        accounting_date: choice.accounting_date,
+        piece_reference: choice.piece_reference,
+      } : {};
       try {
-        const saved = await request<{ sha256: string; original_name: string }>(
-          "/documents",
-          "POST",
-          {
-            filename: file.name,
-            media_type: TYPES[file.type],
-            content_base64: btoa(binary),
-            ...(choice ? {
-              entry_number: choice.entry_number,
-              accounting_date: choice.accounting_date,
-              piece_reference: choice.piece_reference,
-            } : {}),
-          },
-          "/api/filing",
-        );
+        const policy = await request<StoragePolicy>("/storage", "GET", undefined, "/api/filing");
+        if (file.size > policy.max_upload_bytes) {
+          setError("Le justificatif dépasse la taille autorisée.");
+          return;
+        }
+        const saved = needsDirectUpload(file.size, policy)
+          ? await uploadDirect(file, content, link)
+          : await uploadInline(file, content, link);
         show({
           kind: GLOSSARY.justificatif.label,
           name: saved.original_name,
@@ -168,6 +165,40 @@ export default function ConservationPage() {
         reload();
       } catch (reason) {
         retryAction.current = upload;
+        setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
+      }
+    });
+  }
+
+  async function download(documentId: number) {
+    await run(async (report) => {
+      clearFeedback();
+      report("Téléchargement du justificatif…");
+      try {
+        await downloadFiling(`/api/filing/documents/${documentId}/content`);
+      } catch (reason) {
+        retryAction.current = () => download(documentId);
+        setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
+      }
+    });
+  }
+
+  async function remove(documentId: number, name: string) {
+    await run(async (report) => {
+      clearFeedback();
+      report("Suppression du justificatif…");
+      try {
+        await request<{ deleted: boolean }>(`/documents/${documentId}`, "DELETE", undefined, "/api/filing");
+        show({
+          kind: GLOSSARY.justificatif.label,
+          name,
+          action: "supprimé",
+          targetId: "justificatifs",
+          detail: `Justificatif ${name} supprimé.`,
+        });
+        reload();
+      } catch (reason) {
+        retryAction.current = () => remove(documentId, name);
         setApiError(reason instanceof RequestError ? reason : new RequestError(toApiError(reason), 0));
       }
     });
@@ -211,7 +242,7 @@ export default function ConservationPage() {
       clearFeedback();
       report("Création de la sauvegarde…");
       try {
-        const saved = await request<{ filename: string; sha256: string }>("/backup", "POST", {}, "/api/filing");
+        const saved = await request<{ filename: string; sha256: string }>("/dossier/export", "POST", {}, "/api/filing");
         show({
           kind: GLOSSARY.sauvegarde.label,
           name: saved.filename,
@@ -234,7 +265,7 @@ export default function ConservationPage() {
       clearFeedback();
       report("Contrôle de la sauvegarde…");
       try {
-        const saved = await request<BackupRow>("/backups/verify", "POST", { filename }, "/api/filing");
+        const saved = await request<BackupRow>("/dossier/exports/verify", "POST", { filename }, "/api/filing");
         show({
           kind: "Contrôle",
           name: saved.filename,
@@ -265,7 +296,7 @@ export default function ConservationPage() {
           entries: number;
           years: number;
         }>(
-          "/backup/restore",
+          "/dossier/restore",
           "POST",
           { filename, confirmation: "RESTAURER" },
           "/api/filing",
@@ -361,6 +392,7 @@ export default function ConservationPage() {
             { key: "size", label: "Taille", priority: "secondary" },
             { key: "sha", label: "Empreinte SHA-256", priority: "secondary" },
             { key: "entry", label: "Écriture liée" },
+            { key: "file", label: "Fichier" },
             { key: "link", label: "Liaison" },
           ]}
           rows={rows.map((document) => ({
@@ -372,6 +404,28 @@ export default function ConservationPage() {
               octets(document.size),
               <span className="fingerprint" key="sha">{document.sha256}</span>,
               entryLabel(document.entry),
+              <>
+                <button
+                  key="download"
+                  type="button"
+                  disabled={busy}
+                  aria-busy={busy || undefined}
+                  aria-label={`Télécharger ${document.original_name}`}
+                  onClick={() => { void download(document.id); }}
+                >
+                  Télécharger
+                </button>
+                <button
+                  key="delete"
+                  type="button"
+                  disabled={busy}
+                  aria-busy={busy || undefined}
+                  aria-label={`Supprimer ${document.original_name}`}
+                  onClick={() => { void remove(document.id, document.original_name); }}
+                >
+                  Supprimer
+                </button>
+              </>,
               <button
                 key="link"
                 type="button"

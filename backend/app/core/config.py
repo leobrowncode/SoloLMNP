@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     cors_origins: Annotated[tuple[str, ...], NoDecode] = ()
     allowed_hosts: Annotated[tuple[str, ...], NoDecode] = ("localhost", "127.0.0.1", "[::1]")
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0, le=50 * 1024 * 1024)
+    blob_read_write_token: str = Field(default="", repr=False)
 
     @field_validator("cors_origins", "allowed_hosts", mode="before")
     @classmethod
@@ -92,6 +93,18 @@ class Settings(BaseSettings):
                 raise ValueError("Unsupported Postgres URL options: " + ", ".join(sorted(unknown)))
             return url.render_as_string(hide_password=False)
         raise ValueError("DATABASE_URL must be a SQLite file or a Postgres URL")
+
+    @field_validator("blob_read_write_token")
+    @classmethod
+    def plain_blob_token(cls, value: str) -> str:
+        token = value.strip()
+        if any(character.isspace() for character in token):
+            raise ValueError("BLOB_READ_WRITE_TOKEN must be a single token")
+        return token
+
+    @property
+    def uses_blob(self) -> bool:
+        return bool(self.blob_read_write_token)
 
     @property
     def uses_sqlite(self) -> bool:

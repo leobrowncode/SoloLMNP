@@ -62,7 +62,7 @@ test("asks for a supported document before upload", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const url = String(input);
     if (url.endsWith("/documents")) return json({ documents: [] });
-    if (url.endsWith("/backups")) return json({ backups: [] });
+    if (url.endsWith("/dossier/exports")) return json({ backups: [] });
     throw new Error(url);
   });
   renderPage();
@@ -82,7 +82,7 @@ test("shows loading then an empty inventory, and an error is not an empty list",
       if (documentsCalls === 1) return pending.promise;
       return json({ documents: [] });
     }
-    if (url.endsWith("/backups")) return json({ backups: [] });
+    if (url.endsWith("/dossier/exports")) return json({ backups: [] });
     throw new Error(url);
   });
   renderPage();
@@ -112,7 +112,7 @@ test("lists a justificatif and links it from the entry picker", async () => {
     const body = typeof init?.body === "string" ? init.body : null;
     calls.push({ url, method, body });
     if (url.endsWith("/documents") && method === "GET") return json({ documents: [unlinked] });
-    if (url.endsWith("/backups") && method === "GET") return json({ backups: [] });
+    if (url.endsWith("/dossier/exports") && method === "GET") return json({ backups: [] });
     if (url.includes("/entries?")) {
       return json({ entries: [documentRow.entry] });
     }
@@ -160,8 +160,8 @@ test("previews a known backup and restores only after RESTAURER", async () => {
     const body = typeof init?.body === "string" ? init.body : null;
     calls.push({ url, method, body });
     if (url.endsWith("/documents")) return json({ documents: [] });
-    if (url.endsWith("/backups")) return json({ backups: [backupRow] });
-    if (url.includes("/backups/preview")) {
+    if (url.endsWith("/dossier/exports")) return json({ backups: [backupRow] });
+    if (url.includes("/dossier/exports/preview")) {
       return json({
         filename: backupRow.filename,
         backup_date: backupRow.created_at,
@@ -169,13 +169,13 @@ test("previews a known backup and restores only after RESTAURER", async () => {
         backup: { entries: 12, years: 1 },
       });
     }
-    if (url.endsWith("/backups/verify")) {
+    if (url.endsWith("/dossier/exports/verify")) {
       return json({
         ...backupRow,
         integrity: { status: "ok", checked_at: "2026-03-06T09:00:00Z", message: "Contrôle d’intégrité réussi." },
       });
     }
-    if (url.endsWith("/backup/restore")) {
+    if (url.endsWith("/dossier/restore")) {
       return json({
         restored_from: backupRow.filename,
         pre_restore_backup: "sololmnp-2.zip",
@@ -205,7 +205,7 @@ test("previews a known backup and restores only after RESTAURER", async () => {
   expect(restore).toBeEnabled();
   fireEvent.click(restore);
   expect(await screen.findByRole("status")).toHaveTextContent("sololmnp-2.zip");
-  const posted = calls.find((call) => call.url.endsWith("/backup/restore"));
+  const posted = calls.find((call) => call.url.endsWith("/dossier/restore"));
   expect(JSON.parse(posted?.body ?? "{}")).toEqual({
     filename: "sololmnp-1.zip",
     confirmation: "RESTAURER",
@@ -213,5 +213,5 @@ test("previews a known backup and restores only after RESTAURER", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Contrôler la sauvegarde du 06/03/2026 08:30" }));
   expect(await screen.findByRole("status")).toHaveTextContent(/Contrôle d.intégrité réussi/);
-  expect(calls.some((call) => call.url.endsWith("/backups/verify") && call.method === "POST")).toBe(true);
+  expect(calls.some((call) => call.url.endsWith("/dossier/exports/verify") && call.method === "POST")).toBe(true);
 });

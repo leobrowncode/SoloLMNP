@@ -19,6 +19,6 @@ Un résultat affiché, même équilibré, reste à contrôler sur le formulaire 
 
 ## Données et restauration
 
-Le propriétaire du fichier SQLite peut le modifier. L’audit n’est pas une piste inviolable. La restauration remplace toute la base après contrôle de l’archive et sauvegarde préalable. Elle ne réécrit pas une écriture validée en place.
+Le propriétaire du fichier SQLite peut le modifier. L’audit n’est pas une piste inviolable. La restauration d’un dossier remplace toutes les lignes après contrôle de l’archive et copie préalable, sur SQLite comme sur Postgres. Elle ne réécrit pas une écriture validée en place. Le zip fichier SQLite reste une copie du fichier de base ; il n’existe pas sur Postgres. Les justificatifs sont privés : le téléchargement passe par l’API, y compris quand les octets sont chez Vercel Blob.
 
 Le FEC suit le format légal (tabulation, 18 zones, dates et montants inchangés). Ses zones de texte neutralisent une formule de tableur, comme les autres CSV produits par l’application.
