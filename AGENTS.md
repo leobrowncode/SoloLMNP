@@ -31,7 +31,7 @@
 - Millésimes 2025/2026 en **Recherche** tant que `fiscal/<année>/validation.json` n'est pas une attestation effective.
 - `scripts/check.py` n'exécute pas Playwright; l'e2e est manuel ou job CI dédié.
 - Migrations: au démarrage local/Docker; sur Vercel via `scripts/vercel_build.py` au build.
-- Après Google, le Bearer vient de `set-auth-jwt` ou de `GET /token`. `session.token` peut être un JWT de session refusé par l’API.
+- Après Google, le Bearer vient de `set-auth-jwt` ou de `GET /token` (pas `session.token`). Le JWT Neon a `iss` et `aud` égaux à l’origine de `NEON_AUTH_BASE_URL`, sans le chemin `/neondb/auth`.
 
 ## Méthode de travail
 - Lire ce fichier, puis recherche ciblée (grep, chemins ci-dessus) au lieu d'explorer tout le dépôt.

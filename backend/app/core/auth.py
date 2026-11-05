@@ -1,18 +1,30 @@
 """Verify a Neon Auth JWT, or a test token when the app is explicitly in test mode.
 
 Production never accepts the test issuer. The test secret is not a Neon credential.
+
+Neon Auth signs ``iss`` and ``aud`` with the origin of ``NEON_AUTH_BASE_URL``
+(``https://ep.example``), not the managed path that ends in ``/neondb/auth``.
+The JWKS URL keeps that path.
 """
 
 from __future__ import annotations
 
+import base64
+import json
+import logging
+import re
 import time
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 import jwt
 from jwt import PyJWKClient
 from jwt.exceptions import PyJWTError
 
 from app.core.config import Settings
+
+logger = logging.getLogger(__name__)
+_COMPACT_JWT = re.compile(r"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$")
 
 TEST_ISSUER = "sololmnp-test"
 TEST_EMAIL = "ada@sololmnp.test"
@@ -98,20 +110,78 @@ def _verify_test(settings: Settings, token: str) -> Principal:
 def _verify_neon(settings: Settings, token: str) -> Principal:
     if not settings.neon_auth_base_url or not settings.neon_auth_jwks_url:
         raise AuthError(401, "AUTH_NOT_CONFIGURED", "L’authentification n’est pas configurée.")
-    issuer = settings.neon_auth_base_url
+    # Docs: issuer and audience are the origin, e.g. https://ep.example
+    # when the base URL is https://ep.example/neondb/auth.
+    origin = _neon_origin(settings.neon_auth_base_url)
     try:
         signing_key = _jwks(settings.neon_auth_jwks_url).get_signing_key_from_jwt(token)
         payload = jwt.decode(
             token,
             signing_key.key,
             algorithms=["EdDSA"],
-            issuer=issuer,
-            options={"require": ["exp", "sub", "iss"], "verify_aud": False},
+            issuer=origin,
+            audience=origin,
+            options={"require": ["exp", "sub", "iss", "aud"]},
             leeway=30,
         )
     except PyJWTError as exc:
+        _log_rejected_neon_jwt(token, exc)
         raise AuthError(401, "INVALID_TOKEN", "Session expirée ou jeton refusé.") from exc
     return _principal(settings, payload)
+
+
+def _neon_origin(base_url: str) -> str:
+    parsed = urlsplit(base_url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _log_rejected_neon_jwt(token: str, exc: PyJWTError) -> None:
+    """Record alg, kid, iss and whether an email claim exists. Never the token."""
+    try:
+        alg, kid, issuer, has_email = _jwt_diagnostics(token)
+    except Exception:
+        logger.warning("Jeton Neon refusé error=%s", type(exc).__name__)
+        return
+    logger.warning(
+        "Jeton Neon refusé alg=%s kid=%s iss=%s has_email=%s error=%s",
+        alg or "-",
+        kid or "-",
+        issuer or "-",
+        has_email,
+        type(exc).__name__,
+    )
+
+
+def _jwt_diagnostics(token: str) -> tuple[str | None, str | None, str | None, bool]:
+    header = _json_segment(token, 0)
+    claims = _json_segment(token, 1)
+    alg = _safe_label(header.get("alg")) if isinstance(header, dict) else None
+    kid = _safe_label(header.get("kid")) if isinstance(header, dict) else None
+    issuer = _safe_label(claims.get("iss")) if isinstance(claims, dict) else None
+    email = claims.get("email") if isinstance(claims, dict) else None
+    has_email = isinstance(email, str) and "@" in email and len(email) <= 320
+    return alg, kid, issuer, has_email
+
+
+def _json_segment(token: str, index: int) -> object:
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    segment = parts[index]
+    try:
+        raw = base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4))
+        return json.loads(raw)
+    except (ValueError, json.JSONDecodeError, UnicodeError):
+        return None
+
+
+def _safe_label(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    if not cleaned or len(cleaned) > 300 or _COMPACT_JWT.fullmatch(cleaned):
+        return None
+    return cleaned
 
 
 def _principal(settings: Settings, payload: object) -> Principal:
