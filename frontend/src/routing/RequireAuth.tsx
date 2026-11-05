@@ -14,7 +14,7 @@ export default function RequireAuth() {
   useEffect(() => {
     if (readToken() || testAuthMode()) return;
     let cancelled = false;
-    restoreNeonToken()
+    restoreNeonToken(location.search)
       .then((token) => {
         if (cancelled) return;
         if (token) storeToken(token);
@@ -26,7 +26,7 @@ export default function RequireAuth() {
     return () => {
       cancelled = true;
     };
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   if (readToken()) return <Outlet />;
   const next = location.pathname + location.search + location.hash;
