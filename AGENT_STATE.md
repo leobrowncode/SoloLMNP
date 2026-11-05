@@ -5,42 +5,38 @@
 
 ## Current project status
 
-- Completed through: liasse LMNP IR conforme à la notice 2033, entrée du bien au premier exercice, dossier de contrôle FEC
-- Current phase: exercice 2026 (premier exercice réel : achat 09/01/2026, location et exercice depuis le 06/04/2026)
-- Current objective: saisie des données réelles 2026 par l’utilisateur, clôture début 2027, recopie EFI. Les millésimes 2025 et 2026 restent en recherche.
+- Completed through: liasse LMNP IR, entrée du bien, dossier FEC, enchaînement SIRET → exercice → bien → banque (#118), Neon Auth + Postgres + `owner_id` (#123 à #130), déploiement https://sololmnp.vercel.app
+- Current phase: audit de parcours de novembre 2026 livré dans `docs/audit/2026-11/PARCOURS.md`, en attente de relecture avant tout correctif
+- Current objective: ne pas coder les P0/P1 tant que cette PR d’audit n’est pas relue. Les millésimes 2025 et 2026 restent en recherche.
 
 ## Completed
 
-- P0–P12 et liasse 2025 : 2033-A, B, C, E, 2031 et 2031-bis, cases lues sur les PDF archivés
-- 23/10/2026 : 370/372 = 352/354 (ligne 360 réservée à l’IS), ligne 350 = reprise d’amortissements 39 C antérieurs, 2033-D cadre II retiré, consignes de saisie (case 018…), état de suivi 39 C
-- 2042-C-PRO revenus 2025 : 5NA / 5NY et 5GA (2015) à 5GJ (2024), lus sur le CERFA 11222*28 archivé. 5NK et 5NZ bloquées. Exercice 2026 : cases non publiées (`case_not_verified`)
-- `POST /api/assets/properties/{id}/entry` : entrée du bien (immobilisations, emprunts, banque, frais d’avant début, 108), aperçu puis confirmation, extournable
-- FEC nommé `SirenFECAAAAMMJJ.txt`, bloqué sans SIREN ; `GET /api/filing/years/{id}/archive` : zip FEC + description A47 A-1 + liasse + SHA256SUMS
-- Contrôle immobilisations et 2033-E lus hors centralisation (bug qui bloquait toute clôture avec immobilisations)
-- `test_first_exercise.py` : parcours complet achat → clôture → liasse `ready` → FEC → dossier
+- P0 a P12 et liasse 2025, cases lues sur les PDF archivés
+- Correctifs UX du 31/10/2026 (#108 à #117) et initialisation en une suite (#118)
+- Auth de production : Neon Auth (e-mail et Google), `ALLOWED_EMAILS`, isolation `owner_id`, Vercel Blob, JWT dont l’émetteur est l’origine (#130)
+- Audit 05/11/2026 : parcours rejoué en local (mode d’essai) et connexion prod ouverte. Le lanceur README sans secrets Neon s’arrête sur « L’authentification n’est pas configurée. »
 
 ## Active work
 
-- Issue: résidus #7 (cession/TVA/PV). #13 : parcours navigateur, sécurité, axe, volume. Pas d’authentification tant que l’écoute reste locale.
-- Branch: cursor/p12-e2e-security-a11y-perf-2aa3
-- Status: produit utilisable pour préparer l’exercice 2026. Les montants fiscaux restent en recherche, pas une base de déclaration.
+- Issue: #7 (moteur fiscal, cession, TVA, plus-values) et #11 (feuille EFI et 2042-C-PRO). Seules issues ouvertes.
+- Branch: audit documentaire `docs/audit/2026-11/PARCOURS.md`
+- Status: pas de réécriture d’auth. Neon Auth + Postgres partagé + `owner_id` est le choix retenu. Pas d’Argon2 local, pas d’une base SQLite par utilisateur.
 
 ## Important decisions
 
 - Montants en centimes entiers. Le ledger est la seule source du journal, du bilan et du FEC.
 - Les couches fiscales ne modifient pas les écritures.
 - `ready` exige : registre de cases respecté, aucun écart d’immobilisations, de classement, d’effectifs, de cession ou de TVA, et un SIREN.
-- La liasse n’impute pas les déficits LMNP antérieurs ; le calcul interne garde une estimation FIFO au niveau du foyer.
-- Les comptes 120 et 129 ne sont pas créés automatiquement.
+- La liasse n’impute pas les déficits LMNP antérieurs.
 - SoloLMNP ne télétransmet pas.
+- Auth : Neon Auth. Le mode `AUTH_MODE=test` est réservé aux essais et refusé en production.
 
 ## Known limitations / blockers
 
 - Périmètre LMNP déclaré. Le LMP n’est pas calculé.
 - Cession, TVA, plus-values et ventilation automatique du terrain : désactivées, et bloquantes si elles apparaissent
-- Millésime 2026 : formulaires 2027 non publiés au 30/10/2026 ; numéros de cases bloqués, non repris comme officiels
-- SQLite refuse les écritures datées dans le futur : dotations au 31/12 validables à partir de cette date
-- Pas d’authentification ; l’instance doit rester privée
+- Millésime 2026 : formulaires 2027 non publiés ; cases non reprises comme officielles
+- P0 d’audit : sans variables Neon, le README et Docker n’ouvrent pas le dossier (régression de parcours de la #125, pas de la #118)
 
 ## Validation baseline
 
@@ -48,13 +44,14 @@
 python scripts/check.py
 ```
 
-- 23/10/2026 : backend 255 tests, frontend 65 tests, ruff, mypy, ESLint, tsc et build verts
+L’audit de novembre est documentaire : pas de changement applicatif, donc pas de nouveau passage de `scripts/check.py` pour cette PR.
 
 ## Next action
 
-1. Archiver les PDF 2031/2033 et 2042-C-PRO du millésime 2027 dès publication, puis créer `fiscal/2026/forms/cases.yaml`.
-2. Comparer les numéros de cases avec le registre 2025 et ne publier que ceux lus sur le PDF.
+1. Faire relire `docs/audit/2026-11/PARCOURS.md`.
+2. Ensuite seulement : P0 premier écran (explication Neon, pas une nouvelle auth), puis P1 de saisie et de parcours, dans l’ordre du document.
+3. #7 et #11 restent hors de ces PR tant qu’une source et un test ne les justifient pas.
 
 ## Last updated
 
-- Date: 2026-10-30
+- Date: 2026-11-05
