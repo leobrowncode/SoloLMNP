@@ -2,7 +2,18 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RouterProvider } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { restoreNeonToken, signInWithGoogle, signOutNeon } from "../api/neonAuth";
 import { createTestRouter } from "../routing/router";
+
+vi.mock("../api/neonAuth", async () => {
+  const actual = await vi.importActual<typeof import("../api/neonAuth")>("../api/neonAuth");
+  return {
+    ...actual,
+    signInWithGoogle: vi.fn(),
+    restoreNeonToken: vi.fn(async () => null),
+    signOutNeon: vi.fn(),
+  };
+});
 
 describe("connexion", () => {
   beforeEach(() => {
@@ -30,5 +41,55 @@ describe("connexion", () => {
     await user.type(screen.getByLabelText("Mot de passe"), "mauvais-mot");
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Adresse ou mot de passe refusé.");
+  });
+});
+
+describe("retour Google", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubEnv("VITE_AUTH_MODE", "");
+    vi.stubEnv("VITE_NEON_AUTH_URL", "https://auth.example.test/neondb/auth");
+    vi.mocked(restoreNeonToken).mockReset();
+    vi.mocked(restoreNeonToken).mockResolvedValue(null);
+    vi.mocked(signInWithGoogle).mockReset();
+    vi.mocked(signOutNeon).mockReset();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })));
+  });
+
+  it("entre dans l’application quand la session Google fournit un JWT", async () => {
+    vi.mocked(restoreNeonToken).mockResolvedValue("header.jwt.value");
+    render(<RouterProvider router={createTestRouter([
+      "/connexion?neon_auth_session_verifier=abc&next=%2Fcomptabilite%2Fjournal",
+    ])} />);
+    expect(await screen.findByRole("heading", { level: 1, name: "Comptabilité" })).toBeInTheDocument();
+    expect(sessionStorage.getItem("sololmnp.token")).toBe("header.jwt.value");
+    expect(restoreNeonToken).toHaveBeenCalledWith(expect.stringContaining("neon_auth_session_verifier=abc"));
+  });
+
+  it("explique un retour Google refusé", async () => {
+    render(<RouterProvider router={createTestRouter(["/connexion?error=access_denied"])} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("La connexion Google a été refusée.");
+    expect(restoreNeonToken).not.toHaveBeenCalled();
+  });
+
+  it("renvoie une adresse non autorisée vers la connexion", async () => {
+    vi.mocked(restoreNeonToken).mockResolvedValue("header.jwt.value");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 403 })));
+    render(<RouterProvider router={createTestRouter(["/connexion?neon_auth_session_verifier=abc"])} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Cette adresse n’est pas autorisée.");
+    expect(signOutNeon).toHaveBeenCalled();
+    expect(sessionStorage.getItem("sololmnp.token")).toBeNull();
+  });
+
+  it("ouvre Google vers /connexion en conservant la page demandée", async () => {
+    const user = userEvent.setup();
+    render(<RouterProvider router={createTestRouter(["/connexion?next=%2Fcomptabilite%2Fjournal"])} />);
+    await user.click(await screen.findByRole("button", { name: "Continuer avec Google" }));
+    expect(signInWithGoogle).toHaveBeenCalledWith(
+      `${window.location.origin}/connexion?next=%2Fcomptabilite%2Fjournal`,
+    );
   });
 });

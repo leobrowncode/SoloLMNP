@@ -1,6 +1,13 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { signInWithGoogle, signInWithPassword, signUpWithPassword } from "../api/neonAuth";
+import {
+  googleCallbackURL,
+  restoreNeonToken,
+  signInWithGoogle,
+  signInWithPassword,
+  signOutNeon,
+  signUpWithPassword,
+} from "../api/neonAuth";
 import { neonAuthConfigured, safeNext, storeToken, testAuthMode } from "../api/session";
 
 export default function LoginPage() {
@@ -13,11 +20,64 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const search = params.toString();
+  const [trackedSearch, setTrackedSearch] = useState(search);
+  const [oauthSettled, setOauthSettled] = useState(false);
+  const queryError = params.get("error") ? "La connexion Google a été refusée." : "";
+  const returning = params.has("neon_auth_session_verifier");
+  if (trackedSearch !== search) {
+    setTrackedSearch(search);
+    setOauthSettled(false);
+  }
+  const oauthPending = returning && !queryError && !oauthSettled;
 
-  function enter(token: string) {
+  const enter = useCallback((token: string) => {
     storeToken(token);
     navigate(next, { replace: true });
-  }
+  }, [navigate, next]);
+
+  const admit = useCallback(async (token: string): Promise<boolean> => {
+    const allowed = await fetch("/api/status", {
+      cache: "no-store",
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    });
+    if (allowed.status === 403) {
+      await signOutNeon();
+      setError("Cette adresse n’est pas autorisée.");
+      return false;
+    }
+    if (!allowed.ok && allowed.status !== 503) {
+      setError("La session n’a pas été acceptée.");
+      return false;
+    }
+    enter(token);
+    return true;
+  }, [enter]);
+
+  useEffect(() => {
+    if (testAuthMode() || !neonAuthConfigured() || queryError) return;
+    let cancelled = false;
+    restoreNeonToken(search)
+      .then(async (token) => {
+        if (cancelled) return;
+        if (!token) {
+          if (returning) setError("La connexion Google a été refusée.");
+          return;
+        }
+        await admit(token);
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setError(caught instanceof Error && caught.message ? caught.message : "La connexion Google a été refusée.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOauthSettled(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [admit, queryError, returning, search]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -46,21 +106,7 @@ export default function LoginPage() {
       const token = creating
         ? await signUpWithPassword(email.trim(), password, name.trim())
         : await signInWithPassword(email.trim(), password);
-      const allowed = await fetch("/api/status", {
-        cache: "no-store",
-        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
-      });
-      if (allowed.status === 403) {
-        const { signOutNeon } = await import("../api/neonAuth");
-        await signOutNeon();
-        setError("Cette adresse n’est pas autorisée.");
-        return;
-      }
-      if (!allowed.ok && allowed.status !== 503) {
-        setError("La session n’a pas été acceptée.");
-        return;
-      }
-      enter(token);
+      await admit(token);
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : "Connexion refusée.");
     } finally {
@@ -72,8 +118,7 @@ export default function LoginPage() {
     setError("");
     setPending(true);
     try {
-      const callback = new URL(next, window.location.origin).toString();
-      await signInWithGoogle(callback);
+      await signInWithGoogle(googleCallbackURL(next, window.location.origin));
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : "La connexion Google a été refusée.");
       setPending(false);
@@ -113,9 +158,9 @@ export default function LoginPage() {
             required
           />
         </label>
-        {error && <p className="notice notice-error" role="alert">{error}</p>}
-        <button type="submit" disabled={pending}>
-          {pending ? "Connexion…" : creating ? "Créer le compte" : "Se connecter"}
+        {(error || queryError) && <p className="notice notice-error" role="alert">{error || queryError}</p>}
+        <button type="submit" disabled={pending || oauthPending}>
+          {pending || oauthPending ? "Connexion…" : creating ? "Créer le compte" : "Se connecter"}
         </button>
         <button type="button" className="login-switch" onClick={() => { setCreating((value) => !value); setError(""); }}>
           {creating ? "J’ai déjà un compte" : "Créer un compte"}
@@ -123,7 +168,7 @@ export default function LoginPage() {
         {testAuthMode() ? (
           <p className="login-note">Google n’est pas disponible dans le mode d’essai.</p>
         ) : (
-          <button type="button" onClick={() => { void onGoogle(); }} disabled={pending || !neonAuthConfigured()}>
+          <button type="button" onClick={() => { void onGoogle(); }} disabled={pending || oauthPending || !neonAuthConfigured()}>
             Continuer avec Google
           </button>
         )}
