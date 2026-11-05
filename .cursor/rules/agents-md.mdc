@@ -1,0 +1,9 @@
+---
+description: Contexte projet via AGENTS.md et sa mise à jour
+alwaysApply: true
+---
+- AGENTS.md (racine) est la source de vérité du projet : stack, commandes, carte par dossier, pièges connus. Le lire avant d'explorer le repo.
+- Ne pas lister ni parcourir tout le repo : recherche ciblée, lire seulement les fichiers utiles à la tâche.
+- Si AGENTS.md n'existe pas, le créer (40 lignes max) : Stack, Commandes, Carte par dossier (jamais fichier par fichier), Conventions, Pièges connus.
+- En fin de tâche, si un dossier est créé ou déplacé, ou si une commande change, mettre à jour AGENTS.md en une ligne. Rester sous 40 lignes.
+- Quand une même erreur revient, ajouter une ligne dans "Pièges connus".

@@ -1,0 +1,8 @@
+---
+description: Interdire les tirets cadratins dans les réponses et les textes produits
+alwaysApply: true
+---
+- N'utilise jamais de tiret cadratin (—) ni de tiret demi-cadratin (–) comme ponctuation, ni dans tes réponses, ni dans le code, les textes d'interface, les pages web, les docs ou les messages de commit.
+- Remplace-les par une virgule, deux-points, des parenthèses ou une nouvelle phrase.
+- Le trait d'union simple (-) reste autorisé dans les mots composés, les noms de fichiers, les options de ligne de commande et les plages en code.
+- Avant de livrer, vérifie le texte produit et corrige tout tiret cadratin restant.
