@@ -97,6 +97,45 @@ describe("neon auth", () => {
     );
   });
 
+  it("préfère set-auth-jwt à un session.token déjà en trois parties", async () => {
+    installFetch((url) => {
+      if (url.includes("/get-session")) {
+        return new Response(JSON.stringify(sessionBody("eyJhbGciOiJIUzI1NiJ9.session.token")), {
+          status: 200,
+          headers: { "content-type": "application/json", "set-auth-jwt": "header.jwt.value" },
+        });
+      }
+      if (url.endsWith("/token")) {
+        return new Response(JSON.stringify({ token: "endpoint.jwt.value" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response("null", { status: 200 });
+    });
+    await expect(restoreNeonToken()).resolves.toBe("header.jwt.value");
+    expect(calls.some((call) => call.url.endsWith("/token"))).toBe(false);
+  });
+
+  it("ignore un session.token à trois segments sans set-auth-jwt", async () => {
+    installFetch((url) => {
+      if (url.includes("/get-session")) {
+        return new Response(JSON.stringify(sessionBody("eyJhbGciOiJIUzI1NiJ9.session.token")), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url.endsWith("/token")) {
+        return new Response(JSON.stringify({ token: "api.jwt.value" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response("null", { status: 200 });
+    });
+    await expect(restoreNeonToken()).resolves.toBe("api.jwt.value");
+  });
+
   it("demande /token si la session n’a pas de JWT", async () => {
     installFetch((url) => {
       if (url.includes("/get-session")) {

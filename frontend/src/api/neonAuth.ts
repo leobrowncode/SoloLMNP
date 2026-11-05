@@ -3,12 +3,27 @@ import { BetterAuthReactAdapter } from "@neondatabase/auth/react/adapters";
 
 const SESSION_VERIFIER = "neon_auth_session_verifier";
 
-function client() {
+function isJwt(token: string | null | undefined): token is string {
+  if (!token) return false;
+  const parts = token.split(".");
+  return parts.length === 3 && parts.every((part) => part.length > 0);
+}
+
+function client(captureJwt?: (token: string) => void) {
   const url = import.meta.env.VITE_NEON_AUTH_URL;
   if (!url) throw new Error("L’adresse Neon Auth n’est pas configurée.");
   // Cross-origin SPA: the session cookie is on the Neon Auth host.
+  const fetchOptions = captureJwt
+    ? {
+        credentials: "include" as const,
+        onSuccess: (ctx: { response: { headers: Headers } }) => {
+          const header = ctx.response.headers.get("set-auth-jwt");
+          if (isJwt(header)) captureJwt(header);
+        },
+      }
+    : { credentials: "include" as const };
   return createAuthClient(url, {
-    adapter: BetterAuthReactAdapter({ fetchOptions: { credentials: "include" } }),
+    adapter: BetterAuthReactAdapter({ fetchOptions }),
   });
 }
 
@@ -67,14 +82,6 @@ function verifierFrom(search: string): string | null {
   return new URL(next, "https://sololmnp.local").searchParams.get(SESSION_VERIFIER);
 }
 
-function jwtFromSession(session: { token?: unknown } | null | undefined): string | null {
-  const token = session?.token;
-  if (typeof token !== "string") return null;
-  const parts = token.split(".");
-  if (parts.length !== 3 || parts.some((part) => part.length === 0)) return null;
-  return token;
-}
-
 async function jwtFromEndpoint(authUrl: string): Promise<string> {
   const base = authUrl.endsWith("/") ? authUrl : `${authUrl}/`;
   const response = await fetch(new URL("token", base), {
@@ -94,16 +101,20 @@ async function jwtFromEndpoint(authUrl: string): Promise<string> {
 export async function restoreNeonToken(search = ""): Promise<string | null> {
   const authUrl = import.meta.env.VITE_NEON_AUTH_URL;
   if (!authUrl) return null;
-  const auth = client();
+  let apiJwt: string | null = null;
+  const auth = client((token) => {
+    apiJwt = token;
+  });
   const verifier = verifierFrom(search);
-  // getSession writes set-auth-jwt onto session.token. auth.token() is then
-  // served from that session cache and its payload has no data.token.
+  // session.token peut déjà avoir trois segments (jeton de session Better Auth)
+  // sans être le JWT API EdDSA. set-auth-jwt est ce JWT. Sinon GET /token,
+  // le même appel que le login mot de passe. auth.token() après getSession
+  // relit le cache de session et n’a pas data.token.
   const session = await auth.getSession(verifier
     ? { query: { [SESSION_VERIFIER]: verifier } } as NonNullable<Parameters<typeof auth.getSession>[0]>
     : undefined);
   if (session.error || !session.data?.user) return null;
-  const embedded = jwtFromSession(session.data.session);
-  if (embedded) return embedded;
+  if (apiJwt) return apiJwt;
   return jwtFromEndpoint(authUrl);
 }
 
