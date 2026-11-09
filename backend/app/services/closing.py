@@ -21,10 +21,10 @@ from app.domain.fiscal.output_status import (
 )
 from app.models import AccountingEntry, FiscalYear
 from app.models.assets import DepreciationPeriod
-from app.models.foundation import Property
 from app.models.base import utc_now
 from app.models.filing import AuditEvent, TaxReturnSnapshot
 from app.models.fiscal import FiscalComputation
+from app.models.foundation import Property
 from app.services.fiscal import latest_fiscal, ledger_fingerprint
 from app.services.ledger import fail, get_year
 from app.services.result_closing import _live
