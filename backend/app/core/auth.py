@@ -193,6 +193,20 @@ def _safe_label(value: object) -> str | None:
     return cleaned
 
 
+def _allowed_emails(settings: Settings) -> set[str]:
+    return {item.lower() for item in settings.allowed_emails}
+
+
+def ensure_email_allowed(settings: Settings, email: str) -> str:
+    """Return a normalized address or raise when it is outside ALLOWED_EMAILS."""
+    normalized = email.strip().lower()
+    if not normalized or "@" not in normalized or len(normalized) > 320 or any(char.isspace() for char in normalized):
+        raise AuthError(400, "INVALID_EMAIL", "Indiquez une adresse e-mail valide.")
+    if normalized not in _allowed_emails(settings):
+        raise AuthError(403, "EMAIL_NOT_ALLOWED", "Cette adresse n’est pas autorisée.")
+    return normalized
+
+
 def _principal(settings: Settings, payload: object) -> Principal:
     if not isinstance(payload, dict):
         raise AuthError(401, "INVALID_TOKEN", "Jeton illisible.")
@@ -200,12 +214,9 @@ def _principal(settings: Settings, payload: object) -> Principal:
     email = payload.get("email")
     if not isinstance(subject, str) or not subject.strip() or len(subject) > 200:
         raise AuthError(401, "INVALID_TOKEN", "Jeton sans identifiant.")
-    if not isinstance(email, str) or "@" not in email or len(email) > 320:
+    if not isinstance(email, str):
         raise AuthError(401, "INVALID_TOKEN", "Jeton sans adresse e-mail.")
-    normalized = email.strip().lower()
-    allowed = {item.lower() for item in settings.allowed_emails}
-    if normalized not in allowed:
-        raise AuthError(403, "EMAIL_NOT_ALLOWED", "Cette adresse n’est pas autorisée.")
+    normalized = ensure_email_allowed(settings, email)
     return Principal(subject=subject.strip(), email=normalized)
 
 

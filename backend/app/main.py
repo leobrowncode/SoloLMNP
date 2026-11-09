@@ -20,7 +20,7 @@ from app.api.fiscal import build_fiscal_router
 from app.api.ledger import build_ledger_router
 from app.api.operations import build_operations_router
 from app.core.api_errors import register_exception_handlers
-from app.core.auth import AuthError, verify_authorization
+from app.core.auth import AuthError, ensure_email_allowed, verify_authorization
 from app.core.config import Settings, deployment_hosts, get_settings, local_mode_allowed
 from app.core.database import SCHEMA_REVISION, Database
 from app.core.ownership import resolve_owner_id
@@ -132,7 +132,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         path = request.url.path
-        if request.method == "OPTIONS" or path == "/api/health" or not path.startswith("/api/"):
+        public = {"/api/health", "/api/auth/admission"}
+        if request.method == "OPTIONS" or path in public or not path.startswith("/api/"):
             return await call_next(request)
         try:
             request.state.principal = verify_authorization(
@@ -182,6 +183,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @application.get("/api/health", tags=["system"])
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @application.get("/api/auth/admission", tags=["system"])
+    def admission(email: str) -> dict[str, str]:
+        try:
+            ensure_email_allowed(configuration, email)
+        except AuthError as exc:
+            return JSONResponse(
+                status_code=exc.status,
+                content={"detail": {"code": exc.code, "message": exc.message}},
+                headers={"Cache-Control": "no-store"},
+            )
+        return {"status": "allowed"}
 
     @application.get("/api/status", tags=["system"], response_model=ApplicationStatus)
     def status(request: Request, response: Response) -> ApplicationStatus:

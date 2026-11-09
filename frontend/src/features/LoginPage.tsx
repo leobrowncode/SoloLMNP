@@ -8,6 +8,7 @@ import {
   signOutNeon,
   signUpWithPassword,
 } from "../api/neonAuth";
+import { errorSummary, parseApiErrorDetail } from "../api/errors";
 import { localAuthMode, neonAuthConfigured, safeNext, storeToken, testAuthMode } from "../api/session";
 
 export default function LoginPage() {
@@ -35,6 +36,27 @@ export default function LoginPage() {
     storeToken(token);
     navigate(next, { replace: true });
   }, [navigate, next]);
+
+  const ensureAdmitted = useCallback(async (address: string): Promise<boolean> => {
+    const query = new URLSearchParams({ email: address.trim() });
+    const response = await fetch(`/api/auth/admission?${query}`, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    if (response.status === 403) {
+      setError(
+        "Cette adresse n’est pas autorisée. L’inscription est réservée aux adresses déjà invitées.",
+      );
+      return false;
+    }
+    if (!response.ok) {
+      const body = await response.json().catch(() => undefined) as { detail?: unknown } | undefined;
+      const detail = parseApiErrorDetail(body?.detail);
+      setError(detail.message ? errorSummary(detail) : "L’adresse n’a pas pu être vérifiée.");
+      return false;
+    }
+    return true;
+  }, []);
 
   const admit = useCallback(async (token: string): Promise<boolean> => {
     const allowed = await fetch("/api/status", {
@@ -103,9 +125,13 @@ export default function LoginPage() {
         setError("L’authentification n’est pas configurée.");
         return;
       }
+      const address = email.trim();
+      if (creating && !(await ensureAdmitted(address))) {
+        return;
+      }
       const token = creating
-        ? await signUpWithPassword(email.trim(), password, name.trim())
-        : await signInWithPassword(email.trim(), password);
+        ? await signUpWithPassword(address, password, name.trim())
+        : await signInWithPassword(address, password);
       await admit(token);
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : "Connexion refusée.");
@@ -177,6 +203,12 @@ export default function LoginPage() {
         <h1 id="page-title">Connexion</h1>
         <p className="login-lead">Le dossier reste privé. Seules les adresses autorisées entrent.</p>
         {creating && (
+          <p className="login-note">
+            L’inscription est réservée aux adresses déjà invitées. Si la vôtre n’est pas sur la liste,
+            aucun compte ne sera créé chez Neon Auth.
+          </p>
+        )}
+        {creating && (
           <label className="form-field">
             Nom
             <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" required />
@@ -201,7 +233,9 @@ export default function LoginPage() {
             autoComplete={creating ? "new-password" : "current-password"}
             minLength={8}
             required
+            aria-describedby={creating ? "password-min-length" : undefined}
           />
+          {creating && <span id="password-min-length" className="form-help">8 caractères minimum.</span>}
         </label>
         {(error || queryError) && <p className="notice notice-error" role="alert">{error || queryError}</p>}
         <button type="submit" disabled={pending || oauthPending}>
