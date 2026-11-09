@@ -194,8 +194,10 @@ describe("ReviewForm", () => {
     expect(screen.getByLabelText("Date d’acquisition")).toHaveAttribute("type", "date");
     expect(screen.getByText("Format JJ/MM/AAAA.")).toBeInTheDocument();
     expect(screen.getByLabelText(/Prix constaté au m²/)).toHaveValue("");
+    expect(screen.getByLabelText(/Prix constaté au m²/)).toHaveAttribute("placeholder", "ex. 1 234,56");
     expect(screen.getByLabelText(/Prix constaté au m²/)).not.toBeRequired();
     expect(screen.getByLabelText("Prix d’acquisition (€)")).toHaveValue("0.00");
+    expect(screen.getByLabelText("Prix d’acquisition (€)")).not.toHaveAttribute("placeholder");
     fireEvent.change(screen.getByLabelText("Date d’acquisition"), { target: { value: "2025-01-09" } });
     expect(screen.queryByText("JJ/MM/AAAA")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Date d’acquisition")).toHaveValue("2025-01-09");
