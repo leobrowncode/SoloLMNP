@@ -211,6 +211,10 @@ export default function PropertyEntry({
       Une écriture unique, datée du premier jour de l’exercice. Les emprunts repris ici n’ont pas besoin
       de « déblocage » : saisissez ensuite seulement les échéances payées pendant l’exercice.
     </p>
+    <p className="form-help">
+      À remplir : rien n’est proposé par défaut. Sauf le capital restant dû repris de l’emprunt, les montants
+      restent vides tant que vous ne les saisissez pas. Les frais payés à zéro peuvent rester vides.
+    </p>
     {error && <p role="alert" className="ledger-error">{error}</p>}
     <MutationStatus step={step} />
     <div className="form-grid">
@@ -226,7 +230,7 @@ export default function PropertyEntry({
       </label>
       {propertyLoans.map((row) => <label key={row.id} className="field-money">
         Capital restant dû au début de l’exercice — {row.lender} ({row.principal_account})
-        <input inputMode="decimal" lang="fr" data-money="true" placeholder="1 234,56" value={outstanding[row.id] ?? ""} onChange={(event) => {
+        <input inputMode="decimal" lang="fr" data-money="true" value={outstanding[row.id] ?? ""} onChange={(event) => {
           setOutstanding({ ...outstanding, [row.id]: event.target.value }); setPreview(null);
         }} />
       </label>)}
@@ -241,11 +245,11 @@ export default function PropertyEntry({
         </FitSelect>
       </label>
       <label className="field-money">Solde du compte bancaire au début de l’exercice (€)
-        <input inputMode="decimal" lang="fr" data-money="true" value={bankAmount} placeholder="1 234,56" onChange={(event) => { setBankAmount(event.target.value); setPreview(null); }} />
+        <input inputMode="decimal" lang="fr" data-money="true" value={bankAmount} onChange={(event) => { setBankAmount(event.target.value); setPreview(null); }} />
       </label>
       {CHARGES.map(([key, account, label]) => <label key={key} className="field-money">
         {label} ({account})
-        <input inputMode="decimal" lang="fr" data-money="true" value={charges[key] ?? ""} placeholder="1 234,56" onChange={(event) => {
+        <input inputMode="decimal" lang="fr" data-money="true" value={charges[key] ?? ""} onChange={(event) => {
           setCharges({ ...charges, [key]: event.target.value }); setPreview(null);
         }} />
       </label>)}
