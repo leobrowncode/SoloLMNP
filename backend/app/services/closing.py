@@ -20,6 +20,7 @@ from app.domain.fiscal.output_status import (
     load_validation,
 )
 from app.models import AccountingEntry, FiscalYear
+from app.models.foundation import Property
 from app.models.assets import DepreciationPeriod
 from app.models.base import utc_now
 from app.models.filing import AuditEvent, TaxReturnSnapshot
@@ -34,6 +35,22 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
     year = get_year(session, year_id)
     errors: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
+    property_count = session.scalar(select(func.count()).select_from(Property)) or 0
+    validated_entries = session.scalar(
+        select(func.count())
+        .select_from(AccountingEntry)
+        .where(AccountingEntry.fiscal_year_id == year.id, AccountingEntry.status == "VALIDATED")
+    ) or 0
+    if property_count == 0 and validated_entries == 0:
+        errors.append(
+            {
+                "code": "EMPTY_EXERCISE",
+                "message": (
+                    "Aucun logement ni écriture validée : cet exercice est encore vide. "
+                    "Ajoutez au moins un bien ou une écriture avant de clôturer."
+                ),
+            }
+        )
     drafts = session.scalar(
         select(func.count())
         .select_from(AccountingEntry)
