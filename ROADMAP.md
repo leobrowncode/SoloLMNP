@@ -4,7 +4,7 @@
 
 - Auth et hébergement en production : Neon Postgres, Neon Auth (e-mail et Google, `ALLOWED_EMAILS`, isolation `owner_id`), Vercel, https://sololmnp.vercel.app (PR #123 à #130). Ce n’est pas un compte Argon2 local ni une base SQLite par utilisateur.
 - Initialisation en une suite : SIRET, exercice, bien, banque (#118). Correctifs d’interface du 31 octobre (#108 à #117).
-- Audit de parcours livré : [docs/audit/2026-11/PARCOURS.md](docs/audit/2026-11/PARCOURS.md). P0 : le lanceur du README et Docker, sans secrets Neon, s’arrêtent sur une connexion inutilisable. Les P0 et P1 ne se codent qu’après relecture de cet audit. L’ordre des PR est dans ce document.
+- Audit de parcours livré : [docs/audit/2026-11/PARCOURS.md](docs/audit/2026-11/PARCOURS.md). P0 corrigé : le lanceur et Docker ouvrent un dossier local (`AUTH_MODE=local`) sans secret Neon. La production reste Neon Auth. Les P1 ne se codent qu’après relecture. L’ordre des PR est dans ce document.
 - Issues ouvertes : [#7](https://github.com/leobrowncode/SoloLMNP/issues/7) et [#11](https://github.com/leobrowncode/SoloLMNP/issues/11), toutes deux fiscales, hors des PR de parcours.
 
 ## État au 2 octobre 2026

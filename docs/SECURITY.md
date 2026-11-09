@@ -1,6 +1,6 @@
 # Relecture de sécurité — 30 octobre 2026
 
-Depuis l’issue #121, `/api/*` exige un JWT Neon Auth vérifié par JWKS, sauf `GET /api/health`. `ALLOWED_EMAILS` limite les adresses. `owner_id` filtre le dossier. Sur Vercel, la même barrière s’applique (`APP_ENV=production`, `AUTH_MODE` jamais `test`) : voir [DEPLOYMENT.md](DEPLOYMENT.md). Le texte ci-dessous décrit la relecture du 30 octobre, avant cette barrière.
+Depuis l’issue #121, `/api/*` exige un JWT Neon Auth vérifié par JWKS, sauf `GET /api/health`. `ALLOWED_EMAILS` limite les adresses. `owner_id` filtre le dossier. Sur Vercel, la même barrière s’applique (`APP_ENV=production`, `AUTH_MODE` jamais `test` ni `local`) : voir [DEPLOYMENT.md](DEPLOYMENT.md). Le dossier local (`AUTH_MODE=local`, un seul compte) n’existe que si `APP_ENV=development` et si `VERCEL` n’est pas `1`. Le texte ci-dessous décrit la relecture du 30 octobre, avant cette barrière.
 
 Cette note décrit ce qui a été vérifié pour l’issue #13, ce qui a été corrigé, et ce qui reste accepté. SoloLMNP est mono-utilisateur et auto-hébergé. Les millésimes chargés restent `research_only` : aucun résultat fiscal de cette relecture n’est une base de déclaration.
 

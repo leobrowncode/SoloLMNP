@@ -1,6 +1,8 @@
-"""Verify a Neon Auth JWT, or a test token when the app is explicitly in test mode.
+"""Verify a Neon Auth JWT, a test token, or the single local dossier.
 
 Production never accepts the test issuer. The test secret is not a Neon credential.
+``AUTH_MODE=local`` returns one fixed account and only when ``APP_ENV`` is
+``development`` and the process is not running on Vercel. It is not a password.
 
 Neon Auth signs ``iss`` and ``aud`` with the origin of ``NEON_AUTH_BASE_URL``
 (``https://ep.example``), not the managed path that ends in ``/neondb/auth``.
@@ -12,6 +14,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import os
 import re
 import time
 from dataclasses import dataclass
@@ -21,7 +24,7 @@ import jwt
 from jwt import PyJWKClient
 from jwt.exceptions import PyJWTError
 
-from app.core.config import Settings
+from app.core.config import Settings, local_mode_allowed
 
 logger = logging.getLogger(__name__)
 _COMPACT_JWT = re.compile(r"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$")
@@ -32,6 +35,8 @@ TEST_SUBJECT = "test-ada"
 TEST_SECRET = "sololmnp-test-auth-secret"  # noqa: S105
 OTHER_EMAIL = "bea@sololmnp.test"
 OTHER_SUBJECT = "test-bea"
+LOCAL_SUBJECT = "sololmnp-local"
+LOCAL_EMAIL = "local@sololmnp.dev"
 
 _jwks_clients: dict[str, PyJWKClient] = {}
 
@@ -72,8 +77,12 @@ def issue_test_token(
 
 
 def verify_authorization(settings: Settings, header: str | None) -> Principal:
+    if settings.auth_mode == "local":
+        if not local_mode_allowed(settings):
+            raise AuthError(401, "UNAUTHENTICATED", "Authentification locale refusée.")
+        return Principal(subject=LOCAL_SUBJECT, email=LOCAL_EMAIL)
     if settings.auth_mode == "test":
-        if settings.app_env != "test":
+        if settings.app_env != "test" or os.environ.get("VERCEL") == "1":
             raise AuthError(401, "UNAUTHENTICATED", "Authentification d’essai refusée.")
         return _verify_test(settings, _bearer(header))
     return _verify_neon(settings, _bearer(header))

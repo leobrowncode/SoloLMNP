@@ -74,7 +74,10 @@ def plan_migration(env: Mapping[str, str]) -> MigrationPlan:
         raise DeployGuardError("APP_ENV doit valoir production sur Vercel.")
     auth_mode = env.get("AUTH_MODE", "neon").strip() or "neon"
     if auth_mode != "neon":
-        raise DeployGuardError("AUTH_MODE=test est refusé sur Vercel.")
+        raise DeployGuardError("AUTH_MODE doit valoir neon sur Vercel.")
+    vite_auth_mode = env.get("VITE_AUTH_MODE", "").strip()
+    if vite_auth_mode not in {"", "neon"}:
+        raise DeployGuardError("VITE_AUTH_MODE doit rester vide ou neon sur Vercel.")
     missing = [name for name in _REQUIRED if not env.get(name, "").strip()]
     if missing:
         raise DeployGuardError("Variable manquante : " + ", ".join(missing) + ".")

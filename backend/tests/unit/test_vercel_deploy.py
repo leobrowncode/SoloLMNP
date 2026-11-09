@@ -76,6 +76,9 @@ def test_production_does_not_need_the_preview_guard() -> None:
     "overrides",
     [
         {"AUTH_MODE": "test"},
+        {"AUTH_MODE": "local"},
+        {"VITE_AUTH_MODE": "local"},
+        {"VITE_AUTH_MODE": "test"},
         {"APP_ENV": "development"},
         {"ALLOWED_EMAILS": ""},
         {"BLOB_READ_WRITE_TOKEN": ""},

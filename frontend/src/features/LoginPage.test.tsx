@@ -44,6 +44,49 @@ describe("connexion", () => {
   });
 });
 
+describe("dossier local", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubEnv("VITE_AUTH_MODE", "local");
+    vi.stubEnv("VITE_NEON_AUTH_URL", "");
+  });
+
+  it("ouvre le dossier sans formulaire ni bouton Google", async () => {
+    const user = userEvent.setup();
+    render(<RouterProvider router={createTestRouter(["/connexion"])} />);
+    expect(await screen.findByRole("heading", { name: "Dossier local" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Adresse e-mail")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continuer avec Google" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Ouvrir le dossier" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeInTheDocument();
+    expect(screen.getByText("Dossier local, sans compte Neon.")).toBeInTheDocument();
+  });
+});
+
+describe("neon absent", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubEnv("VITE_AUTH_MODE", "");
+    vi.stubEnv("VITE_NEON_AUTH_URL", "");
+  });
+
+  it("explique où configurer Neon au lieu d’un formulaire inactif", async () => {
+    render(<RouterProvider router={createTestRouter(["/connexion"])} />);
+    expect(await screen.findByRole("heading", { name: "Authentification non configurée" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Documentation de déploiement" })).toHaveAttribute(
+      "href",
+      "https://github.com/leobrowncode/SoloLMNP/blob/main/docs/DEPLOYMENT.md",
+    );
+    expect(screen.getByRole("link", { name: "Instance hébergée" })).toHaveAttribute(
+      "href",
+      "https://sololmnp.vercel.app",
+    );
+    expect(screen.queryByLabelText("Adresse e-mail")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continuer avec Google" })).not.toBeInTheDocument();
+    expect(screen.getByText(/AUTH_MODE=local/)).toBeInTheDocument();
+  });
+});
+
 describe("retour Google", () => {
   beforeEach(() => {
     sessionStorage.clear();

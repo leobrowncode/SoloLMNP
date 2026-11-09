@@ -51,6 +51,11 @@ export function testAuthMode(): boolean {
   return import.meta.env.VITE_AUTH_MODE === "test";
 }
 
+/** One local dossier, baked in only when the dev server or image is built that way. */
+export function localAuthMode(): boolean {
+  return import.meta.env.VITE_AUTH_MODE === "local";
+}
+
 export function neonAuthConfigured(): boolean {
   return Boolean(import.meta.env.VITE_NEON_AUTH_URL);
 }

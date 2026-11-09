@@ -21,7 +21,7 @@ from app.api.ledger import build_ledger_router
 from app.api.operations import build_operations_router
 from app.core.api_errors import register_exception_handlers
 from app.core.auth import AuthError, verify_authorization
-from app.core.config import Settings, deployment_hosts, get_settings
+from app.core.config import Settings, deployment_hosts, get_settings, local_mode_allowed
 from app.core.database import SCHEMA_REVISION, Database
 from app.core.ownership import resolve_owner_id
 from app.core.version import APPLICATION_VERSION
@@ -82,8 +82,20 @@ def _request_origin(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
 
+def _refuse_auth_bypass(configuration: Settings) -> None:
+    """Production and Vercel accept Neon Auth only. Local mode cannot be constructed around this."""
+    on_vercel = os.environ.get("VERCEL") == "1"
+    if configuration.auth_mode == "test" and (configuration.app_env == "production" or on_vercel):
+        raise RuntimeError("AUTH_MODE=test est refusé en production.")
+    if configuration.auth_mode == "local" and not local_mode_allowed(configuration):
+        raise RuntimeError("AUTH_MODE=local est refusé en production et sur Vercel.")
+    if (configuration.app_env == "production" or on_vercel) and configuration.auth_mode != "neon":
+        raise RuntimeError("Seul Neon Auth est accepté en production et sur Vercel.")
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     configuration = settings if settings is not None else get_settings()
+    _refuse_auth_bypass(configuration)
     database = Database(configuration)
 
     @asynccontextmanager
@@ -114,10 +126,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     hosts = tuple(dict.fromkeys((*configuration.allowed_hosts, *deployment_hosts())))
     application.add_middleware(TrustedHostMiddleware, allowed_hosts=list(hosts))
     register_exception_handlers(application)
-    if configuration.auth_mode == "test" and (
-        configuration.app_env == "production" or os.environ.get("VERCEL") == "1"
-    ):
-        raise RuntimeError("AUTH_MODE=test est refusé en production.")
 
     @application.middleware("http")
     async def require_session(

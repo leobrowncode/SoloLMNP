@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { signOutNeon } from "./api/neonAuth";
-import { clearToken, neonAuthConfigured, testAuthMode } from "./api/session";
+import { clearToken, localAuthMode, neonAuthConfigured, testAuthMode } from "./api/session";
 import { fetchStatus } from "./api/status";
 import { MOBILE_QUERY, NARROW_CONTROL_QUERY, useMediaQuery } from "./lib/viewport";
 import { focusRouteTarget } from "./routing/focusTarget";
@@ -192,6 +192,7 @@ export default function AppShell() {
             <span className="small-dot" aria-hidden="true" />
             <strong>Dans l’ordre du menu</strong>
             <p>Une étape à la fois.</p>
+            {localAuthMode() && <p>Dossier local, sans compte Neon.</p>}
           </div>
           <div className="sidebar-version">SoloLMNP · {status ? `v${status.application_version}` : "Développement"}</div>
           <button
@@ -200,7 +201,7 @@ export default function AppShell() {
             onClick={() => {
               void (async () => {
                 clearToken();
-                if (!testAuthMode() && neonAuthConfigured()) {
+                if (!testAuthMode() && !localAuthMode() && neonAuthConfigured()) {
                   try {
                     await signOutNeon();
                   } catch {

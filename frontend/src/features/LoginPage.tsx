@@ -8,7 +8,7 @@ import {
   signOutNeon,
   signUpWithPassword,
 } from "../api/neonAuth";
-import { neonAuthConfigured, safeNext, storeToken, testAuthMode } from "../api/session";
+import { localAuthMode, neonAuthConfigured, safeNext, storeToken, testAuthMode } from "../api/session";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -55,7 +55,7 @@ export default function LoginPage() {
   }, [enter]);
 
   useEffect(() => {
-    if (testAuthMode() || !neonAuthConfigured() || queryError) return;
+    if (localAuthMode() || testAuthMode() || !neonAuthConfigured() || queryError) return;
     let cancelled = false;
     restoreNeonToken(search)
       .then(async (token) => {
@@ -123,6 +123,51 @@ export default function LoginPage() {
       setError(caught instanceof Error && caught.message ? caught.message : "La connexion Google a été refusée.");
       setPending(false);
     }
+  }
+
+  if (localAuthMode()) {
+    return (
+      <main className="login-screen" id="main">
+        <section className="login-card">
+          <p className="login-brand">SoloLMNP</p>
+          <h1 id="page-title">Dossier local</h1>
+          <p className="login-lead">
+            Un seul dossier sur cette machine, sans compte Neon. Les données restent dans SQLite.
+          </p>
+          <button type="button" onClick={() => navigate(next)}>Ouvrir le dossier</button>
+        </section>
+      </main>
+    );
+  }
+
+  if (!testAuthMode() && !neonAuthConfigured()) {
+    return (
+      <main className="login-screen" id="main">
+        <section className="login-card">
+          <p className="login-brand">SoloLMNP</p>
+          <h1 id="page-title">Authentification non configurée</h1>
+          <p className="login-lead">
+            Neon Auth n’a pas d’adresse. Le formulaire de connexion ne peut pas ouvrir le dossier.
+          </p>
+          <p className="login-note">
+            Pour un essai sur cette machine, le lanceur et Docker utilisent le mode local
+            (AUTH_MODE=local et VITE_AUTH_MODE=local), sans secret. Ce mode est refusé
+            quand APP_ENV vaut production, et sur Vercel.
+          </p>
+          <p className="login-note">
+            Pour brancher Neon : NEON_AUTH_BASE_URL, VITE_NEON_AUTH_URL et ALLOWED_EMAILS.
+            Le détail est dans docs/DEPLOYMENT.md.
+          </p>
+          <p className="login-note">
+            <a href="https://github.com/leobrowncode/SoloLMNP/blob/main/docs/DEPLOYMENT.md">
+              Documentation de déploiement
+            </a>
+            {" · "}
+            <a href="https://sololmnp.vercel.app">Instance hébergée</a>
+          </p>
+        </section>
+      </main>
+    );
   }
 
   return (
