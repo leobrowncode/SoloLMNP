@@ -124,6 +124,12 @@ describe("responsive layout", () => {
     expect(screen.queryByRole("navigation", { name: "Sections de la comptabilité" })).not.toBeInTheDocument();
     shell.unmount();
 
+    const ledgerShell = renderLedger("Brouillons");
+    expect(await screen.findByLabelText("SIRET")).toBeInTheDocument();
+    expect(document.getElementById("reglages-comptables")?.tagName).toBe("DETAILS");
+    expect(document.getElementById("reglages-comptables")).toHaveClass("mobile-section--wide");
+    ledgerShell.unmount();
+
     renderLedger("Balance");
     expect(await screen.findByRole("table")).toHaveTextContent("123,45");
     expect(document.querySelector("[data-mobile-variant='cards']")).not.toBeInTheDocument();
@@ -195,6 +201,7 @@ describe("responsive layout", () => {
     const journalView = renderLedger("Journal");
     expect(await screen.findByRole("navigation", { name: "Sections de la comptabilité" })).toBeInTheDocument();
     expect(document.getElementById("reglages-comptables")?.tagName).toBe("DETAILS");
+    expect(document.getElementById("reglages-comptables")).toHaveClass("mobile-section--narrow");
     const journal = await screen.findByRole("list", { name: "Lignes de l’écriture" });
     expect(journal.closest("[data-mobile-variant]")).toHaveAttribute("data-mobile-variant", "cards");
     expect(journal.closest("[data-table]")).toHaveAttribute("data-table", "Lignes de l’écriture");
