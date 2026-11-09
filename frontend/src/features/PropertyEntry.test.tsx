@@ -102,6 +102,32 @@ test("explains a disabled property entry and the missing preview", () => {
   expect(causes?.querySelector('a[href="/comptabilite/brouillons#ajouter-exercice"]')).toBeTruthy();
 });
 
+test("shows empty money fields without misleading placeholders", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url === "/api/operations/loans") {
+      return response([
+        {
+          id: 1, lender: "Banque", property_id: 1, initial_principal: "15000.00",
+          remaining_principal: "0.00", monthly_payment: "0.00", monthly_insurance: "0.00",
+          principal_account: "164000",
+        },
+      ]);
+    }
+    if (url === "/api/operations/banks") return response([{ id: 1, name: "Banque", account_number: "512000" }]);
+    throw new Error(url);
+  });
+  render(<PropertyEntry
+    properties={[{ id: 1, name: "Bien", acquisition_price: "1.00", land_value: "0.00", building_value: "1.00" }]}
+    years={[{ id: 4, year: 2026 }]}
+    onDone={vi.fn()}
+  />);
+  fireEvent.click(screen.getByRole("button", { name: "Faire entrer le bien en comptabilité" }));
+  expect(await screen.findByText(/À remplir : rien n’est proposé/)).toBeInTheDocument();
+  expect(screen.getByLabelText(/Solde du compte bancaire au début/)).not.toHaveAttribute("placeholder");
+  expect(screen.getByLabelText(/Intérêts d’emprunt payés avant/)).not.toHaveAttribute("placeholder");
+});
+
 test("explains that posting waits for a preview", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const url = String(input);

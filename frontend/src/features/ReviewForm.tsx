@@ -275,7 +275,15 @@ export default function ReviewForm({
                   type={field.rate ? "text" : field.type === "number" ? "number" : field.type ?? "text"}
                   lang={field.money || field.rate ? "fr" : undefined}
                   min={field.type === "number" ? "1" : undefined}
-                  placeholder={field.money ? "1 234,56" : field.rate ? "3,125" : undefined}
+                  placeholder={
+                    field.money
+                      ? field.optional
+                        ? "ex. 1 234,56"
+                        : undefined
+                      : field.rate
+                        ? "3,125"
+                        : undefined
+                  }
                   data-money={field.money ? "true" : undefined}
                   data-rate={field.rate ? "true" : undefined}
                   inputMode={field.money || field.rate ? "decimal" : undefined}

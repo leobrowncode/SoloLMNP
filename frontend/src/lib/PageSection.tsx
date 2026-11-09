@@ -25,8 +25,9 @@ export function PageAnchors({
 
 /**
  * On a narrow viewport, a disclosure the reader can open.
- * Wider screens keep a plain wrapper so the desktop layout stays the same.
- * `open` is the preferred initial state; the reader can still toggle it.
+ * Wider screens keep the same DOM node (`details`) and hide the summary
+ * so resizing the window does not remount children and wipe in-progress input.
+ * `open` is the preferred initial state; the reader can still toggle it on mobile.
  */
 export function MobileSection({
   id,
@@ -49,16 +50,27 @@ export function MobileSection({
     setOpened(open);
   }
 
-  if (!mobile) {
-    return <div id={id} className={className}>{children}</div>;
-  }
+  const sectionClass = [
+    "mobile-section",
+    mobile ? "mobile-section--narrow" : "mobile-section--wide",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <details
       id={id}
-      className={["mobile-section", className].filter(Boolean).join(" ")}
-      open={opened}
-      onToggle={(event) => setOpened(event.currentTarget.open)}
+      className={sectionClass}
+      open={mobile ? opened : true}
+      onToggle={
+        mobile
+          ? (event) => setOpened(event.currentTarget.open)
+          : (event) => {
+              event.preventDefault();
+              event.currentTarget.open = true;
+            }
+      }
     >
       <summary>{title}</summary>
       {children}
