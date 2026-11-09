@@ -200,7 +200,12 @@ def _allowed_emails(settings: Settings) -> set[str]:
 def ensure_email_allowed(settings: Settings, email: str) -> str:
     """Return a normalized address or raise when it is outside ALLOWED_EMAILS."""
     normalized = email.strip().lower()
-    if not normalized or "@" not in normalized or len(normalized) > 320 or any(char.isspace() for char in normalized):
+    if (
+        not normalized
+        or "@" not in normalized
+        or len(normalized) > 320
+        or any(char.isspace() for char in normalized)
+    ):
         raise AuthError(400, "INVALID_EMAIL", "Indiquez une adresse e-mail valide.")
     if normalized not in _allowed_emails(settings):
         raise AuthError(403, "EMAIL_NOT_ALLOWED", "Cette adresse n’est pas autorisée.")
