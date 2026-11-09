@@ -162,7 +162,7 @@ test.describe.serial("parcours critique", () => {
     await page.getByLabel("Millésime fiscal").fill("2025");
     await page.getByRole("button", { name: "Créer l’exercice" }).click();
     await expect(page.getByRole("heading", { name: "Ajouter un bien" })).toBeVisible();
-    await expect(page.getByText(/Ajoutez le logement/)).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: /Ajoutez le logement/ })).toBeVisible();
     await expect(page).toHaveURL(/\/operations\/biens/);
     await page.getByRole("button", { name: "Ajouter un bien" }).click();
     await expect(page.locator(".date-placeholder").first()).toHaveText("JJ/MM/AAAA");
