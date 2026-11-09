@@ -36,11 +36,14 @@ def precheck(session: Session, year_id: int) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
     property_count = session.scalar(select(func.count()).select_from(Property)) or 0
-    validated_entries = session.scalar(
-        select(func.count())
-        .select_from(AccountingEntry)
-        .where(AccountingEntry.fiscal_year_id == year.id, AccountingEntry.status == "VALIDATED")
-    ) or 0
+    validated_entries = (
+        session.scalar(
+            select(func.count())
+            .select_from(AccountingEntry)
+            .where(AccountingEntry.fiscal_year_id == year.id, AccountingEntry.status == "VALIDATED")
+        )
+        or 0
+    )
     if property_count == 0 and validated_entries == 0:
         errors.append(
             {
