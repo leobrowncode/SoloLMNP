@@ -64,6 +64,21 @@ export function guideNoteFrom(state: unknown): string {
   return typeof note === "string" ? note : "";
 }
 
+/** Drop or rewrite setup banners once the dossier has moved past the rail step they describe. */
+export function guideNoteForOperations(
+  state: unknown,
+  propertyCount: number,
+  bankCount: number,
+): string {
+  const note = guideNoteFrom(state);
+  if (!note) return "";
+  if (propertyCount > 0) {
+    if (bankCount === 0) return "Logement enregistré. Ajoutez un compte bancaire.";
+    return "";
+  }
+  return note;
+}
+
 export const DECLARATION_STEPS = [
   { id: "siret", label: "SIRET" },
   { id: "exercice", label: "Exercice" },

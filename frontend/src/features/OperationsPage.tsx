@@ -38,7 +38,7 @@ import {
 import { buildPieceReference, defaultType, findType, typesFor } from "./operationTypes";
 import { enumChoices, enumLabel, formatEuros, formatIsoDate, rateToApi } from "../lib/format";
 import { propertySplitGap, proposeLandFromArea } from "./propertySplit";
-import { guideNoteFrom } from "./declarationSetup";
+import { guideNoteForOperations } from "./declarationSetup";
 import FrenchForm from "../lib/FrenchForm";
 import "./ledger.css";
 import FitSelect from "../lib/FitSelect";
@@ -104,13 +104,13 @@ export default function OperationsPage() {
   const { tab: tabSlug } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const guideNote = guideNoteFrom(location.state);
   const resolvedTab = operationsTabFromSlug(tabSlug);
   const tab: OperationsTab = resolvedTab ?? DEFAULT_OPERATIONS_TAB;
   const [setup, setSetup] = useState<Setup | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Record<number, Tenant[]>>({});
   const [banks, setBanks] = useState<Bank[]>([]);
+  const guideNote = guideNoteForOperations(location.state, properties.length, banks.length);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [operations, setOperations] = useState<Operation[]>([]);

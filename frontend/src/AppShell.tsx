@@ -190,8 +190,8 @@ export default function AppShell() {
           </nav>
           <div className="sidebar-note">
             <span className="small-dot" aria-hidden="true" />
-            <strong>Dans l’ordre du menu</strong>
-            <p>Une étape à la fois.</p>
+            <strong>Ordre du parcours</strong>
+            <p>SIRET, exercice, bien, banque, puis le reste du menu.</p>
             {localAuthMode() && <p>Dossier local, sans compte Neon.</p>}
           </div>
           <div className="sidebar-version">SoloLMNP · {status ? `v${status.application_version}` : "Développement"}</div>

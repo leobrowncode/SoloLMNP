@@ -200,7 +200,7 @@ export default function SetupGuide({
         }
         setEditing(false);
         if (openProperty) {
-          note = `SIREN ${identity.siren} enregistré. Indiquez le logement.`;
+          note = `SIREN ${identity.siren} enregistré. Ajoutez le logement, puis le compte bancaire.`;
           return;
         }
         show({
@@ -241,7 +241,7 @@ export default function SetupGuide({
           fiscal_vintage: input.vintage,
         });
         if (first) {
-          note = `Exercice ${vintage} enregistré. Indiquez le logement.`;
+          note = `Exercice ${vintage} enregistré. Ajoutez le logement, puis le compte bancaire.`;
           return;
         }
         show({
@@ -268,7 +268,7 @@ export default function SetupGuide({
         <>
           <DeclarationRail current={current} />
           <p className="form-help">
-            Une étape à la fois. Le SIRET remplit le SIREN, puis l’exercice s’ouvre, puis le logement.
+            Une étape à la fois. SIRET, exercice, bien, compte bancaire : suivez le rail dans cet ordre.
           </p>
         </>
       )}

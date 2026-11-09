@@ -79,11 +79,11 @@ export const navItems: {
   path: string;
 }[] = [
   { id: "overview", label: "Vue d’ensemble", hint: "Par où commencer.", path: ROUTES.home },
-  { id: "ledger", label: "Comptabilité", step: "1", hint: "Activité, exercice, puis écritures validées.", path: ledgerPath() },
-  { id: "operations", label: "Opérations & banque", step: "2", hint: "Bien, banque, emprunt, loyers et charges.", path: operationsPath() },
-  { id: "assets", label: "Immobilisations", step: "3", hint: "Terrain, bâtiment, mobilier, puis dotations.", path: ROUTES.assets },
-  { id: "statements", label: "États comptables", step: "4", hint: "Bilan, résultat, puis centralisation.", path: ROUTES.statements },
-  { id: "fiscal", label: "Fiscalité LMNP", step: "5", hint: "Calcul fiscal, pré-contrôle, clôture, puis sorties figées.", path: ROUTES.fiscal },
+  { id: "ledger", label: "Comptabilité", step: "1", hint: "SIRET et exercice, puis écritures validées.", path: ledgerPath() },
+  { id: "operations", label: "Opérations & banque", step: "2", hint: "Bien et compte 512, puis emprunts et loyers.", path: operationsPath() },
+  { id: "assets", label: "Immobilisations", step: "3", hint: "Après l’entrée du bien : dotations et registre.", path: ROUTES.assets },
+  { id: "statements", label: "États comptables", step: "4", hint: "Quand le journal existe : bilan, résultat, centralisation.", path: ROUTES.statements },
+  { id: "fiscal", label: "Fiscalité LMNP", step: "5", hint: "Calcul, pré-contrôle et clôture sur un dossier complet.", path: ROUTES.fiscal },
   { id: "conservation", label: "Conservation", step: "6", hint: "Justificatifs et sauvegarde.", path: ROUTES.conservation },
 ];
 

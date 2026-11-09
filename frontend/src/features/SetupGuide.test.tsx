@@ -83,7 +83,7 @@ describe("SetupGuide", () => {
     fireEvent.click(screen.getByRole("button", { name: "Créer l’exercice" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/operations/biens"));
     expect(router.state.location.hash).toBe("#ajouter-bien");
-    expect(guideNoteFrom(router.state.location.state)).toMatch(/Indiquez le logement/);
+    expect(guideNoteFrom(router.state.location.state)).toMatch(/logement/);
     expect(onReload).not.toHaveBeenCalled();
     const call = fetcher.mock.calls.find((item) => String(item[0]).endsWith("/years"));
     expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({
