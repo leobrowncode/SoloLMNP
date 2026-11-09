@@ -215,6 +215,9 @@ section{
   background:var(--bg-canvas);
   color:inherit
 }
+.login-card a{
+  color:inherit
+}
 .login-card button{
   min-height:2.75rem;
   border:1px solid var(--border-hairline);

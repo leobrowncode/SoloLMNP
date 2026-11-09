@@ -6,8 +6,8 @@
 ## Current project status
 
 - Completed through: liasse LMNP IR, entrée du bien, dossier FEC, enchaînement SIRET → exercice → bien → banque (#118), Neon Auth + Postgres + `owner_id` (#123 à #130), déploiement https://sololmnp.vercel.app
-- Current phase: audit de parcours de novembre 2026 livré dans `docs/audit/2026-11/PARCOURS.md`, en attente de relecture avant tout correctif
-- Current objective: ne pas coder les P0/P1 tant que cette PR d’audit n’est pas relue. Les millésimes 2025 et 2026 restent en recherche.
+- Current phase: P0 du parcours corrigé (dossier local sans secret Neon). Les P1 de `docs/audit/2026-11/PARCOURS.md` restent ouverts.
+- Current objective: ne pas coder les P1 tant qu’ils ne sont pas demandés. Les millésimes 2025 et 2026 restent en recherche.
 
 ## Completed
 
@@ -29,14 +29,14 @@
 - `ready` exige : registre de cases respecté, aucun écart d’immobilisations, de classement, d’effectifs, de cession ou de TVA, et un SIREN.
 - La liasse n’impute pas les déficits LMNP antérieurs.
 - SoloLMNP ne télétransmet pas.
-- Auth : Neon Auth. Le mode `AUTH_MODE=test` est réservé aux essais et refusé en production.
+- Auth : Neon Auth en production. `AUTH_MODE=local` ouvre un seul dossier si `APP_ENV=development` et hors Vercel. `AUTH_MODE=test` reste réservé aux essais et refusé en production.
 
 ## Known limitations / blockers
 
 - Périmètre LMNP déclaré. Le LMP n’est pas calculé.
 - Cession, TVA, plus-values et ventilation automatique du terrain : désactivées, et bloquantes si elles apparaissent
 - Millésime 2026 : formulaires 2027 non publiés ; cases non reprises comme officielles
-- P0 d’audit : sans variables Neon, le README et Docker n’ouvrent pas le dossier (régression de parcours de la #125, pas de la #118)
+- P0 d’audit corrigé : README et Docker ouvrent le dossier local sans secret Neon. Production et Vercel restent sur Neon Auth.
 
 ## Validation baseline
 

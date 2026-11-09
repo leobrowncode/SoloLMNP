@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     allowed_hosts: Annotated[tuple[str, ...], NoDecode] = ("localhost", "127.0.0.1", "[::1]")
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0, le=50 * 1024 * 1024)
     blob_read_write_token: str = Field(default="", repr=False)
-    auth_mode: Literal["neon", "test"] = "neon"
+    auth_mode: Literal["neon", "test", "local"] = "neon"
     auth_test_secret: str = Field(default="", repr=False)
     allowed_emails: Annotated[tuple[str, ...], NoDecode] = ()
     neon_auth_base_url: str = ""
@@ -89,6 +89,14 @@ class Settings(BaseSettings):
     def default_jwks(self) -> Self:
         if self.neon_auth_base_url and not self.neon_auth_jwks_url:
             self.neon_auth_jwks_url = f"{self.neon_auth_base_url}/.well-known/jwks.json"
+        return self
+
+    @model_validator(mode="after")
+    def local_mode_is_development_only(self) -> Self:
+        if self.auth_mode != "local":
+            return self
+        if self.app_env != "development" or os.environ.get("VERCEL") == "1":
+            raise ValueError("AUTH_MODE=local est refusé en production et sur Vercel.")
         return self
 
     @field_validator("allowed_hosts")
@@ -190,6 +198,15 @@ def _bare_host(value: str) -> str:
     if not raw or any(char in raw for char in "*/@?# "):
         return ""
     return raw
+
+
+def local_mode_allowed(settings: Settings) -> bool:
+    """Explicit local dossier: development only, and never when the process is on Vercel."""
+    return (
+        settings.auth_mode == "local"
+        and settings.app_env == "development"
+        and os.environ.get("VERCEL") != "1"
+    )
 
 
 @lru_cache

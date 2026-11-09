@@ -7,8 +7,8 @@ services:
         APP_UID: ${SOLOLMNP_UID:-1000}
         APP_GID: ${SOLOLMNP_GID:-1000}
     environment:
-      APP_ENV: ${APP_ENV:-production}
-      AUTH_MODE: ${AUTH_MODE:-neon}
+      APP_ENV: ${APP_ENV:-development}
+      AUTH_MODE: ${AUTH_MODE:-local}
       AUTH_TEST_SECRET: ${AUTH_TEST_SECRET:-}
       ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
       NEON_AUTH_BASE_URL: ${NEON_AUTH_BASE_URL:-}
@@ -45,6 +45,7 @@ services:
       dockerfile: Dockerfile.frontend
       args:
         VITE_NEON_AUTH_URL: ${VITE_NEON_AUTH_URL:-}
+        VITE_AUTH_MODE: ${VITE_AUTH_MODE:-local}
     ports:
       - "127.0.0.1:${SOLOLMNP_PORT:-5173}:8080"
     depends_on:

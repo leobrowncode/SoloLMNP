@@ -19,6 +19,13 @@ démarre Uvicorn (`127.0.0.1:8000`) et Vite (`127.0.0.1:5173`), puis ouvre le na
 Arrêt avec Ctrl+C. Guide métier : [TUTORIAL.md](TUTORIAL.md). Cycle d’un exercice :
 [ANNUAL_CYCLE.md](ANNUAL_CYCLE.md). Limites : [LIMITS.md](LIMITS.md).
 
+Le fichier copié depuis `.env.example` active le dossier local : `APP_ENV=development`,
+`AUTH_MODE=local`, `VITE_AUTH_MODE=local`. Aucun secret Neon n’est demandé. L’API traite
+chaque requête comme le compte fixe `sololmnp-local` (le premier compte, `owner_id` 1 sur
+une base neuve). Ce mode est refusé si `APP_ENV` vaut `production` ou si `VERCEL=1` :
+l’application ne démarre pas. Un `.env` déjà présent n’est pas réécrit. Pour le même
+comportement, y ajouter ces trois variables, puis relancer.
+
 Le parcours navigateur n’utilise pas `data/`. Depuis `e2e/`, après `npm ci` et
 `npx playwright install chromium`, `npm test` démarre l’API sur une base temporaire
 et Vite. Il faut le Python du dépôt (dépendances backend installées).
@@ -33,6 +40,9 @@ docker compose up --build --wait
 ```
 
 Ouvrir [SoloLMNP](http://127.0.0.1:5173). Le fichier `.env` est facultatif.
+Sans variable, Compose prend `APP_ENV=development` et `AUTH_MODE=local`, et construit
+l’interface avec `VITE_AUTH_MODE=local`. Le dossier s’ouvre sans secret Neon.
+`APP_ENV=production` avec `AUTH_MODE=local` fait échouer le démarrage du backend.
 Le répertoire `data/` existe dans Git avec un marqueur vide ; la base est créée au
 premier démarrage dans `data/sololmnp.sqlite3`. Le montage exige que le répertoire hôte
 existe, pour éviter qu'un chemin erroné soit créé silencieusement par Docker.
@@ -81,10 +91,12 @@ Copier `.env.example` vers `.env` permet de personnaliser Compose :
 
 Compose utilise volontairement des chemins internes fixes pour SQLite et les documents.
 Les variables `DATABASE_URL` et `DOCUMENTS_DIR` de l'exemple servent au développement natif.
-Chaque route `/api/*` exige une session vérifiée, sauf `GET /api/health`.
-Le navigateur envoie `Authorization: Bearer` après une connexion Neon Auth (e-mail ou Google).
-`ALLOWED_EMAILS` refuse toute autre adresse. Les variables sont dans `.env.example`.
-`VITE_NEON_AUTH_URL` est figée dans l’image frontend : la reconstruire après un changement.
+En mode local, les routes `/api/*` autres que `GET /api/health` utilisent le compte fixe,
+sans JWT. Dès que `AUTH_MODE` vaut `neon`, le navigateur envoie `Authorization: Bearer`
+après une connexion Neon Auth (e-mail ou Google), et `ALLOWED_EMAILS` refuse toute autre
+adresse. Les variables sont dans `.env.example`.
+`VITE_NEON_AUTH_URL` et `VITE_AUTH_MODE` sont figés dans l’image frontend : la reconstruire
+après un changement.
 Elle est aussi ajoutée à `connect-src`, avec `https://vercel.com` pour le dépôt direct des fichiers de plus de 3 Mio.
 L’écoute reste sur `127.0.0.1` : un tunnel SSH suffit pour un accès distant.
 
@@ -126,7 +138,7 @@ Le lanceur local et Docker ne passent pas par ce build. Ils migrent au démarrag
 - `scripts/vercel_build.py` construit le frontend, puis lance `alembic upgrade head` seulement quand `VERCEL=1` et `VERCEL_ENV` vaut `preview` ou `production`. Ailleurs, il ne migre pas.
 - La migration utilise `DATABASE_URL_UNPOOLED` (hôte direct, sans `-pooler`). Le verrou `pg_advisory_lock` dure le temps du build, avec un `lock_timeout` de 180 secondes. Deux déploiements ne migrent pas ensemble. Un échec fait échouer le build : le déploiement précédent reste en service.
 - Une preview refuse la migration si `SOLOLMNP_PRODUCTION_DB_HOST` manque, ou si l’hôte direct visé est celui de la production. La variable est le nom d’hôte, sans utilisateur ni mot de passe.
-- `APP_ENV=production` est exigé. `AUTH_MODE=test` est refusé dès que `VERCEL=1`.
+- `APP_ENV=production` est exigé. `AUTH_MODE` autre que `neon`, et `VITE_AUTH_MODE` autre que vide ou `neon`, sont refusés. `AUTH_MODE=test` et `AUTH_MODE=local` le sont aussi dès que `VERCEL=1`, y compris si `APP_ENV` n’est pas `production`.
 - Les hôtes `VERCEL_URL`, `VERCEL_BRANCH_URL` et `VERCEL_PROJECT_PRODUCTION_URL` sont acceptés. Un domaine propre se déclare dans `ALLOWED_HOSTS`.
 - `VERCEL_FASTAPI_STATIC_CDN=1` et `tool.vercel.fastapi.static.cdn = true` envoient le build Vite vers le CDN. Sans la variable, les fichiers restent dans la fonction.
 - La CSP du navigateur est une balise injectée au build. `connect-src` contient l’origine de `VITE_NEON_AUTH_URL` et `https://vercel.com`. L’en-tête HTTP ne contient que `frame-ancestors 'none'` : un second `connect-src` plus étroit bloquerait Neon Auth.
@@ -174,7 +186,8 @@ Production et Preview :
 | `BLOB_READ_WRITE_TOKEN` | Sensible. Magasin Blob privé. |
 | `ALLOWED_EMAILS` | Adresses autorisées, séparées par des virgules. |
 | `APP_ENV` | `production`. |
-| `AUTH_MODE` | Absente, ou `neon`. Jamais `test`. |
+| `AUTH_MODE` | Absente, ou `neon`. Jamais `test`, jamais `local`. |
+| `VITE_AUTH_MODE` | Absente, ou `neon`. Jamais `local`. |
 | `VERCEL_FASTAPI_STATIC_CDN` | `1`. |
 | `ALLOWED_HOSTS` | Domaine propre, et le host `vercel.app` de production s’il est utilisé. |
 
@@ -184,7 +197,7 @@ Preview seulement :
 | --- | --- |
 | `SOLOLMNP_PRODUCTION_DB_HOST` | Hôte direct de production, sans mot de passe. Absent ou égal à la cible : le build échoue. |
 
-Développement local : ne pas définir ces variables. SQLite, `python scripts/start_local.py` et Compose restent la voie locale.
+Développement local : ne pas définir ces variables Vercel. SQLite, `python scripts/start_local.py` et Compose restent la voie locale, avec `AUTH_MODE=local`. Pour un essai contre une branche Neon, passer `AUTH_MODE=neon`, les trois URL d’auth et `ALLOWED_EMAILS`, puis reconstruire l’image frontend si Docker est utilisé.
 
 ### Blob, fichiers de plus de 3 Mio
 

@@ -73,6 +73,7 @@ def main() -> None:
             ALLOWED_HOSTS="localhost,127.0.0.1,[::1]",
             APP_ENV="test",
             AUTH_MODE="test",
+            VITE_AUTH_MODE="test",
             AUTH_TEST_SECRET=_TEST_SECRET,
             ALLOWED_EMAILS=_TEST_EMAIL,
         )

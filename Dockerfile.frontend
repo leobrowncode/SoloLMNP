@@ -3,9 +3,12 @@ WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
-# Baked into the bundle. Empty leaves the login page unconfigured.
+# Baked into the bundle. Empty leaves Neon login unconfigured.
+# VITE_AUTH_MODE=local is the explicit local dossier. Compose passes it for a clone.
 ARG VITE_NEON_AUTH_URL=
+ARG VITE_AUTH_MODE=
 ENV VITE_NEON_AUTH_URL=$VITE_NEON_AUTH_URL
+ENV VITE_AUTH_MODE=$VITE_AUTH_MODE
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.28-alpine

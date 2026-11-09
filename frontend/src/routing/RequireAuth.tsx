@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { restoreNeonToken } from "../api/neonAuth";
-import { loginPath, readToken, storeToken, testAuthMode } from "../api/session";
+import { localAuthMode, loginPath, readToken, storeToken, testAuthMode } from "../api/session";
 
 type Gate = "checking" | "in" | "out";
 
@@ -12,7 +12,7 @@ export default function RequireAuth() {
   );
 
   useEffect(() => {
-    if (readToken() || testAuthMode()) return;
+    if (readToken() || testAuthMode() || localAuthMode()) return;
     let cancelled = false;
     restoreNeonToken(location.search)
       .then((token) => {
@@ -28,6 +28,7 @@ export default function RequireAuth() {
     };
   }, [location.pathname, location.search]);
 
+  if (localAuthMode()) return <Outlet />;
   if (readToken()) return <Outlet />;
   const next = location.pathname + location.search + location.hash;
   if (testAuthMode()) return <Navigate to={loginPath(next)} replace />;
