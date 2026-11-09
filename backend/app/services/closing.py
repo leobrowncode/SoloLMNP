@@ -20,8 +20,8 @@ from app.domain.fiscal.output_status import (
     load_validation,
 )
 from app.models import AccountingEntry, FiscalYear
-from app.models.foundation import Property
 from app.models.assets import DepreciationPeriod
+from app.models.foundation import Property
 from app.models.base import utc_now
 from app.models.filing import AuditEvent, TaxReturnSnapshot
 from app.models.fiscal import FiscalComputation
