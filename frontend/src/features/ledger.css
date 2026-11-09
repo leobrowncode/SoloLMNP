@@ -678,6 +678,15 @@
   color: var(--text-strong);
   padding: .45rem 0;
 }
+.mobile-section--wide > summary {
+  display: none;
+  pointer-events: none;
+}
+.mobile-section--wide::marker,
+.mobile-section--wide summary::marker,
+.mobile-section--wide summary::-webkit-details-marker {
+  display: none;
+}
 .mobile-table { margin: 1rem 0; min-width: 0; }
 .mobile-table-caption,
 .mobile-table-priority,
