@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Literal, Self
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
@@ -189,11 +189,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             ensure_email_allowed(configuration, email)
         except AuthError as exc:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=exc.status,
-                content={"detail": {"code": exc.code, "message": exc.message}},
-                headers={"Cache-Control": "no-store"},
-            )
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
         return {"status": "allowed"}
 
     @application.get("/api/status", tags=["system"], response_model=ApplicationStatus)

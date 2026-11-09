@@ -51,7 +51,9 @@ export default function LoginPage() {
     }
     if (!response.ok) {
       const body = await response.json().catch(() => undefined) as { detail?: unknown } | undefined;
-      const detail = parseApiErrorDetail(body?.detail);
+      const detail = parseApiErrorDetail(
+        body?.detail as Parameters<typeof parseApiErrorDetail>[0],
+      );
       setError(detail.message ? errorSummary(detail) : "L’adresse n’a pas pu être vérifiée.");
       return false;
     }
