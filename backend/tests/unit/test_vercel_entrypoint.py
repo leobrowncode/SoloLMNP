@@ -42,9 +42,8 @@ def test_vercel_project_serves_static_frontend_and_a_long_api_function() -> None
     assert "outputDirectory" not in config
     assert config["functions"]["asgi.py"]["maxDuration"] == 300
     included = config["functions"]["asgi.py"]["includeFiles"]
-    assert "fiscal/**" in included
-    assert "lmnp_core/**" in included
-    assert "golden/**" in included
+    assert isinstance(included, str)
+    assert included == "{fiscal,lmnp_core,golden}/**"
     assert project["tool"]["vercel"]["entrypoint"] == "asgi:app"
     assert project["tool"]["vercel"]["fastapi"]["static"]["cdn"] is True
     nginx = (ROOT / "scripts" / "nginx.conf").read_text(encoding="utf-8")

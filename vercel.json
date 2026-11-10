@@ -6,7 +6,7 @@
   "functions": {
     "asgi.py": {
       "maxDuration": 300,
-      "includeFiles": ["fiscal/**", "lmnp_core/**", "golden/**"],
+      "includeFiles": "{fiscal,lmnp_core,golden}/**",
       "excludeFiles": "{frontend/node_modules/**,e2e/**,backend/tests/**,docs/**,**/.venv/**,**/.pytest-tmp/**}"
     }
   },
