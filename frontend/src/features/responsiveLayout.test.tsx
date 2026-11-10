@@ -112,7 +112,7 @@ describe("responsive layout", () => {
 
   it("keeps the desktop navigation and tables", async () => {
     installViewport(1200);
-    const shell = renderAt("/");
+    const shell = renderAt("/legacy");
     expect(await screen.findByText("Prêt à vérifier")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Continuer" })).toHaveLength(1);
     expect(document.querySelector(".topbar")).not.toHaveTextContent("Continuer");
@@ -138,7 +138,7 @@ describe("responsive layout", () => {
 
   it.each(WIDTHS)("folds the mobile menu without removing navigation at %s px", async (width) => {
     installViewport(width);
-    renderAt("/");
+    renderAt("/legacy");
     expect(await screen.findByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeVisible();
     expect((await screen.findByText("Statut et progression")).closest("details")).not.toHaveAttribute("open");
     const nav = screen.getByRole("navigation", { name: "Navigation principale" });
@@ -170,7 +170,7 @@ describe("responsive layout", () => {
 
   it.each([320, 390] as const)("shows the full select value between 320 and 430 px (%s)", async (width) => {
     installViewport(width);
-    const shell = renderAt("/");
+    const shell = renderAt("/legacy");
     expect(await screen.findByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeVisible();
     expect((await screen.findByText("Statut et progression")).closest("details")).not.toHaveAttribute("open");
     expect(document.querySelector(".app-layout")).toHaveClass("narrow-controls");
@@ -187,7 +187,7 @@ describe("responsive layout", () => {
 
   it("does not repeat select values at 768 px", async () => {
     installViewport(768);
-    renderAt("/");
+    renderAt("/legacy");
     expect(await screen.findByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeVisible();
     expect((await screen.findByText("Statut et progression")).closest("details")).not.toHaveAttribute("open");
     expect(document.querySelector(".app-layout")).not.toHaveClass("narrow-controls");

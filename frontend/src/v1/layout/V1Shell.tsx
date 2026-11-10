@@ -3,7 +3,7 @@ import { signOutNeon } from "../../api/neonAuth";
 import { clearToken, localAuthMode } from "../../api/session";
 import { Badge } from "../components/ui/badge";
 import { libelleEtat } from "../lib/status";
-import { useDossierSession } from "../context/DossierContext";
+import { useDossierSession } from "../context/dossierSession";
 import { cn } from "../lib/cn";
 
 const ETAPES = [

@@ -6,6 +6,26 @@ const response = (body: unknown, status = 200) => new Response(JSON.stringify(bo
   status, headers: { "Content-Type": "application/json" },
 });
 
+test("blocks an empty exercise and links to add a property", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
+    blocking: true,
+    errors: [{
+      code: "EMPTY_EXERCISE",
+      message: "Aucun logement ni écriture validée : cet exercice est encore vide.",
+    }],
+    warnings: [],
+  }));
+  render(<CloseYear year={1} />);
+  fireEvent.click(screen.getByRole("button", { name: "Lancer le pré-contrôle" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("exercice est encore vide");
+  expect(within(alert).getByRole("link", { name: "Ajouter un bien" })).toHaveAttribute(
+    "href",
+    "/operations/biens#ajouter-bien",
+  );
+  expect(screen.getByRole("button", { name: "Accuser et préparer la clôture" })).toBeDisabled();
+});
+
 test("focuses the precheck error and names each warning", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(response({
     detail: { message: "Exercice verrouillé" },
