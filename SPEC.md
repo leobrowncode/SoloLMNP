@@ -16,7 +16,7 @@ LMP, micro-BIC, location nue, SCI, TVA, cession, plus-value (alerte seulement), 
 
 ## Critères
 
-CA1 à CA6 : trois dossiers de référence, FEC, bilan équilibré, continuité, chaque case reliée à ses comptes et écritures. CA7 : une commande, zéro secret. CA8 : saisie d'une année par Léo (jalon suivant, hors de ce chantier).
+CA1 à CA6 : trois dossiers de référence, FEC, bilan équilibré, continuité, chaque case reliée à ses comptes et écritures. CA7 : une commande, zéro secret (`python scripts/start_v1.py`). CA8 : saisie d'une année par Léo (jalon J4, parcours `/v1`).
 
 ## États
 
