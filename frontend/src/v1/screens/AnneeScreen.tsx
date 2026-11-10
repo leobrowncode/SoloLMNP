@@ -5,7 +5,7 @@ import { Card, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { chargerCategories, construire, deposerJustificatif, enregistrerDossier, listerJustificatifs } from "../lib/api";
-import { useDossierSession } from "../context/DossierContext";
+import { useDossierSession } from "../context/dossierSession";
 import { centimesDepuisEuros, eurosDepuisCentimes } from "../lib/money";
 import { ligneDepuisCategorie, parserCsvMouvements, totalParCompte } from "../lib/mouvements";
 
@@ -44,7 +44,7 @@ export default function AnneeScreen() {
       const total = totalParCompte(session.mouvements, categorie.compte);
       if (total > 0) suivant[categorie.id] = eurosDepuisCentimes(total);
     }
-    setMontants(suivant);
+    queueMicrotask(() => setMontants(suivant));
   }, [categories, session?.mouvements]);
 
   if (!session || !exercice) {

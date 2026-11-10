@@ -5,7 +5,7 @@ import { Card, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { construire, enregistrerDossier, telechargerSortie, type EfiLigne } from "../lib/api";
-import { useDossierSession } from "../context/DossierContext";
+import { useDossierSession } from "../context/dossierSession";
 import { libelleEtat } from "../lib/status";
 
 function cleCase(ligne: EfiLigne): string {
@@ -21,13 +21,13 @@ export default function SortiesScreen() {
   const [message, setMessage] = useState<string | null>(null);
 
   const sorties = session?.calcul?.sorties;
-  const lignes = sorties?.efi?.lignes ?? [];
   const traces = sorties?.traces ?? {};
   const archive = sorties;
 
   const effectif = session?.calcul?.etat?.effectif ?? String(session?.dossier?.statut ?? "brouillon");
 
   const lignesParEcran = useMemo(() => {
+    const lignes = sorties?.efi?.lignes ?? [];
     const map = new Map<string, EfiLigne[]>();
     for (const ligne of lignes) {
       const bloc = map.get(ligne.ecran) ?? [];
@@ -35,7 +35,7 @@ export default function SortiesScreen() {
       map.set(ligne.ecran, bloc);
     }
     return map;
-  }, [lignes]);
+  }, [sorties?.efi?.lignes]);
 
   async function copierLigne(ligne: EfiLigne) {
     const texte = `${ligne.case}\t${ligne.montant ?? ""}`;

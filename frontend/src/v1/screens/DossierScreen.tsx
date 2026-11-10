@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -16,7 +16,7 @@ import {
   enregistrerDossier,
   type DossierPayload,
 } from "../lib/api";
-import { useDossierSession } from "../context/DossierContext";
+import { useDossierSession } from "../context/dossierSession";
 import { siretValide } from "../lib/siret";
 
 const schema = z.object({
@@ -49,21 +49,24 @@ export default function DossierScreen() {
     void chargerModeles().then((rep) => setModeles(rep.modeles));
   }, []);
 
-  function appliquer(payload: DossierPayload) {
-    setSession({
-      dossier: payload.dossier,
-      mouvements: payload.mouvements,
-      grille: payload.grille,
-      calcul: null,
-    });
-    const dossier = payload.dossier;
-    form.reset({
-      nom: String(dossier.nom ?? ""),
-      siret: String(dossier.siret ?? ""),
-      debut_activite: String(dossier.debut_activite ?? ""),
-      millesime: String(dossier.millesime ?? ""),
-    });
-  }
+  const appliquer = useCallback(
+    (payload: DossierPayload) => {
+      setSession({
+        dossier: payload.dossier,
+        mouvements: payload.mouvements,
+        grille: payload.grille,
+        calcul: null,
+      });
+      const dossier = payload.dossier;
+      form.reset({
+        nom: String(dossier.nom ?? ""),
+        siret: String(dossier.siret ?? ""),
+        debut_activite: String(dossier.debut_activite ?? ""),
+        millesime: String(dossier.millesime ?? ""),
+      });
+    },
+    [form, setSession],
+  );
 
   useEffect(() => {
     if (session) return;
@@ -77,7 +80,7 @@ export default function DossierScreen() {
         setChargement(false);
       }
     })();
-  }, [form, session, setSession]);
+  }, [appliquer, form, session, setSession]);
 
   async function ouvrirModele(id: string) {
     setChargement(true);
