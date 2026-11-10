@@ -28,12 +28,13 @@
 - États de sortie : Brouillon, Vérifié par l'utilisateur, Déclaré. Pas de verrou `validation.json` sur le chemin v1.
 - Trois états seulement. L'outil calcule, l'utilisateur signe.
 
+## Messages de commit
+- PR brouillon avant le premier push; objet `#<numero> <type>:`; corps `Nouvelles fonctionnalités produit :` ou `aucune` + `Technique :`. Voir `.cursor/rules/commits-numero-pr.mdc`.
+
 ## Pièges connus
 - Les cases 2025 viennent des PDF archivés. Ne pas recopier un numéro de 2026 ou 2027.
 - `validation.json` décrit encore l'ancien verrou Recherche du legacy. La v1 ne le consulte pas.
 - Test Compta Demat est un outil Windows : le validateur du dépôt rejoue les règles publiées, il ne lance pas l'outil.
 - Importer `app.services` depuis `lmnp_core` est interdit : ces services parlent à la base.
-
 ## Méthode
-- Lire `SPEC.md` et ce fichier, puis chercher un chemin ciblé.
-- Si une commande ou un dossier change, mettre à jour une ligne ici. Rester sous 40 lignes.
+- Lire `SPEC.md` et ce fichier, chercher un chemin ciblé; mettre à jour une ligne ici si besoin (max 40 lignes).
