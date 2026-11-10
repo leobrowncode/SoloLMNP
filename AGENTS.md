@@ -1,5 +1,4 @@
 # AGENTS.md
-
 ## Stack
 - Backend: Python 3.12, FastAPI, SQLAlchemy 2, Alembic, SQLite (local) ou Postgres via `DATABASE_URL`.
 - Frontend: React 19, TypeScript strict, Vite, Vitest.
@@ -27,6 +26,9 @@
 - Montants: `Decimal` côté Python, centimes entiers en base ; refus des flottants à la persistance.
 - CI sur `main` et PR: backend Linux/Windows, Postgres, frontend, e2e, docker smoke (`Makefile` reprend les commandes).
 
+## Messages de commit
+- PR brouillon avant le premier push; objet `#<numero> <type>:`; corps `Nouvelles fonctionnalités produit :` ou `aucune` + `Technique :`. Voir `.cursor/rules/commits-numero-pr.mdc`.
+
 ## Pièges connus
 - Millésimes 2025/2026 en **Recherche** tant que `fiscal/<année>/validation.json` n'est pas une attestation effective.
 - `scripts/check.py` n'exécute pas Playwright; l'e2e est manuel ou job CI dédié.
@@ -34,5 +36,4 @@
 - Après Google, le Bearer vient de `set-auth-jwt` ou de `GET /token` (pas `session.token`). Le JWT Neon a `iss` et `aud` égaux à l’origine de `NEON_AUTH_BASE_URL`, sans le chemin `/neondb/auth`. `AUTH_MODE=local` (dossier sans secret) n’est accepté que si `APP_ENV=development` et que `VERCEL` n’est pas `1`.
 
 ## Méthode de travail
-- Lire ce fichier, puis recherche ciblée (grep, chemins ci-dessus) au lieu d'explorer tout le dépôt.
-- En fin de tâche, si structure ou commandes changent, mettre à jour une ligne ici (rester sous 40 lignes).
+- Lire ce fichier, recherche ciblée (grep, chemins ci-dessus); en fin de tâche, une ligne de mise à jour ici (max 40 lignes).

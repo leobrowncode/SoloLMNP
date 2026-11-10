@@ -1,0 +1,51 @@
+---
+description: Messages de commit avec numéro de PR, corps produit/technique
+alwaysApply: true
+---
+## Ordre de travail
+
+1. Créer la branche de fonctionnalité.
+2. Ouvrir une **PR en brouillon** sur `main` et noter son **numéro** (`#N`).
+3. Ne pousser des commits qu'après avoir ce numéro. Chaque message commence par `#N`.
+4. Avant de marquer la PR prête à relire: amender ou rebase sur ta branche si le numéro manquait sur un premier essai.
+
+## Format de la ligne d'objet
+
+`#N <type>: <résumé court en français>`
+
+- `N` = numéro GitHub de la PR associée (visible dans les déploiements Vercel).
+- Types autorisés: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`, `style`.
+- Au squash merge sur GitHub, garder `#N` en tête du titre de commit squashé.
+
+## Corps du message
+
+Toujours inclure la section **Nouvelles fonctionnalités produit :** (puces en langage produit, une ligne par changement visible utilisateur).
+
+- S'il n'y a **aucun** changement visible: écrire `Nouvelles fonctionnalités produit : aucune` puis détailler sous **Technique :** (puces).
+
+Pas de tiret cadratin (U+2014) ni demi-cadratin (U+2013) dans les messages; seulement le trait d'union simple (-) quand il est nécessaire.
+
+## Exemple complet
+
+```
+#42 feat: export CSV des campagnes
+
+Nouvelles fonctionnalités produit :
+- Télécharger la liste des campagnes au format CSV depuis la page Campagnes
+- Choisir les colonnes incluses dans l'export avant le téléchargement
+
+Technique :
+- Endpoint GET /api/campaigns/export et tests pytest associés
+```
+
+## Exemple sans changement produit
+
+```
+#87 chore: mise a jour des dependances frontend
+
+Nouvelles fonctionnalités produit : aucune
+
+Technique :
+- Bump Vite et Vitest dans frontend/package.json
+- Regeneration du lockfile npm
+```
