@@ -4,7 +4,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { chargerDossier, construire, enregistrerDossier, type EfiLigne } from "../lib/api";
+import { construire, enregistrerDossier, telechargerSortie, type EfiLigne } from "../lib/api";
 import { useDossierSession } from "../context/dossierSession";
 import { libelleEtat } from "../lib/status";
 
@@ -60,15 +60,18 @@ export default function SortiesScreen() {
       empreinte_figee: session.calcul.empreinte,
     };
     try {
-      await enregistrerDossier(session.chemin, dossier, session.mouvements);
-      const relu = await chargerDossier(session.chemin);
-      const calcul = await construire(session.chemin);
+      const saved = await enregistrerDossier(dossier, session.mouvements);
+      if (saved.erreur) {
+        setMessage(saved.erreur);
+        return;
+      }
+      const calcul = await construire();
       setCalcul(calcul);
       setSession({
         ...session,
-        dossier: relu.dossier,
-        mouvements: relu.mouvements,
-        grille: relu.grille,
+        dossier: saved.dossier,
+        mouvements: saved.mouvements,
+        grille: saved.grille,
         calcul,
       });
     } catch (error) {
@@ -97,9 +100,30 @@ export default function SortiesScreen() {
           télétransmission.
         </p>
         {archive ? (
-          <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
-            Archive {archive.archive_nom} · empreinte {archive.archive_sha256.slice(0, 16)}…
-          </p>
+          <div className="mt-4 space-y-2">
+            <p className="text-xs text-[var(--color-muted-foreground)]">
+              Archive {archive.archive_nom} · empreinte {archive.archive_sha256.slice(0, 16)}…
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { nom: archive.fec.nom, label: "FEC" },
+                { nom: "liasse.pdf", label: "Liasse PDF" },
+                { nom: "2042-c-pro.pdf", label: "2042-C-PRO PDF" },
+                { nom: "suivi-39c.pdf", label: "Suivi 39 C PDF" },
+                { nom: archive.archive_nom, label: "Archive ZIP" },
+              ].map((fichier) => (
+                <Button
+                  key={fichier.nom}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void telechargerSortie(fichier.nom)}
+                >
+                  {fichier.label}
+                </Button>
+              ))}
+            </div>
+          </div>
         ) : null}
       </Card>
 

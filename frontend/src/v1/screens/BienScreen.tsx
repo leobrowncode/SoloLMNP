@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { chargerDossier, construire, enregistrerDossier } from "../lib/api";
+import { construire, enregistrerDossier } from "../lib/api";
 import { useDossierSession } from "../context/dossierSession";
 import { centimesDepuisEuros, eurosDepuisCentimes } from "../lib/money";
 
@@ -97,9 +97,12 @@ export default function BienScreen() {
       apport_centimes: centimesDepuisEuros(values.apport),
     };
     try {
-      await enregistrerDossier(courant.chemin, dossier, courant.mouvements);
-      const relu = await chargerDossier(courant.chemin);
-      const calcul = await construire(courant.chemin);
+      const saved = await enregistrerDossier(dossier, courant.mouvements);
+      if (saved.erreur) {
+        setMessage(saved.erreur);
+        return;
+      }
+      const calcul = await construire();
       if (calcul.erreur) {
         setMessage(calcul.erreur);
         return;
@@ -107,8 +110,9 @@ export default function BienScreen() {
       setCalcul(calcul);
       setSession({
         ...courant,
-        dossier: relu.dossier,
-        grille: relu.grille,
+        dossier: saved.dossier,
+        mouvements: saved.mouvements,
+        grille: saved.grille,
         calcul,
       });
       navigate("/v1/annee");

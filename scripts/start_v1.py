@@ -76,8 +76,24 @@ def wait(url: str, proc: subprocess.Popen[bytes], label: str) -> None:
     die(f"{label} n'a pas répondu.")
 
 
+def arreter(proc: subprocess.Popen[bytes]) -> None:
+    if proc.poll() is not None:
+        return
+    if os.name != "nt":
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+            return
+        except (ProcessLookupError, PermissionError):
+            pass
+    proc.terminate()
+
+
 def spawn(cmd: list[str], cwd: Path) -> subprocess.Popen[bytes]:
     env = os.environ.copy()
+    env.pop("VERCEL", None)
+    env["APP_ENV"] = "development"
+    env["AUTH_MODE"] = "local"
+    env["VITE_AUTH_MODE"] = "local"
     env["PYTHONPATH"] = f"{ROOT}{os.pathsep}{ROOT / 'backend'}"
     if sys.platform == "win32":
         return subprocess.Popen(cmd, cwd=str(cwd), env=env, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)  # type: ignore[attr-defined]
@@ -98,8 +114,7 @@ def main() -> None:
 
     def stop(*_args: object) -> None:
         for proc in (frontend, backend):
-            if proc.poll() is None:
-                proc.terminate()
+            arreter(proc)
         raise SystemExit(0)
 
     signal.signal(signal.SIGINT, stop)

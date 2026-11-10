@@ -2,7 +2,6 @@ import { createContext } from "react";
 import type { BuildResponse, DossierMap, GrilleLigne, MouvementLigne } from "../lib/api";
 
 export type SessionV1 = {
-  chemin: string;
   dossier: DossierMap;
   mouvements: MouvementLigne[];
   grille: GrilleLigne[];
@@ -16,7 +15,5 @@ export type DossierStore = {
   setMouvements: (lignes: MouvementLigne[]) => void;
   setCalcul: (calcul: BuildResponse | null) => void;
 };
-
-export const STORAGE_KEY = "sololmnp-v1-chemin";
 
 export const DossierCtx = createContext<DossierStore | null>(null);

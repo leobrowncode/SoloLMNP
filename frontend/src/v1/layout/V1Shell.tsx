@@ -1,4 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { signOutNeon } from "../../api/neonAuth";
+import { clearToken, localAuthMode } from "../../api/session";
 import { Badge } from "../components/ui/badge";
 import { libelleEtat } from "../lib/status";
 import { useDossierSession } from "../context/dossierSession";
@@ -29,7 +31,23 @@ export default function V1Shell() {
               L&apos;outil calcule, l&apos;utilisateur signe. Aucune télétransmission.
             </p>
           </div>
-          <Badge>{libelle}</Badge>
+          <div className="flex items-center gap-3">
+            <Badge>{libelle}</Badge>
+            {localAuthMode() ? null : (
+              <button
+                type="button"
+                className="text-sm underline"
+                onClick={() => {
+                  void signOutNeon().finally(() => {
+                    clearToken();
+                    window.location.assign("/connexion");
+                  });
+                }}
+              >
+                Se déconnecter
+              </button>
+            )}
+          </div>
         </div>
         <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-4 pb-3" aria-label="Étapes de saisie">
           {ETAPES.map((etape) => (

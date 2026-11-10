@@ -1,14 +1,12 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import type { BuildResponse, DossierMap, MouvementLigne } from "../lib/api";
-import { DossierCtx, STORAGE_KEY, type DossierStore, type SessionV1 } from "./dossierStore";
+import { DossierCtx, type DossierStore, type SessionV1 } from "./dossierStore";
 
 export function DossierProvider({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<SessionV1 | null>(null);
 
   const setSession = useCallback((value: SessionV1 | null) => {
     setSessionState(value);
-    if (value?.chemin) sessionStorage.setItem(STORAGE_KEY, value.chemin);
-    if (!value) sessionStorage.removeItem(STORAGE_KEY);
   }, []);
 
   const mergeDossier = useCallback((patch: DossierMap) => {

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Card, CardTitle } from "../components/ui/card";
 import { Checkbox } from "../components/ui/checkbox";
-import { chargerDossier, construire, enregistrerDossier } from "../lib/api";
+import { construire, enregistrerDossier } from "../lib/api";
 import { useDossierSession } from "../context/dossierSession";
 import { eurosDepuisCentimes } from "../lib/money";
 import { libelleEtat } from "../lib/status";
@@ -22,8 +22,8 @@ export default function RevueScreen() {
   }, [session?.dossier?.relu_notice]);
 
   useEffect(() => {
-    if (!session?.chemin || session.calcul) return;
-    void construire(session.chemin).then((calcul) => {
+    if (!session || session.calcul) return;
+    void construire().then((calcul) => {
       if (!calcul.erreur) setCalcul(calcul);
     });
   }, [session, setCalcul]);
@@ -49,9 +49,12 @@ export default function RevueScreen() {
       statut: relu ? "verifie" : "brouillon",
     };
     try {
-      await enregistrerDossier(session.chemin, dossier, session.mouvements);
-      const reluPayload = await chargerDossier(session.chemin);
-      const calcul = await construire(session.chemin);
+      const saved = await enregistrerDossier(dossier, session.mouvements);
+      if (saved.erreur) {
+        setMessage(saved.erreur);
+        return;
+      }
+      const calcul = await construire();
       if (calcul.erreur) {
         setMessage(calcul.erreur);
         return;
@@ -59,9 +62,9 @@ export default function RevueScreen() {
       setCalcul(calcul);
       setSession({
         ...session,
-        dossier: reluPayload.dossier,
-        mouvements: reluPayload.mouvements,
-        grille: reluPayload.grille,
+        dossier: saved.dossier,
+        mouvements: saved.mouvements,
+        grille: saved.grille,
         calcul,
       });
       navigate("/v1/sorties");

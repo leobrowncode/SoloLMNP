@@ -1,3 +1,6 @@
+import { downloadFiling } from "../../api/download";
+import { authHeaders, noteUnauthorized } from "../../api/session";
+
 export type DossierMap = Record<string, unknown>;
 
 export type MouvementLigne = {
@@ -59,58 +62,99 @@ export type TraceCase = {
   origine: string;
 };
 
+export type DossierPayload = {
+  dossier: DossierMap;
+  mouvements: MouvementLigne[];
+  grille: GrilleLigne[];
+  erreur?: string;
+};
+
+function entetes(json = false): Headers {
+  const headers = authHeaders({ "X-SoloLMNP-Request": "1" });
+  if (json) headers.set("Content-Type", "application/json");
+  return headers;
+}
+
 async function lire<T>(response: Response): Promise<T> {
+  if (response.status === 401 || response.status === 403) {
+    noteUnauthorized(response.status);
+  }
   const corps = (await response.json()) as T & { erreur?: string };
   if (!response.ok) {
-    throw new Error("Réponse HTTP refusée.");
+    throw new Error(corps.erreur || "Réponse HTTP refusée.");
   }
   return corps;
 }
 
 export async function chargerModeles() {
-  const response = await fetch("/api/v1/modeles");
-  return lire<{ modeles: { id: string; chemin: string; etiquette: string }[] }>(response);
+  const response = await fetch("/api/v1/modeles", { headers: entetes(), cache: "no-store" });
+  return lire<{ modeles: { id: string; etiquette: string }[] }>(response);
 }
 
-export async function chargerDossier(chemin: string) {
-  const response = await fetch(`/api/v1/dossier?chemin=${encodeURIComponent(chemin)}`);
-  return lire<{
-    chemin: string;
-    dossier: DossierMap;
-    mouvements: MouvementLigne[];
-    grille: GrilleLigne[];
-    erreur?: string;
-  }>(response);
+export async function chargerModele(id: string) {
+  const response = await fetch(`/api/v1/modeles/${encodeURIComponent(id)}`, {
+    headers: entetes(),
+    cache: "no-store",
+  });
+  return lire<DossierPayload>(response);
 }
 
-export async function enregistrerDossier(chemin: string, dossier: DossierMap, mouvements?: MouvementLigne[]) {
+export async function chargerDossier(): Promise<DossierPayload | null> {
+  const response = await fetch("/api/v1/dossier", { headers: entetes(), cache: "no-store" });
+  if (response.status === 404) return null;
+  return lire<DossierPayload>(response);
+}
+
+export async function enregistrerDossier(dossier: DossierMap, mouvements?: MouvementLigne[]) {
   const response = await fetch("/api/v1/dossier", {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chemin, dossier, mouvements }),
+    headers: entetes(true),
+    body: JSON.stringify({ dossier, mouvements }),
   });
-  return lire<{ chemin: string; erreur?: string }>(response);
+  return lire<DossierPayload>(response);
 }
 
-export async function creerDepuisModele(modele: string, nom: string) {
+export async function creerDepuisModele(modele: string) {
   const response = await fetch("/api/v1/dossiers", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ modele, nom }),
+    headers: entetes(true),
+    body: JSON.stringify({ modele }),
   });
-  return lire<{ chemin: string; erreur?: string }>(response);
+  return lire<DossierPayload>(response);
 }
 
-export async function construire(chemin: string) {
+export async function construire() {
   const response = await fetch("/api/v1/build", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chemin }),
+    headers: entetes(true),
+    body: JSON.stringify({}),
   });
   return lire<BuildResponse>(response);
 }
 
 export async function chargerCategories() {
-  const response = await fetch("/api/v1/categories");
+  const response = await fetch("/api/v1/categories", { headers: entetes(), cache: "no-store" });
   return lire<{ categories: { id: string; libelle: string; compte: string; sens: string }[] }>(response);
+}
+
+export function telechargerSortie(nom: string) {
+  return downloadFiling(`/api/v1/sorties/${encodeURIComponent(nom)}`);
+}
+
+export async function listerJustificatifs() {
+  const response = await fetch("/api/v1/justificatifs", { headers: entetes(), cache: "no-store" });
+  return lire<{ noms: string[] }>(response);
+}
+
+export async function deposerJustificatif(fichier: File) {
+  const nom = fichier.name.replace(/[^A-Za-z0-9._-]/g, "-").replace(/^[-.]+/, "") || "piece.pdf";
+  const response = await fetch(`/api/v1/justificatifs/${encodeURIComponent(nom)}`, {
+    method: "PUT",
+    headers: authHeaders({
+      "X-SoloLMNP-Request": "1",
+      "Content-Type": fichier.type || "application/octet-stream",
+    }),
+    body: fichier,
+  });
+  return lire<{ nom: string; erreur?: string }>(response);
 }

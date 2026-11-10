@@ -1,114 +1,106 @@
-"""API fine au-dessus du noyau. Le calcul reste dans `build_dossier`."""
+"""API fine au-dessus du noyau. Le calcul reste dans `build_dossier`.
+
+En local, `AUTH_MODE=local` ouvre un seul dossier, sans secret.
+Ce mode est refusé en production et sur Vercel. Neon Auth et le jeton d'essai
+réutilisent `app.core.auth`.
+"""
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
+import os
+from collections.abc import Awaitable, Callable
 
-from fastapi import FastAPI, Query
+from app.core.auth import AuthError, ensure_email_allowed, verify_authorization
+from app.core.config import Settings, local_mode_allowed
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from fastapi.responses import JSONResponse
+from starlette.responses import Response
 
-from lmnp_core.build import build_dossier, build_path
-from lmnp_core.dossier import DossierError, dossier_from_mapping
-from lmnp_core.persist import (
-    assurer_data,
-    categories_annee,
-    creer_dossier,
-    enregistrer,
-    lire_chemin,
-    lister_modeles,
-)
-from lmnp_core.siret import valide as siret_valide
-from lmnp_core.sorties import pour_api, produire
+from lmnp_core.depot import Depot, DepotFichiers
+from lmnp_core.http import inclure_v1
+from lmnp_core.persist import DATA_ROOT
 
-app = FastAPI(title="SoloLMNP", version="1.0.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+_ENV = ("development", "production", "test")
 
 
-class Chemin(BaseModel):
-    chemin: str = Field(min_length=1)
+def reglages_processus() -> Settings:
+    app_env = os.environ.get("APP_ENV", "").strip() or "development"
+    if app_env not in _ENV:
+        app_env = "development"
+    mode = os.environ.get("AUTH_MODE", "").strip()
+    if not mode:
+        mode = "local" if app_env == "development" and os.environ.get("VERCEL") != "1" else "neon"
+    if mode == "local" and (app_env != "development" or os.environ.get("VERCEL") == "1"):
+        raise RuntimeError("AUTH_MODE=local est refusé en production et sur Vercel.")
+    emails = tuple(
+        part.strip() for part in os.environ.get("ALLOWED_EMAILS", "").split(",") if part.strip()
+    )
+    return Settings(
+        _env_file=None,
+        app_env=app_env,  # type: ignore[arg-type]
+        auth_mode=mode,  # type: ignore[arg-type]
+        allowed_emails=emails,
+        auth_test_secret=os.environ.get("AUTH_TEST_SECRET", ""),
+        neon_auth_base_url=os.environ.get("NEON_AUTH_BASE_URL", ""),
+        neon_auth_jwks_url=os.environ.get("NEON_AUTH_JWKS_URL", ""),
+        allowed_hosts=("localhost", "127.0.0.1", "[::1]", "testserver"),
+    )
 
 
-class Enregistrement(BaseModel):
-    chemin: str | None = None
-    dossier: dict[str, Any]
-    mouvements: list[dict[str, Any]] | None = None
+def creer_app(depot: Depot | None = None, reglages: Settings | None = None) -> FastAPI:
+    if reglages is None:
+        reglages = reglages_processus()
+    elif reglages.auth_mode == "local" and not local_mode_allowed(reglages):
+        raise RuntimeError("AUTH_MODE=local est refusé en production et sur Vercel.")
+    if depot is None:
+        depot = DepotFichiers(DATA_ROOT)
+
+    application = FastAPI(title="SoloLMNP", version="1.0.0")
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @application.middleware("http")
+    async def exiger_session(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        path = request.url.path
+        public = {"/api/health", "/api/auth/admission"}
+        if request.method == "OPTIONS" or path in public or not path.startswith("/api/"):
+            return await call_next(request)
+        try:
+            request.state.principal = verify_authorization(
+                reglages, request.headers.get("authorization")
+            )
+        except AuthError as exc:
+            return JSONResponse(
+                status_code=exc.status,
+                content={"detail": {"code": exc.code, "message": exc.message}},
+                headers={"Cache-Control": "no-store"},
+            )
+        return await call_next(request)
+
+    @application.get("/api/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "produit": "sololmnp-v1"}
+
+    @application.get("/api/auth/admission")
+    def admission(email: str) -> dict[str, str]:
+        try:
+            ensure_email_allowed(reglages, email)
+        except AuthError as exc:
+            raise HTTPException(
+                status_code=exc.status,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
+        return {"status": "allowed"}
+
+    inclure_v1(application, depot)
+    return application
 
 
-class Creation(BaseModel):
-    modele: str = Field(min_length=1)
-    nom: str = Field(min_length=1, pattern=r"^[a-z0-9-]+$")
-
-
-class SiretBody(BaseModel):
-    siret: str = Field(min_length=14, max_length=14)
-
-
-@app.get("/api/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "produit": "sololmnp-v1"}
-
-
-@app.get("/api/v1/modeles")
-def modeles() -> dict[str, object]:
-    return {"modeles": lister_modeles()}
-
-
-@app.get("/api/v1/categories")
-def categories() -> dict[str, object]:
-    return {"categories": categories_annee()}
-
-
-@app.post("/api/v1/siret/verifier")
-def verifier_siret(body: SiretBody) -> dict[str, object]:
-    return {"siret": body.siret, "valide": siret_valide(body.siret)}
-
-
-@app.post("/api/v1/dossiers")
-def nouveau_dossier(body: Creation) -> dict[str, str]:
-    try:
-        return creer_dossier(body.modele, body.nom)
-    except DossierError as exc:
-        return {"erreur": str(exc)}
-
-
-@app.get("/api/v1/dossier")
-def lire_dossier(chemin: str = Query(min_length=1)) -> dict[str, object]:
-    try:
-        return lire_chemin(assurer_data(chemin))
-    except DossierError as exc:
-        return {"erreur": str(exc)}
-
-
-@app.put("/api/v1/dossier")
-def sauver_dossier(body: Enregistrement) -> dict[str, object]:
-    try:
-        if not body.chemin:
-            raise DossierError("Le chemin du dossier est requis.")
-        chemin = assurer_data(body.chemin)
-        return enregistrer(chemin, body.dossier, body.mouvements)
-    except DossierError as exc:
-        return {"erreur": str(exc)}
-
-
-@app.post("/api/v1/build")
-def build_endpoint(body: dict[str, Any]) -> dict[str, Any]:
-    """Construit depuis un chemin local ou depuis le JSON du dossier (même schéma que le YAML)."""
-    try:
-        if "chemin" in body and isinstance(body["chemin"], str):
-            Chemin(chemin=body["chemin"])
-            resultat = build_path(Path(body["chemin"]))
-        else:
-            resultat = build_dossier(dossier_from_mapping(body))
-        corps = resultat.to_json()
-        corps["sorties"] = pour_api(produire(resultat))
-        corps["dossier"] = body if "chemin" not in body else {"chemin": body["chemin"]}
-        return corps
-    except DossierError as exc:
-        return {"erreur": str(exc)}
+app = creer_app()
