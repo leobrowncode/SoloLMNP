@@ -6,7 +6,7 @@
 ## Current project status
 
 - Completed through: liasse LMNP IR, entrée du bien, dossier FEC, enchaînement SIRET → exercice → bien → banque (#118), Neon Auth + Postgres + `owner_id` (#123 à #130), déploiement https://sololmnp.vercel.app
-- Current phase: P0 du parcours corrigé (dossier local sans secret Neon). Les P1 de `docs/audit/2026-11/PARCOURS.md` restent ouverts.
+- Current phase: P0 du parcours corrigé (dossier local sans secret Neon). Les P1 de `docs/archive/audit/2026-11/PARCOURS.md` restent ouverts.
 - Current objective: ne pas coder les P1 tant qu’ils ne sont pas demandés. Les millésimes 2025 et 2026 restent en recherche.
 
 ## Completed
@@ -19,7 +19,7 @@
 ## Active work
 
 - Issue: #7 (moteur fiscal, cession, TVA, plus-values) et #11 (feuille EFI et 2042-C-PRO). Seules issues ouvertes.
-- Branch: audit documentaire `docs/audit/2026-11/PARCOURS.md`
+- Branch: audit documentaire `docs/archive/audit/2026-11/PARCOURS.md`
 - Status: pas de réécriture d’auth. Neon Auth + Postgres partagé + `owner_id` est le choix retenu. Pas d’Argon2 local, pas d’une base SQLite par utilisateur.
 
 ## Important decisions
@@ -48,7 +48,7 @@ L’audit de novembre est documentaire : pas de changement applicatif, donc pas 
 
 ## Next action
 
-1. Faire relire `docs/audit/2026-11/PARCOURS.md`.
+1. Faire relire `docs/archive/audit/2026-11/PARCOURS.md`.
 2. Ensuite seulement : P0 premier écran (explication Neon, pas une nouvelle auth), puis P1 de saisie et de parcours, dans l’ordre du document.
 3. #7 et #11 restent hors de ces PR tant qu’une source et un test ne les justifient pas.
 

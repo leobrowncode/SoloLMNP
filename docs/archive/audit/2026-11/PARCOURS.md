@@ -13,7 +13,7 @@ La production https://sololmnp.vercel.app a été ouverte sur `/connexion` seule
 
 Docker n’a pas été exécuté : la commande `docker` est absente de la machine. Le fichier `docker-compose.yml` a été lu.
 
-Captures dans `docs/audit/2026-11/screenshots/`, en 1280 px et en 390 px pour les étapes clés. Chromium via Playwright. Axe-core sur les vues principales, à 1280 px et à 390 px : aucune violation. Aucun dépassement horizontal mesuré sur ces vues (`scrollWidth` égal à `clientWidth`). Aucun avertissement « same key » en console.
+Captures dans `docs/archive/audit/2026-11/screenshots/`, en 1280 px et en 390 px pour les étapes clés. Chromium via Playwright. Axe-core sur les vues principales, à 1280 px et à 390 px : aucune violation. Aucun dépassement horizontal mesuré sur ces vues (`scrollWidth` égal à `clientWidth`). Aucun avertissement « same key » en console.
 
 Les issues [#7](https://github.com/leobrowncode/SoloLMNP/issues/7) et [#11](https://github.com/leobrowncode/SoloLMNP/issues/11) restent ouvertes. Elles ne sont pas recréées ici. Les millésimes restent en Recherche.
 
