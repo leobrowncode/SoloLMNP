@@ -1,0 +1,25 @@
+nom: Reference plafond 39 C
+siret: "12345678900025"
+debut_activite: 2025-01-01
+millesime: "2025"
+regime: lmnp
+statut: brouillon
+relu_notice: false
+bien:
+  nom: Studio Plafond
+  date_acquisition: 2025-01-01
+  date_mise_en_service: 2025-01-01
+  terrain_centimes: 0
+  batiment_centimes: 3051670
+  frais_centimes: 0
+  mobilier_centimes: 0
+  mobilier_duree_mois: 84
+  ventilation: unique
+  duree_mois: 120
+  compte_immobilisation: "213000"
+  compte_amortissement: "281300"
+apport_centimes: 3051670
+exercices:
+  - debut: 2025-01-01
+    fin: 2025-12-31
+    mouvements: mouvements.csv

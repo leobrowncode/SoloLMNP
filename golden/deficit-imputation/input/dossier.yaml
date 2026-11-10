@@ -1,0 +1,28 @@
+nom: Reference deficit puis imputation
+siret: "12345678900033"
+debut_activite: 2024-01-01
+millesime: "2025"
+regime: lmnp
+statut: brouillon
+relu_notice: false
+bien:
+  nom: Studio Deficit
+  date_acquisition: 2024-01-01
+  date_mise_en_service: 2024-01-01
+  terrain_centimes: 0
+  batiment_centimes: 1596712
+  frais_centimes: 0
+  mobilier_centimes: 0
+  mobilier_duree_mois: 84
+  ventilation: unique
+  duree_mois: 240
+  compte_immobilisation: "213000"
+  compte_amortissement: "281300"
+apport_centimes: 1746712
+exercices:
+  - debut: 2024-01-01
+    fin: 2024-12-31
+    mouvements: mouvements-2024.csv
+  - debut: 2025-01-01
+    fin: 2025-12-31
+    mouvements: mouvements-2025.csv
