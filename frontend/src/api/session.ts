@@ -25,16 +25,21 @@ export function authHeaders(extra?: HeadersInit): Headers {
   return headers;
 }
 
+const LEGACY_HOME = "/legacy";
+
 export function safeNext(value: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/connexion")) {
-    return "/";
+  if (!value || value.startsWith("//") || value.startsWith("/connexion")) {
+    return LEGACY_HOME;
+  }
+  if (value === "/" || !value.startsWith("/")) {
+    return LEGACY_HOME;
   }
   return value;
 }
 
 export function loginPath(next: string): string {
   const target = safeNext(next);
-  return target === "/" ? "/connexion" : `/connexion?next=${encodeURIComponent(target)}`;
+  return target === LEGACY_HOME ? "/connexion" : `/connexion?next=${encodeURIComponent(target)}`;
 }
 
 /** Drop a dead session. Vitest keeps the current page so a mocked 401 stays an error. */

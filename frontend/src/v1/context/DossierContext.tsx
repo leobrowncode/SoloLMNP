@@ -1,24 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { BuildResponse, DossierMap, GrilleLigne, MouvementLigne } from "../lib/api";
-
-export type SessionV1 = {
-  chemin: string;
-  dossier: DossierMap;
-  mouvements: MouvementLigne[];
-  grille: GrilleLigne[];
-  calcul: BuildResponse | null;
-};
-
-type Store = {
-  session: SessionV1 | null;
-  setSession: (value: SessionV1 | null) => void;
-  mergeDossier: (patch: DossierMap) => void;
-  setMouvements: (lignes: MouvementLigne[]) => void;
-  setCalcul: (calcul: BuildResponse | null) => void;
-};
-
-const Ctx = createContext<Store | null>(null);
-const STORAGE_KEY = "sololmnp-v1-chemin";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import type { BuildResponse, DossierMap, MouvementLigne } from "../lib/api";
+import { DossierCtx, STORAGE_KEY, type DossierStore, type SessionV1 } from "./dossierStore";
 
 export function DossierProvider({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<SessionV1 | null>(null);
@@ -44,20 +26,10 @@ export function DossierProvider({ children }: { children: ReactNode }) {
     setSessionState((courant) => (courant ? { ...courant, calcul } : courant));
   }, []);
 
-  const value = useMemo(
+  const value = useMemo<DossierStore>(
     () => ({ session, setSession, mergeDossier, setMouvements, setCalcul }),
     [session, setSession, mergeDossier, setMouvements, setCalcul],
   );
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
-}
-
-export function useDossierSession() {
-  const store = useContext(Ctx);
-  if (!store) throw new Error("DossierProvider manquant.");
-  return store;
-}
-
-export function cheminMemorise(): string | null {
-  return sessionStorage.getItem(STORAGE_KEY);
+  return <DossierCtx.Provider value={value}>{children}</DossierCtx.Provider>;
 }

@@ -35,7 +35,7 @@ def lister_modeles() -> list[dict[str, str]]:
 
 
 def lire_chemin(chemin: Path) -> dict[str, Any]:
-    dossier = load_dossier(chemin)
+    load_dossier(chemin)
     raw = _lire_yaml(chemin)
     mouvements = _lire_mouvements(chemin, raw)
     return {
@@ -46,7 +46,11 @@ def lire_chemin(chemin: Path) -> dict[str, Any]:
     }
 
 
-def enregistrer(chemin: Path, mapping: dict[str, Any], mouvements: list[dict[str, Any]] | None) -> dict[str, str]:
+def enregistrer(
+    chemin: Path,
+    mapping: dict[str, Any],
+    mouvements: list[dict[str, Any]] | None,
+) -> dict[str, str]:
     folder = chemin if chemin.is_dir() else chemin.parent
     folder.mkdir(parents=True, exist_ok=True)
     if mouvements is not None:
@@ -133,7 +137,12 @@ def categories_annee() -> list[dict[str, str]]:
         {"id": "travaux", "libelle": "Travaux", "compte": "615000", "sens": "debit"},
         {"id": "interets", "libelle": "Intérêts d'emprunt", "compte": "661000", "sens": "debit"},
         {"id": "capital", "libelle": "Capital emprunt", "compte": "164000", "sens": "debit"},
-        {"id": "assurance_emprunt", "libelle": "Assurance emprunteur", "compte": "616000", "sens": "debit"},
+        {
+            "id": "assurance_emprunt",
+            "libelle": "Assurance emprunteur",
+            "compte": "616000",
+            "sens": "debit",
+        },
     ]
 
 

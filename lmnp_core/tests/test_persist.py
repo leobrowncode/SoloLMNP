@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from lmnp_core.dossier import DossierError
-from lmnp_core.persist import creer_dossier, enregistrer, lister_modeles, lire_chemin
+from lmnp_core.persist import creer_dossier, enregistrer, lire_chemin, lister_modeles
 from lmnp_core.siret import valide
 
 GOLDEN = Path(__file__).resolve().parents[2] / "golden" / "premier-exercice" / "input"

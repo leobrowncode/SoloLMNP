@@ -4,8 +4,14 @@ import { Button } from "../components/ui/button";
 import { Card, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { chargerCategories, chargerDossier, construire, enregistrerDossier } from "../lib/api";
-import { useDossierSession } from "../context/DossierContext";
+import {
+  chargerCategories,
+  chargerDossier,
+  construire,
+  enregistrerDossier,
+  type MouvementLigne,
+} from "../lib/api";
+import { useDossierSession } from "../context/dossierSession";
 import { centimesDepuisEuros, eurosDepuisCentimes } from "../lib/money";
 import { ligneDepuisCategorie, parserCsvMouvements, totalParCompte } from "../lib/mouvements";
 
@@ -36,7 +42,7 @@ export default function AnneeScreen() {
       const total = totalParCompte(session.mouvements, categorie.compte);
       if (total > 0) suivant[categorie.id] = eurosDepuisCentimes(total);
     }
-    setMontants(suivant);
+    queueMicrotask(() => setMontants(suivant));
   }, [categories, session?.mouvements]);
 
   if (!session || !exercice) {
@@ -57,7 +63,9 @@ export default function AnneeScreen() {
 
   function fusionnerCategories(): void {
     if (!session || !exercice) return;
-    const horsCategories = session.mouvements.filter((ligne) => !ligne.piece.startsWith("CAT-"));
+    const horsCategories = session.mouvements.filter(
+      (ligne: MouvementLigne) => !ligne.piece.startsWith("CAT-"),
+    );
     const generes = categories
       .map((categorie) =>
         ligneDepuisCategorie({
@@ -88,7 +96,9 @@ export default function AnneeScreen() {
   async function enregistrer() {
     if (!session || !exercice) return;
     setMessage(null);
-    const horsCategories = session.mouvements.filter((ligne) => !ligne.piece.startsWith("CAT-"));
+    const horsCategories = session.mouvements.filter(
+      (ligne: MouvementLigne) => !ligne.piece.startsWith("CAT-"),
+    );
     const generes = categories
       .map((categorie) =>
         ligneDepuisCategorie({
@@ -198,7 +208,7 @@ export default function AnneeScreen() {
               </tr>
             </thead>
             <tbody>
-              {session.mouvements.map((ligne) => (
+              {session.mouvements.map((ligne: MouvementLigne) => (
                 <tr key={`${ligne.piece}-${ligne.date}-${ligne.compte}`} className="border-b border-[var(--color-border)]">
                   <td className="py-1 pr-2">{ligne.date}</td>
                   <td className="py-1 pr-2">{ligne.piece}</td>

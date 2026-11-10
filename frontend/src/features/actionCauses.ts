@@ -49,6 +49,7 @@ const PRECHECK: Record<string, CauseAction> = {
   ASSET_PURCHASE_UNBOOKED: FIX.bookAsset,
   IMMOBILISATIONS_ECART: FIX.enterProperty,
   IMMOBILISATIONS_NETTES_NEGATIVES: FIX.enterProperty,
+  EMPTY_EXERCISE: FIX.property,
 };
 
 const OPENING_BLOCKERS: Record<string, CauseAction> = {

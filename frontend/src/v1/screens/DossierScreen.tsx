@@ -14,7 +14,7 @@ import {
   creerDepuisModele,
   enregistrerDossier,
 } from "../lib/api";
-import { cheminMemorise, useDossierSession } from "../context/DossierContext";
+import { cheminMemorise, useDossierSession } from "../context/dossierSession";
 import { siretValide } from "../lib/siret";
 
 const schema = z.object({
@@ -26,20 +26,27 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+const MILLESIME_PAR_DEFAUT = "2025";
+let brouillonSeq = 0;
+
+function nomBrouillonAutomatique(): string {
+  brouillonSeq += 1;
+  return `dossier-${brouillonSeq}`;
+}
+
 export default function DossierScreen() {
   const navigate = useNavigate();
   const { session, setSession, setCalcul } = useDossierSession();
   const [modeles, setModeles] = useState<{ id: string; chemin: string; etiquette: string }[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [chargement, setChargement] = useState(false);
-
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       nom: "",
       siret: "",
       debut_activite: "",
-      millesime: new Date().getFullYear().toString(),
+      millesime: MILLESIME_PAR_DEFAUT,
     },
   });
 
@@ -125,7 +132,7 @@ export default function DossierScreen() {
     try {
       let chemin = session?.chemin;
       if (!chemin) {
-        const created = await creerDepuisModele("premier-exercice", `dossier-${Date.now().toString(36)}`);
+        const created = await creerDepuisModele("premier-exercice", nomBrouillonAutomatique());
         if ("erreur" in created && created.erreur) {
           setMessage(created.erreur);
           return;
