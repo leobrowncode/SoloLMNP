@@ -12,7 +12,7 @@
 
 ## Commandes
 - v1 : `python scripts/lmnp.py build <dossier>` et `python scripts/lmnp.py serve` (127.0.0.1, zéro secret).
-- Golden : `python -m pytest lmnp_core/tests` (PYTHONPATH : racine et `backend/`).
+- Golden : `python -m pytest lmnp_core/tests` (PYTHONPATH : racine et `backend/`). Job CI `Noyau v1`.
 - Legacy, hors chemin v1 : `python scripts/check.py`, `make check`.
 
 ## Carte
