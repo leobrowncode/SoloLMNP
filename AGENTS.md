@@ -11,7 +11,7 @@
 - Le dépôt legacy (SQLAlchemy, React, auth, Postgres, Vercel) reste sous le tag `v0-archive`. Il n'est pas le chemin v1.
 
 ## Commandes
-- v1 : `python scripts/lmnp.py build <dossier>` et `python scripts/lmnp.py serve` (127.0.0.1, zéro secret).
+- v1 : `python scripts/lmnp.py build <dossier>` (écrit `sorties/`) et `serve` (127.0.0.1, zéro secret).
 - Golden : `python -m pytest lmnp_core/tests` (PYTHONPATH : racine et `backend/`). Job CI `Noyau v1`.
 - Legacy, hors chemin v1 : `python scripts/check.py`, `make check`.
 
