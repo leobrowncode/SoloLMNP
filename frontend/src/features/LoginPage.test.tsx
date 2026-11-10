@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RouterProvider } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { restoreNeonToken, signInWithGoogle, signOutNeon } from "../api/neonAuth";
+import { restoreNeonToken, signInWithGoogle, signOutNeon, signUpWithPassword } from "../api/neonAuth";
 import { createTestRouter } from "../routing/router";
 
 vi.mock("../api/neonAuth", async () => {
@@ -12,6 +12,7 @@ vi.mock("../api/neonAuth", async () => {
     signInWithGoogle: vi.fn(),
     restoreNeonToken: vi.fn(async () => null),
     signOutNeon: vi.fn(),
+    signUpWithPassword: vi.fn(),
   };
 });
 
@@ -84,6 +85,38 @@ describe("neon absent", () => {
     expect(screen.queryByLabelText("Adresse e-mail")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Continuer avec Google" })).not.toBeInTheDocument();
     expect(screen.getByText(/AUTH_MODE=local/)).toBeInTheDocument();
+  });
+});
+
+describe("inscription Neon", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubEnv("VITE_AUTH_MODE", "");
+    vi.stubEnv("VITE_NEON_AUTH_URL", "https://auth.example.test/neondb/auth");
+    vi.mocked(signUpWithPassword).mockReset();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/auth/admission")) {
+        return new Response(JSON.stringify({
+          detail: { code: "EMAIL_NOT_ALLOWED", message: "Cette adresse n’est pas autorisée." },
+        }), { status: 403, headers: { "content-type": "application/json" } });
+      }
+      return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+    }));
+  });
+
+  it("refuse l’inscription avant Neon quand l’adresse n’est pas sur la liste", async () => {
+    const user = userEvent.setup();
+    render(<RouterProvider router={createTestRouter(["/connexion"])} />);
+    await user.click(await screen.findByRole("button", { name: "Créer un compte" }));
+    expect(screen.getByText(/adresses déjà invitées/)).toBeInTheDocument();
+    expect(screen.getByText("8 caractères minimum.")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Nom"), "Test");
+    await user.type(screen.getByLabelText("Adresse e-mail"), "intrus@example.com");
+    await user.type(screen.getByLabelText(/^Mot de passe/), "motdepasse");
+    await user.click(screen.getByRole("button", { name: "Créer le compte" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/pas autorisée/);
+    expect(signUpWithPassword).not.toHaveBeenCalled();
   });
 });
 
