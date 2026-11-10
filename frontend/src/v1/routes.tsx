@@ -1,7 +1,7 @@
 import { Navigate, type RouteObject } from "react-router-dom";
 import { DossierProvider } from "./context/DossierContext";
 import V1Shell from "./layout/V1Shell";
-import AnneePlaceholder from "./screens/AnneePlaceholder";
+import AnneeScreen from "./screens/AnneeScreen";
 import BienScreen from "./screens/BienScreen";
 import DossierScreen from "./screens/DossierScreen";
 
@@ -16,7 +16,7 @@ export const v1Routes: RouteObject = {
     { index: true, element: <Navigate to="dossier" replace /> },
     { path: "dossier", element: <DossierScreen /> },
     { path: "bien", element: <BienScreen /> },
-    { path: "annee", element: <AnneePlaceholder /> },
+    { path: "annee", element: <AnneeScreen /> },
     { path: "revue", element: <Navigate to="/v1/annee" replace /> },
     { path: "sorties", element: <Navigate to="/v1/annee" replace /> },
   ],
