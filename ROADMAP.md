@@ -1,23 +1,25 @@
 # Roadmap
 
+Le contrat de la refonte est [SPEC.md](SPEC.md). Les jalons ci-dessous décrivent l'historique du dépôt, pas le périmètre v1.
+
 ## État au 5 novembre 2026
 
 - Auth et hébergement en production : Neon Postgres, Neon Auth (e-mail et Google, `ALLOWED_EMAILS`, isolation `owner_id`), Vercel, https://sololmnp.vercel.app (PR #123 à #130). Ce n’est pas un compte Argon2 local ni une base SQLite par utilisateur.
 - Initialisation en une suite : SIRET, exercice, bien, banque (#118). Correctifs d’interface du 31 octobre (#108 à #117).
-- Audit de parcours livré : [docs/audit/2026-11/PARCOURS.md](docs/audit/2026-11/PARCOURS.md). P0 corrigé : le lanceur et Docker ouvrent un dossier local (`AUTH_MODE=local`) sans secret Neon. La production reste Neon Auth. Les P1 ne se codent qu’après relecture. L’ordre des PR est dans ce document.
+- Audit de parcours livré : [docs/archive/audit/2026-11/PARCOURS.md](docs/archive/audit/2026-11/PARCOURS.md). P0 corrigé : le lanceur et Docker ouvrent un dossier local (`AUTH_MODE=local`) sans secret Neon. La production reste Neon Auth. Les P1 ne se codent qu’après relecture. L’ordre des PR est dans ce document.
 - Issues ouvertes : [#7](https://github.com/leobrowncode/SoloLMNP/issues/7) et [#11](https://github.com/leobrowncode/SoloLMNP/issues/11), toutes deux fiscales, hors des PR de parcours.
 
 ## État au 2 octobre 2026
 
 - P0 à P4 : livrés. Voir les rapports de phase et l’historique ci-dessous.
-- P5 : présentation par rubriques, centralisation et affectation du résultat livrées. Les états restent provisoires jusqu’à la clôture. Voir [le rapport](docs/PHASE5_REPORT.md).
-- P6 : calcul fiscal versionné (`research-2`, toujours `research_only`) et registres séparés d’amortissements non déduits et de déficits LMNP, avec historique créé / utilisé / expiré / restant. Les règles incertaines (cession, TVA, plus-values, ventilation automatique, ARD antérieurs à 2004, art. 156 I 1° bis) sont bloquées et non appliquées. Voir [le rapport](docs/PHASE6_REPORT.md) et [les sources](docs/FISCAL_RULES.md). L’issue [#7](https://github.com/leobrowncode/SoloLMNP/issues/7) reste ouverte : aucun millésime n’est déclarable.
-- P7 : pré-contrôle, clôture, réouverture motivée et audit. Voir [le rapport](docs/PHASE7_REPORT.md).
-- P8 : export FEC déterministe des écritures validées d’un exercice clôturé, hors centralisation. Voir [le rapport](docs/PHASE8_REPORT.md).
-- P9 : compilateur de mappings en liste blanche et snapshots immuables. Structure de travail, pas une liasse certifiée. Voir [le rapport](docs/PHASE9_REPORT.md).
-- P10 : feuille de recopie EFI (2031 / 2033) et 2042-C-PRO, document de travail. Revenus 2025 : cases lues sur les PDF archivés ; exercice 2026 : cases bloquées, formulaires 2027 non publiés. Saisie manuelle uniquement. Voir [le rapport](docs/PHASE10_REPORT.md).
-- P11 : dépôt de justificatifs, sauvegarde cohérente et restauration contrôlée. L’archive remplace la base vivante après une sauvegarde préalable. Voir [le rapport](docs/PHASE11_REPORT.md).
-- P12 : scénarios A–J sur l’API, parcours navigateur, relecture de sécurité, axe et vues étroites, volume de lecture. Les millésimes restent en recherche. Voir [le rapport](docs/PHASE12_REPORT.md).
+- P5 : présentation par rubriques, centralisation et affectation du résultat livrées. Les états restent provisoires jusqu’à la clôture. Voir [le rapport](docs/archive/PHASE5_REPORT.md).
+- P6 : calcul fiscal versionné (`research-2`, toujours `research_only`) et registres séparés d’amortissements non déduits et de déficits LMNP, avec historique créé / utilisé / expiré / restant. Les règles incertaines (cession, TVA, plus-values, ventilation automatique, ARD antérieurs à 2004, art. 156 I 1° bis) sont bloquées et non appliquées. Voir [le rapport](docs/archive/PHASE6_REPORT.md) et [les sources](docs/FISCAL_RULES.md). L’issue [#7](https://github.com/leobrowncode/SoloLMNP/issues/7) reste ouverte : aucun millésime n’est déclarable.
+- P7 : pré-contrôle, clôture, réouverture motivée et audit. Voir [le rapport](docs/archive/PHASE7_REPORT.md).
+- P8 : export FEC déterministe des écritures validées d’un exercice clôturé, hors centralisation. Voir [le rapport](docs/archive/PHASE8_REPORT.md).
+- P9 : compilateur de mappings en liste blanche et snapshots immuables. Structure de travail, pas une liasse certifiée. Voir [le rapport](docs/archive/PHASE9_REPORT.md).
+- P10 : feuille de recopie EFI (2031 / 2033) et 2042-C-PRO, document de travail. Revenus 2025 : cases lues sur les PDF archivés ; exercice 2026 : cases bloquées, formulaires 2027 non publiés. Saisie manuelle uniquement. Voir [le rapport](docs/archive/PHASE10_REPORT.md).
+- P11 : dépôt de justificatifs, sauvegarde cohérente et restauration contrôlée. L’archive remplace la base vivante après une sauvegarde préalable. Voir [le rapport](docs/archive/PHASE11_REPORT.md).
+- P12 : scénarios A–J sur l’API, parcours navigateur, relecture de sécurité, axe et vues étroites, volume de lecture. Les millésimes restent en recherche. Voir [le rapport](docs/archive/PHASE12_REPORT.md).
 
 Les issues #6 à #13 restent ouvertes sur leurs résidus. L’outil vise une activité déclarée LMNP ; le LMP est hors périmètre. Les contrôles de cases de la liasse BIC peuvent être satisfaits sans rendre la sortie déclarable. Le statut affiché est Recherche, Provisoire ou Déclarable ; les millésimes 2025 et 2026 restent en Recherche. La cession, la TVA, les plus-values et la ventilation automatique du terrain restent désactivées. Le calcul fiscal stocké reste `research_only`. La 2042-C-PRO des revenus 2025 est numérotée (5NA / 5NY, 5GA à 5GJ) d’après le CERFA 11222*28 ; l’exercice 2026 ne publie pas ces cases. Aucune télétransmission.
 
@@ -25,10 +27,10 @@ Historique antérieur au 2 octobre 2026 :
 
 - P0 : architecture et catalogue de scénarios livrés dans la PR #1.
 - P1 : implémentation, contrôles natifs et [CI Linux/Windows/frontend/Docker réussis](https://github.com/leobrowncode/SoloLMNP/actions/runs/35065201132). Revue et intégration de la [PR #14](https://github.com/leobrowncode/SoloLMNP/pull/14) en attente.
-- P2 : ledger, API et interface implémentés. Voir [le rapport](docs/PHASE2_REPORT.md).
-- P3 : recettes/dépenses à l'engagement, règlements, banque CSV, rapprochement et emprunts implémentés. Voir [le rapport](docs/PHASE3_REPORT.md).
-- P4 : registre immuable, composants, prorata en jours et dotations ledger implémentés. Voir [le rapport](docs/PHASE4_REPORT.md).
-- P5 initiale : bilan/résultat provisoires, inventaire manuel, prévisualisation et génération des à-nouveaux. Voir [le rapport](docs/PHASE5_REPORT.md).
+- P2 : ledger, API et interface implémentés. Voir [le rapport](docs/archive/PHASE2_REPORT.md).
+- P3 : recettes/dépenses à l'engagement, règlements, banque CSV, rapprochement et emprunts implémentés. Voir [le rapport](docs/archive/PHASE3_REPORT.md).
+- P4 : registre immuable, composants, prorata en jours et dotations ledger implémentés. Voir [le rapport](docs/archive/PHASE4_REPORT.md).
+- P5 initiale : bilan/résultat provisoires, inventaire manuel, prévisualisation et génération des à-nouveaux. Voir [le rapport](docs/archive/PHASE5_REPORT.md).
   - Intégration P3/P4/P5 : scénario sur deux exercices avec règlements métier, emprunt et dotations ; correction du double comptage du capital après reprise et filtres du journal étendus aux dotations/à-nouveaux. La clôture reste simulée uniquement dans les fixtures de test.
   - Inventaire P5 : API de saisie manuelle justifiée, atomique et idempotente, audit et filtre journal livrés dans la PR #18. Formulaire dédié livré dans la PR #19 ; pièces archivées et traitements automatiques restent à développer.
   - Suite de l’issue #6 livrée dans la PR #19 fusionnée : formulaire d’inventaire manuel, revue avant validation, reçu et reprise de la même demande après réponse perdue. Les pièces archivées, traitements automatiques et autres limites P5 restent à livrer.

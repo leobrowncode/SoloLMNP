@@ -13,7 +13,7 @@ Application lancée en local : API FastAPI sur `127.0.0.1:8000`, interface Vite 
 - Locataire Camille Dupont, loyer 850 €. Recettes, assurance PNO 180 €, copropriété 1 200 €, taxe foncière 900 €, entretien 240 € non payé.
 - Entrée du bien tentée après la clôture : capital restant dû 14 884 € et 195 000 €, banque 46 000 €, intérêts antérieurs 1 200 €, frais de dossier 500 €. Apport attendu et obtenu : 1 078,00 €.
 
-Parcours joués dans Chromium headless (Playwright), en 1 280 px et 390 px : démarrage, biens, plan d’amortissement, banque et CSV, journal, plan comptable, grand livre, balance, centralisation, fiscalité, pré-contrôle, clôture, réouverture, liasse à recopier, 2042-C-PRO, documents, sauvegarde, contrôle, restauration. Les captures sont dans `docs/audit/2026-10-31/screenshots/`.
+Parcours joués dans Chromium headless (Playwright), en 1 280 px et 390 px : démarrage, biens, plan d’amortissement, banque et CSV, journal, plan comptable, grand livre, balance, centralisation, fiscalité, pré-contrôle, clôture, réouverture, liasse à recopier, 2042-C-PRO, documents, sauvegarde, contrôle, restauration. Les captures sont dans `docs/archive/audit/2026-10-31/screenshots/`.
 
 Les montants cités pour la liasse bloquée sont ceux de l’exercice **clôturé avant l’entrée du bien**. L’entrée a ensuite été rejouée après réouverture, pour finir le parcours : l’écriture est équilibrée et l’apport est bien 1 078,00 € (`screenshots/1280-property-entry-preview.png`).
 
