@@ -1,0 +1,59 @@
+name: Nettoyage Neon preview
+
+# The Vercel-managed Neon integration keeps one branch preview/<git branch> per
+# previewed branch until Vercel deletes its last deployment. The Free project holds
+# 10 branches; past that, every preview fails with "Resource provisioning failed".
+
+on:
+  pull_request:
+    types: [closed]
+  delete:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Lister sans supprimer"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: neon-preview-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: >-
+      (github.event_name != 'pull_request'
+        || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.event_name != 'delete' || github.event.ref_type == 'branch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || 'main' }}
+          persist-credentials: false
+          sparse-checkout: scripts/neon_preview_cleanup.py
+          sparse-checkout-cone-mode: false
+      - name: Supprimer les branches preview/* devenues inutiles
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID || vars.NEON_PROJECT_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR_HEAD: ${{ github.event.pull_request.head.ref }}
+          DELETED_REF: ${{ github.event.ref }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          case "$EVENT" in
+            pull_request) set -- --branch "$PR_HEAD" ;;
+            delete) set -- --branch "$DELETED_REF" ;;
+            *) set -- --stale ;;
+          esac
+          if [ "$DRY_RUN" = "true" ]; then set -- "$@" --dry-run; fi
+          python3 scripts/neon_preview_cleanup.py "$@"

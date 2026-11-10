@@ -25,7 +25,9 @@
 
 ## Pièges connus
 - Cases 2025 depuis PDF archivés. `validation.json` : verrou legacy, ignoré en v1. JWT Neon : `iss`/`aud` sans `/neondb/auth`.
-- Test Compta Demat : le validateur rejoue les règles, n'appelle pas l'outil Windows. Neon preview : 10 branches max.
+- Test Compta Demat : le validateur rejoue les règles, n'appelle pas l'outil Windows.
+- Neon preview : 10 branches max, sinon « Resource provisioning failed ». Nettoyage : `neon-preview-cleanup.yml`.
+- `npm ci` refuse une dépendance directe dont la version diffère de son `overrides` (zod) : version exacte des deux côtés.
 - Importer `app.services` depuis `lmnp_core` est interdit.
 
 ## Méthode
