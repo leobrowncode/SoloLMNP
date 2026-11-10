@@ -157,20 +157,40 @@ Le lanceur local et Docker ne passent pas par ce build. Ils migrent au démarrag
 4. Branche de production `main`. Previews activées pour les pull requests.
 5. Région de la fonction égale à la région Neon.
 
-### Intégration Neon–Vercel
+### Intégration Neon et Vercel
 
-Ne pas poser `DATABASE_URL` avant de connecter l’intégration : la liaison échoue si la variable existe déjà.
+Le projet `sololmnp` (équipe Encoore) utilise l’intégration gérée par Vercel : la ressource Storage Neon `sololmnpdata` (projet Neon `jolly-cloud-02145368`, organisation « Vercel: Encoore », plan Free). Ne pas activer en même temps l’intégration gérée par Neon. Ne pas poser `DATABASE_URL` avant de connecter la ressource : la liaison échoue si la variable existe déjà.
 
-1. Console Neon, Integrations, Vercel, lier le compte existant.
-2. Intégration gérée par Neon. Un projet Neon pour un projet Vercel. Ne pas activer en même temps l’intégration gérée par Vercel.
-3. Choisir la branche de production : pas un nom `preview/*`, pas de TTL.
-4. Activer la suppression automatique des branches de preview devenues inutiles.
-5. La branche `vercel-dev` est facultative.
-6. Laisser l’intégration injecter `DATABASE_URL` (hôte `-pooler`), `DATABASE_URL_UNPOOLED` (hôte direct), `NEON_AUTH_BASE_URL` et `VITE_NEON_AUTH_URL`.
-7. Chaque pull request reçoit une branche Neon `preview/<branche-git>`, avec sa base et son URL d’auth. Ne jamais faire pointer le `DATABASE_URL` d’une preview vers la production.
-8. Cette branche de preview est créée depuis la branche par défaut du projet Neon, même si la production Vercel utilise une autre branche.
+1. Vercel, Storage, ressource Neon, connecter le projet `sololmnp` en Production et Preview.
+2. Garder la création d’une branche de base pour les déploiements Preview.
+3. Laisser l’intégration injecter `DATABASE_URL` (hôte `-pooler`), `DATABASE_URL_UNPOOLED` (hôte direct), `NEON_AUTH_BASE_URL` et `VITE_NEON_AUTH_URL`.
+4. Chaque branche git déployée en preview reçoit une branche Neon `preview/<branche-git>`, avec sa base et son URL d’auth, créée depuis la branche par défaut `main`. Ne jamais faire pointer le `DATABASE_URL` d’une preview vers la production.
 
 `NEON_AUTH_JWKS_URL` n’est pas injectée. Vide, l’API prend `{NEON_AUTH_BASE_URL}/.well-known/jwks.json`.
+
+### Branches de preview : limite et nettoyage
+
+Le plan Free du projet Neon tient 10 branches, production comprise. Quand il est plein, chaque preview échoue avant le build, sans log, avec « Resource provisioning failed ». La production n’est pas touchée.
+
+Avec l’intégration gérée par Vercel, Neon ne supprime une branche `preview/*` qu’avec le dernier déploiement Vercel de sa branche git. Vercel garde toujours les 20 derniers previews prêts et les 10 derniers déploiements : sur ce projet, les branches ne partent donc jamais seules. Raccourcir la rétention Vercel n’y change rien.
+
+Le workflow `.github/workflows/neon-preview-cleanup.yml` lance `scripts/neon_preview_cleanup.py` :
+
+- à la fermeture ou au merge d’une PR, il supprime `preview/<branche de la PR>` ;
+- à la suppression d’une branche git, il supprime `preview/<branche>` ;
+- toutes les 30 minutes, il supprime chaque `preview/*` dont la branche git a disparu, ou dont les PR sont toutes fermées ;
+- il ne supprime jamais la branche d’une PR ouverte, une branche sans PR, la production, une branche protégée ou parente ;
+- il avertit si le projet reste à une branche de sa limite.
+
+Le dépôt supprime la branche git au merge : une PR mergée libère sa branche Neon au plus tard au passage suivant. Les URL de preview d’une PR fermée perdent leur base, c’est voulu. Un nouveau push sur la branche recrée la base.
+
+Réglages hors dépôt :
+
+1. Neon : ouvrir le projet depuis Vercel (Storage, `sololmnpdata`, Open in Neon), puis Organization settings, API keys, créer une clé limitée au projet `sololmnpdata`.
+2. GitHub, Settings, Secrets and variables, Actions : secret `NEON_API_KEY` (la clé), et `NEON_PROJECT_ID` = `jolly-cloud-02145368`, en secret ou en variable.
+3. Actions, « Nettoyage Neon preview », Run workflow sur `main` avec « Lister sans supprimer » coché, puis décoché.
+
+Un `ignoreCommand` dans `vercel.json` ne protège pas la limite : la branche Neon est créée avant l’étape Ignored Build Step. S’il faut un jour plus de 9 previews ouverts en même temps, deux voies : passer le projet Neon sur un plan payant, ou décocher la branche par preview dans la ressource Storage et donner à Preview les quatre variables d’une branche Neon partagée, avec Neon Auth activé. Cette seconde voie mélange les données et les migrations Alembic de toutes les PR. Décocher la branche sans retirer Preview de la ressource donne à la preview l’hôte de production : le build refuse alors de migrer et échoue.
 
 ### Variables
 
