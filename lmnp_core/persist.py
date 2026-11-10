@@ -1,13 +1,15 @@
-"""Persistance locale YAML + CSV pour la saisie v1."""
+"""Persistance YAML + CSV pour la saisie v1, sur disque ou via un dépôt."""
 
 from __future__ import annotations
 
 import csv
+import io
 import json
 import shutil
 from pathlib import Path
 from typing import Any
 
+from lmnp_core.depot import Depot, DepotAbsent, relatif_sur
 from lmnp_core.depreciation import COMPOSANTS_DEFAUT, shares
 from lmnp_core.dossier import DossierError, dossier_from_mapping, load_dossier
 from lmnp_core.yamlio import loads
@@ -221,6 +223,138 @@ def _scalaire(value: object) -> str:
     if any(char in text for char in ":#") or not text:
         return json.dumps(text, ensure_ascii=False)
     return text
+
+
+def copier_modele(depot: Depot, owner: str, cle_modele: str) -> dict[str, Any]:
+    """Remplace le dossier du compte par une copie du modèle golden."""
+    source = GOLDEN / cle_modele / "input"
+    if not (source / "dossier.yaml").is_file():
+        raise DossierError(f"Modèle inconnu : {cle_modele}.")
+    for path in sorted(source.rglob("*")):
+        if not path.is_file() or path.is_symlink():
+            continue
+        rel = path.relative_to(source).as_posix()
+        depot.ecrire(owner, rel, path.read_bytes())
+    return lire_owner(depot, owner)
+
+
+def lire_owner(depot: Depot, owner: str) -> dict[str, Any]:
+    try:
+        brut = depot.lire(owner, "dossier.yaml")
+    except DepotAbsent as exc:
+        raise DossierError("Aucun dossier pour ce compte.") from exc
+    raw = loads(brut.decode("utf-8"))
+    if not isinstance(raw, dict):
+        raise DossierError("dossier.yaml illisible.")
+    return {
+        "dossier": raw,
+        "mouvements": _mouvements_depot(depot, owner, raw),
+        "grille": grille_apercu(raw),
+    }
+
+
+def enregistrer_owner(
+    depot: Depot,
+    owner: str,
+    mapping: dict[str, Any],
+    mouvements: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    if mouvements is not None:
+        exercices = mapping.get("exercices")
+        if isinstance(exercices, list) and exercices and isinstance(exercices[0], dict):
+            nom = exercices[0].get("mouvements")
+            if not isinstance(nom, str) or not nom.endswith(".csv"):
+                nom = "mouvements.csv"
+                exercices[0]["mouvements"] = nom
+            depot.ecrire(owner, nom, _csv_octets(mouvements))
+    depot.ecrire(owner, "dossier.yaml", (_dumps(mapping) + "\n").encode("utf-8"))
+    dossier_from_mapping(materialiser(mapping, depot, owner))
+    return lire_owner(depot, owner)
+
+
+def materialiser(mapping: dict[str, Any], depot: Depot, owner: str) -> dict[str, Any]:
+    """Remplace chaque nom de CSV par ses lignes, pour calculer sans dossier disque."""
+    copie = dict(mapping)
+    exercices = mapping.get("exercices")
+    if not isinstance(exercices, list):
+        return copie
+    nouveau: list[object] = []
+    for item in exercices:
+        if not isinstance(item, dict):
+            nouveau.append(item)
+            continue
+        ligne = dict(item)
+        nom = ligne.get("mouvements")
+        if isinstance(nom, str):
+            try:
+                payload = depot.lire(owner, nom)
+            except DepotAbsent as exc:
+                raise DossierError(f"CSV introuvable : {nom}.") from exc
+            ligne["mouvements"] = _csv_depuis_octets(payload)
+        nouveau.append(ligne)
+    copie["exercices"] = nouveau
+    return copie
+
+
+def enregistrer_sorties(depot: Depot, owner: str, produit: dict[str, object]) -> list[str]:
+    """Écrit FEC, PDF et ZIP sous `sorties/` pour le téléchargement."""
+    noms: list[str] = []
+    fichiers = produit.get("fichiers")
+    if isinstance(fichiers, list):
+        for item in fichiers:
+            if not isinstance(item, tuple) or len(item) != 2:
+                continue
+            nom, contenu = item
+            if isinstance(nom, str) and isinstance(contenu, bytes):
+                relatif_sur(f"sorties/{nom}")
+                depot.ecrire(owner, f"sorties/{nom}", contenu)
+                noms.append(nom)
+    archive = produit.get("archive")
+    nom_archive = produit.get("archive_nom")
+    if isinstance(archive, bytes) and isinstance(nom_archive, str) and nom_archive not in noms:
+        relatif_sur(f"sorties/{nom_archive}")
+        depot.ecrire(owner, f"sorties/{nom_archive}", archive)
+        noms.append(nom_archive)
+    return noms
+
+
+def lire_modele(cle_modele: str) -> dict[str, Any]:
+    source = GOLDEN / cle_modele / "input"
+    if not (source / "dossier.yaml").is_file():
+        raise DossierError(f"Modèle inconnu : {cle_modele}.")
+    payload = lire_chemin(source)
+    payload.pop("chemin", None)
+    return payload
+
+
+def _mouvements_depot(depot: Depot, owner: str, raw: dict[str, Any]) -> list[dict[str, Any]]:
+    exercices = raw.get("exercices")
+    if not isinstance(exercices, list) or not exercices or not isinstance(exercices[0], dict):
+        return []
+    nom = exercices[0].get("mouvements")
+    if isinstance(nom, list):
+        return [dict(item) for item in nom if isinstance(item, dict)]
+    if not isinstance(nom, str):
+        return []
+    try:
+        return _csv_depuis_octets(depot.lire(owner, nom))
+    except DepotAbsent:
+        return []
+
+
+def _csv_depuis_octets(payload: bytes) -> list[dict[str, Any]]:
+    with io.StringIO(payload.decode("utf-8")) as handle:
+        return [dict(row) for row in csv.DictReader(handle)]
+
+
+def _csv_octets(lignes: list[dict[str, Any]]) -> bytes:
+    champs = ("date", "piece", "libelle", "compte", "debit_centimes", "credit_centimes")
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=champs)
+    writer.writeheader()
+    for ligne in lignes:
+        writer.writerow({key: ligne.get(key, "") for key in champs})
+    return buffer.getvalue().encode("utf-8")
 
 
 def _entier(value: object, default: int) -> int:
