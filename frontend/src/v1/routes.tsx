@@ -4,6 +4,8 @@ import V1Shell from "./layout/V1Shell";
 import AnneeScreen from "./screens/AnneeScreen";
 import BienScreen from "./screens/BienScreen";
 import DossierScreen from "./screens/DossierScreen";
+import RevueScreen from "./screens/RevueScreen";
+import SortiesScreen from "./screens/SortiesScreen";
 
 export const v1Routes: RouteObject = {
   path: "/v1",
@@ -17,7 +19,7 @@ export const v1Routes: RouteObject = {
     { path: "dossier", element: <DossierScreen /> },
     { path: "bien", element: <BienScreen /> },
     { path: "annee", element: <AnneeScreen /> },
-    { path: "revue", element: <Navigate to="/v1/annee" replace /> },
-    { path: "sorties", element: <Navigate to="/v1/annee" replace /> },
+    { path: "revue", element: <RevueScreen /> },
+    { path: "sorties", element: <SortiesScreen /> },
   ],
 };
