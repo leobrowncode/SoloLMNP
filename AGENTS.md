@@ -6,35 +6,27 @@
 - Réduire, ne pas réécrire : moteur fiscal, FEC, liasse, mappings 2025, plan de comptes, composants, emprunt.
 
 ## Stack v1
-- Python 3.12, paquet `lmnp_core` (sans base ni HTTP au cœur), API FastAPI fine, CLI `python scripts/lmnp.py`.
-- Données : un dossier YAML + CSV. Montants en centimes entiers. Aucun secret.
-- Le dépôt legacy (SQLAlchemy, React, auth, Postgres, Vercel) reste sous le tag `v0-archive`. Il n'est pas le chemin v1.
+- Python 3.12, `lmnp_core` (calcul sans base), API FastAPI, CLI `python scripts/lmnp.py`.
+- Dossier YAML + CSV. Blob privé Vercel en ligne. Auth Neon (`ALLOWED_EMAILS`). Legacy sous `/legacy`.
+- Montants en centimes entiers. `AUTH_MODE=local` seulement hors production et hors Vercel.
 
 ## Commandes
-- v1 : `python scripts/lmnp.py build <dossier>` (écrit `sorties/`) et `serve` (127.0.0.1, zéro secret).
-- Saisie v1 : `python scripts/start_v1.py` (API noyau + frontend `/v1`, zéro secret).
-- Golden : `python -m pytest lmnp_core/tests` (PYTHONPATH : racine et `backend/`). Job CI `Noyau v1`.
-- Legacy, hors chemin v1 : `python scripts/check.py`, `make check`.
+- v1 : `python scripts/lmnp.py build <dossier>` et `serve` (127.0.0.1). Saisie : `scripts/start_v1.py` (`/v1`).
+- En ligne : Vercel, `asgi.py`, `scripts/vercel_build.py`. Golden : `pytest lmnp_core/tests`. Legacy : `make check`.
 
 ## Carte
-- `lmnp_core/` : dossier, écritures, fiscal, FEC, liasse, 2042, état de suivi, API.
-- `golden/` : dossiers de référence `input/` + `expected.json`.
-- `fiscal/` : règles et formulaires par millésime. 2027 hors v1.
-- `backend/` : moteur et mappings réutilisés. `frontend/` : UI legacy, saisie v1 au jalon suivant.
-- `docs/archive/` : rapports de phase, audits, `AGENT_STATE.md`.
+- `lmnp_core/` : dossier, fiscal, FEC, liasse, API, dépôt. `golden/`, `fiscal/`. `backend/` : moteur, auth, Blob. `frontend/` : `/v1` et `/legacy`.
 
 ## Conventions
-- Dépendances v1 : `lmnp_core` appelle le domaine pur (`app.domain.fiscal.engine`, FEC, liasse, plan).
-- États de sortie : Brouillon, Vérifié par l'utilisateur, Déclaré. Pas de verrou `validation.json` sur le chemin v1.
-- Trois états seulement. L'outil calcule, l'utilisateur signe.
+- `lmnp_core` appelle le domaine pur, pas `app.services`. États : Brouillon, Vérifié, Déclaré. Pas de verrou `validation.json` sur v1.
 
 ## Messages de commit
 - PR brouillon avant le premier push; objet `#<numero> <type>:`; corps `Nouvelles fonctionnalités produit :` ou `aucune` + `Technique :`. Voir `.cursor/rules/commits-numero-pr.mdc`.
 
 ## Pièges connus
-- Les cases 2025 viennent des PDF archivés. Ne pas recopier un numéro de 2026 ou 2027.
-- `validation.json` décrit encore l'ancien verrou Recherche du legacy. La v1 ne le consulte pas.
-- Test Compta Demat est un outil Windows : le validateur du dépôt rejoue les règles publiées, il ne lance pas l'outil.
-- Importer `app.services` depuis `lmnp_core` est interdit : ces services parlent à la base.
+- Cases 2025 depuis PDF archivés. `validation.json` : verrou legacy, ignoré en v1. JWT Neon : `iss`/`aud` sans `/neondb/auth`.
+- Test Compta Demat : le validateur rejoue les règles, n'appelle pas l'outil Windows. Neon preview : 10 branches max.
+- Importer `app.services` depuis `lmnp_core` est interdit.
+
 ## Méthode
-- Lire `SPEC.md` et ce fichier, chercher un chemin ciblé; mettre à jour une ligne ici si besoin (max 40 lignes).
+- Lire `SPEC.md` et ce fichier; mettre à jour une ligne ici si besoin (max 40 lignes).
