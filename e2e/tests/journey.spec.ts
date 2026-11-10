@@ -363,7 +363,7 @@ test.describe.serial("parcours critique", () => {
   });
 
   test("axe et défilement sur les vues principales", async ({ page }) => {
-    const routes = ["/", "/comptabilite/brouillons", "/operations/biens", "/immobilisations", "/etats-comptables", "/fiscalite", "/conservation"];
+    const routes = ["/legacy", "/comptabilite/brouillons", "/operations/biens", "/immobilisations", "/etats-comptables", "/fiscalite", "/conservation"];
     const widths = [320, 390, 768, 1280];
     for (const width of widths) {
       await page.setViewportSize({ width, height: 800 });
