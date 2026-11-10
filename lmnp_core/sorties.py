@@ -66,6 +66,7 @@ def produire(resultat: Resultat) -> dict[str, object]:
         "archive_nom": f"{resultat.dossier.siren}-sorties-{annee.annee}.zip",
         "archive_sha256": sha,
         "archive": archive,
+        "fichiers": files,
     }
 
 
@@ -82,7 +83,7 @@ def ecrire(resultat: Resultat, dossier: Path) -> tuple[Path, dict[str, object]]:
 
 
 def pour_api(produit: dict[str, object]) -> dict[str, object]:
-    return {key: value for key, value in produit.items() if key != "archive"}
+    return {key: value for key, value in produit.items() if key not in {"archive", "fichiers"}}
 
 
 def _annee_liasse(resultat: Resultat) -> Annee:
