@@ -4,6 +4,7 @@ import { RouterProvider } from "react-router-dom";
 import { router } from "./routing/router";
 import "./tokens.css";
 import "./style.css";
+import "./v1/v1.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Le point de montage de l’application est absent.");

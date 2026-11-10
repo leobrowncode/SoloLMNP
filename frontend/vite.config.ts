@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 import type { Plugin, ProxyOptions } from "vite";
@@ -26,7 +27,7 @@ const localProxy: ProxyOptions["configure"] = (proxy) => {
 
 export default defineConfig({
   envDir: fileURLToPath(new URL("..", import.meta.url)),
-  plugins: [react(), contentSecurityPolicyPlugin()],
+  plugins: [react(), tailwindcss(), contentSecurityPolicyPlugin()],
   server: {
     host: "127.0.0.1", port: 5173, strictPort: true,
     proxy: { "/api": { target: "http://127.0.0.1:8000", configure: localProxy } },

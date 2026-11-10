@@ -1,4 +1,5 @@
 import { Navigate, createBrowserRouter, createMemoryRouter, type RouteObject } from "react-router-dom";
+import { v1Routes } from "../v1/routes";
 import AppShell from "../AppShell";
 import LoginPage from "../features/LoginPage";
 import LedgerPage from "../features/LedgerPage";
@@ -11,13 +12,15 @@ import { DEFAULT_LEDGER_TAB, DEFAULT_OPERATIONS_TAB, ledgerPath, operationsPath,
 import RequireAuth from "./RequireAuth";
 
 export const appRoutes: RouteObject[] = [
+  { path: "/", element: <Navigate to="/v1/dossier" replace /> },
+  v1Routes,
   { path: "/connexion", element: <LoginPage /> },
   {
-    path: "/",
+    path: "/legacy",
     element: <RequireAuth />,
     children: [
   {
-    path: "/",
+    path: "/legacy",
     element: <AppShell />,
     children: [
       { index: true, element: null },

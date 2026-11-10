@@ -12,6 +12,7 @@
 
 ## Commandes
 - v1 : `python scripts/lmnp.py build <dossier>` (écrit `sorties/`) et `serve` (127.0.0.1, zéro secret).
+- Saisie v1 : `python scripts/start_v1.py` (API noyau + frontend `/v1`, zéro secret).
 - Golden : `python -m pytest lmnp_core/tests` (PYTHONPATH : racine et `backend/`). Job CI `Noyau v1`.
 - Legacy, hors chemin v1 : `python scripts/check.py`, `make check`.
 

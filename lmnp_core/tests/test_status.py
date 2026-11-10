@@ -26,7 +26,7 @@ def test_three_states() -> None:
         empreinte=built.empreinte,
     )
     assert checked.effectif == "verifie"
-    assert checked.libelle == "Verifie par l'utilisateur"
+    assert checked.libelle == "Vérifié par l'utilisateur"
 
     missing_registry = resoudre(
         replace(dossier, statut="verifie", relu_notice=True),
@@ -47,7 +47,7 @@ def test_three_states() -> None:
         empreinte=built.empreinte,
     )
     assert declared.effectif == "declare"
-    assert declared.libelle == "Declare"
+    assert declared.libelle == "Déclaré"
 
     drifted = resoudre(
         replace(

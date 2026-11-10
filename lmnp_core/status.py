@@ -8,8 +8,8 @@ from lmnp_core.dossier import Dossier
 
 LIBELLES = {
     "brouillon": "Brouillon",
-    "verifie": "Verifie par l'utilisateur",
-    "declare": "Declare",
+    "verifie": "Vérifié par l'utilisateur",
+    "declare": "Déclaré",
 }
 PHRASE = "L'outil calcule, l'utilisateur signe."
 
