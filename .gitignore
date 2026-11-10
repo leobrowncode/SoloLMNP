@@ -38,6 +38,7 @@ data/**
 *.pem
 *.key
 exports/
+sorties/
 backups/
 work/
 test-results/

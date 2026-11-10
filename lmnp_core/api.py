@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from lmnp_core.build import build_dossier, build_path
 from lmnp_core.dossier import DossierError, dossier_from_mapping
+from lmnp_core.sorties import pour_api, produire
 
 app = FastAPI(title="SoloLMNP", version="1.0.0")
 
@@ -29,7 +30,11 @@ def build_endpoint(body: dict[str, Any]) -> dict[str, Any]:
     try:
         if "chemin" in body and isinstance(body["chemin"], str):
             Chemin(chemin=body["chemin"])
-            return build_path(Path(body["chemin"])).to_json()
-        return build_dossier(dossier_from_mapping(body)).to_json()
+            resultat = build_path(Path(body["chemin"]))
+        else:
+            resultat = build_dossier(dossier_from_mapping(body))
+        corps = resultat.to_json()
+        corps["sorties"] = pour_api(produire(resultat))
+        return corps
     except DossierError as exc:
         return {"erreur": str(exc)}

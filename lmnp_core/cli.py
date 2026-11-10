@@ -8,6 +8,7 @@ from pathlib import Path
 
 from lmnp_core.build import build_path
 from lmnp_core.dossier import DossierError
+from lmnp_core.sorties import ecrire, pour_api
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -24,9 +25,14 @@ def main(argv: list[str] | None = None) -> int:
         print("Usage : python scripts/lmnp.py build <dossier>", file=sys.stderr)
         return 2
     try:
-        resultat = build_path(Path(args[1]))
+        dossier = Path(args[1])
+        resultat = build_path(dossier)
+        archive, produit = ecrire(resultat, dossier if dossier.is_dir() else dossier.parent)
     except DossierError as exc:
         print(str(exc), file=sys.stderr)
         return 1
-    print(json.dumps(resultat.to_json(), ensure_ascii=False, indent=2))
+    corps = resultat.to_json()
+    corps["sorties"] = pour_api(produit)
+    corps["archive"] = str(archive)
+    print(json.dumps(corps, ensure_ascii=False, indent=2))
     return 0
