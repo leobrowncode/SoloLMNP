@@ -342,6 +342,6 @@ def _close_errors(report: dict[str, Any]) -> tuple[tuple[str, str], ...]:
             continue
         code = item.get("code")
         message = item.get("message")
-        if isinstance(code, str) and isinstance(message, str):
+        if isinstance(code, str) and isinstance(message, str) and code != "EMPTY_EXERCISE":
             rows.append((code, message))
     return tuple(rows)
