@@ -1,0 +1,4 @@
+date,piece,libelle,compte,debit_centimes,credit_centimes
+2025-06-30,LOY-2025,Loyers de l'exercice,706000,0,250000
+2025-06-30,COPRO-2025,Charges de copropriete,614000,60000,0
+2025-06-30,INT-2025,Interets d'emprunt,661000,40000,0

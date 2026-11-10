@@ -1,0 +1,25 @@
+nom: Reference premier exercice
+siret: "12345678900017"
+debut_activite: 2025-07-01
+millesime: "2025"
+regime: lmnp
+statut: brouillon
+relu_notice: false
+bien:
+  nom: Appartement Reference
+  date_acquisition: 2025-07-01
+  date_mise_en_service: 2025-07-01
+  terrain_centimes: 4000000
+  batiment_centimes: 16000000
+  frais_centimes: 0
+  mobilier_centimes: 240000
+  mobilier_duree_mois: 84
+  ventilation: composants
+emprunt:
+  capital_centimes: 15000000
+  date: 2025-07-01
+apport_centimes: 5500000
+exercices:
+  - debut: 2025-07-01
+    fin: 2025-12-31
+    mouvements: mouvements.csv
