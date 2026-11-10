@@ -82,7 +82,7 @@ test.describe.serial("parcours critique", () => {
 
   test("vue d’ensemble compacte : une action, aides lisibles", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto("/");
+    await page.goto("/legacy");
     await expect(page.getByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Continuer" })).toHaveCount(1);
     await expect(page.locator(".topbar")).not.toContainText("Continuer");
@@ -357,13 +357,13 @@ test.describe.serial("parcours critique", () => {
     await page.getByLabel(/Confirmation — saisir RESTAURER/).fill("RESTAURER");
     await page.getByRole("button", { name: "Restaurer la sauvegarde" }).click();
     await expect(page.getByText(/Base restaurée depuis/)).toBeVisible();
-    await page.goto("/");
+    await page.goto("/legacy");
     await expect(page.getByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeVisible();
     await expect(page.getByText("Prête à recopier")).toHaveCount(0);
   });
 
   test("axe et défilement sur les vues principales", async ({ page }) => {
-    const routes = ["/", "/comptabilite/brouillons", "/operations/biens", "/immobilisations", "/etats-comptables", "/fiscalite", "/conservation"];
+    const routes = ["/legacy", "/comptabilite/brouillons", "/operations/biens", "/immobilisations", "/etats-comptables", "/fiscalite", "/conservation"];
     const widths = [320, 390, 768, 1280];
     for (const width of widths) {
       await page.setViewportSize({ width, height: 800 });

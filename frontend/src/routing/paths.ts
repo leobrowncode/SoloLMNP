@@ -1,5 +1,5 @@
 export const ROUTES = {
-  home: "/",
+  home: "/legacy",
   ledger: "/comptabilite",
   operations: "/operations",
   assets: "/immobilisations",

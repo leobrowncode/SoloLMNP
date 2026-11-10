@@ -12,6 +12,7 @@
 
 ## Commandes
 - v1 : `python scripts/lmnp.py build <dossier>` (écrit `sorties/`) et `serve` (127.0.0.1, zéro secret).
+- Saisie v1 : `python scripts/start_v1.py` (API noyau + frontend `/v1`, zéro secret).
 - Golden : `python -m pytest lmnp_core/tests` (PYTHONPATH : racine et `backend/`). Job CI `Noyau v1`.
 - Legacy, hors chemin v1 : `python scripts/check.py`, `make check`.
 
@@ -35,6 +36,5 @@
 - `validation.json` décrit encore l'ancien verrou Recherche du legacy. La v1 ne le consulte pas.
 - Test Compta Demat est un outil Windows : le validateur du dépôt rejoue les règles publiées, il ne lance pas l'outil.
 - Importer `app.services` depuis `lmnp_core` est interdit : ces services parlent à la base.
-
 ## Méthode
 - Lire `SPEC.md` et ce fichier, chercher un chemin ciblé; mettre à jour une ligne ici si besoin (max 40 lignes).

@@ -1,0 +1,233 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
+import { z } from "zod";
+import { Button } from "../components/ui/button";
+import { Card, CardTitle } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import {
+  chargerDossier,
+  chargerModeles,
+  construire,
+  creerDepuisModele,
+  enregistrerDossier,
+} from "../lib/api";
+import { cheminMemorise, useDossierSession } from "../context/dossierSession";
+import { siretValide } from "../lib/siret";
+
+const schema = z.object({
+  nom: z.string().min(2, "Nom du dossier requis"),
+  siret: z.string().refine(siretValide, "SIRET invalide (14 chiffres, clé de Luhn)"),
+  debut_activite: z.string().min(1, "Date requise"),
+  millesime: z.string().regex(/^\d{4}$/, "Millésime sur quatre chiffres"),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+const MILLESIME_PAR_DEFAUT = "2025";
+let brouillonSeq = 0;
+
+function nomBrouillonAutomatique(): string {
+  brouillonSeq += 1;
+  return `dossier-${brouillonSeq}`;
+}
+
+export default function DossierScreen() {
+  const navigate = useNavigate();
+  const { session, setSession, setCalcul } = useDossierSession();
+  const [modeles, setModeles] = useState<{ id: string; chemin: string; etiquette: string }[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+  const [chargement, setChargement] = useState(false);
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      nom: "",
+      siret: "",
+      debut_activite: "",
+      millesime: MILLESIME_PAR_DEFAUT,
+    },
+  });
+
+  useEffect(() => {
+    void chargerModeles().then((rep) => setModeles(rep.modeles));
+  }, []);
+
+  useEffect(() => {
+    const chemin = session?.chemin ?? cheminMemorise();
+    if (!chemin || session) return;
+    void (async () => {
+      setChargement(true);
+      try {
+        const payload = await chargerDossier(chemin);
+        if (payload.erreur) {
+          setMessage(payload.erreur);
+          return;
+        }
+        setSession({
+          chemin: payload.chemin,
+          dossier: payload.dossier,
+          mouvements: payload.mouvements,
+          grille: payload.grille,
+          calcul: null,
+        });
+        const dossier = payload.dossier;
+        form.reset({
+          nom: String(dossier.nom ?? ""),
+          siret: String(dossier.siret ?? ""),
+          debut_activite: String(dossier.debut_activite ?? ""),
+          millesime: String(dossier.millesime ?? ""),
+        });
+      } finally {
+        setChargement(false);
+      }
+    })();
+  }, [form, session, setSession]);
+
+  async function ouvrirModele(_id: string, chemin: string) {
+    setChargement(true);
+    setMessage(null);
+    try {
+      const payload = await chargerDossier(chemin);
+      setSession({
+        chemin: payload.chemin,
+        dossier: payload.dossier,
+        mouvements: payload.mouvements,
+        grille: payload.grille,
+        calcul: null,
+      });
+      const dossier = payload.dossier;
+      form.reset({
+        nom: String(dossier.nom ?? ""),
+        siret: String(dossier.siret ?? ""),
+        debut_activite: String(dossier.debut_activite ?? ""),
+        millesime: String(dossier.millesime ?? ""),
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement refusé.");
+    } finally {
+      setChargement(false);
+    }
+  }
+
+  async function creerNouveau(modele: string) {
+    const nom = `dossier-${Date.now().toString(36)}`;
+    setChargement(true);
+    try {
+      const created = await creerDepuisModele(modele, nom);
+      if ("erreur" in created && created.erreur) {
+        setMessage(created.erreur);
+        return;
+      }
+      await ouvrirModele(modele, created.chemin);
+    } finally {
+      setChargement(false);
+    }
+  }
+
+  async function onSubmit(values: FormValues) {
+    setMessage(null);
+    setChargement(true);
+    try {
+      let chemin = session?.chemin;
+      if (!chemin) {
+        const created = await creerDepuisModele("premier-exercice", nomBrouillonAutomatique());
+        if ("erreur" in created && created.erreur) {
+          setMessage(created.erreur);
+          return;
+        }
+        chemin = created.chemin;
+      }
+      const base = session?.dossier ?? (await chargerDossier(chemin)).dossier;
+      const dossier = {
+        ...base,
+        ...values,
+        regime: "lmnp",
+        statut: base.statut ?? "brouillon",
+        relu_notice: base.relu_notice ?? false,
+      };
+      const saved = await enregistrerDossier(chemin, dossier, session?.mouvements);
+      const relu = await chargerDossier(saved.chemin);
+      const calcul = await construire(saved.chemin);
+      if (calcul.erreur) {
+        setMessage(calcul.erreur);
+        return;
+      }
+      setCalcul(calcul);
+      setSession({
+        chemin: relu.chemin,
+        dossier: relu.dossier,
+        mouvements: relu.mouvements,
+        grille: relu.grille,
+        calcul,
+      });
+      navigate("/v1/bien");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Enregistrement refusé.");
+    } finally {
+      setChargement(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardTitle>1. Dossier</CardTitle>
+        <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+          SIRET, début d&apos;activité et millésime fiscal. Contrôle minimal de la clé SIRENE (Luhn).
+        </p>
+        <form className="mt-6 grid gap-4 sm:grid-cols-2" onSubmit={form.handleSubmit(onSubmit)}>
+          <div className="sm:col-span-2">
+            <Label htmlFor="nom">Nom du dossier</Label>
+            <Input id="nom" {...form.register("nom")} autoComplete="organization" />
+            {form.formState.errors.nom ? (
+              <p className="mt-1 text-sm text-[var(--color-destructive)]">{form.formState.errors.nom.message}</p>
+            ) : null}
+          </div>
+          <div>
+            <Label htmlFor="siret">SIRET</Label>
+            <Input id="siret" inputMode="numeric" maxLength={14} {...form.register("siret")} />
+            {form.formState.errors.siret ? (
+              <p className="mt-1 text-sm text-[var(--color-destructive)]">{form.formState.errors.siret.message}</p>
+            ) : null}
+          </div>
+          <div>
+            <Label htmlFor="debut_activite">Début d&apos;activité</Label>
+            <Input id="debut_activite" type="date" {...form.register("debut_activite")} />
+          </div>
+          <div>
+            <Label htmlFor="millesime">Millésime</Label>
+            <Input id="millesime" inputMode="numeric" maxLength={4} {...form.register("millesime")} />
+          </div>
+          <div className="sm:col-span-2 flex justify-end">
+            <Button type="submit" disabled={chargement}>
+              Enregistrer et continuer
+            </Button>
+          </div>
+        </form>
+        {message ? <p className="mt-4 text-sm text-[var(--color-destructive)]">{message}</p> : null}
+      </Card>
+
+      <Card>
+        <CardTitle>Démarrer depuis un exemple</CardTitle>
+        <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+          Les dossiers golden servent de référence et de point de départ pour la saisie.
+        </p>
+        <ul className="mt-4 space-y-2">
+          {modeles.map((modele) => (
+            <li key={modele.id} className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">{modele.etiquette}</span>
+              <Button type="button" size="sm" variant="outline" onClick={() => void ouvrirModele(modele.id, modele.chemin)}>
+                Ouvrir en lecture
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => void creerNouveau(modele.id)}>
+                Copier pour travailler
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </div>
+  );
+}
