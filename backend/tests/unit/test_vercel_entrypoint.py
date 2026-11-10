@@ -29,8 +29,10 @@ def test_vercel_entrypoint_serves_health(monkeypatch: pytest.MonkeyPatch) -> Non
     assert 'fallback="index.html"' in source
     with TestClient(module.app, base_url="http://localhost") as client:
         response = client.get("/api/health")
+        modeles = client.get("/api/v1/modeles")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+    assert modeles.status_code != 404
 
 
 def test_vercel_project_serves_static_frontend_and_a_long_api_function() -> None:
@@ -39,7 +41,9 @@ def test_vercel_project_serves_static_frontend_and_a_long_api_function() -> None
     assert config["framework"] == "fastapi"
     assert "outputDirectory" not in config
     assert config["functions"]["asgi.py"]["maxDuration"] == 300
-    assert "fiscal/**" == config["functions"]["asgi.py"]["includeFiles"]
+    included = config["functions"]["asgi.py"]["includeFiles"]
+    assert isinstance(included, str)
+    assert included == "{fiscal,lmnp_core,golden}/**"
     assert project["tool"]["vercel"]["entrypoint"] == "asgi:app"
     assert project["tool"]["vercel"]["fastapi"]["static"]["cdn"] is True
     nginx = (ROOT / "scripts" / "nginx.conf").read_text(encoding="utf-8")
