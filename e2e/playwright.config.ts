@@ -3,6 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
   ...(process.env.SOLOLMNP_VOLUME ? {} : { testIgnore: "**/volume.spec.ts" }),
+  ...(process.env.SOLOLMNP_E2E_V1 ? { testMatch: "**/v1-parcours.spec.ts" } : { testIgnore: "**/v1-parcours.spec.ts" }),
   timeout: 240_000,
   expect: { timeout: 20_000 },
   fullyParallel: false,
@@ -16,7 +17,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `${process.env.PYTHON ?? "python3"} serve.py`,
+    command: `${process.env.PYTHON ?? "python3"} ${process.env.SOLOLMNP_E2E_V1 ? "serve_v1.py" : "serve.py"}`,
     url: "http://127.0.0.1:5173",
     timeout: 120_000,
     reuseExistingServer: false,
