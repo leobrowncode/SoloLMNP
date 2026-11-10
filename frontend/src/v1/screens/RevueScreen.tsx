@@ -4,7 +4,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardTitle } from "../components/ui/card";
 import { Checkbox } from "../components/ui/checkbox";
 import { chargerDossier, construire, enregistrerDossier } from "../lib/api";
-import { useDossierSession } from "../context/DossierContext";
+import { useDossierSession } from "../context/dossierSession";
 import { eurosDepuisCentimes } from "../lib/money";
 import { libelleEtat } from "../lib/status";
 
@@ -18,7 +18,7 @@ export default function RevueScreen() {
   const annee = session?.calcul?.annees?.[millesime] as Record<string, number> | undefined;
 
   useEffect(() => {
-    setRelu(Boolean(session?.dossier?.relu_notice));
+    queueMicrotask(() => setRelu(Boolean(session?.dossier?.relu_notice)));
   }, [session?.dossier?.relu_notice]);
 
   useEffect(() => {
