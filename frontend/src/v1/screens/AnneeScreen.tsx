@@ -4,7 +4,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { chargerCategories, chargerDossier, construire, enregistrerDossier } from "../lib/api";
+import { chargerCategories, construire, deposerJustificatif, enregistrerDossier, listerJustificatifs } from "../lib/api";
 import { useDossierSession } from "../context/DossierContext";
 import { centimesDepuisEuros, eurosDepuisCentimes } from "../lib/money";
 import { ligneDepuisCategorie, parserCsvMouvements, totalParCompte } from "../lib/mouvements";
@@ -17,6 +17,7 @@ export default function AnneeScreen() {
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [montants, setMontants] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
+  const [pieces, setPieces] = useState<string[]>([]);
 
   const exercice = useMemo(() => {
     const exercices = session?.dossier?.exercices;
@@ -28,6 +29,13 @@ export default function AnneeScreen() {
   useEffect(() => {
     void chargerCategories().then((rep) => setCategories(rep.categories));
   }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    void listerJustificatifs()
+      .then((rep) => setPieces(rep.noms))
+      .catch(() => setPieces([]));
+  }, [session]);
 
   useEffect(() => {
     if (!session?.mouvements?.length || !categories.length) return;
@@ -103,9 +111,12 @@ export default function AnneeScreen() {
       .filter((ligne): ligne is NonNullable<typeof ligne> => ligne !== null);
     const mouvements = [...horsCategories, ...generes];
     try {
-      await enregistrerDossier(session.chemin, session.dossier, mouvements);
-      const relu = await chargerDossier(session.chemin);
-      const calcul = await construire(session.chemin);
+      const saved = await enregistrerDossier(session.dossier, mouvements);
+      if (saved.erreur) {
+        setMessage(saved.erreur);
+        return;
+      }
+      const calcul = await construire();
       if (calcul.erreur) {
         setMessage(calcul.erreur);
         return;
@@ -113,9 +124,9 @@ export default function AnneeScreen() {
       setCalcul(calcul);
       setSession({
         ...session,
-        dossier: relu.dossier,
-        mouvements: relu.mouvements,
-        grille: relu.grille,
+        dossier: saved.dossier,
+        mouvements: saved.mouvements,
+        grille: saved.grille,
         calcul,
       });
       navigate("/v1/revue");
@@ -144,6 +155,45 @@ export default function AnneeScreen() {
             }}
           />
         </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Justificatifs</CardTitle>
+        <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+          PDF ou image. Ils restent dans le dossier de ce compte.
+        </p>
+        <div className="mt-4">
+          <Label htmlFor="justificatif">Ajouter un justificatif</Label>
+          <Input
+            id="justificatif"
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg"
+            onChange={(event) => {
+              const fichier = event.target.files?.[0];
+              if (!fichier) return;
+              void deposerJustificatif(fichier)
+                .then((rep) => {
+                  if (rep.erreur) {
+                    setMessage(rep.erreur);
+                    return;
+                  }
+                  setPieces((courants) => [...courants.filter((nom) => nom !== rep.nom), rep.nom]);
+                })
+                .catch((error: unknown) => {
+                  setMessage(error instanceof Error ? error.message : "Dépôt refusé.");
+                });
+            }}
+          />
+        </div>
+        {pieces.length ? (
+          <ul className="mt-3 space-y-1 text-sm">
+            {pieces.map((nom) => (
+              <li key={nom}>{nom}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-[var(--color-muted-foreground)]">Aucun justificatif.</p>
+        )}
       </Card>
 
       <Card>

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,11 @@ def main(argv: list[str] | None = None) -> int:
     if args[0] == "serve":
         import uvicorn
 
+        if os.environ.get("VERCEL") == "1":
+            print("Le serveur local est refusé sur Vercel.", file=sys.stderr)
+            return 1
+        os.environ.setdefault("APP_ENV", "development")
+        os.environ.setdefault("AUTH_MODE", "local")
         uvicorn.run("lmnp_core.api:app", host="127.0.0.1", port=8000, factory=False)
         return 0
     if args[0] != "build" or len(args) != 2:

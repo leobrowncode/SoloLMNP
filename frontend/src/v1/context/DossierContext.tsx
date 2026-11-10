@@ -2,7 +2,6 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import type { BuildResponse, DossierMap, GrilleLigne, MouvementLigne } from "../lib/api";
 
 export type SessionV1 = {
-  chemin: string;
   dossier: DossierMap;
   mouvements: MouvementLigne[];
   grille: GrilleLigne[];
@@ -18,15 +17,12 @@ type Store = {
 };
 
 const Ctx = createContext<Store | null>(null);
-const STORAGE_KEY = "sololmnp-v1-chemin";
 
 export function DossierProvider({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<SessionV1 | null>(null);
 
   const setSession = useCallback((value: SessionV1 | null) => {
     setSessionState(value);
-    if (value?.chemin) sessionStorage.setItem(STORAGE_KEY, value.chemin);
-    if (!value) sessionStorage.removeItem(STORAGE_KEY);
   }, []);
 
   const mergeDossier = useCallback((patch: DossierMap) => {
@@ -56,8 +52,4 @@ export function useDossierSession() {
   const store = useContext(Ctx);
   if (!store) throw new Error("DossierProvider manquant.");
   return store;
-}
-
-export function cheminMemorise(): string | null {
-  return sessionStorage.getItem(STORAGE_KEY);
 }

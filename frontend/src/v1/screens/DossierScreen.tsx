@@ -9,12 +9,14 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import {
   chargerDossier,
+  chargerModele,
   chargerModeles,
   construire,
   creerDepuisModele,
   enregistrerDossier,
+  type DossierPayload,
 } from "../lib/api";
-import { cheminMemorise, useDossierSession } from "../context/DossierContext";
+import { useDossierSession } from "../context/DossierContext";
 import { siretValide } from "../lib/siret";
 
 const schema = z.object({
@@ -29,7 +31,7 @@ type FormValues = z.infer<typeof schema>;
 export default function DossierScreen() {
   const navigate = useNavigate();
   const { session, setSession, setCalcul } = useDossierSession();
-  const [modeles, setModeles] = useState<{ id: string; chemin: string; etiquette: string }[]>([]);
+  const [modeles, setModeles] = useState<{ id: string; etiquette: string }[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [chargement, setChargement] = useState(false);
 
@@ -47,56 +49,46 @@ export default function DossierScreen() {
     void chargerModeles().then((rep) => setModeles(rep.modeles));
   }, []);
 
+  function appliquer(payload: DossierPayload) {
+    setSession({
+      dossier: payload.dossier,
+      mouvements: payload.mouvements,
+      grille: payload.grille,
+      calcul: null,
+    });
+    const dossier = payload.dossier;
+    form.reset({
+      nom: String(dossier.nom ?? ""),
+      siret: String(dossier.siret ?? ""),
+      debut_activite: String(dossier.debut_activite ?? ""),
+      millesime: String(dossier.millesime ?? ""),
+    });
+  }
+
   useEffect(() => {
-    const chemin = session?.chemin ?? cheminMemorise();
-    if (!chemin || session) return;
+    if (session) return;
     void (async () => {
       setChargement(true);
       try {
-        const payload = await chargerDossier(chemin);
-        if (payload.erreur) {
-          setMessage(payload.erreur);
-          return;
-        }
-        setSession({
-          chemin: payload.chemin,
-          dossier: payload.dossier,
-          mouvements: payload.mouvements,
-          grille: payload.grille,
-          calcul: null,
-        });
-        const dossier = payload.dossier;
-        form.reset({
-          nom: String(dossier.nom ?? ""),
-          siret: String(dossier.siret ?? ""),
-          debut_activite: String(dossier.debut_activite ?? ""),
-          millesime: String(dossier.millesime ?? ""),
-        });
+        const payload = await chargerDossier();
+        if (!payload || payload.erreur) return;
+        appliquer(payload);
       } finally {
         setChargement(false);
       }
     })();
   }, [form, session, setSession]);
 
-  async function ouvrirModele(_id: string, chemin: string) {
+  async function ouvrirModele(id: string) {
     setChargement(true);
     setMessage(null);
     try {
-      const payload = await chargerDossier(chemin);
-      setSession({
-        chemin: payload.chemin,
-        dossier: payload.dossier,
-        mouvements: payload.mouvements,
-        grille: payload.grille,
-        calcul: null,
-      });
-      const dossier = payload.dossier;
-      form.reset({
-        nom: String(dossier.nom ?? ""),
-        siret: String(dossier.siret ?? ""),
-        debut_activite: String(dossier.debut_activite ?? ""),
-        millesime: String(dossier.millesime ?? ""),
-      });
+      const payload = await chargerModele(id);
+      if (payload.erreur) {
+        setMessage(payload.erreur);
+        return;
+      }
+      appliquer(payload);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Chargement refusé.");
     } finally {
@@ -105,15 +97,17 @@ export default function DossierScreen() {
   }
 
   async function creerNouveau(modele: string) {
-    const nom = `dossier-${Date.now().toString(36)}`;
     setChargement(true);
+    setMessage(null);
     try {
-      const created = await creerDepuisModele(modele, nom);
-      if ("erreur" in created && created.erreur) {
+      const created = await creerDepuisModele(modele);
+      if (created.erreur) {
         setMessage(created.erreur);
         return;
       }
-      await ouvrirModele(modele, created.chemin);
+      appliquer(created);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Copie refusée.");
     } finally {
       setChargement(false);
     }
@@ -123,16 +117,17 @@ export default function DossierScreen() {
     setMessage(null);
     setChargement(true);
     try {
-      let chemin = session?.chemin;
-      if (!chemin) {
-        const created = await creerDepuisModele("premier-exercice", `dossier-${Date.now().toString(36)}`);
-        if ("erreur" in created && created.erreur) {
+      let base = session?.dossier;
+      let mouvements = session?.mouvements;
+      if (!base) {
+        const created = await creerDepuisModele("premier-exercice");
+        if (created.erreur) {
           setMessage(created.erreur);
           return;
         }
-        chemin = created.chemin;
+        base = created.dossier;
+        mouvements = created.mouvements;
       }
-      const base = session?.dossier ?? (await chargerDossier(chemin)).dossier;
       const dossier = {
         ...base,
         ...values,
@@ -140,19 +135,21 @@ export default function DossierScreen() {
         statut: base.statut ?? "brouillon",
         relu_notice: base.relu_notice ?? false,
       };
-      const saved = await enregistrerDossier(chemin, dossier, session?.mouvements);
-      const relu = await chargerDossier(saved.chemin);
-      const calcul = await construire(saved.chemin);
+      const saved = await enregistrerDossier(dossier, mouvements);
+      if (saved.erreur) {
+        setMessage(saved.erreur);
+        return;
+      }
+      const calcul = await construire();
       if (calcul.erreur) {
         setMessage(calcul.erreur);
         return;
       }
       setCalcul(calcul);
       setSession({
-        chemin: relu.chemin,
-        dossier: relu.dossier,
-        mouvements: relu.mouvements,
-        grille: relu.grille,
+        dossier: saved.dossier,
+        mouvements: saved.mouvements,
+        grille: saved.grille,
         calcul,
       });
       navigate("/v1/bien");
@@ -211,7 +208,7 @@ export default function DossierScreen() {
           {modeles.map((modele) => (
             <li key={modele.id} className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium">{modele.etiquette}</span>
-              <Button type="button" size="sm" variant="outline" onClick={() => void ouvrirModele(modele.id, modele.chemin)}>
+              <Button type="button" size="sm" variant="outline" onClick={() => void ouvrirModele(modele.id)}>
                 Ouvrir en lecture
               </Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => void creerNouveau(modele.id)}>
