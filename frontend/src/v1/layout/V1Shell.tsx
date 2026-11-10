@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Badge } from "../components/ui/badge";
 import { libelleEtat } from "../lib/status";
-import { useDossierSession } from "../context/DossierContext";
+import { useDossierSession } from "../context/dossierSession";
 import { cn } from "../lib/cn";
 
 const ETAPES = [

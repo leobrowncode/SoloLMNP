@@ -8,7 +8,7 @@ import { Card, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { chargerDossier, construire, enregistrerDossier } from "../lib/api";
-import { useDossierSession } from "../context/DossierContext";
+import { useDossierSession } from "../context/dossierSession";
 import { centimesDepuisEuros, eurosDepuisCentimes } from "../lib/money";
 
 const schema = z.object({

@@ -82,7 +82,7 @@ test.describe.serial("parcours critique", () => {
 
   test("vue d’ensemble compacte : une action, aides lisibles", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto("/");
+    await page.goto("/legacy");
     await expect(page.getByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Continuer" })).toHaveCount(1);
     await expect(page.locator(".topbar")).not.toContainText("Continuer");
@@ -357,7 +357,7 @@ test.describe.serial("parcours critique", () => {
     await page.getByLabel(/Confirmation — saisir RESTAURER/).fill("RESTAURER");
     await page.getByRole("button", { name: "Restaurer la sauvegarde" }).click();
     await expect(page.getByText(/Base restaurée depuis/)).toBeVisible();
-    await page.goto("/");
+    await page.goto("/legacy");
     await expect(page.getByRole("heading", { level: 1, name: "Vue d’ensemble" })).toBeVisible();
     await expect(page.getByText("Prête à recopier")).toHaveCount(0);
   });
