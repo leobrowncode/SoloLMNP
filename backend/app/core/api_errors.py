@@ -111,6 +111,7 @@ RESOLUTION_ACTIONS: dict[str, dict[str, str]] = {
     "ACTIVITY_REQUIRED": {"label": "Ouvrir Comptabilité", "href": "/comptabilite"},
     "ACTIVITY_EXISTS": {"label": "Ouvrir Comptabilité", "href": "/comptabilite"},
     "FISCAL_NOT_COMPUTED": {"label": "Calculer la fiscalité", "href": "/fiscalite#calcul-fiscal"},
+    "EMPTY_EXERCISE": {"label": "Ajouter un bien", "href": "/operations/biens#ajouter-bien"},
     "FISCAL_RULE_BLOCKED": {
         "label": "Voir les règles bloquées",
         "href": "/fiscalite#regles-lmnp",
